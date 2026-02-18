@@ -688,10 +688,22 @@ def execute_tool(name: str, args: dict) -> str:
 
         elif name == 'python_eval':
             code = args.get('code', '')
-            timeout_sec = min(args.get('timeout', 15), 60)
-            # Execute in subprocess for safety
+            timeout_sec = min(args.get('timeout', 15), 30)
+            # Block dangerous patterns in code
+            _EVAL_BLOCKLIST = [
+                'import os', 'import sys', 'import subprocess', 'import shutil',
+                '__import__', 'eval(', 'exec(', 'compile(', 'open(',
+                'os.system', 'os.popen', 'os.exec', 'os.spawn', 'os.remove', 'os.unlink',
+                'shutil.rmtree', 'pathlib', '.vault', 'audit.db', 'auth.db',
+                'import socket', 'import http', 'import urllib', 'import requests',
+            ]
+            code_lower = code.lower().replace(' ', '')
+            for blocked in _EVAL_BLOCKLIST:
+                if blocked.lower().replace(' ', '') in code_lower:
+                    return f'❌ 보안 차단: `{blocked}` 사용 불가. python_eval은 계산/데이터 처리 전용입니다.'
+            # Execute in isolated subprocess (no network, limited imports)
             wrapper = f'''
-import sys, json, traceback
+import json, math, re, statistics, collections, itertools, functools, datetime, hashlib, base64, random, string, textwrap, csv, io
 _result = None
 try:
     exec({repr(code)})
