@@ -10,7 +10,8 @@ from .constants import *
 from .crypto import vault, log
 
 # ============================================================
-_audit_lock = threading.Lock()
+_db_lock = threading.Lock()  # Single lock for all audit.db access
+_audit_lock = _db_lock
 
 
 def _init_audit_db():
@@ -85,7 +86,7 @@ class ResponseCache:
 
 response_cache = ResponseCache()
 
-_usage_lock = threading.Lock()
+_usage_lock = _db_lock  # Share lock with audit to prevent race conditions
 _usage = {'total_input': 0, 'total_output': 0, 'total_cost': 0.0,
           'by_model': {}, 'session_start': time.time()}
 
@@ -329,18 +330,9 @@ def compact_messages(messages: list, model: str = None) -> list:
         {'role': 'system', 'content': '다음 대화를 핵심만 간결하게 한국어로 요약해. 결정사항, 작업 내용, 중요 맥락 위주로 5~8문장.'},
         {'role': 'user', 'content': summary_text}
     ]
-    # Note: call_llm is sync (urllib). In async context, run via thread.
-    try:
-        loop = asyncio.get_running_loop()
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            summary_result = loop.run_until_complete(
-                loop.run_in_executor(pool, lambda: call_llm(
-                    _summ_msgs, model=summary_model, max_tokens=800
-                ))
-            )
-    except RuntimeError:
-        summary_result = call_llm(_summ_msgs, model=summary_model, max_tokens=800)
+    # Note: call_llm is sync (urllib). Always call directly since compact_messages
+    # is invoked from sync context. If ever called from async, wrap in run_in_executor.
+    summary_result = call_llm(_summ_msgs, model=summary_model, max_tokens=800)
 
     compacted = system_msgs + [
         {'role': 'system', 'content': f'[이전 대화 요약]\n{summary_result["content"]}'}

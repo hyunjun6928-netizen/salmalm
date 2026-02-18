@@ -119,6 +119,10 @@ class WSClient:
                 payload = struct.pack('!H', code) + reason.encode('utf-8')[:123]
                 await self._send_frame(OP_CLOSE, payload)
                 self.writer.close()
+                try:
+                    await self.writer.wait_closed()
+                except Exception:
+                    pass
             except Exception:
                 pass
 

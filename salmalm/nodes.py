@@ -56,7 +56,8 @@ class SSHNode:
 
     def _ssh_cmd(self, command: str, timeout: int = 30) -> tuple:
         """Execute SSH command, return (stdout, stderr, returncode)."""
-        args = ["ssh", "-o", "StrictHostKeyChecking=no",
+        # StrictHostKeyChecking=accept-new: trust on first use, reject changes (TOFU)
+        args = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
                 "-o", "ConnectTimeout=10",
                 "-p", str(self.port)]
         if self.key:
@@ -134,7 +135,7 @@ class SSHNode:
 
     def upload(self, local_path: str, remote_path: str) -> dict:
         """Upload file via SCP."""
-        args = ["scp", "-o", "StrictHostKeyChecking=no",
+        args = ["scp", "-o", "StrictHostKeyChecking=accept-new",
                 "-P", str(self.port)]
         if self.key:
             args.extend(["-i", os.path.expanduser(self.key)])
@@ -149,7 +150,7 @@ class SSHNode:
 
     def download(self, remote_path: str, local_path: str) -> dict:
         """Download file via SCP."""
-        args = ["scp", "-o", "StrictHostKeyChecking=no",
+        args = ["scp", "-o", "StrictHostKeyChecking=accept-new",
                 "-P", str(self.port)]
         if self.key:
             args.extend(["-i", os.path.expanduser(self.key)])

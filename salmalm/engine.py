@@ -164,13 +164,13 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 # Handle async callbacks
                 if asyncio.iscoroutine(result):
                     try:
-                        loop = asyncio.get_event_loop()
-                        if loop.is_running():
-                            asyncio.ensure_future(result)
-                        else:
-                            loop.run_until_complete(result)
+                        loop = asyncio.get_running_loop()
+                        task = loop.create_task(result)
+                        task.add_done_callback(
+                            lambda t: t.exception() if not t.cancelled() and t.exception() else None
+                        )
                     except RuntimeError:
-                        pass  # No event loop available
+                        pass  # No running event loop
 
         if len(tool_calls) == 1:
             tc = tool_calls[0]

@@ -51,7 +51,7 @@ EXEC_BLOCKLIST = {
     'rm', 'rmdir', 'mkfs', 'dd', 'shutdown', 'reboot', 'halt', 'poweroff',
     'init', 'systemctl', 'useradd', 'userdel', 'passwd', 'chown', 'chmod',
     'mount', 'umount', 'fdisk', 'parted', 'iptables', 'nft',
-    'su', 'sudo', 'doas', 'pkill', 'killall',
+    'su', 'sudo', 'doas', 'kill', 'pkill', 'killall',
 }
 EXEC_BLOCKLIST_PATTERNS = [
     r'[;&|`]\s*(rm|dd|mkfs|shutdown|reboot|halt|sudo|su)\b',  # chained dangerous cmds

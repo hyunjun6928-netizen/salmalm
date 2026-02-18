@@ -61,7 +61,7 @@ class TokenManager:
         data = base64.urlsafe_b64encode(
             json.dumps(payload, separators=(',', ':')).encode()
         ).decode().rstrip('=')
-        sig = hmac.new(self._secret, data.encode(), hashlib.sha256).hexdigest()[:32]
+        sig = hmac.new(self._secret, data.encode(), hashlib.sha256).hexdigest()
         return f"{data}.{sig}"
 
     def verify(self, token: str) -> Optional[dict]:
@@ -71,7 +71,7 @@ class TokenManager:
             if len(parts) != 2:
                 return None
             data, sig = parts
-            expected_sig = hmac.new(self._secret, data.encode(), hashlib.sha256).hexdigest()[:32]
+            expected_sig = hmac.new(self._secret, data.encode(), hashlib.sha256).hexdigest()
             if not hmac.compare_digest(sig, expected_sig):
                 return None
             # Pad base64
