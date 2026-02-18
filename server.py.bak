@@ -404,8 +404,6 @@ class ModelRouter:
         models = self.TIERS.get(tier, self.TIERS[2])
         for m in models:
             provider = m.split('/')[0]
-            if provider == 'ollama':
-                return m  # Ollama doesn't need API key
             key_name = f'{provider}_api_key'
             if vault.get(key_name):
                 return m
@@ -413,7 +411,7 @@ class ModelRouter:
         for t in [2, 1, 3]:
             for m in self.TIERS.get(t, []):
                 provider = m.split('/')[0]
-                if provider == 'ollama' or vault.get(f'{provider}_api_key'):
+                if vault.get(f'{provider}_api_key'):
                     return m
         return 'google/gemini-3-flash-preview'  # last resort
 
@@ -524,11 +522,6 @@ def _call_provider(provider, api_key, model_id, messages, tools, max_tokens):
         return _call_openai(api_key, model_id, messages, tools, max_tokens, base_url)
     elif provider == 'google':
         return _call_google(api_key, model_id, messages, max_tokens)
-    elif provider == 'ollama':
-        ollama_url = vault.get('ollama_url') or 'http://localhost:11434/v1'
-        return _call_openai('ollama', model_id, messages, tools, max_tokens, ollama_url)
-    elif provider == 'openrouter':
-        return _call_openai(api_key, model_id, messages, tools, max_tokens, 'https://openrouter.ai/api/v1')
     else:
         raise ValueError(f'Unknown provider: {provider}')
 
@@ -589,12 +582,9 @@ def _call_openai(api_key, model_id, messages, tools, max_tokens, base_url):
     body = {'model': model_id, 'max_tokens': max_tokens, 'messages': converted_msgs}
     if tools:
         body['tools'] = [{'type': 'function', 'function': t} for t in tools]
-    headers = {'Content-Type': 'application/json'}
-    if api_key and api_key != 'ollama':
-        headers['Authorization'] = f'Bearer {api_key}'
     resp = _http_post(
         f'{base_url}/chat/completions',
-        headers,
+        {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
         body
     )
     choice = resp['choices'][0]['message']
@@ -827,44 +817,6 @@ TOOL_DEFINITIONS = [
             'required': ['text']
         }
     },
-    {
-        'name': 'python_eval',
-        'description': 'Python 코드를 실행합니다. 수학 계산, 데이터 처리, 분석에 유용합니다. exec()로 실행 후 _result 변수에 담긴 값을 반환합니다.',
-        'input_schema': {
-            'type': 'object',
-            'properties': {
-                'code': {'type': 'string', 'description': '실행할 Python 코드. 결과를 _result 변수에 할당하세요.'},
-                'timeout': {'type': 'integer', 'description': '타임아웃(초)', 'default': 15}
-            },
-            'required': ['code']
-        }
-    },
-    {
-        'name': 'system_monitor',
-        'description': '시스템 상태를 모니터링합니다 (CPU, 메모리, 디스크, 프로세스).',
-        'input_schema': {
-            'type': 'object',
-            'properties': {
-                'detail': {'type': 'string', 'description': 'overview(전체), cpu, memory, disk, processes, network 중 택1', 'default': 'overview'}
-            },
-            'required': []
-        }
-    },
-    {
-        'name': 'http_request',
-        'description': 'HTTP 요청을 보냅니다 (GET/POST/PUT/DELETE). API 호출에 유용합니다.',
-        'input_schema': {
-            'type': 'object',
-            'properties': {
-                'method': {'type': 'string', 'description': 'GET, POST, PUT, DELETE', 'default': 'GET'},
-                'url': {'type': 'string', 'description': '요청 URL'},
-                'headers': {'type': 'object', 'description': '요청 헤더 (JSON)'},
-                'body': {'type': 'string', 'description': '요청 바디 (POST/PUT용)'},
-                'timeout': {'type': 'integer', 'description': '타임아웃(초)', 'default': 15}
-            },
-            'required': ['url']
-        }
-    },
 ]
 
 
@@ -1010,18 +962,12 @@ def execute_tool(name: str, args: dict) -> str:
             keywords = query.split()
             max_results = args.get('max_results', 5)
             results = []
-            # Search MEMORY.md, memory/*.md, and uploaded text files
+            # Search MEMORY.md and all memory/*.md
             search_files = []
             if MEMORY_FILE.exists():
                 search_files.append(('MEMORY.md', MEMORY_FILE))
             for f in sorted(MEMORY_DIR.glob('*.md')):
                 search_files.append((f'memory/{f.name}', f))
-            # Also search uploaded text files (RAG)
-            uploads_dir = WORKSPACE_DIR / 'uploads'
-            if uploads_dir.exists():
-                for f in uploads_dir.glob('*'):
-                    if f.suffix.lower() in ('.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.log', '.xml', '.yaml', '.yml'):
-                        search_files.append((f'uploads/{f.name}', f))
             for label, fpath in search_files:
                 try:
                     text = fpath.read_text(encoding='utf-8', errors='replace')
@@ -1110,115 +1056,6 @@ def execute_tool(name: str, args: dict) -> str:
             log.info(f"🔊 TTS generated: {fname} ({size_kb:.1f}KB)")
             return f'✅ 음성 생성 완료: uploads/{fname} ({size_kb:.1f}KB)\n텍스트: {text[:100]}'
 
-        elif name == 'python_eval':
-            code = args.get('code', '')
-            timeout_sec = min(args.get('timeout', 15), 60)
-            # Execute in subprocess for safety
-            wrapper = f'''
-import sys, json, traceback
-_result = None
-try:
-    exec({repr(code)})
-except Exception as e:
-    _result = f"Error: {{type(e).__name__}}: {{e}}"
-if _result is not None:
-    print(json.dumps({{"result": str(_result)[:10000]}}))
-else:
-    print(json.dumps({{"result": "(no _result set)"}}))
-'''
-            try:
-                result = subprocess.run(
-                    [sys.executable, '-c', wrapper],
-                    capture_output=True, text=True,
-                    timeout=timeout_sec, cwd=str(WORKSPACE_DIR)
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    try:
-                        data = json.loads(result.stdout.strip())
-                        output = data.get('result', result.stdout)
-                    except json.JSONDecodeError:
-                        output = result.stdout[-5000:]
-                else:
-                    output = result.stdout[-3000:] if result.stdout else ''
-                if result.stderr:
-                    output += f'\n[stderr]: {result.stderr[-2000:]}'
-                return output or '(no output)'
-            except subprocess.TimeoutExpired:
-                return f'❌ Python 실행 타임아웃 ({timeout_sec}초)'
-
-        elif name == 'system_monitor':
-            detail = args.get('detail', 'overview')
-            lines = []
-            try:
-                if detail in ('overview', 'cpu'):
-                    load = os.getloadavg()
-                    cpu_count = os.cpu_count() or 1
-                    lines.append(f'🖥️ CPU: {cpu_count}코어, 부하: {load[0]:.2f} / {load[1]:.2f} / {load[2]:.2f} (1/5/15분)')
-                if detail in ('overview', 'memory'):
-                    mem = subprocess.run(['free', '-h'], capture_output=True, text=True, timeout=5)
-                    if mem.stdout:
-                        for l in mem.stdout.strip().split('\n'):
-                            lines.append(f'💾 {l}')
-                if detail in ('overview', 'disk'):
-                    disk = subprocess.run(['df', '-h', '/'], capture_output=True, text=True, timeout=5)
-                    if disk.stdout:
-                        for l in disk.stdout.strip().split('\n'):
-                            lines.append(f'💿 {l}')
-                if detail in ('overview', 'network'):
-                    # Quick network check
-                    net = subprocess.run(['ss', '-s'], capture_output=True, text=True, timeout=5)
-                    if net.stdout:
-                        lines.append(f'🌐 네트워크:')
-                        for l in net.stdout.strip().split('\n')[:5]:
-                            lines.append(f'   {l}')
-                if detail == 'processes':
-                    ps = subprocess.run(['ps', 'aux', '--sort=-rss'], capture_output=True, text=True, timeout=5)
-                    if ps.stdout:
-                        for l in ps.stdout.strip().split('\n')[:20]:
-                            lines.append(l)
-                if detail in ('overview',):
-                    uptime = subprocess.run(['uptime', '-p'], capture_output=True, text=True, timeout=5)
-                    if uptime.stdout:
-                        lines.append(f'⏱️ 가동시간: {uptime.stdout.strip()}')
-                    # Python process info
-                    import resource
-                    mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
-                    lines.append(f'🐍 삶앎 메모리: {mem_mb:.1f}MB')
-                    lines.append(f'📂 세션 수: {len(_sessions)}')
-            except Exception as e:
-                lines.append(f'❌ 모니터링 오류: {e}')
-            return '\n'.join(lines) or '정보 없음'
-
-        elif name == 'http_request':
-            method = args.get('method', 'GET').upper()
-            url = args.get('url', '')
-            headers = args.get('headers', {})
-            body_str = args.get('body', '')
-            timeout_sec = min(args.get('timeout', 15), 60)
-            if not url:
-                return '❌ URL이 필요합니다'
-            headers.setdefault('User-Agent', f'SalmAlm/{VERSION}')
-            data = body_str.encode('utf-8') if body_str else None
-            try:
-                req = urllib.request.Request(url, data=data, headers=headers, method=method)
-                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-                    status = resp.status
-                    resp_headers = dict(resp.headers)
-                    raw = resp.read()
-                # Try JSON
-                try:
-                    body_json = json.loads(raw)
-                    body_out = json.dumps(body_json, ensure_ascii=False, indent=2)[:8000]
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    body_out = raw.decode('utf-8', errors='replace')[:8000]
-                header_str = '\n'.join(f'  {k}: {v}' for k, v in list(resp_headers.items())[:10])
-                return f'HTTP {status}\n헤더:\n{header_str}\n\n바디:\n{body_out}'
-            except urllib.error.HTTPError as e:
-                body = e.read().decode('utf-8', errors='replace')[:3000]
-                return f'HTTP {e.code} {e.reason}\n{body}'
-            except Exception as e:
-                return f'❌ 요청 오류: {e}'
-
         else:
             return f'❌ 알 수 없는 도구: {name}'
 
@@ -1296,7 +1133,7 @@ def build_system_prompt(full: bool = True) -> str:
     # Tool instructions
     parts.append(textwrap.dedent("""
     [삶앎 시스템]
-    - 도구 사용 가능: exec(셸), read_file, write_file, edit_file, web_search, web_fetch, memory_read, memory_write, memory_search, image_generate, tts, usage_report, python_eval(Python실행), system_monitor(시스템감시), http_request(HTTP요청)
+    - 도구 사용 가능: exec(셸), read_file, write_file, edit_file, web_search, web_fetch, memory_read, memory_write, memory_search, image_generate, tts, usage_report
     - 파일 업로드: 텔레그램에서 보낸 파일은 uploads/ 폴더에 저장됨
     - 워크스페이스: 이 디렉토리가 작업 공간
     - 메모리: MEMORY.md(장기), memory/YYYY-MM-DD.md(일일)에 기록
@@ -1823,10 +1660,7 @@ WEB_HTML = '''<!DOCTYPE html>
 <style>
 :root{--bg:#0b0d14;--bg2:#12141f;--bg3:#1a1d2b;--border:#252838;--text:#d4d4dc;--text2:#8889a0;
 --accent:#7c5cfc;--accent2:#9b7dff;--accent-dim:rgba(124,92,252,0.12);--green:#34d399;--red:#f87171;
---user-bg:linear-gradient(135deg,#6d5cfc,#8b5cf6);--bot-bg:#161928;--yellow:#fbbf24;--blue:#60a5fa}
-[data-theme="light"]{--bg:#f8f9fc;--bg2:#ffffff;--bg3:#f0f1f5;--border:#e2e4ea;--text:#1e293b;--text2:#64748b;
---accent:#6d5cfc;--accent2:#7c5cfc;--accent-dim:rgba(109,92,252,0.08);--green:#059669;--red:#dc2626;
---user-bg:linear-gradient(135deg,#6d5cfc,#8b5cf6);--bot-bg:#f7f7fb;--yellow:#d97706;--blue:#2563eb}
+--user-bg:linear-gradient(135deg,#6d5cfc,#8b5cf6);--bot-bg:#161928}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text)}
 body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1fr;grid-template-areas:"side head" "side chat" "side input"}
@@ -1901,42 +1735,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 .settings-card input,.settings-card select{width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;margin-bottom:12px}
 .settings-card .btn{padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px}
 
-/* TOOL CALL DISPLAY */
-.tool-call{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin:6px 0;font-size:12px;font-family:'SF Mono',monospace}
-.tool-call .tool-name{color:var(--accent2);font-weight:600}
-.tool-call .tool-result{color:var(--text2);margin-top:4px;max-height:120px;overflow-y:auto}
-
-/* COPY BUTTON */
-.copy-btn{position:absolute;top:6px;right:6px;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;opacity:0;transition:opacity 0.15s}
-.bubble:hover .copy-btn{opacity:1}
-.bubble{position:relative}
-.bubble pre{position:relative}
-
-/* STATS BAR */
-#stats-bar{display:flex;gap:16px;padding:6px 12px;background:var(--bg);border-radius:8px;margin-top:8px;font-size:11px;color:var(--text2)}
-#stats-bar .stat{display:flex;align-items:center;gap:4px}
-#stats-bar .stat-val{color:var(--accent2);font-weight:600}
-
-/* THEME TOGGLE */
-#theme-toggle{background:none;border:1px solid var(--border);color:var(--text2);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:14px;transition:all 0.15s}
-#theme-toggle:hover{border-color:var(--accent);color:var(--text)}
-
-/* MOBILE MENU BUTTON */
-#mobile-menu-btn{display:none;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;padding:4px}
-
 /* MOBILE */
 @media(max-width:768px){
   body{grid-template-columns:1fr;grid-template-areas:"head" "chat" "input"}
-  #sidebar{display:none;position:fixed;top:0;left:0;width:280px;height:100%;z-index:1000;box-shadow:4px 0 24px rgba(0,0,0,0.4)}
-  #sidebar.open{display:flex}
-  #mobile-menu-btn{display:block}
-  .msg-row{max-width:95%}
-  #chat{padding:12px}
-  #input-area{padding:10px 12px}
-  .input-hint{display:none}
-  #header{padding:10px 12px}
-  .side-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999}
-  .side-overlay.open{display:block}
+  #sidebar{display:none}
 }
 </style></head><body>
 
@@ -1949,11 +1751,11 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div class="nav-section">채널</div>
     <div class="nav-item active" onclick="showChat()">💬 웹 챗</div>
     <div class="nav-item" id="tg-status">📡 텔레그램 <span class="badge">ON</span></div>
-    <div class="nav-section">도구 (15개)</div>
-    <div class="nav-item" onclick="quickCmd('/help')">🔧 exec · 파일 · 검색</div>
-    <div class="nav-item" onclick="quickCmd('시스템 상태를 확인해줘')">🖥️ 시스템 모니터</div>
-    <div class="nav-item" onclick="quickCmd('메모리 파일 목록을 보여줘')">🧠 메모리</div>
-    <div class="nav-item" onclick="quickCmd('오늘의 비용 리포트를 보여줘')">💰 비용 추적</div>
+    <div class="nav-section">도구</div>
+    <div class="nav-item">🔧 exec</div>
+    <div class="nav-item">📁 파일</div>
+    <div class="nav-item">🔍 웹 검색</div>
+    <div class="nav-item">🧠 메모리</div>
     <div class="nav-section">관리</div>
     <div class="nav-item" onclick="showSettings()">⚙️ 설정</div>
     <div class="nav-item" onclick="showUsage()">📊 사용량</div>
@@ -1964,16 +1766,11 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   </div>
 </div>
 
-<div class="side-overlay" id="side-overlay" onclick="toggleSidebar()"></div>
-
 <div id="header">
-  <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
   <div class="title">💬 웹 챗</div>
   <div class="model-badge" id="model-badge">auto routing</div>
   <div class="spacer"></div>
   <div class="cost">비용: <b id="cost-display">$0.0000</b></div>
-  <button id="theme-toggle" onclick="toggleTheme()" title="테마 전환">🌙</button>
-  <button id="export-btn" onclick="window.exportChat('md')" title="대화 내보내기" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer">📥 내보내기</button>
   <button id="new-chat-btn" onclick="window.newChat()" title="새 대화">🗑️ 새 대화</button>
 </div>
 
@@ -1990,13 +1787,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       <option value="xai/grok-4">Grok 4</option>
       <option value="google/gemini-3-pro-preview">Gemini 3 Pro</option>
       <option value="google/gemini-3-flash-preview">Gemini 3 Flash (저렴)</option>
-      <option value="ollama/llama3.3">🦙 Ollama Llama 3.3 (로컬)</option>
-      <option value="ollama/qwen3">🦙 Ollama Qwen 3 (로컬)</option>
-      <option value="ollama/gemma3">🦙 Ollama Gemma 3 (로컬)</option>
     </select>
-    <label style="margin-top:8px">Ollama URL (로컬 LLM)</label>
-    <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
-    <button onclick="fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:document.getElementById('s-ollama-url').value})}).then(function(){alert('저장됨')})" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px">Ollama URL 저장</button>
   </div>
   <div class="settings-card">
     <h3>🔐 Vault 키 관리</h3>
@@ -2043,27 +1834,6 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     if(hist.length){window._restoring=true;hist.forEach(function(m){addMsg(m.role,m.text,m.model)});window._restoring=false}
   })();
 
-  /* --- Export chat --- */
-  window.exportChat=function(fmt){
-    var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
-    if(!hist.length){alert('내보낼 대화가 없습니다.');return}
-    var content='';
-    if(fmt==='json'){
-      content=JSON.stringify(hist,null,2);
-      var blob=new Blob([content],{type:'application/json'});
-      var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-      a.download='salmalm_chat_'+new Date().toISOString().slice(0,10)+'.json';a.click();
-    }else{
-      hist.forEach(function(m){
-        var role=m.role==='user'?'👤 사용자':'😈 삶앎';
-        content+=role+'\\n'+m.text+'\\n\\n---\\n\\n';
-      });
-      var blob=new Blob([content],{type:'text/markdown'});
-      var a=document.createElement('a');a.href=URL.createObjectURL(blob);
-      a.download='salmalm_chat_'+new Date().toISOString().slice(0,10)+'.md';a.click();
-    }
-  };
-
   /* --- New chat --- */
   window.newChat=function(){
     if(!confirm('대화 기록을 삭제하고 새 대화를 시작할까요?'))return;
@@ -2102,22 +1872,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     var meta_parts=[];
     if(model)meta_parts.push(model);
     meta_parts.push(new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
-    var mt=document.createElement('div');mt.className='meta';mt.textContent=meta_parts.join(' · ');
-    if(role==='assistant'&&text){
-      var regenBtn=document.createElement('span');
-      regenBtn.textContent=' 🔄';regenBtn.style.cursor='pointer';regenBtn.title='재생성';
-      regenBtn.onclick=function(){
-        var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
-        /* Find last user message */
-        for(var i=hist.length-1;i>=0;i--){if(hist[i].role==='user'){
-          /* Remove this assistant msg and resend */
-          hist.splice(i+1);localStorage.setItem('salm_chat',JSON.stringify(hist));
-          row.remove();input.value=hist[i].text||'';doSend();break;
-        }}
-      };
-      mt.appendChild(regenBtn);
-    }
-    wrap.appendChild(mt);
+    var mt=document.createElement('div');mt.className='meta';mt.textContent=meta_parts.join(' · ');wrap.appendChild(mt);
     row.appendChild(av);row.appendChild(wrap);
     chat.appendChild(row);chat.scrollTop=999999;
     if(!window._restoring){
