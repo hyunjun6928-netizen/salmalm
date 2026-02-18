@@ -542,7 +542,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
       }
     }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ 오류: '+se.message)}
-    btn.disabled=false;input.focus();
+    finally{btn.disabled=false;input.focus()}
   }
   window.doSend=doSend;
 
