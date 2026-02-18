@@ -1301,9 +1301,10 @@ async function save(){
     const r=await fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
     if(d.ok){
-      show(d.test_result+' ('+d.saved.join(', ')+' 저장됨)','ok');
-      btn.textContent='✅ 완료! 3초 후 이동...';
-      setTimeout(()=>location.reload(),3000);
+      const isTestFail=d.test_result&&d.test_result.includes('실패');
+      show(d.test_result+' ('+d.saved.join(', ')+' 저장됨)',isTestFail?'err':'ok');
+      if(!isTestFail){btn.textContent='✅ 완료! 3초 후 이동...';setTimeout(()=>location.reload(),3000);}
+      else{btn.textContent='⚠️ 저장됨 (키 확인 필요)';btn.disabled=false;}
     }else{show(d.error,'err');btn.disabled=false;btn.textContent='저장 & 테스트';}
   }catch(e){show('네트워크 오류: '+e,'err');btn.disabled=false;btn.textContent='저장 & 테스트';}
 }
