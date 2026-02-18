@@ -168,7 +168,13 @@ class MCPServer:
             uri = params.get("uri", "")
             if uri.startswith("file://"):
                 rel_path = uri[7:]
-                full_path = BASE_DIR / rel_path
+                full_path = (BASE_DIR / rel_path).resolve()
+                # Path traversal protection
+                try:
+                    full_path.relative_to(BASE_DIR.resolve())
+                except ValueError:
+                    return _rpc_response(msg_id, error={
+                        "code": -32602, "message": "Path traversal denied"})
                 if full_path.exists() and full_path.is_file():
                     try:
                         content = full_path.read_text(encoding='utf-8', errors='replace')[:50000]

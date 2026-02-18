@@ -46,6 +46,22 @@ def main() -> None:
         from salmalm.stability import health_monitor, watchdog_tick
         import salmalm.core as _core
 
+        def _check_for_updates() -> str:
+            """Check PyPI for newer version. Returns update message or empty string."""
+            try:
+                import urllib.request, json as _json
+                req = urllib.request.Request(
+                    'https://pypi.org/pypi/salmalm/json',
+                    headers={'User-Agent': f'SalmAlm/{VERSION}', 'Accept': 'application/json'})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = _json.loads(resp.read())
+                latest = data.get('info', {}).get('version', '')
+                if latest and latest != VERSION:
+                    return f"⬆️  새 버전 {latest} 발견! 업그레이드: pip install --upgrade salmalm"
+            except Exception:
+                pass  # 네트워크 없어도 조용히 넘김
+            return ""
+
         async def _main():
             _init_audit_db()
             _restore_usage()
@@ -133,6 +149,7 @@ def main() -> None:
 
             rag_stats = rag_engine.get_stats()
             st = f"{selftest['passed']}/{selftest['total']}"
+            update_msg = _check_for_updates()
             print(f"""
 ╔══════════════════════════════════════════════╗
 ║  😈 {APP_NAME} v{VERSION}                   ║
@@ -143,6 +160,8 @@ def main() -> None:
 ║  Self-test: {st}                               ║
 ╚══════════════════════════════════════════════╝
 """)
+            if update_msg:
+                print(f"  {update_msg}\n")
             try:
                 while True:
                     await asyncio.sleep(1)

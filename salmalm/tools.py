@@ -869,6 +869,14 @@ else:
             timeout_sec = min(args.get('timeout', 15), 60)
             if not url:
                 return '❌ URL이 필요합니다'
+            # SSRF protection: block internal/private IPs
+            from urllib.parse import urlparse
+            _host = urlparse(url).hostname or ''
+            _blocked = ('localhost', '127.', '10.', '192.168.', '172.16.',
+                        '172.17.', '172.18.', '172.19.', '172.2', '172.30.', '172.31.',
+                        '169.254.', '0.0.0.0', '::1', 'metadata.google', '169.254.169.254')
+            if any(_host.startswith(b) or _host == b for b in _blocked):
+                return f'❌ 내부 네트워크 접근 차단: {_host}'
             headers.setdefault('User-Agent', f'SalmAlm/{VERSION}')
             data = body_str.encode('utf-8') if body_str else None
             try:
