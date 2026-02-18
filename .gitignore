@@ -26,3 +26,5 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+salmalm_out.log
+*.bak
