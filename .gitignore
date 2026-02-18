@@ -1,0 +1,28 @@
+# Secrets & data
+.vault.enc
+audit.db
+*.db
+salmalm.log
+
+# Memory (personal)
+MEMORY.md
+SOUL.md
+USER.md
+TOOLS.md
+AGENTS.md
+IDENTITY.md
+HEARTBEAT.md
+memory/
+
+# Uploads
+uploads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# OS
+.DS_Store
+Thumbs.db
