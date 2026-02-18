@@ -344,14 +344,21 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* --- Helpers --- */
   var _copyId=0;
+  function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
   function renderMd(t){
     if(t.startsWith('<img ')||t.startsWith('<audio '))return t;
-    /* Code blocks with copy button */
+    /* Extract code blocks first, escape everything else, then restore */
+    var codeBlocks=[];
     t=t.replace(/```(\\w+)?\\n?([\\s\\S]*?)```/g,function(_,lang,code){
       _copyId++;var id='cp'+_copyId;
-      return '<pre style="position:relative"><button class="copy-btn" onclick="copyCode(&quot;'+id+'&quot;)" id="btn'+id+'">📋 복사</button><code id="'+id+'">'+(lang?'/* '+lang+' */\\n':'')+code.replace(/</g,'&lt;')+'</code></pre>';
+      var safe='<pre style="position:relative"><button class="copy-btn" onclick="copyCode(&quot;'+id+'&quot;)" id="btn'+id+'">📋 복사</button><code id="'+id+'">'+(lang?'/* '+lang+' */\\n':'')+escHtml(code)+'</code></pre>';
+      codeBlocks.push(safe);return '%%CODEBLOCK'+(codeBlocks.length-1)+'%%';
     });
-    t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
+    /* Escape remaining HTML to prevent XSS */
+    t=escHtml(t);
+    /* Restore code blocks */
+    for(var ci=0;ci<codeBlocks.length;ci++){t=t.replace('%%CODEBLOCK'+ci+'%%',codeBlocks[ci])}
+    t=t.replace(/`([^`]+)`/g,function(_,c){return '<code>'+c+'</code>'});
     t=t.replace(/\\*\\*([^*]+)\\*\\*/g,'<strong>$1</strong>');
     t=t.replace(/\\*([^*]+)\\*/g,'<em>$1</em>');
     /* Tables */

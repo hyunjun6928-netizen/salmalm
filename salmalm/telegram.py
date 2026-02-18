@@ -3,7 +3,7 @@ import asyncio, json, re, textwrap, time, urllib.request
 
 from .constants import *
 from .crypto import vault, log
-from .core import router, get_session, _sessions
+from .core import router, get_session, _sessions, audit_log
 from .llm import _http_post, _http_get
 from .prompt import build_system_prompt
 from .tools import execute_tool
@@ -111,11 +111,16 @@ class TelegramBot:
                 log.error(f"Telegram poll error: {e}")
                 await asyncio.sleep(5)
 
-    def _download_file(self, file_id: str) -> tuple[bytes, str]:
+    def _download_file(self, file_id: str) -> tuple:
         """Download a file from Telegram. Returns (data, filename)."""
         info = self._api('getFile', {'file_id': file_id})
         file_path = info['result']['file_path']
         filename = file_path.split('/')[-1]
+        # Sanitize filename — remove path traversal chars
+        filename = re.sub(r'[/\\\.]{2,}', '_', filename)
+        filename = re.sub(r'[^\w.\-]', '_', filename)
+        if not filename or filename.startswith('.'):
+            filename = f'file_{int(time.time())}'
         url = f'https://api.telegram.org/file/bot{self.token}/{file_path}'
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req, timeout=30) as resp:

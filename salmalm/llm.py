@@ -95,14 +95,14 @@ def call_llm(messages: list, model: str = None, tools: list = None,
             fb_model_id = fb_models[fb_provider]
             log.info(f"🔄 Fallback: {provider} → {fb_provider}/{fb_model_id}")
             try:
-                if fb_provider == 'google':
+                if not tools:
                     fb_tools = None
                 elif fb_provider == 'anthropic':
                     fb_tools = [{'name': t['name'], 'description': t['description'],
                                  'input_schema': t['input_schema']} for t in tools]
-                elif fb_provider in ('openai', 'xai'):
+                elif fb_provider in ('openai', 'xai', 'google'):
                     fb_tools = [{'name': t['name'], 'description': t['description'],
-                                 'parameters': t['input_schema']} for t in tools]
+                                 'parameters': t.get('input_schema', t.get('parameters', {}))} for t in tools]
                 else:
                     fb_tools = None
                 result = _call_provider(fb_provider, fb_key, fb_model_id, messages,
@@ -127,7 +127,7 @@ def _call_provider(provider, api_key, model_id, messages, tools, max_tokens,
         base_url = 'https://api.x.ai/v1' if provider == 'xai' else 'https://api.openai.com/v1'
         return _call_openai(api_key, model_id, messages, tools, max_tokens, base_url)
     elif provider == 'google':
-        return _call_google(api_key, model_id, messages, max_tokens)
+        return _call_google(api_key, model_id, messages, max_tokens, tools=tools)
     elif provider == 'ollama':
         ollama_url = vault.get('ollama_url') or 'http://localhost:11434/v1'
         return _call_openai('ollama', model_id, messages, tools, max_tokens, ollama_url)
@@ -242,12 +242,17 @@ def _call_openai(api_key, model_id, messages, tools, max_tokens, base_url):
     }
 
 
-def _call_google(api_key, model_id, messages, max_tokens):
-    # Gemini API — text only (no tool support for simplicity)
+def _call_google(api_key, model_id, messages, max_tokens, tools=None):
+    # Gemini API — with optional tool support
     parts = []
     for m in messages:
+        content = m.get('content', '')
+        if isinstance(content, list):
+            # Multimodal — extract text only for Google
+            text_parts = [b.get('text', '') for b in content if isinstance(b, dict) and b.get('type') == 'text']
+            content = ' '.join(text_parts)
         role = 'user' if m['role'] in ('user', 'system') else 'model'
-        parts.append({'role': role, 'parts': [{'text': m['content']}]})
+        parts.append({'role': role, 'parts': [{'text': str(content)}]})
     # Merge consecutive same-role messages
     merged = []
     for p in parts:
@@ -259,17 +264,36 @@ def _call_google(api_key, model_id, messages, max_tokens):
         'contents': merged,
         'generationConfig': {'maxOutputTokens': max_tokens}
     }
+    # Add tools if provided
+    if tools:
+        gemini_tools = []
+        for t in tools:
+            fn_decl = {'name': t['name'], 'description': t.get('description', '')}
+            params = t.get('parameters', t.get('input_schema', {}))
+            if params and params.get('properties'):
+                fn_decl['parameters'] = params
+            gemini_tools.append(fn_decl)
+        body['tools'] = [{'functionDeclarations': gemini_tools}]
     resp = _http_post(
         f'https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}',
         {'Content-Type': 'application/json'}, body
     )
     text = ''
+    tool_calls = []
     for cand in resp.get('candidates', []):
         for part in cand.get('content', {}).get('parts', []):
-            text += part.get('text', '')
+            if 'text' in part:
+                text += part['text']
+            elif 'functionCall' in part:
+                fc = part['functionCall']
+                tool_calls.append({
+                    'id': f"google_{fc['name']}_{int(time.time()*1000)}",
+                    'name': fc['name'],
+                    'arguments': fc.get('args', {})
+                })
     usage_meta = resp.get('usageMetadata', {})
     return {
-        'content': text, 'tool_calls': [],
+        'content': text, 'tool_calls': tool_calls,
         'usage': {'input': usage_meta.get('promptTokenCount', 0),
                   'output': usage_meta.get('candidatesTokenCount', 0)}
     }

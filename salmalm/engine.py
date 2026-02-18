@@ -140,7 +140,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 seen.add(t['name'])
         
         if provider == 'google':
-            return None
+            # Google Gemini: use OpenAI-compatible tool format
+            return [{'name': t['name'], 'description': t['description'],
+                     'parameters': t['input_schema']} for t in all_tools]
         elif provider in ('openai', 'xai', 'deepseek', 'meta-llama'):
             return [{'name': t['name'], 'description': t['description'],
                      'parameters': t['input_schema']} for t in all_tools]
@@ -153,7 +155,17 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         """Execute multiple tools in parallel, return {id: result}."""
         for tc in tool_calls:
             if on_tool:
-                on_tool(tc['name'], tc['arguments'])
+                result = on_tool(tc['name'], tc['arguments'])
+                # Handle async callbacks
+                if asyncio.iscoroutine(result):
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            asyncio.ensure_future(result)
+                        else:
+                            loop.run_until_complete(result)
+                    except RuntimeError:
+                        pass  # No event loop available
 
         if len(tool_calls) == 1:
             tc = tool_calls[0]
@@ -230,7 +242,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         # PHASE 1: PLANNING — inject plan prompt for complex tasks
         if classification['intent'] in ('code', 'analysis') and classification['score'] >= 2:
             # Inject planning instruction into the last user message context
-            plan_msg = {'role': 'system', 'content': self.PLAN_PROMPT}
+            plan_msg = {'role': 'system', 'content': self.PLAN_PROMPT, '_plan_injected': True}
             session.messages.insert(-1, plan_msg)  # Before the user message
 
         # PHASE 2: EXECUTE — tool loop
@@ -326,18 +338,21 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                                            model=router._pick_available(2),
                                            max_tokens=4000)
                 improved = reflect_result.get('content', '')
-                if improved and len(improved) > len(response) * 0.5:
-                    # Only use reflection if it's substantive
-                    response = improved
+                if improved and len(improved) > len(response) * 0.5 and len(improved) > 50:
+                    # Only use reflection if it's substantive and not a degradation
+                    # Skip if reflection is just "the answer is fine" or similar
+                    skip_phrases = ['satisfactory', 'sufficient', 'correct', '충분', '적절', '문제없']
+                    if not any(p in improved[:100].lower() for p in skip_phrases):
+                        response = improved
                     log.info(f"🔍 Reflection improved: {len(response)} chars")
 
             session.add_assistant(response)
             log.info(f"💬 Response ({result.get('model', '?')}): {len(response)} chars, "
                      f"iteration {iteration + 1}, intent={classification['intent']}")
 
-            # Clean up planning message if added
+            # Clean up planning message if added (use marker, not content comparison)
             session.messages = [m for m in session.messages
-                                if m.get('content') != self.PLAN_PROMPT]
+                                if not m.get('_plan_injected')]
             return response
 
         # Loop exhausted
@@ -474,11 +489,12 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
     from .core import _tg_bot
     from .crypto import vault
 
-    # Only notify for non-trivial tasks (tier 2+ or tool-using)
+    # Only notify for complex tasks (tier 3 or high-score tool-using)
     tier = classification.get('tier', 1)
     intent = classification.get('intent', 'chat')
-    if tier < 2 and intent == 'chat':
-        return  # Skip simple chat
+    score = classification.get('score', 0)
+    if tier < 3 and score < 3:
+        return  # Skip simple/medium tasks — avoid notification spam
 
     # Build summary
     task_preview = user_message[:80] + ('...' if len(user_message) > 80 else '')

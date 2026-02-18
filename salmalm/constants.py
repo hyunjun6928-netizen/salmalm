@@ -27,9 +27,21 @@ PBKDF2_ITER = 200_000
 SESSION_TIMEOUT = 3600 * 8
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION = 60
-EXEC_BLOCKLIST = set()
-EXEC_BLOCKLIST_PATTERNS = []
-PROTECTED_FILES = {'.vault.enc', 'audit.db', 'server.py'}
+EXEC_BLOCKLIST = {
+    'rm', 'rmdir', 'mkfs', 'dd', 'shutdown', 'reboot', 'halt', 'poweroff',
+    'init', 'systemctl', 'useradd', 'userdel', 'passwd', 'chown', 'chmod',
+    'mount', 'umount', 'fdisk', 'parted', 'iptables', 'nft',
+    'su', 'sudo', 'doas', 'pkill', 'killall',
+}
+EXEC_BLOCKLIST_PATTERNS = [
+    r'[;&|`]\s*(rm|dd|mkfs|shutdown|reboot|halt|sudo|su)\b',  # chained dangerous cmds
+    r'\$\(.*\)',       # command substitution
+    r'`[^`]+`',        # backtick substitution
+    r'>\s*/dev/sd',    # write to raw device
+    r'>\s*/etc/',      # overwrite system config
+    r'/proc/sysrq',    # sysrq trigger
+]
+PROTECTED_FILES = {'.vault.enc', 'audit.db', 'auth.db', 'server.py', '.clipboard.json'}
 
 # LLM
 DEFAULT_MAX_TOKENS = 4096

@@ -3,12 +3,10 @@ from .constants import VAULT_FILE, PBKDF2_ITER, VAULT_VERSION
 from . import log
 
 import json
-
 import secrets
-
 import hmac
-
 import hashlib
+from typing import Optional
 
 HAS_CRYPTO = False
 try:

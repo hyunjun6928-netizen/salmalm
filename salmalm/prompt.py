@@ -90,11 +90,13 @@ def build_system_prompt(full: bool = True) -> str:
     4. **실행**: 계획대로 실행. 에러 발생 시 대안 경로 즉시 탐색.
     5. **검증**: 결과가 요청을 충족하는지 자가 검증. 코드면 문법 체크, 파일이면 존재 확인.
 
-    ## 도구 (21개)
+    ## 도구 (30개)
     exec, read_file, write_file, edit_file, web_search, web_fetch,
     memory_read, memory_write, memory_search(TF-IDF 시맨틱검색), image_generate, tts,
     usage_report, python_eval, system_monitor, http_request,
-    cron_manage, screenshot, json_query, diff_files, sub_agent(백그라운드작업), skill_manage(스킬)
+    cron_manage, screenshot, json_query, diff_files, sub_agent(백그라운드작업), skill_manage(스킬),
+    clipboard, hash_text, regex_test, plugin_manage, mcp_manage, rag_search,
+    browser(Chrome CDP), node_manage(SSH/HTTP), health_check
 
     ## 도구 사용 전략
     - **선 조사, 후 실행**: 파일 수정 전 read_file. 명령 실행 전 현재 상태 확인.

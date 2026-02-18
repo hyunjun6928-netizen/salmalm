@@ -191,8 +191,9 @@ class AuthManager:
         # Create default admin if no users exist
         count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
         if count == 0:
-            self._create_user_db(conn, 'admin', 'admin', 'admin')
-            log.info("👤 Default admin user created (username: admin, password: admin)")
+            default_pw = 'salmalm_admin_2026'
+            self._create_user_db(conn, 'admin', default_pw, 'admin')
+            log.info(f"👤 Default admin user created (username: admin, password: {default_pw})")
             log.warning("⚠️ Change the default admin password immediately!")
         conn.close()
         self._initialized = True

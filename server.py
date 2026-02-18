@@ -1,19 +1,29 @@
 #!/usr/bin/env python3
 """
-삶앎 (SalmAlm) v0.5.0 — Personal AI Gateway
+삶앎 (SalmAlm) v0.7.0 — Personal AI Gateway
 Modularized entry point.
 
-Modules:
-  salmalm/constants.py  — paths, costs, thresholds
-  salmalm/crypto.py     — Vault (AES-256-GCM), logging
-  salmalm/core.py       — audit, cache, usage, router, compaction,
-                          search, subagent, skills, session, cron
-  salmalm/llm.py        — LLM API calls (Anthropic/OpenAI/xAI/Google)
-  salmalm/tools.py      — 21 tool definitions + execute_tool
-  salmalm/prompt.py     — system prompt builder
-  salmalm/engine.py     — Intelligence Engine (Plan→Execute→Reflect)
-  salmalm/telegram.py   — Telegram bot
-  salmalm/web.py        — Web UI + HTTP handler
+Modules (19):
+  salmalm/constants.py   — paths, costs, thresholds
+  salmalm/crypto.py      — Vault (AES-256-GCM), logging
+  salmalm/core.py        — audit, cache, usage, router, compaction,
+                           search, subagent, skills, session, cron
+  salmalm/llm.py         — LLM API calls (Anthropic/OpenAI/xAI/Google)
+  salmalm/tools.py       — 30 tool definitions + execute_tool
+  salmalm/prompt.py      — system prompt builder
+  salmalm/engine.py      — Intelligence Engine (Plan→Execute→Reflect)
+  salmalm/telegram.py    — Telegram bot
+  salmalm/web.py         — Web UI + HTTP handler
+  salmalm/ws.py          — WebSocket server (RFC 6455)
+  salmalm/rag.py         — RAG engine (BM25 + SQLite)
+  salmalm/mcp.py         — MCP server + client (JSON-RPC 2.0)
+  salmalm/browser.py     — Browser automation (Chrome CDP)
+  salmalm/nodes.py       — Remote node control (SSH/HTTP)
+  salmalm/stability.py   — Health monitor + circuit breaker + watchdog
+  salmalm/auth.py        — Multi-user auth, RBAC, rate limiting
+  salmalm/tls.py         — Self-signed TLS cert generation
+  salmalm/logging_ext.py — Structured JSON logging + rotation
+  salmalm/docs.py        — Auto-generated API documentation
 """
 
 import asyncio

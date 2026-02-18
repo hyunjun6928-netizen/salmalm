@@ -9,7 +9,10 @@ import uuid
 import urllib.request
 import base64
 import mimetypes
-import resource
+try:
+    import resource as _resource_mod
+except ImportError:
+    _resource_mod = None  # Windows
 import difflib
 import threading
 from datetime import datetime
@@ -426,7 +429,7 @@ def _is_safe_command(cmd: str) -> tuple[bool, str]:
     return True, ''
 
 
-def _resolve_path(path: str) -> Path:
+def _resolve_path(path: str, writing: bool = False) -> Path:
     """Resolve path, preventing traversal outside workspace."""
     p = Path(path)
     if not p.is_absolute():
@@ -436,7 +439,7 @@ def _resolve_path(path: str) -> Path:
     allowed = [WORKSPACE_DIR, Path.home()]
     if not any(str(p).startswith(str(a)) for a in allowed):
         raise PermissionError(f'접근 불가: {p}')
-    if p.name in PROTECTED_FILES and 'write' in str(traceback.extract_stack()):
+    if writing and p.name in PROTECTED_FILES:
         raise PermissionError(f'보호된 파일: {p.name}')
     return p
 
@@ -477,13 +480,13 @@ def execute_tool(name: str, args: dict) -> str:
             return '\n'.join(selected)[:50000]
 
         elif name == 'write_file':
-            p = _resolve_path(args['path'])
+            p = _resolve_path(args['path'], writing=True)
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(args['content'], encoding='utf-8')
             return f'✅ {p} ({len(args["content"])} chars)'
 
         elif name == 'edit_file':
-            p = _resolve_path(args['path'])
+            p = _resolve_path(args['path'], writing=True)
             text = p.read_text(encoding='utf-8')
             if args['old_text'] not in text:
                 return f'❌ 텍스트를 찾을 수 없음'
@@ -754,8 +757,9 @@ else:
                     if uptime.stdout:
                         lines.append(f'⏱️ 가동시간: {uptime.stdout.strip()}')
                     # Python process info
-                    import resource
-                    mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+                    mem_mb = 0
+                    if _resource_mod:
+                        mem_mb = _resource_mod.getrusage(_resource_mod.RUSAGE_SELF).ru_maxrss / 1024
                     lines.append(f'🐍 삶앎 메모리: {mem_mb:.1f}MB')
                     lines.append(f'📂 세션 수: {len(_sessions)}')
             except Exception as e:
@@ -817,7 +821,7 @@ else:
             query = args.get('query', '.')
             from_file = args.get('from_file', False)
             if from_file:
-                fpath = _safe_resolve(data_str)
+                fpath = _resolve_path(data_str)
                 data_str = fpath.read_text(encoding='utf-8', errors='replace')
             try:
                 result = subprocess.run(
@@ -855,14 +859,14 @@ else:
             import difflib
             # If paths exist, read them
             try:
-                p1 = _safe_resolve(f1)
+                p1 = _resolve_path(f1)
                 text1 = p1.read_text(encoding='utf-8', errors='replace').splitlines()
                 label1 = f1
             except Exception:
                 text1 = f1.splitlines()
                 label1 = 'text1'
             try:
-                p2 = _safe_resolve(f2)
+                p2 = _resolve_path(f2)
                 text2 = p2.read_text(encoding='utf-8', errors='replace').splitlines()
                 label2 = f2
             except Exception:
@@ -978,27 +982,20 @@ else:
             except re.error as e:
                 return f'❌ 정규표현식 오류: {e}'
 
-            # ReDoS 방어 - 5초 타임아웃
-            import signal
-            def timeout_handler(signum, frame):
-                raise TimeoutError("정규식 실행 시간 초과 (5초)")
-            
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(5)
-            
-            try:
+            # ReDoS 방어 - subprocess로 격리 (cross-platform)
+            def _run_regex():
                 if action == 'match':
-                        m = compiled.fullmatch(text)
-                        if m:
-                            groups = m.groups()
-                            gdict = m.groupdict()
-                            result = f'✅ 전체 매칭 성공: "{m.group()}"'
-                            if groups:
-                                result += f'\n그룹: {groups}'
-                            if gdict:
-                                result += f'\n명명 그룹: {gdict}'
-                            return result
-                        return '❌ 매칭 실패'
+                    m = compiled.fullmatch(text)
+                    if m:
+                        groups = m.groups()
+                        gdict = m.groupdict()
+                        result = f'✅ 전체 매칭 성공: "{m.group()}"'
+                        if groups:
+                            result += f'\n그룹: {groups}'
+                        if gdict:
+                            result += f'\n명명 그룹: {gdict}'
+                        return result
+                    return '❌ 매칭 실패'
 
                 elif action == 'find':
                     matches = compiled.findall(text)
@@ -1027,11 +1024,15 @@ else:
                     return '\n'.join(lines)
 
                 return f'❌ 알 수 없는 action: {action}'
-            except TimeoutError as e:
-                return f'❌ {e}'
-            finally:
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
+
+            # Run with timeout using threading
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                try:
+                    future = pool.submit(_run_regex)
+                    return future.result(timeout=5)
+                except concurrent.futures.TimeoutError:
+                    return '❌ 정규식 실행 시간 초과 (5초)'
 
         elif name == 'cron_manage':
             from .core import _llm_cron
@@ -1095,35 +1096,40 @@ else:
         elif name == 'browser':
             import asyncio
             from .browser import browser
+
+            def _run_async(coro):
+                """Safely run async coroutine from sync context (ThreadPool)."""
+                try:
+                    loop = asyncio.get_running_loop()
+                    # Already in async context — use new thread with new loop
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(1) as pool:
+                        return pool.submit(lambda: asyncio.run(coro)).result(timeout=30)
+                except RuntimeError:
+                    # No running loop — safe to use asyncio.run
+                    return asyncio.run(coro)
+
             action = args.get('action', 'status')
             if action == 'status':
                 return json.dumps(browser.get_status(), ensure_ascii=False)
             elif action == 'connect':
-                loop = asyncio.get_event_loop()
-                ok = loop.run_until_complete(browser.connect()) if not loop.is_running() else False
-                if not ok:
-                    # Try via new loop
-                    try:
-                        ok = asyncio.run(browser.connect())
-                    except RuntimeError:
-                        return '❌ 브라우저 연결 실패. Chrome --remote-debugging-port=9222 로 실행 필요'
-                return '🌐 브라우저 연결 성공' if ok else '❌ 연결 실패. Chrome 디버그 포트 확인'
+                ok = _run_async(browser.connect())
+                return '🌐 브라우저 연결 성공' if ok else '❌ 연결 실패. Chrome --remote-debugging-port=9222 확인'
             elif action == 'navigate':
                 url = args.get('url', '')
                 if not url:
                     return '❌ url이 필요합니다'
-                result = asyncio.get_event_loop().run_until_complete(browser.navigate(url))
+                result = _run_async(browser.navigate(url))
                 return f'🌐 이동: {url}\n{json.dumps(result, ensure_ascii=False)}'
             elif action == 'text':
-                text = asyncio.get_event_loop().run_until_complete(browser.get_text())
+                text = _run_async(browser.get_text())
                 return text[:5000] if text else '(빈 페이지 또는 미연결)'
             elif action == 'html':
-                html = asyncio.get_event_loop().run_until_complete(browser.get_html())
+                html = _run_async(browser.get_html())
                 return html[:8000] if html else '(빈 페이지 또는 미연결)'
             elif action == 'screenshot':
-                b64 = asyncio.get_event_loop().run_until_complete(browser.screenshot())
+                b64 = _run_async(browser.screenshot())
                 if b64:
-                    # Save to uploads
                     import base64 as b64mod
                     save_dir = WORKSPACE_DIR / 'uploads'
                     save_dir.mkdir(exist_ok=True)
@@ -1135,25 +1141,25 @@ else:
                 expr = args.get('expression', '')
                 if not expr:
                     return '❌ expression이 필요합니다'
-                result = asyncio.get_event_loop().run_until_complete(browser.evaluate(expr))
+                result = _run_async(browser.evaluate(expr))
                 return json.dumps(result, ensure_ascii=False, default=str)[:5000]
             elif action == 'click':
                 sel = args.get('selector', '')
-                ok = asyncio.get_event_loop().run_until_complete(browser.click(sel))
+                ok = _run_async(browser.click(sel))
                 return f'✅ 클릭: {sel}' if ok else f'❌ 요소 못 찾음: {sel}'
             elif action == 'type':
                 sel = args.get('selector', '')
                 text = args.get('text', '')
-                ok = asyncio.get_event_loop().run_until_complete(browser.type_text(sel, text))
+                ok = _run_async(browser.type_text(sel, text))
                 return f'✅ 입력: {sel}' if ok else f'❌ 요소 못 찾음: {sel}'
             elif action == 'tabs':
-                tabs = asyncio.get_event_loop().run_until_complete(browser.get_tabs())
+                tabs = _run_async(browser.get_tabs())
                 return json.dumps(tabs, ensure_ascii=False)
             elif action == 'console':
                 logs = browser.get_console_logs(limit=30)
                 return '\n'.join(logs) if logs else '(콘솔 로그 없음)'
             elif action == 'pdf':
-                b64 = asyncio.get_event_loop().run_until_complete(browser.pdf())
+                b64 = _run_async(browser.pdf())
                 if b64:
                     import base64 as b64mod
                     save_dir = WORKSPACE_DIR / 'uploads'
@@ -1249,7 +1255,13 @@ else:
                 return '\n'.join(lines)
             elif action == 'recover':
                 import asyncio
-                recovered = asyncio.get_event_loop().run_until_complete(health_monitor.auto_recover())
+                try:
+                    loop = asyncio.get_running_loop()
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(1) as pool:
+                        recovered = pool.submit(lambda: asyncio.run(health_monitor.auto_recover())).result(timeout=30)
+                except RuntimeError:
+                    recovered = asyncio.run(health_monitor.auto_recover())
                 if recovered:
                     return f'🔧 복구 완료: {", ".join(recovered)}'
                 return '🔧 복구할 컴포넌트 없음 (모두 정상)'

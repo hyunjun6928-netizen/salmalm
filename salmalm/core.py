@@ -85,9 +85,6 @@ class ResponseCache:
 
 response_cache = ResponseCache()
 
-
-response_cache = ResponseCache()
-
 _usage_lock = threading.Lock()
 _usage = {'total_input': 0, 'total_output': 0, 'total_cost': 0.0,
           'by_model': {}, 'session_start': time.time()}
@@ -241,13 +238,6 @@ router = ModelRouter()
 
 
 # ============================================================
-def _estimate_tokens(text: str) -> int:
-    """Rough token estimate. Korean ≈ 1.5 tokens/char, English ≈ 0.3 tokens/word."""
-    if not text:
-        return 0
-    return max(len(text) // 3, len(text.split()) * 2)
-
-
 def _msg_content_str(msg: dict) -> str:
     """Extract text content from a message (handles list content blocks)."""
     c = msg.get('content', '')
@@ -333,12 +323,24 @@ def compact_messages(messages: list, model: str = None) -> list:
     )
 
     from .llm import call_llm
-    summary_result = call_llm(
-        [{'role': 'system', 'content': '다음 대화를 핵심만 간결하게 한국어로 요약해. 결정사항, 작업 내용, 중요 맥락 위주로 5~8문장.'},
-         {'role': 'user', 'content': summary_text}],
-        model='google/gemini-3-flash-preview',
-        max_tokens=800
-    )
+    # Pick cheapest available model for summarization (avoid hardcoded google)
+    summary_model = router._pick_available(1)
+    _summ_msgs = [
+        {'role': 'system', 'content': '다음 대화를 핵심만 간결하게 한국어로 요약해. 결정사항, 작업 내용, 중요 맥락 위주로 5~8문장.'},
+        {'role': 'user', 'content': summary_text}
+    ]
+    # Note: call_llm is sync (urllib). In async context, run via thread.
+    try:
+        loop = asyncio.get_running_loop()
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            summary_result = loop.run_until_complete(
+                loop.run_in_executor(pool, lambda: call_llm(
+                    _summ_msgs, model=summary_model, max_tokens=800
+                ))
+            )
+    except RuntimeError:
+        summary_result = call_llm(_summ_msgs, model=summary_model, max_tokens=800)
 
     compacted = system_msgs + [
         {'role': 'system', 'content': f'[이전 대화 요약]\n{summary_result["content"]}'}
@@ -473,10 +475,6 @@ class TFIDFSearch:
 
 _tfidf = TFIDFSearch()
 
-
-
-_tfidf = TFIDFSearch()
-
 # ============================================================
 class SubAgent:
     """Background task executor with notification on completion."""
@@ -501,15 +499,13 @@ class SubAgent:
 
         def _run():
             try:
-                # Create isolated session
+                # Create isolated session with its own event loop
+                # (avoids cross-loop issues with main loop resources)
                 session_id = f'subagent-{agent_id}'
                 session = get_session(session_id)
-                # Run through the engine
                 from .engine import process_message
-                loop = asyncio.new_event_loop()
-                result = loop.run_until_complete(
+                result = asyncio.run(
                     process_message(session_id, task, model_override=model))
-                loop.close()
                 agent_info['result'] = result
                 agent_info['status'] = 'completed'
                 agent_info['completed'] = datetime.now(KST).isoformat()
@@ -1033,7 +1029,3 @@ def write_daily_log(entry: str):
     with open(log_file, 'a', encoding='utf-8') as f:
         ts = datetime.now(KST).strftime('%H:%M')
         f.write(f'{header}- [{ts}] {entry}\n')
-
-
-
-cron = CronScheduler()

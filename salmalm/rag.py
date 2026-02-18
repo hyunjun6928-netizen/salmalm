@@ -210,18 +210,23 @@ class RAGEngine:
         if not new_docs:
             return
 
-        # Rebuild tables
-        self._conn.execute("DELETE FROM chunks")
-        self._conn.execute("DELETE FROM doc_freq")
-        self._conn.executemany(
-            "INSERT INTO chunks (source, line_start, line_end, text, tokens, token_count, mtime, hash) VALUES (?,?,?,?,?,?,?,?)",
-            new_docs
-        )
-        self._conn.executemany(
-            "INSERT OR REPLACE INTO doc_freq (term, df) VALUES (?,?)",
-            list(doc_freq.items())
-        )
-        self._conn.commit()
+        # Rebuild tables atomically (BEGIN IMMEDIATE prevents reads seeing empty state)
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            self._conn.execute("DELETE FROM chunks")
+            self._conn.execute("DELETE FROM doc_freq")
+            self._conn.executemany(
+                "INSERT INTO chunks (source, line_start, line_end, text, tokens, token_count, mtime, hash) VALUES (?,?,?,?,?,?,?,?)",
+                new_docs
+            )
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO doc_freq (term, df) VALUES (?,?)",
+                list(doc_freq.items())
+            )
+            self._conn.execute("COMMIT")
+        except Exception:
+            self._conn.execute("ROLLBACK")
+            raise
         self._load_stats()
         log.info(f"🧠 RAG index rebuilt: {len(new_docs)} chunks from {len(files)} files, "
                  f"{len(doc_freq)} unique terms")
