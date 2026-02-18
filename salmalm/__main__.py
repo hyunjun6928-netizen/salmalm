@@ -9,22 +9,16 @@ def _ensure_windows_shortcut():
     """Create a Windows shortcut (.lnk) on Desktop via PowerShell."""
     try:
         import subprocess as _sp
-        python_exe = sys.executable.replace('\\', '\\\\')
-        # PowerShell script to create .lnk shortcut
-        ps_script = f'''
-$desktop = [Environment]::GetFolderPath("Desktop")
-$lnk = Join-Path $desktop "SalmAlm.lnk"
-if (Test-Path $lnk) {{ exit 0 }}
-$ws = New-Object -ComObject WScript.Shell
-$s = $ws.CreateShortcut($lnk)
-$s.TargetPath = "{python_exe}"
-$s.Arguments = "-m salmalm"
-$s.WorkingDirectory = "$env:USERPROFILE"
-$s.Description = "SalmAlm - Personal AI Gateway"
-$s.Save()
-Write-Host "Created: $lnk"
-'''
-        result = _sp.run(['powershell', '-Command', ps_script],
+        python_exe = sys.executable
+        cmd = (
+            "$ws = New-Object -ComObject WScript.Shell; "
+            "$lnk = $ws.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\\SalmAlm.lnk'); "
+            f"$lnk.TargetPath = '{python_exe}'; "
+            "$lnk.Arguments = '-m salmalm'; "
+            "$lnk.Save(); "
+            "Write-Host 'Created SalmAlm shortcut on Desktop'"
+        )
+        result = _sp.run(['powershell', '-Command', cmd],
                         capture_output=True, text=True, timeout=10)
         if result.stdout.strip():
             print(f"📌 {result.stdout.strip()}")
