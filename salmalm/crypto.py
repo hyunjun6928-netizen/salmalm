@@ -64,15 +64,28 @@ class Vault:
                 aesgcm = AESGCM(key)
                 plaintext = aesgcm.decrypt(nonce, ct, None)
             elif version == b'\x02' or (version == b'\x03' and not HAS_CRYPTO):
-                # HMAC-CTR fallback
+                # HMAC-CTR fallback (with IV for keystream uniqueness)
                 tag = ciphertext[:32]
-                ct = ciphertext[32:]
+                rest = ciphertext[32:]
                 hmac_key = _derive_key(password, self._salt + b'hmac', 32)
-                expected = hmac.new(hmac_key, ct, hashlib.sha256).digest()
-                if not hmac.compare_digest(tag, expected):
+                # Try new format (tag + iv(16) + ct) first, fall back to legacy (tag + ct)
+                if len(rest) >= 16:
+                    iv = rest[:16]
+                    ct = rest[16:]
+                    expected = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
+                    if hmac.compare_digest(tag, expected):
+                        enc_key = _derive_key(password, self._salt + b'enc' + iv, 32)
+                        plaintext = self._ctr_decrypt(enc_key, ct)
+                    else:
+                        # Legacy format (no IV): tag + ct
+                        ct = rest
+                        expected = hmac.new(hmac_key, ct, hashlib.sha256).digest()
+                        if not hmac.compare_digest(tag, expected):
+                            return False
+                        enc_key = _derive_key(password, self._salt + b'enc', 32)
+                        plaintext = self._ctr_decrypt(enc_key, ct)
+                else:
                     return False
-                enc_key = _derive_key(password, self._salt + b'enc', 32)
-                plaintext = self._ctr_decrypt(enc_key, ct)
             else:
                 return False
             self._data = json.loads(plaintext.decode('utf-8'))
@@ -92,12 +105,13 @@ class Vault:
             ct = aesgcm.encrypt(nonce, plaintext, None)
             VAULT_FILE.write_bytes(VAULT_VERSION + self._salt + nonce + ct)
         else:
-            # HMAC-CTR
-            enc_key = _derive_key(self._password, self._salt + b'enc', 32)
+            # HMAC-CTR with random IV (prevents keystream reuse)
+            iv = secrets.token_bytes(16)
+            enc_key = _derive_key(self._password, self._salt + b'enc' + iv, 32)
             ct = self._ctr_encrypt(enc_key, plaintext)
             hmac_key = _derive_key(self._password, self._salt + b'hmac', 32)
-            tag = hmac.new(hmac_key, ct, hashlib.sha256).digest()
-            VAULT_FILE.write_bytes(b'\x02' + self._salt + tag + ct)
+            tag = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
+            VAULT_FILE.write_bytes(b'\x02' + self._salt + tag + iv + ct)
 
     @staticmethod
     def _ctr_encrypt(key: bytes, data: bytes) -> bytes:
