@@ -254,10 +254,11 @@ TOOL_DEFINITIONS = [
         'input_schema': {
             'type': 'object',
             'properties': {
-                'action': {'type': 'string', 'description': 'spawn, list, or result', 'enum': ['spawn', 'list', 'result']},
+                'action': {'type': 'string', 'description': 'spawn, list, result, or send', 'enum': ['spawn', 'list', 'result', 'send']},
                 'task': {'type': 'string', 'description': 'Task description (for spawn)'},
                 'model': {'type': 'string', 'description': 'Model to use (optional)'},
-                'agent_id': {'type': 'string', 'description': 'Agent ID (for result)'}
+                'agent_id': {'type': 'string', 'description': 'Agent ID (for result/send)'},
+                'message': {'type': 'string', 'description': 'Message to send to agent (for send)'}
             },
             'required': ['action']
         }
@@ -268,9 +269,10 @@ TOOL_DEFINITIONS = [
         'input_schema': {
             'type': 'object',
             'properties': {
-                'action': {'type': 'string', 'description': 'list, load, or match', 'enum': ['list', 'load', 'match']},
-                'skill_name': {'type': 'string', 'description': 'Skill directory name (for load)'},
-                'query': {'type': 'string', 'description': 'Query to match (for match)'}
+                'action': {'type': 'string', 'description': 'list, load, match, install, or uninstall', 'enum': ['list', 'load', 'match', 'install', 'uninstall']},
+                'skill_name': {'type': 'string', 'description': 'Skill directory name (for load/uninstall)'},
+                'query': {'type': 'string', 'description': 'Query to match (for match)'},
+                'url': {'type': 'string', 'description': 'Git URL or GitHub shorthand user/repo (for install)'}
             },
             'required': ['action']
         }
@@ -665,6 +667,13 @@ def execute_tool(name: str, args: dict) -> str:
                     return f'⏳ [{agent_id}] Still running.\nStarted: {info["started"]}'
                 result = info.get('result', '(no result)')
                 return f'{"✅" if status == "completed" else "❌"} [{agent_id}] {status}\nStarted: {info["started"]}\nFinished: {info["completed"]}\n\n{result[:3000]}'
+            elif action == 'send':
+                agent_id = args.get('agent_id', '')
+                message = args.get('message', '')
+                if not agent_id or not message:
+                    return '❌ agent_id and message are required'
+                result = SubAgent.send_message(agent_id, message)
+                return result
             return f'❌ Unknown action: {action}'
 
         elif name == 'skill_manage':
@@ -689,6 +698,16 @@ def execute_tool(name: str, args: dict) -> str:
                 if not content:
                     return 'No matching skill found.'
                 return f'📚 Auto-matched skill:\n\n{content[:5000]}'
+            elif action == 'install':
+                url = args.get('url', '')
+                if not url:
+                    return '❌ url is required (Git URL or GitHub shorthand user/repo)'
+                return SkillLoader.install(url)
+            elif action == 'uninstall':
+                skill_name = args.get('skill_name', '')
+                if not skill_name:
+                    return '❌ skill_name is required'
+                return SkillLoader.uninstall(skill_name)
             return f'❌ Unknown action: {action}'
 
         elif name == 'image_generate':
