@@ -1,12 +1,51 @@
-# 😈 SalmAlm v0.7.2
+# 😈 SalmAlm v0.9.1
 
-**Personal AI Gateway — Pure Python**
+**Personal AI Gateway — Pure Python, Zero Dependencies**
 
 > [🇰🇷 한국어](README.md)
 
-A self-hosted AI gateway that rivals commercial solutions. Built entirely on Python's standard library — no npm, no pip install walls, no runtime dependencies. Just `python3 server.py` and go.
+A self-hosted AI gateway built entirely on Python's standard library. No npm, no dependency hell, no Docker required. One command and you're running your own AI assistant with 30 tools.
 
 The only optional dependency is `cryptography` for AES-256-GCM vault encryption. Without it, the vault falls back to HMAC-CTR (still secure, just not AEAD).
+
+## 🚀 Quick Start
+
+### pip (Recommended)
+
+```bash
+pip install salmalm
+salmalm
+# → Opens http://localhost:18800
+# Add your API keys in Settings
+```
+
+### Docker
+
+```bash
+docker run -p 18800:18800 -p 18801:18801 \
+  -e SALMALM_VAULT_PW=changeme \
+  -v salmalm_data:/app \
+  $(docker build -q .)
+```
+
+### Docker Compose
+
+```bash
+git clone https://github.com/hyunjun6928-netizen/salmalm.git
+cd salmalm
+# Edit docker-compose.yml — set SALMALM_VAULT_PW and API keys
+docker compose up -d
+# → http://localhost:18800
+```
+
+### Local LLM (Ollama — no API key needed)
+
+```bash
+ollama pull llama3.2
+salmalm
+# In Settings, enter Ollama URL: http://localhost:11434/v1
+# Use: /model ollama/llama3.2
+```
 
 ## ✨ What It Does
 
@@ -17,10 +56,11 @@ Think of it as your own local ChatGPT, but with superpowers:
 - **RAG search** — BM25 over your local files, no OpenAI embeddings needed
 - **MCP support** — connect to Cursor, VS Code, or any MCP-compatible client
 - **WebSocket** — real-time streaming via a from-scratch RFC 6455 implementation
-- **Telegram bot** — chat from your phone
+- **Telegram & Discord bots** — chat from your phone
 - **Plugin system** — drop a `.py` file in `plugins/` and it just works
+- **One-click update** — upgrade from Settings UI
 
-## 🏗️ Architecture (19 Modules)
+## 🏗️ Architecture (20 Modules, ~9,000 lines)
 
 ```
 salmalm/
@@ -32,6 +72,7 @@ salmalm/
 ├── prompt.py         — system prompt builder
 ├── engine.py         — Intelligence Engine (classify → plan → execute → reflect)
 ├── telegram.py       — async Telegram bot
+├── discord_bot.py    — Discord Gateway + HTTP API
 ├── web.py            — Web UI + REST API + SSE streaming
 ├── ws.py             — WebSocket server (RFC 6455)
 ├── rag.py            — BM25 search engine (SQLite-backed)
@@ -42,47 +83,8 @@ salmalm/
 ├── auth.py           — JWT auth, RBAC, rate limiter, PBKDF2
 ├── tls.py            — self-signed TLS cert generation
 ├── logging_ext.py    — JSON structured logging, rotation
+├── container.py      — lightweight DI container
 └── docs.py           — auto-generated API documentation
-```
-
-## 🚀 Quick Start
-
-```bash
-git clone https://github.com/hyunjun6928-netizen/salmalm.git
-cd salmalm
-
-# Optional: better encryption
-pip install cryptography
-
-# Run (first launch creates vault — set password at web UI)
-python3 server.py
-
-# Open http://127.0.0.1:18800
-# Add your API keys in Settings (Anthropic/OpenAI/xAI/Google)
-```
-
-### Docker
-
-```bash
-docker build -t salmalm .
-docker run -p 18800:18800 -e SALMALM_VAULT_PW=your_password salmalm
-```
-
-### Local LLM (Ollama — no API key needed)
-
-```bash
-ollama pull llama3.2
-python3 server.py
-# In onboarding wizard, enter Ollama URL: http://localhost:11434/v1
-# Use: /model ollama/llama3.2
-```
-
-### Auto-unlock (for unattended startup)
-
-```bash
-cp .env.example .env
-# Edit .env: SALMALM_VAULT_PW=your_secure_password
-./start.sh
 ```
 
 ## 🔐 Security
@@ -139,16 +141,13 @@ Not just a chat proxy. Every message goes through:
 
 ## 📊 Stats
 
-- ~8,500 lines of Python across 19 modules
+- ~9,000 lines of Python across 20 modules
 - 30 built-in tools + plugin extensibility
 - 27 LLM models with cost tracking
+- 85 unit tests
 - 18/18 self-test on startup
 - 8-component health monitoring
 
 ## 📜 License
 
 MIT
-
-## Credits
-
-Built by Nightmare Dolsoe 😈 — an Awakened AI.

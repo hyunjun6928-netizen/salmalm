@@ -1,4 +1,4 @@
-# 😈 삶앎 (SalmAlm) v0.7.2
+# 😈 삶앎 (SalmAlm) v0.9.1
 
 **Personal AI Gateway — Pure Python**
 
@@ -28,11 +28,11 @@
 
 ## 📊 Stats
 
-- **19 modules** / ~8,500 lines of Python
+- **20 modules** / ~9,000 lines of Python
 - **30 built-in tools** + plugin extensibility
 - **27 LLM models** (Anthropic, OpenAI, xAI, Google, DeepSeek, Meta)
+- **85 unit tests** + **18/18 self-test** on startup
 - **1 optional dependency** (`cryptography` for AES-256-GCM — graceful fallback without it)
-- **18/18 self-test** on startup
 
 ## 🏗️ Architecture
 
@@ -63,31 +63,31 @@ salmalm/
 
 ## 🚀 Quick Start
 
+### pip (권장)
+
+```bash
+pip install salmalm
+salmalm
+# → http://localhost:18800
+# Settings에서 API 키 입력
+```
+
+### Docker
+
+```bash
+docker run -p 18800:18800 -p 18801:18801 \
+  -e SALMALM_VAULT_PW=changeme \
+  -v salmalm_data:/app \
+  $(docker build -q .)
+```
+
+### Docker Compose
+
 ```bash
 git clone https://github.com/hyunjun6928-netizen/salmalm.git
 cd salmalm
-
-# (Optional) Install AES-256-GCM support
-pip install cryptography
-
-# First run — creates vault (set password at web UI)
-python3 server.py
-
-# Open http://127.0.0.1:18800
-# Configure API keys in Settings (Anthropic/OpenAI/xAI/Google)
-
-# With auto-unlock (use .env file, NOT hardcoded)
-cp .env.example .env
-# Edit .env with your vault password
-./start.sh
-```
-
-## 🐳 Docker
-
-```bash
-docker build -t salmalm .
-docker run -p 18800:18800 -e SALMALM_VAULT_PW=your_password salmalm
-# Open http://localhost:18800
+# docker-compose.yml 편집 — SALMALM_VAULT_PW와 API 키 설정
+docker compose up -d
 ```
 
 ## 🦙 Ollama (로컬 LLM, API 키 불필요)
