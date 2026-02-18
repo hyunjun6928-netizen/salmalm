@@ -158,7 +158,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div class="nav-section">채널</div>
     <div class="nav-item active" onclick="showChat()">💬 웹 챗</div>
     <div class="nav-item" id="tg-status">📡 텔레그램 <span class="badge">ON</span></div>
-    <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ 도구 (19개) ▾</div>
+    <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ 도구 (30개) ▾</div>
     <div id="tools-list">
     <div class="nav-item" onclick="quickCmd('/help')">🔧 exec · 파일 · 검색</div>
     <div class="nav-item" onclick="quickCmd('시스템 상태를 확인해줘')">🖥️ 시스템 모니터</div>
