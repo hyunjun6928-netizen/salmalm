@@ -346,6 +346,10 @@ class HealthMonitor:
             ("mcp", "salmalm.mcp"),
             ("browser", "salmalm.browser"),
             ("nodes", "salmalm.nodes"),
+            ("auth", "salmalm.auth"),
+            ("tls", "salmalm.tls"),
+            ("logging_ext", "salmalm.logging_ext"),
+            ("docs", "salmalm.docs"),
         ]
 
         passed = 0

@@ -5,6 +5,8 @@ from pathlib import Path
 from .constants import *
 from .crypto import vault, log
 from .core import get_usage_report, router, audit_log
+from .auth import auth_manager, rate_limiter, extract_auth, RateLimitExceeded
+from .logging_ext import request_logger, set_correlation_id
 
 # ============================================================
 WEB_HTML = '''<!DOCTYPE html>
@@ -670,6 +672,27 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _get_client_ip(self) -> str:
+        return self.headers.get('X-Forwarded-For', self.client_address[0] if self.client_address else '?').split(',')[0].strip()
+
+    def _check_rate_limit(self) -> bool:
+        """Check rate limit. Returns True if OK, sends 429 if exceeded."""
+        ip = self._get_client_ip()
+        user = extract_auth(dict(self.headers))
+        role = user.get('role', 'anonymous') if user else 'anonymous'
+        key = user.get('username', ip) if user else ip
+        try:
+            rate_limiter.check(key, role)
+            return True
+        except RateLimitExceeded as e:
+            self.send_response(429)
+            self.send_header('Retry-After', str(int(e.retry_after)))
+            self._cors()
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': 'Rate limit exceeded',
+                                         'retry_after': e.retry_after}).encode())
+            return False
+
     def do_OPTIONS(self):
         self.send_response(204)
         self._cors()
@@ -677,6 +700,25 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        _start = time.time()
+        import uuid
+        set_correlation_id(str(uuid.uuid4())[:8])
+
+        if self.path.startswith('/api/') and not self._check_rate_limit():
+            return
+
+        try:
+            self._do_get_inner()
+        except Exception as e:
+            log.error(f"GET {self.path} error: {e}")
+            self._json({'error': 'Internal server error'}, 500)
+        finally:
+            duration = (time.time() - _start) * 1000
+            request_logger.log_request('GET', self.path.split('?')[0],
+                                        ip=self._get_client_ip(),
+                                        duration_ms=duration)
+
+    def _do_get_inner(self):
         if self.path == '/' or self.path == '/index.html':
             if not vault.is_unlocked:
                 self._html(UNLOCK_HTML)
@@ -770,6 +812,20 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         'unlocked': vault.is_unlocked,
                         'usage': get_usage_report(),
                         'model': router.force_model or 'auto'})
+        elif self.path == '/api/metrics':
+            self._json(request_logger.get_metrics())
+        elif self.path == '/api/cert':
+            from .tls import get_cert_info
+            self._json(get_cert_info())
+        elif self.path == '/api/auth/users':
+            user = extract_auth(dict(self.headers))
+            if not user or user.get('role') != 'admin':
+                self._json({'error': 'Admin access required'}, 403)
+            else:
+                self._json({'users': auth_manager.list_users()})
+        elif self.path == '/docs':
+            from .docs import generate_api_docs_html
+            self._html(generate_api_docs_html())
         elif self.path.startswith('/uploads/'):
             # Serve uploaded files (images, audio)
             fname = self.path.split('/uploads/')[-1]
@@ -800,6 +856,25 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
+        _start = time.time()
+        import uuid
+        set_correlation_id(str(uuid.uuid4())[:8])
+
+        if self.path.startswith('/api/') and not self._check_rate_limit():
+            return
+
+        try:
+            self._do_post_inner()
+        except Exception as e:
+            log.error(f"POST {self.path} error: {e}")
+            self._json({'error': 'Internal server error'}, 500)
+        finally:
+            duration = (time.time() - _start) * 1000
+            request_logger.log_request('POST', self.path,
+                                        ip=self._get_client_ip(),
+                                        duration_ms=duration)
+
+    def _do_post_inner(self):
         from .engine import process_message
         length = int(self.headers.get('Content-Length', 0))
         # Don't parse multipart as JSON
@@ -807,6 +882,31 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             body = {}
         else:
             body = json.loads(self.rfile.read(length)) if length else {}
+
+        if self.path == '/api/auth/login':
+            username = body.get('username', '')
+            password = body.get('password', '')
+            user = auth_manager.authenticate(username, password)
+            if user:
+                token = auth_manager.create_token(user)
+                self._json({'ok': True, 'token': token, 'user': user})
+            else:
+                self._json({'error': 'Invalid credentials'}, 401)
+            return
+
+        if self.path == '/api/auth/register':
+            requester = extract_auth(dict(self.headers))
+            if not requester or requester.get('role') != 'admin':
+                self._json({'error': 'Admin access required'}, 403)
+                return
+            try:
+                user = auth_manager.create_user(
+                    body.get('username', ''), body.get('password', ''),
+                    body.get('role', 'user'))
+                self._json({'ok': True, 'user': user})
+            except ValueError as e:
+                self._json({'error': str(e)}, 400)
+            return
 
         if self.path == '/api/unlock':
             password = body.get('password', '')
