@@ -27,6 +27,26 @@ PBKDF2_ITER = 200_000
 SESSION_TIMEOUT = 3600 * 8
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION = 60
+EXEC_ALLOWLIST = {
+    # Core utils
+    'ls', 'cat', 'head', 'tail', 'wc', 'sort', 'uniq', 'grep', 'awk', 'sed',
+    'find', 'which', 'file', 'stat', 'du', 'df', 'echo', 'printf', 'date',
+    'tr', 'cut', 'tee', 'xargs', 'diff', 'patch', 'env', 'pwd', 'whoami',
+    'uname', 'hostname', 'id', 'dirname', 'basename', 'realpath', 'readlink',
+    'md5sum', 'sha256sum', 'base64', 'xxd', 'hexdump', 'yes', 'true', 'false',
+    # Dev tools
+    'python3', 'python', 'pip', 'pip3', 'node', 'npm', 'npx', 'deno', 'bun',
+    'git', 'gh', 'cargo', 'rustc', 'go', 'java', 'javac', 'gcc', 'g++', 'make',
+    'cmake', 'docker', 'kubectl', 'terraform',
+    # Network (read-only)
+    'curl', 'wget', 'ping', 'dig', 'nslookup', 'host', 'traceroute', 'ss', 'ip',
+    # File ops (safe)
+    'cp', 'mv', 'mkdir', 'touch', 'ln', 'tar', 'gzip', 'gunzip', 'zip', 'unzip',
+    # Text
+    'jq', 'yq', 'csvtool', 'sqlite3', 'psql', 'mysql',
+    # System info
+    'ps', 'top', 'htop', 'free', 'uptime', 'lsof', 'nproc', 'lscpu', 'lsblk',
+}
 EXEC_BLOCKLIST = {
     'rm', 'rmdir', 'mkfs', 'dd', 'shutdown', 'reboot', 'halt', 'poweroff',
     'init', 'systemctl', 'useradd', 'userdel', 'passwd', 'chown', 'chmod',

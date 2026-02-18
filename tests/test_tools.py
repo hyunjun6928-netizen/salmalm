@@ -9,7 +9,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from salmalm.constants import EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, PROTECTED_FILES
+from salmalm.constants import EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, PROTECTED_FILES
 
 
 class TestExecBlocklist(unittest.TestCase):
@@ -33,11 +33,15 @@ class TestExecBlocklist(unittest.TestCase):
             matched = any(re.search(p, cmd) for p in EXEC_BLOCKLIST_PATTERNS)
             self.assertTrue(matched, f"Should block: {cmd}")
 
-    def test_safe_commands_allowed(self):
+    def test_safe_commands_in_allowlist(self):
         safe = ['ls', 'cat', 'grep', 'find', 'wc', 'head', 'tail',
                 'python3', 'git', 'curl']
         for cmd in safe:
-            self.assertNotIn(cmd, EXEC_BLOCKLIST, f"{cmd} should be allowed")
+            self.assertIn(cmd, EXEC_ALLOWLIST, f"{cmd} should be in allowlist")
+            self.assertNotIn(cmd, EXEC_BLOCKLIST, f"{cmd} should not be blocked")
+
+    def test_allowlist_not_empty(self):
+        self.assertGreater(len(EXEC_ALLOWLIST), 30)
 
 
 class TestProtectedFiles(unittest.TestCase):

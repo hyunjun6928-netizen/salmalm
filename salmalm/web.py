@@ -688,6 +688,18 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('X-Frame-Options', 'DENY')
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+        # CSP: allow inline scripts (required) but block external scripts/objects
+        self.send_header('Content-Security-Policy',
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self' ws://127.0.0.1:* wss://127.0.0.1:*; "
+            "font-src 'self' data:; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
 
     def _html(self, content: str):
         body = content.encode('utf-8')

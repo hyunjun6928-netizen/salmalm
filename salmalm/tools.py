@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
-from .constants import (EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, PROTECTED_FILES,
+from .constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, PROTECTED_FILES,
                         WORKSPACE_DIR, VERSION, KST, MEMORY_FILE, MEMORY_DIR, AUDIT_DB)
 from .crypto import vault, log
 from .core import (audit_log, get_usage_report, _tfidf, SubAgent, SkillLoader,
@@ -419,13 +419,19 @@ TOOL_DEFINITIONS = [
 
 
 def _is_safe_command(cmd: str) -> tuple[bool, str]:
-    """Check if command is safe to execute."""
+    """Check if command is safe to execute (allowlist + blocklist double defense)."""
     first_word = cmd.strip().split()[0].split('/')[-1] if cmd.strip() else ''
+    if not first_word:
+        return False, '빈 명령어'
+    # Blocklist takes priority (even if somehow in allowlist)
     if first_word in EXEC_BLOCKLIST:
         return False, f'차단된 명령어: {first_word}'
     for pattern in EXEC_BLOCKLIST_PATTERNS:
         if re.search(pattern, cmd):
             return False, f'차단된 패턴: {pattern}'
+    # Allowlist check — unknown commands blocked
+    if first_word not in EXEC_ALLOWLIST:
+        return False, f'허용되지 않은 명령어: {first_word} (EXEC_ALLOWLIST에 없음)'
     return True, ''
 
 
@@ -784,7 +790,9 @@ else:
                     import resource
                     resource.setrlimit(resource.RLIMIT_CPU, (timeout_sec, timeout_sec))
                     resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))  # 512MB
-                    resource.setrlimit(resource.RLIMIT_NOFILE, (50, 50))
+                    resource.setrlimit(resource.RLIMIT_NOFILE, (50, 50))  # fd limit
+                    resource.setrlimit(resource.RLIMIT_NPROC, (10, 10))  # fork bomb prevention
+                    resource.setrlimit(resource.RLIMIT_FSIZE, (10 * 1024 * 1024, 10 * 1024 * 1024))  # 10MB file write limit
                 except Exception:
                     pass  # Windows or unsupported
 
