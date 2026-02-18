@@ -1,0 +1,74 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: salmalm-windows.exe
+            cmd: pyinstaller --onefile --name salmalm --icon=NONE salmalm_launcher.py
+            path: dist/salmalm.exe
+          - os: macos-latest
+            artifact: salmalm-macos
+            cmd: pyinstaller --onefile --name salmalm salmalm_launcher.py
+            path: dist/salmalm
+          - os: ubuntu-latest
+            artifact: salmalm-linux
+            cmd: pyinstaller --onefile --name salmalm salmalm_launcher.py
+            path: dist/salmalm
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller cryptography
+          pip install -e .
+
+      - name: Build executable
+        run: ${{ matrix.cmd }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Rename artifacts
+        run: |
+          mkdir -p release
+          cp artifacts/salmalm-windows.exe/salmalm.exe release/salmalm-windows.exe
+          cp artifacts/salmalm-macos/salmalm release/salmalm-macos
+          cp artifacts/salmalm-linux/salmalm release/salmalm-linux
+          chmod +x release/salmalm-macos release/salmalm-linux
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
