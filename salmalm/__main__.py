@@ -6,31 +6,28 @@ import sys
 
 
 def _ensure_windows_shortcut():
-    """Create a 'SalmAlm.bat' on Desktop for easy launch (once)."""
+    """Create a Windows shortcut (.lnk) on Desktop via PowerShell."""
     try:
-        # Try Windows shell API first (handles localized Desktop names)
-        desktop = None
-        try:
-            import subprocess as _sp
-            result = _sp.run(
-                ['powershell', '-Command', '[Environment]::GetFolderPath("Desktop")'],
-                capture_output=True, text=True, timeout=5)
-            if result.returncode == 0 and result.stdout.strip():
-                desktop = result.stdout.strip()
-        except Exception:
-            pass
-        if not desktop:
-            desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
-        if not os.path.isdir(desktop):
-            return
-        bat = os.path.join(desktop, 'SalmAlm.bat')
-        if os.path.exists(bat):
-            return
-        python_exe = sys.executable
-        content = f'@echo off\ntitle SalmAlm\n"{python_exe}" -m salmalm\npause\n'
-        with open(bat, 'w') as f:
-            f.write(content)
-        print(f"📌 Created desktop shortcut: {bat}")
+        import subprocess as _sp
+        python_exe = sys.executable.replace('\\', '\\\\')
+        # PowerShell script to create .lnk shortcut
+        ps_script = f'''
+$desktop = [Environment]::GetFolderPath("Desktop")
+$lnk = Join-Path $desktop "SalmAlm.lnk"
+if (Test-Path $lnk) {{ exit 0 }}
+$ws = New-Object -ComObject WScript.Shell
+$s = $ws.CreateShortcut($lnk)
+$s.TargetPath = "{python_exe}"
+$s.Arguments = "-m salmalm"
+$s.WorkingDirectory = "$env:USERPROFILE"
+$s.Description = "SalmAlm - Personal AI Gateway"
+$s.Save()
+Write-Host "Created: $lnk"
+'''
+        result = _sp.run(['powershell', '-Command', ps_script],
+                        capture_output=True, text=True, timeout=10)
+        if result.stdout.strip():
+            print(f"📌 {result.stdout.strip()}")
     except Exception as e:
         print(f"⚠️  Could not create desktop shortcut: {e}")
 
