@@ -1173,7 +1173,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         {'x-api-key': body['anthropic_api_key'],
                          'content-type': 'application/json',
                          'anthropic-version': '2023-06-01'},
-                        {'model': 'claude-haiku-3.5-20241022', 'max_tokens': 10,
+                        {'model': 'claude-3-5-haiku-20241022', 'max_tokens': 10,
                          'messages': [{'role': 'user', 'content': 'ping'}]},
                         timeout=15
                     )
@@ -1187,7 +1187,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         'https://api.openai.com/v1/chat/completions',
                         {'Authorization': f'Bearer {body["openai_api_key"]}',
                          'Content-Type': 'application/json'},
-                        {'model': 'gpt-4.1-nano', 'max_tokens': 10,
+                        {'model': 'gpt-4o-mini', 'max_tokens': 10,
                          'messages': [{'role': 'user', 'content': 'ping'}]},
                         timeout=15
                     )
