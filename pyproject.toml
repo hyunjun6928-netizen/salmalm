@@ -1,0 +1,22 @@
+[project]
+name = "salmalm"
+version = "0.7.2"
+description = "Personal AI Gateway — Pure Python"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+crypto = ["cryptography>=42.0"]
+dev = ["mypy>=1.8", "pytest>=8.0"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = ["plugins/", "scripts/", "memory/"]

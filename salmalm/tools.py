@@ -714,11 +714,22 @@ if _result is not None:
 else:
     print(json.dumps({{"result": "(no _result set)"}}))
 '''
+            # Resource limits (Linux only — graceful no-op on Windows/macOS)
+            def _set_limits():
+                try:
+                    import resource
+                    resource.setrlimit(resource.RLIMIT_CPU, (timeout_sec, timeout_sec))
+                    resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))  # 512MB
+                    resource.setrlimit(resource.RLIMIT_NOFILE, (50, 50))
+                except Exception:
+                    pass  # Windows or unsupported
+
             try:
                 result = subprocess.run(
                     [sys.executable, '-c', wrapper],
                     capture_output=True, text=True,
-                    timeout=timeout_sec, cwd=str(WORKSPACE_DIR)
+                    timeout=timeout_sec, cwd=str(WORKSPACE_DIR),
+                    preexec_fn=_set_limits
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     try:
