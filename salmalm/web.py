@@ -11,9 +11,9 @@ from .logging_ext import request_logger, set_correlation_id
 
 # ============================================================
 WEB_HTML = '''<!DOCTYPE html>
-<html lang="ko"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>삶앎 — Personal AI Gateway</title>
+<title>SalmAlm — Personal AI Gateway</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -151,30 +151,30 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
 <div id="sidebar">
   <div class="side-header">
-    <h1><span class="icon">😈</span> 삶앎</h1>
+    <h1><span class="icon">😈</span> SalmAlm</h1>
     <div class="tagline">Personal AI Gateway</div>
   </div>
   <div class="side-nav">
-    <div class="nav-section">채널</div>
-    <div class="nav-item active" onclick="showChat()">💬 웹 챗</div>
-    <div class="nav-item" id="tg-status">📡 텔레그램 <span class="badge">ON</span></div>
-    <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ 도구 (30개) ▾</div>
+    <div class="nav-section">Channels</div>
+    <div class="nav-item active" onclick="showChat()">💬 Web Chat</div>
+    <div class="nav-item" id="tg-status">📡 Telegram <span class="badge">ON</span></div>
+    <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ Tools (30) ▾</div>
     <div id="tools-list">
-    <div class="nav-item" onclick="quickCmd('/help')">🔧 exec · 파일 · 검색</div>
-    <div class="nav-item" onclick="quickCmd('시스템 상태를 확인해줘')">🖥️ 시스템 모니터</div>
-    <div class="nav-item" onclick="quickCmd('메모리 파일 목록을 보여줘')">🧠 메모리</div>
-    <div class="nav-item" onclick="quickCmd('오늘의 비용 리포트를 보여줘')">💰 비용 추적</div>
-    <div class="nav-item" onclick="quickCmd('크론 작업 목록을 보여줘')">⏰ 크론 관리</div>
-    <div class="nav-item" onclick="quickCmd('Python으로 1+1 계산해줘')">🐍 Python 실행</div>
-    <div class="nav-item" onclick="quickCmd('이미지를 생성해줘: 은하수 배경의 고양이')">🎨 이미지 생성</div>
-    <div class="nav-item" onclick="quickCmd('이 문장을 음성으로 변환해줘: 안녕하세요')">🔊 TTS</div>
+    <div class="nav-item" onclick="quickCmd('/help')">🔧 exec · file · search</div>
+    <div class="nav-item" onclick="quickCmd('Check system status')">🖥️ System Monitor</div>
+    <div class="nav-item" onclick="quickCmd('Show memory files')">🧠 Memory</div>
+    <div class="nav-item" onclick="quickCmd('Show cost report')">💰 Cost Tracker</div>
+    <div class="nav-item" onclick="quickCmd('Show cron jobs')">⏰ Cron Manager</div>
+    <div class="nav-item" onclick="quickCmd('Calculate 1+1 in Python')">🐍 Python Exec</div>
+    <div class="nav-item" onclick="quickCmd('Generate image: a cat in galaxy')">🎨 Image Gen</div>
+    <div class="nav-item" onclick="quickCmd('Convert to speech: Hello world')">🔊 TTS</div>
     </div>
-    <div class="nav-section">관리</div>
-    <div class="nav-item" onclick="showSettings()">⚙️ 설정</div>
-    <div class="nav-item" onclick="showUsage()">📊 사용량</div>
+    <div class="nav-section">Admin</div>
+    <div class="nav-item" onclick="showSettings()">⚙️ Settings</div>
+    <div class="nav-item" onclick="showUsage()">📊 Usage</div>
   </div>
   <div class="side-footer">
-    <div class="status"><span class="dot"></span> 가동 중</div>
+    <div class="status"><span class="dot"></span> Running</div>
     <div>v''' + VERSION + ''' · AES-256-GCM</div>
   </div>
 </div>
@@ -183,24 +183,24 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
 <div id="header">
   <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
-  <div class="title">💬 웹 챗</div>
+  <div class="title">💬 Web Chat</div>
   <div class="model-badge" id="model-badge">auto routing</div>
   <div class="spacer"></div>
-  <div class="cost">비용: <b id="cost-display">$0.0000</b></div>
-  <button id="theme-toggle" onclick="toggleTheme()" title="테마 전환">🌙</button>
-  <button id="export-btn" onclick="window.exportChat('md')" title="대화 내보내기" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer">📥 내보내기</button>
-  <button id="new-chat-btn" onclick="window.newChat()" title="새 대화">🗑️ 새 대화</button>
+  <div class="cost">Cost: <b id="cost-display">$0.0000</b></div>
+  <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+  <button id="export-btn" onclick="window.exportChat('md')" title="Export chat" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer">📥 Export</button>
+  <button id="new-chat-btn" onclick="window.newChat()" title="New Chat">🗑️ New Chat</button>
 </div>
 
 <div id="chat"></div>
 
 <div id="settings">
   <div class="settings-card">
-    <h3>🤖 모델 설정</h3>
-    <label>기본 모델</label>
+    <h3>🤖 Model Settings</h3>
+    <label>Default Model</label>
     <select id="s-model" onchange="setModel(this.value)">
-      <optgroup label="🔄 자동">
-        <option value="auto">자동 라우팅 (추천)</option>
+      <optgroup label="🔄 Auto">
+        <option value="auto">Auto Routing (Recommended)</option>
       </optgroup>
       <optgroup label="🟣 Anthropic">
         <option value="anthropic/claude-opus-4-6">Claude Opus 4.6 💎</option>
@@ -232,41 +232,41 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         <option value="meta-llama/llama-4-maverick">Llama 4 Maverick</option>
         <option value="meta-llama/llama-4-scout">Llama 4 Scout ⚡</option>
       </optgroup>
-      <optgroup label="🦙 Ollama (로컬)">
+      <optgroup label="🦙 Ollama (Local)">
         <option value="ollama/llama3.3">Llama 3.3</option>
         <option value="ollama/qwen3">Qwen 3</option>
         <option value="ollama/gemma3">Gemma 3</option>
       </optgroup>
     </select>
-    <label style="margin-top:8px">Ollama URL (로컬 LLM)</label>
+    <label style="margin-top:8px">Ollama URL (Local LLM)</label>
     <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
-    <button onclick="fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:document.getElementById('s-ollama-url').value})}).then(function(){alert('저장됨')})" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px">Ollama URL 저장</button>
+    <button onclick="fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:document.getElementById('s-ollama-url').value})}).then(function(){alert('Saved')})" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px">Save Ollama URL</button>
   </div>
   <div class="settings-card">
-    <h3>🔑 API 키 관리</h3>
+    <h3>🔑 API Key Management</h3>
     <label>Anthropic API Key</label>
-    <div style="display:flex;gap:6px"><input id="sk-anthropic" type="password" placeholder="sk-ant-..."><button class="btn" onclick="saveKey('anthropic_api_key','sk-anthropic')">저장</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('anthropic')">테스트</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-anthropic" type="password" placeholder="sk-ant-..."><button class="btn" onclick="saveKey('anthropic_api_key','sk-anthropic')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('anthropic')">Test</button></div>
     <label>OpenAI API Key</label>
-    <div style="display:flex;gap:6px"><input id="sk-openai" type="password" placeholder="sk-..."><button class="btn" onclick="saveKey('openai_api_key','sk-openai')">저장</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('openai')">테스트</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-openai" type="password" placeholder="sk-..."><button class="btn" onclick="saveKey('openai_api_key','sk-openai')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('openai')">Test</button></div>
     <label>xAI API Key (Grok)</label>
-    <div style="display:flex;gap:6px"><input id="sk-xai" type="password" placeholder="xai-..."><button class="btn" onclick="saveKey('xai_api_key','sk-xai')">저장</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('xai')">테스트</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-xai" type="password" placeholder="xai-..."><button class="btn" onclick="saveKey('xai_api_key','sk-xai')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('xai')">Test</button></div>
     <label>Google API Key (Gemini)</label>
-    <div style="display:flex;gap:6px"><input id="sk-google" type="password" placeholder="AIza..."><button class="btn" onclick="saveKey('google_api_key','sk-google')">저장</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('google')">테스트</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-google" type="password" placeholder="AIza..."><button class="btn" onclick="saveKey('google_api_key','sk-google')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('google')">Test</button></div>
     <label>Brave Search API Key</label>
-    <div style="display:flex;gap:6px"><input id="sk-brave" type="password" placeholder="BSA..."><button class="btn" onclick="saveKey('brave_api_key','sk-brave')">저장</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-brave" type="password" placeholder="BSA..."><button class="btn" onclick="saveKey('brave_api_key','sk-brave')">Save</button></div>
     <div id="key-test-result" style="margin-top:8px;font-size:12px"></div>
     <div id="vault-keys" style="margin-top:12px"></div>
   </div>
   <div class="settings-card" id="usage-card">
-    <h3>📊 토큰 사용량</h3>
+    <h3>📊 Token Usage</h3>
     <div id="usage-detail"></div>
   </div>
   <div class="settings-card">
-    <h3>🔄 업데이트</h3>
+    <h3>🔄 Update</h3>
     <div style="display:flex;gap:8px;align-items:center">
-      <span id="update-ver" style="font-size:13px;color:var(--text2)">현재: v<span id="cur-ver"></span></span>
-      <button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="checkUpdate()">최신 버전 확인</button>
-      <button class="btn" id="do-update-btn" style="display:none" onclick="doUpdate()">⬆️ 업데이트</button>
+      <span id="update-ver" style="font-size:13px;color:var(--text2)">Current: v<span id="cur-ver"></span></span>
+      <button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="checkUpdate()">Check for Updates</button>
+      <button class="btn" id="do-update-btn" style="display:none" onclick="doUpdate()">⬆️ Update</button>
     </div>
     <div id="update-result" style="margin-top:8px;font-size:12px"></div>
   </div>
@@ -274,7 +274,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
 <div id="input-area">
   <div class="input-box">
-    <textarea id="input" rows="1" placeholder="메시지를 입력하세요..."></textarea>
+    <textarea id="input" rows="1" placeholder="Type a message..."></textarea>
     <button id="send-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
     </button>
@@ -288,7 +288,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     </div>
     <img id="img-preview" style="display:none;max-height:120px;border-radius:8px;margin-top:8px">
   </div>
-  <div class="input-hint">Enter 전송 · Shift+Enter 줄바꿈 · Ctrl+V 이미지/파일 · 드래그앤드롭 가능</div>
+  <div class="input-hint">Enter to send · Shift+Enter newline · Ctrl+V paste · Drag&Drop files</div>
 </div>
 
 <script>
@@ -310,7 +310,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- Export chat --- */
   window.exportChat=function(fmt){
     var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
-    if(!hist.length){alert('내보낼 대화가 없습니다.');return}
+    if(!hist.length){alert('No chat to export.');return}
     var content='';
     if(fmt==='json'){
       content=JSON.stringify(hist,null,2);
@@ -319,7 +319,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       a.download='salmalm_chat_'+new Date().toISOString().slice(0,10)+'.json';a.click();
     }else{
       hist.forEach(function(m){
-        var role=m.role==='user'?'👤 사용자':'😈 삶앎';
+        var role=m.role==='user'?'👤 User':'😈 SalmAlm';
         content+=role+'\\n'+m.text+'\\n\\n---\\n\\n';
       });
       var blob=new Blob([content],{type:'text/markdown'});
@@ -330,12 +330,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* --- New chat --- */
   window.newChat=function(){
-    if(!confirm('대화 기록을 삭제하고 새 대화를 시작할까요?'))return;
+    if(!confirm('Delete chat history and start a new conversation?'))return;
     localStorage.removeItem('salm_chat');
     chat.innerHTML='';
     fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
       body:JSON.stringify({message:'/clear',session:'web'})}).catch(function(){});
-    addMsg('system','😈 새 대화가 시작되었습니다.');
+    addMsg('system','😈 New conversation started.');
   };
 
   /* --- Theme --- */
@@ -372,7 +372,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     var codeBlocks=[];
     t=t.replace(/```(\\w+)?\\n?([\\s\\S]*?)```/g,function(_,lang,code){
       _copyId++;var id='cp'+_copyId;
-      var safe='<pre style="position:relative"><button class="copy-btn" onclick="copyCode(&quot;'+id+'&quot;)" id="btn'+id+'">📋 복사</button><code id="'+id+'">'+(lang?'/* '+lang+' */\\n':'')+escHtml(code)+'</code></pre>';
+      var safe='<pre style="position:relative"><button class="copy-btn" onclick="copyCode(&quot;'+id+'&quot;)" id="btn'+id+'">📋 Copy</button><code id="'+id+'">'+(lang?'/* '+lang+' */\\n':'')+escHtml(code)+'</code></pre>';
       codeBlocks.push(safe);return '%%CODEBLOCK'+(codeBlocks.length-1)+'%%';
     });
     /* Escape remaining HTML to prevent XSS */
@@ -403,8 +403,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   window.copyCode=function(id){
     var el=document.getElementById(id);if(!el)return;
     navigator.clipboard.writeText(el.textContent).then(function(){
-      var btn=document.getElementById('btn'+id);btn.textContent='✅ 복사됨';
-      setTimeout(function(){btn.textContent='📋 복사'},1500);
+      var btn=document.getElementById('btn'+id);btn.textContent='✅ Copied';
+      setTimeout(function(){btn.textContent='📋 Copy'},1500);
     });
   };
   function addMsg(role,text,model){
@@ -421,7 +421,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     var mt=document.createElement('div');mt.className='meta';mt.textContent=meta_parts.join(' · ');
     if(role==='assistant'&&text){
       var regenBtn=document.createElement('span');
-      regenBtn.textContent=' 🔄';regenBtn.style.cursor='pointer';regenBtn.title='재생성';
+      regenBtn.textContent=' 🔄';regenBtn.style.cursor='pointer';regenBtn.title='Regenerate';
       regenBtn.onclick=function(){
         var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
         /* Find last user message */
@@ -495,14 +495,14 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         var reader=new FileReader();
         var previewUrl=await new Promise(function(res){reader.onload=function(){res(reader.result)};reader.readAsDataURL(pendingFile)});
         addMsg('user','<img src="'+previewUrl+'" style="max-width:300px;max-height:300px;border-radius:8px;display:block;margin:4px 0" alt="'+pendingFile.name+'">');
-      }else{addMsg('user','[📎 '+pendingFile.name+' 업로드 중...]')}
+      }else{addMsg('user','[📎 '+pendingFile.name+' Uploading...]')}
       var fd=new FormData();fd.append('file',pendingFile);
       try{
         var ur=await fetch('/api/upload',{method:'POST',body:fd});
         var ud=await ur.json();
         if(ud.ok){fileMsg=ud.info;if(ud.image_base64){imgData=ud.image_base64;imgMime=ud.image_mime}}
-        else addMsg('assistant','❌ 업로드 실패: '+(ud.error||''));
-      }catch(ue){addMsg('assistant','❌ 업로드 오류: '+ue.message)}
+        else addMsg('assistant','❌ Upload failed: '+(ud.error||''));
+      }catch(ue){addMsg('assistant','❌ Upload error: '+ue.message)}
       window.clearFile();
     }
 
@@ -540,7 +540,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
               gotDone=true;
               if(typingEl)typingEl.remove();
               var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
-              addMsg('assistant',edata.response||'',(edata.model||'')+' · ⏱️'+_secs+'초');
+              addMsg('assistant',edata.response||'',(edata.model||'')+' · ⏱️'+_secs+'s');
               fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
             }
           }
@@ -551,17 +551,17 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         /* Fallback to regular /api/chat */
         console.warn('Stream failed, falling back:',streamErr);
         var typRow=document.getElementById('typing-row');
-        if(typRow){var tb3=typRow.querySelector('.bubble');if(tb3)tb3.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> 처리 중...'}
+        if(typRow){var tb3=typRow.querySelector('.bubble');if(tb3)tb3.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> Processing...'}
         var r2=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
           body:JSON.stringify(chatBody)});
         var d=await r2.json();
         if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
         var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
-        if(d.response)addMsg('assistant',d.response,(d.model||'')+' · ⏱️'+_secs2+'초');
+        if(d.response)addMsg('assistant',d.response,(d.model||'')+' · ⏱️'+_secs2+'s');
         else if(d.error)addMsg('assistant','❌ '+d.error);
         fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
       }
-    }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ 오류: '+se.message)}
+    }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ Error: '+se.message)}
     finally{btn.disabled=false;input.focus()}
   }
   window.doSend=doSend;
@@ -580,52 +580,52 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       .then(function(r){return r.json()}).then(function(d){
         document.getElementById('vault-keys').innerHTML=d.keys.map(function(k){return '<div style="padding:4px 0;font-size:13px;color:var(--text2)">🔑 '+k+'</div>'}).join('')});
     fetch('/api/status').then(function(r){return r.json()}).then(function(d){
-      var u=d.usage,h='<div style="font-size:13px;line-height:2">📥 입력: '+u.total_input.toLocaleString()+' 토큰<br>📤 출력: '+u.total_output.toLocaleString()+' 토큰<br>💰 비용: $'+u.total_cost.toFixed(4)+'<br>⏱️ 가동: '+u.elapsed_hours+'시간</div>';
-      if(u.by_model){h+='<div style="margin-top:12px;font-size:12px">';for(var m in u.by_model){var v=u.by_model[m];h+='<div style="padding:4px 0;color:var(--text2)">'+m+': '+v.calls+'회 · $'+v.cost.toFixed(4)+'</div>'}h+='</div>'}
+      var u=d.usage,h='<div style="font-size:13px;line-height:2">📥 Input: '+u.total_input.toLocaleString()+' tokens<br>📤 Output: '+u.total_output.toLocaleString()+' tokens<br>💰 Cost: $'+u.total_cost.toFixed(4)+'<br>⏱️ Uptime: '+u.elapsed_hours+'h</div>';
+      if(u.by_model){h+='<div style="margin-top:12px;font-size:12px">';for(var m in u.by_model){var v=u.by_model[m];h+='<div style="padding:4px 0;color:var(--text2)">'+m+': '+v.calls+'calls · $'+v.cost.toFixed(4)+'</div>'}h+='</div>'}
       document.getElementById('usage-detail').innerHTML=h});
   };
   window.showUsage=window.showSettings;
   window.checkUpdate=function(){
     var re=document.getElementById('update-result');
-    re.innerHTML='<span style="color:var(--text2)">⏳ PyPI 확인 중...</span>';
+    re.innerHTML='<span style="color:var(--text2)">⏳ Checking PyPI...</span>';
     fetch('/api/check-update').then(function(r){return r.json()}).then(function(d){
       document.getElementById('cur-ver').textContent=d.current;
       if(d.latest&&d.latest!==d.current){
-        re.innerHTML='<span style="color:#fbbf24">🆕 새 버전 v'+d.latest+' 사용 가능!</span>';
+        re.innerHTML='<span style="color:#fbbf24">🆕 New version v'+d.latest+'  available!</span>';
         document.getElementById('do-update-btn').style.display='inline-block';
-      }else{re.innerHTML='<span style="color:#4ade80">✅ 최신 버전입니다 (v'+d.current+')</span>';
+      }else{re.innerHTML='<span style="color:#4ade80">✅ You are up to date (v'+d.current+')</span>';
         document.getElementById('do-update-btn').style.display='none'}
-    }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ 확인 실패: '+e.message+'</span>'})};
+    }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ Check failed: '+e.message+'</span>'})};
   window.doUpdate=function(){
     var re=document.getElementById('update-result');
     var btn=document.getElementById('do-update-btn');
-    btn.disabled=true;btn.textContent='⏳ 설치 중...';
-    re.innerHTML='<span style="color:var(--text2)">pip install --upgrade salmalm 실행 중... (최대 30초)</span>';
+    btn.disabled=true;btn.textContent='⏳ Installing...';
+    re.innerHTML='<span style="color:var(--text2)">Running pip install --upgrade salmalm... (up to 30s)</span>';
     fetch('/api/do-update',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ v'+d.version+' 설치 완료! 서버를 재시작하세요.</span>';
-        var rb=document.createElement('button');rb.className='btn';rb.style.marginTop='8px';rb.textContent='🔄 지금 재시작';
+      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ v'+d.version+' Installed! Please restart the server.</span>';
+        var rb=document.createElement('button');rb.className='btn';rb.style.marginTop='8px';rb.textContent='🔄 Restart Now';
         rb.onclick=function(){fetch('/api/restart',{method:'POST'});setTimeout(function(){location.reload()},3000)};re.appendChild(rb);
-      }else{re.innerHTML='<span style="color:#f87171">❌ 실패: '+d.error+'</span>'}
-      btn.disabled=false;btn.textContent='⬆️ 업데이트'})
-    .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>';btn.disabled=false;btn.textContent='⬆️ 업데이트'})};
+      }else{re.innerHTML='<span style="color:#f87171">❌ Failed: '+d.error+'</span>'}
+      btn.disabled=false;btn.textContent='⬆️ Update'})
+    .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>';btn.disabled=false;btn.textContent='⬆️ Update'})};
   window.saveKey=function(vaultKey,inputId){
     var v=document.getElementById(inputId).value.trim();
-    if(!v){alert('키를 입력하세요');return}
+    if(!v){alert('Please enter a key');return}
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'set',key:vaultKey,value:v})})
     .then(function(r){return r.json()}).then(function(d){
       var re=document.getElementById('key-test-result');
-      re.innerHTML='<span style="color:#4ade80">✅ '+vaultKey+' 저장됨</span>';
+      re.innerHTML='<span style="color:#4ade80">✅ '+vaultKey+' Saved</span>';
       document.getElementById(inputId).value='';
       window.showSettings()})};
   window.testKey=function(provider){
     var re=document.getElementById('key-test-result');
-    re.innerHTML='<span style="color:var(--text2)">⏳ '+provider+' 테스트 중...</span>';
+    re.innerHTML='<span style="color:var(--text2)">⏳ '+provider+' Testing...</span>';
     fetch('/api/test-key',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({provider:provider})})
     .then(function(r){return r.json()}).then(function(d){
       re.innerHTML=d.ok?'<span style="color:#4ade80">'+d.result+'</span>':'<span style="color:#f87171">'+d.result+'</span>'})
-    .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ 오류: '+e.message+'</span>'})
+    .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ Error: '+e.message+'</span>'})
   };
   window.setModel=function(m){modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
     fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'/model '+(m==='auto'?'auto':m),session:'web'})})};
@@ -670,7 +670,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* --- Welcome (only if no history) --- */
   if(!JSON.parse(localStorage.getItem('salm_chat')||'[]').length){
-    addMsg('assistant','😈 삶앎에 오신 걸 환영합니다!\\n\\n텔레그램과 웹에서 동시에 사용 가능합니다.\\nCtrl+V 이미지 붙여넣기 · 드래그앤드롭 · Enter 전송\\n/help로 명령어 확인','system');
+    addMsg('assistant','😈 Welcome to SalmAlm!\\n\\nUse on Telegram and Web simultaneously.\\nCtrl+V paste image · Drag&Drop · Enter to send\\nType /help for commands','system');
   }
   input.focus();
 
@@ -1103,7 +1103,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         if self.path == '/api/restart':
             import sys, subprocess
             audit_log('restart', 'user-initiated restart')
-            self._json({'ok': True, 'message': '재시작 중...'})
+            self._json({'ok': True, 'message': 'Restarting...'})
             # Restart the server process
             os.execv(sys.executable, [sys.executable] + sys.argv)
             return
@@ -1137,17 +1137,17 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         headers={'Content-Type': 'application/json'}), timeout=15))(vault.get('google_api_key') or ''),
             }
             if provider not in tests:
-                self._json({'ok': False, 'result': f'❌ 알 수 없는 프로바이더: {provider}'})
+                self._json({'ok': False, 'result': f'❌ Unknown provider: {provider}'})
                 return
             key = vault.get(f'{provider}_api_key') if provider != 'google' else vault.get('google_api_key')
             if not key:
-                self._json({'ok': False, 'result': f'❌ {provider} API 키가 저장되어 있지 않습니다'})
+                self._json({'ok': False, 'result': f'❌ {provider} API key not found in vault'})
                 return
             try:
                 tests[provider]()
-                self._json({'ok': True, 'result': f'✅ {provider} API 연결 성공!'})
+                self._json({'ok': True, 'result': f'✅ {provider} API connection successful!'})
             except Exception as e:
-                self._json({'ok': False, 'result': f'❌ {provider} 테스트 실패: {str(e)[:120]}'})
+                self._json({'ok': False, 'result': f'❌ {provider} Test failed: {str(e)[:120]}'})
             return
 
         if self.path == '/api/unlock':
@@ -1163,7 +1163,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'ok': True, 'token': token})
             else:
                 audit_log('unlock_fail', 'wrong password')
-                self._json({'ok': False, 'error': '비밀번호 틀림'}, 401)
+                self._json({'ok': False, 'error': 'Wrong password'}, 401)
 
         elif self.path in ('/api/chat', '/api/chat/stream'):
             self._auto_unlock_localhost()
@@ -1193,7 +1193,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     except Exception:
                         pass
 
-                send_sse('status', {'text': '🤔 생각 중...'})
+                send_sse('status', {'text': '🤔 Thinking...'})
                 try:
                     loop = asyncio.new_event_loop()
                     response = loop.run_until_complete(
@@ -1204,7 +1204,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     loop.close()
                 except Exception as e:
                     log.error(f"SSE process_message error: {e}")
-                    response = f'❌ 내부 오류: {type(e).__name__}'
+                    response = f'❌ Internal error: {type(e).__name__}'
                 send_sse('done', {'response': response, 'model': router.force_model or 'auto'})
                 try:
                     self.wfile.write(b"event: close\ndata: {}\n\n")
@@ -1221,7 +1221,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     loop.close()
                 except Exception as e:
                     log.error(f"Chat process_message error: {e}")
-                    response = f'❌ 내부 오류: {type(e).__name__}'
+                    response = f'❌ Internal error: {type(e).__name__}'
                 self._json({'response': response, 'model': router.force_model or 'auto'})
 
         elif self.path == '/api/vault':
@@ -1299,11 +1299,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     size_kb = len(file_data) / 1024
                     is_image = any(fname.lower().endswith(ext) for ext in ('.png','.jpg','.jpeg','.gif','.webp','.bmp'))
                     is_text = any(fname.lower().endswith(ext) for ext in ('.txt','.md','.py','.js','.json','.csv','.log','.html','.css','.sh','.bat','.yaml','.yml','.xml','.sql'))
-                    info = f'[{"🖼️ 이미지" if is_image else "📎 파일"} 업로드: uploads/{fname} ({size_kb:.1f}KB)]'
+                    info = f'[{"🖼️ Image" if is_image else "📎 File"} uploaded: uploads/{fname} ({size_kb:.1f}KB)]'
                     if is_text:
                         try:
                             preview = file_data.decode('utf-8', errors='replace')[:3000]
-                            info += f'\n[파일 내용]\n{preview}'
+                            info += f'\n[File content]\n{preview}'
                         except Exception:
                             pass
                     log.info(f"📤 Web upload: {fname} ({size_kb:.1f}KB)")
@@ -1389,7 +1389,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 except Exception as e:
                     test_results.append(f'⚠️ Google: {str(e)[:80]}')
             audit_log('onboarding', f'keys: {", ".join(saved)}')
-            test_result = ' | '.join(test_results) if test_results else '키가 저장되었습니다.'
+            test_result = ' | '.join(test_results) if test_results else 'Keys saved.'
             self._json({'ok': True, 'saved': saved, 'test_result': test_result})
             return
 
@@ -1399,16 +1399,16 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 return
             vault.set('telegram_token', body.get('token', ''))
             vault.set('telegram_owner_id', body.get('owner_id', ''))
-            self._json({'ok': True, 'message': 'Telegram 설정 저장. 재시작 필요.'})
+            self._json({'ok': True, 'message': 'Telegram config saved. Restart required.'})
 
         else:
             self._json({'error': 'Not found'}, 404)
 
 
 ONBOARDING_HTML = '''<!DOCTYPE html>
-<html lang="ko"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>삶앎 — 설정 마법사</title>
+<title>SalmAlm — Setup Wizard</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -1437,19 +1437,19 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 .progress .dot.done{background:#34d399}
 </style></head><body>
 <div class="wizard">
-<h1>😈 삶앎 설정 마법사</h1>
-<p class="sub">AI Gateway를 사용하려면 최소 1개의 API 키가 필요합니다</p>
+<h1>😈 SalmAlm Setup Wizard</h1>
+<p class="sub">You need at least 1 API key to use the AI Gateway</p>
 <div class="progress"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
 
 <div class="step">
 <label class="required">Anthropic API Key (Claude)</label>
 <input type="password" id="anthropic" placeholder="sk-ant-...">
-<div class="hint">가장 추천. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c5cfc">발급하기 →</a></div>
+<div class="hint">Recommended. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
 </div>
 <div class="step">
 <label>OpenAI API Key (GPT)</label>
 <input type="password" id="openai" placeholder="sk-...">
-<div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7c5cfc">발급하기 →</a></div>
+<div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
 </div>
 <div class="step">
 <label>xAI API Key (Grok)</label>
@@ -1461,31 +1461,31 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 </div>
 <div class="divider"></div>
 <div class="step">
-<label>Brave Search API Key (웹 검색용)</label>
+<label>Brave Search API Key (Web Search)</label>
 <input type="password" id="brave" placeholder="BSA...">
-<div class="hint">선택사항. <a href="https://brave.com/search/api/" target="_blank" style="color:#7c5cfc">무료 발급 →</a></div>
+<div class="hint">Optional. <a href="https://brave.com/search/api/" target="_blank" style="color:#7c5cfc">Get Free Key →</a></div>
 </div>
 <div class="divider"></div>
 <div class="step">
-<label>🎮 Discord Bot Token (선택)</label>
+<label>🎮 Discord Bot Token (Optional)</label>
 <input type="password" id="discord" placeholder="MTIz...">
-<div class="hint">선택사항. <a href="https://discord.com/developers/applications" target="_blank" style="color:#7c5cfc">봇 만들기 →</a> MESSAGE CONTENT intent 필수</div>
+<div class="hint">Optional. <a href="https://discord.com/developers/applications" target="_blank" style="color:#7c5cfc">Create Bot →</a> MESSAGE CONTENT intent required</div>
 </div>
 <div class="divider"></div>
 <div class="step">
-<label>🦙 Ollama (로컬 LLM — API 키 불필요)</label>
+<label>🦙 Ollama (Local LLM — No API key needed)</label>
 <input type="text" id="ollama" placeholder="http://localhost:11434/v1" value="">
-<div class="hint">Ollama가 설치되어 있다면 URL 입력. API 키 없이 무료로 사용 가능! <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">설치하기 →</a></div>
+<div class="hint">If Ollama is installed, enter URL. Free without API keys! <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">Install →</a></div>
 </div>
 
-<button id="btn" onclick="save()">저장 & 테스트</button>
+<button id="btn" onclick="save()">Save & Test</button>
 <div class="result" id="result"></div>
-<div class="skip"><a onclick="location.reload()">건너뛰기 (나중에 설정)</a></div>
+<div class="skip"><a onclick="location.reload()">Skip (configure later)</a></div>
 </div>
 <script>
 async function save(){
   const btn=document.getElementById('btn');
-  btn.disabled=true; btn.textContent='테스트 중...';
+  btn.disabled=true; btn.textContent='Testing...';
   const body={};
   ['anthropic','openai','xai','google','brave'].forEach(k=>{
     const v=document.getElementById(k).value.trim();
@@ -1496,27 +1496,27 @@ async function save(){
   const ollama=document.getElementById('ollama').value.trim();
   if(ollama) body.ollama_url=ollama;
   if(!Object.keys(body).length){
-    show('최소 1개의 API 키 또는 Ollama URL을 입력하세요','err');
-    btn.disabled=false; btn.textContent='저장 & 테스트'; return;
+    show('Enter at least 1 API key or Ollama URL','err');
+    btn.disabled=false; btn.textContent='Save & Test'; return;
   }
   try{
     const r=await fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
     if(d.ok){
-      const isTestFail=d.test_result&&d.test_result.includes('실패');
-      show(d.test_result+' ('+d.saved.join(', ')+' 저장됨)',isTestFail?'err':'ok');
-      if(!isTestFail){btn.textContent='✅ 완료! 3초 후 이동...';setTimeout(()=>location.reload(),3000);}
-      else{btn.textContent='⚠️ 저장됨 (키 확인 필요)';btn.disabled=false;}
-    }else{show(d.error,'err');btn.disabled=false;btn.textContent='저장 & 테스트';}
-  }catch(e){show('네트워크 오류: '+e,'err');btn.disabled=false;btn.textContent='저장 & 테스트';}
+      const isTestFail=d.test_result&&d.test_result.includes('fail');
+      show(d.test_result+' ('+d.saved.join(', ')+' Saved)',isTestFail?'err':'ok');
+      if(!isTestFail){btn.textContent='✅ Done! Redirecting in 3s...';setTimeout(()=>location.reload(),3000);}
+      else{btn.textContent='⚠️ Saved (verify key)';btn.disabled=false;}
+    }else{show(d.error,'err');btn.disabled=false;btn.textContent='Save & Test';}
+  }catch(e){show('Network error: '+e,'err');btn.disabled=false;btn.textContent='Save & Test';}
 }
 function show(msg,type){const el=document.getElementById('result');el.textContent=msg;el.className='result '+type;}
 </script></body></html>'''
 
 UNLOCK_HTML = '''<!DOCTYPE html>
-<html lang="ko"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>삶앎 — Unlock</title>
+<title>SalmAlm — Unlock</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e0e0e0;height:100vh;display:flex;align-items:center;justify-content:center}
@@ -1529,10 +1529,10 @@ button:hover{background:#4338ca}
 .error{color:#ef4444;margin-top:12px;font-size:14px;display:none}
 </style></head><body>
 <div class="card">
-<h1>😈 삶앎</h1>
+<h1>😈 SalmAlm</h1>
 <p>Personal AI Gateway v''' + VERSION + '''</p>
-<input type="password" id="pw" placeholder="마스터 비밀번호" onkeydown="if(event.key==='Enter')unlock()">
-<button onclick="unlock()">잠금 해제</button>
+<input type="password" id="pw" placeholder="Master password" onkeydown="if(event.key==='Enter')unlock()">
+<button onclick="unlock()">Unlock</button>
 <div class="error" id="err"></div>
 </div>
 <script>
