@@ -157,7 +157,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div class="tagline">Personal AI Gateway</div>
   </div>
   <div class="side-nav">
-    <div class="nav-section">Channels</div>
+    <div class="nav-section" data-i18n="sec-channels">Channels</div>
     <div class="nav-item active" onclick="showChat()">💬 Web Chat</div>
     <div class="nav-item" id="tg-status">📡 Telegram <span class="badge">ON</span></div>
     <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ Tools (30) ▾</div>
@@ -171,7 +171,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div class="nav-item" onclick="quickCmd('Generate image: a cat in galaxy')">🎨 Image Gen</div>
     <div class="nav-item" onclick="quickCmd('Convert to speech: Hello world')">🔊 TTS</div>
     </div>
-    <div class="nav-section">Admin</div>
+    <div class="nav-section" data-i18n="sec-admin">Admin</div>
     <div class="nav-item" onclick="showSettings()"data-i18n="nav-settings">⚙️ Settings</div>
     <div class="nav-item" onclick="showUsage()">📊 Usage</div>
   </div>
@@ -190,7 +190,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div class="spacer"></div>
   <div class="cost">Cost: <b id="cost-display">$0.0000</b></div>
   <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-  <button id="export-btn" onclick="window.exportChat('md')" title="Export chat" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer">📥 Export</button>
+  <button id="export-btn" onclick="window.exportChat('md')" title="Export chat" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer"data-i18n="btn-export">📥 Export</button>
   <button id="new-chat-btn" onclick="window.newChat()" title="New Chat">🗑️ New Chat</button>
 </div>
 
@@ -206,7 +206,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   </div>
   <div class="settings-card">
     <h3 data-i18n="h-model">🤖 Model Settings</h3>
-    <label>Default Model</label>
+    <labeldata-i18n="lbl-model">Default Model</label>
     <select id="s-model" onchange="setModel(this.value)">
       <optgroup label="🔄 Auto">
         <option value="auto">Auto Routing (Recommended)</option>
@@ -247,27 +247,27 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         <option value="ollama/gemma3">Gemma 3</option>
       </optgroup>
     </select>
-    <label style="margin-top:8px">Ollama URL (Local LLM)</label>
+    <label style="margin-top:8px"data-i18n="lbl-ollama">Ollama URL (Local LLM)</label>
     <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
-    <button onclick="fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:document.getElementById('s-ollama-url').value})}).then(function(){alert('Saved')})" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px">Save Ollama URL</button>
+    <button onclick="fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:document.getElementById('s-ollama-url').value})}).then(function(){alert('Saved')})" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px"data-i18n="btn-save-ollama">Save Ollama URL</button>
   </div>
   <div class="settings-card">
     <h3 data-i18n="h-keys">🔑 API Key Management</h3>
-    <label>Anthropic API Key</label>
+    <labeldata-i18n="lbl-anthropic">Anthropic API Key</label>
     <div style="display:flex;gap:6px"><input id="sk-anthropic" type="password" placeholder="sk-ant-..."><button class="btn" onclick="saveKey('anthropic_api_key','sk-anthropic')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('anthropic')">Test</button></div>
-    <label>OpenAI API Key</label>
+    <labeldata-i18n="lbl-openai">OpenAI API Key</label>
     <div style="display:flex;gap:6px"><input id="sk-openai" type="password" placeholder="sk-..."><button class="btn" onclick="saveKey('openai_api_key','sk-openai')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('openai')">Test</button></div>
-    <label>xAI API Key (Grok)</label>
+    <labeldata-i18n="lbl-xai">xAI API Key (Grok)</label>
     <div style="display:flex;gap:6px"><input id="sk-xai" type="password" placeholder="xai-..."><button class="btn" onclick="saveKey('xai_api_key','sk-xai')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('xai')">Test</button></div>
-    <label>Google API Key (Gemini)</label>
+    <labeldata-i18n="lbl-google">Google API Key (Gemini)</label>
     <div style="display:flex;gap:6px"><input id="sk-google" type="password" placeholder="AIza..."><button class="btn" onclick="saveKey('google_api_key','sk-google')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('google')">Test</button></div>
-    <label>Brave Search API Key</label>
+    <labeldata-i18n="lbl-brave">Brave Search API Key</label>
     <div style="display:flex;gap:6px"><input id="sk-brave" type="password" placeholder="BSA..."><button class="btn" onclick="saveKey('brave_api_key','sk-brave')">Save</button></div>
     <div id="key-test-result" style="margin-top:8px;font-size:12px"></div>
     <div id="vault-keys" style="margin-top:12px"></div>
   </div>
   <div class="settings-card" id="usage-card">
-    <h3>📊 Token Usage</h3>
+    <h3data-i18n="h-usage">📊 Token Usage</h3>
     <div id="usage-detail"></div>
   </div>
   <div class="settings-card">
@@ -599,6 +599,11 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'update-uptodate':'✅ You are up to date','update-checking':'⏳ Checking PyPI...',
       'update-new':'🆕 New version','update-available':'available!','update-download':'⬇️ Download',
       'update-installing':'Running pip install --upgrade salmalm...',
+      'nav-webchat':'Web Chat','nav-sysmon':'System Monitor','nav-memory':'Memory',
+      'nav-cost':'Cost Tracker','nav-cron':'Cron Manager','nav-python':'Python Exec',
+      'nav-image':'Image Gen','nav-tts':'TTS',
+      'btn-save-ollama':'Save Ollama URL','btn-newchat':'🗨 New Chat',
+      'sec-channels':'Channels','sec-admin':'Admin',
     },
     ko:{
       'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정',
@@ -615,6 +620,11 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'update-uptodate':'✅ 최신 버전입니다','update-checking':'⏳ PyPI 확인 중...',
       'update-new':'🆕 새 버전','update-available':'사용 가능!','update-download':'⬇️ 다운로드',
       'update-installing':'pip install --upgrade salmalm 실행 중...',
+      'nav-webchat':'웹 채팅','nav-sysmon':'시스템 모니터','nav-memory':'메모리',
+      'nav-cost':'비용 추적','nav-cron':'크론 관리','nav-python':'Python 실행',
+      'nav-image':'이미지 생성','nav-tts':'음성 합성',
+      'btn-save-ollama':'Ollama URL 저장','btn-newchat':'🗨 새 대화',
+      'sec-channels':'채널','sec-admin':'관리',
     }
   };
   var _lang=localStorage.getItem('salmalm-lang')||'en';
@@ -624,6 +634,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       var k=el.getAttribute('data-i18n');
       if(el.tagName==='INPUT'||el.tagName==='TEXTAREA')el.placeholder=t(k);
       else el.textContent=t(k);
+    });
+    // Translate Save/Test buttons by content matching
+    document.querySelectorAll('button').forEach(function(btn){
+      var txt=btn.textContent.trim();
+      if(txt==='Save'||txt==='저장')btn.textContent=t('btn-save');
+      else if(txt==='Test'||txt==='테스트')btn.textContent=t('btn-test');
     });
     var sel=document.getElementById('s-lang');
     if(sel)sel.value=_lang;
@@ -1519,11 +1535,11 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 <div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
 </div>
 <div class="step">
-<label>xAI API Key (Grok)</label>
+<labeldata-i18n="lbl-xai">xAI API Key (Grok)</label>
 <input type="password" id="xai" placeholder="xai-...">
 </div>
 <div class="step">
-<label>Google API Key (Gemini)</label>
+<labeldata-i18n="lbl-google">Google API Key (Gemini)</label>
 <input type="password" id="google" placeholder="AIza...">
 </div>
 <div class="divider"></div>
