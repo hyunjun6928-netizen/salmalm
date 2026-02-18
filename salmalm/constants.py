@@ -2,7 +2,7 @@
 from datetime import timedelta, timezone
 from pathlib import Path
 
-VERSION = "0.9.3"
+VERSION = "0.9.4"
 APP_NAME = "SalmAlm"
 KST = timezone(timedelta(hours=9))
 
