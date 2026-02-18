@@ -1,5 +1,5 @@
 from __future__ import annotations
-"""삶앎 API Documentation — auto-generated from tool definitions and endpoints.
+"""SalmAlm API Documentation — auto-generated from tool definitions and endpoints.
 
 Serves an interactive API documentation page at /docs.
 """
@@ -69,7 +69,7 @@ def generate_api_docs_html() -> str:
     return f'''<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>삶앎 API Documentation v{VERSION}</title>
+<title>SalmAlm API Documentation v{VERSION}</title>
 <style>
 :root{{--bg:#0f1117;--bg2:#1a1d27;--text:#e0e0e0;--text2:#888;--accent:#7c5cfc;--green:#34d399;--border:#252838}}
 *{{margin:0;padding:0;box-sizing:border-box}}
@@ -102,7 +102,7 @@ a{{color:var(--accent);text-decoration:none}}
 a:hover{{text-decoration:underline}}
 </style></head><body>
 <div class="container">
-<h1>😈 삶앎 API Documentation</h1>
+<h1>😈 SalmAlm API Documentation</h1>
 <p class="subtitle">v{VERSION} — Personal AI Gateway — Pure Python, Zero Dependencies</p>
 
 <div class="stats">
@@ -142,6 +142,6 @@ a:hover{{text-decoration:underline}}
 {''.join(tool_rows)}
 
 <div style="margin-top:48px;padding:24px 0;border-top:1px solid var(--border);color:var(--text2);font-size:13px;text-align:center">
-삶앎 (SalmAlm) v{VERSION} — <a href="https://github.com/hyunjun6928-netizen/salmalm">GitHub</a>
+SalmAlm v{VERSION} — <a href="https://github.com/hyunjun6928-netizen/salmalm">GitHub</a>
 </div>
 </div></body></html>'''

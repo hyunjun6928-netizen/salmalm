@@ -1,5 +1,5 @@
 from __future__ import annotations
-"""삶앎 Browser Automation — Chrome DevTools Protocol (CDP) over WebSocket.
+"""SalmAlm Browser Automation — Chrome DevTools Protocol (CDP) over WebSocket.
 
 Pure stdlib. No Playwright/Selenium/Puppeteer needed.
 Connects to Chrome's debug port via CDP WebSocket to:

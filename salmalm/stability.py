@@ -1,5 +1,5 @@
 from __future__ import annotations
-"""삶앎 Stability Engine — health monitoring, auto-recovery, watchdog.
+"""SalmAlm Stability Engine — health monitoring, auto-recovery, watchdog.
 
 Provides production-grade stability:
   - Health check endpoint with detailed diagnostics

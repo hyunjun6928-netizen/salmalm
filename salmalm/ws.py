@@ -1,5 +1,5 @@
 from __future__ import annotations
-"""삶앎 WebSocket server — RFC 6455 over asyncio, pure stdlib.
+"""SalmAlm WebSocket server — RFC 6455 over asyncio, pure stdlib.
 
 Provides real-time bidirectional communication:
   - Chat messages (user ↔ bot)

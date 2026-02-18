@@ -1,4 +1,4 @@
-"""삶앎 Web UI — HTML + WebHandler."""
+"""SalmAlm Web UI — HTML + WebHandler."""
 import asyncio, gzip, http.server, json, os, re, secrets, time
 from pathlib import Path
 from typing import Optional

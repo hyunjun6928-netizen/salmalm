@@ -1,5 +1,5 @@
 from __future__ import annotations
-"""삶앎 RAG — Retrieval-Augmented Generation with local embeddings.
+"""SalmAlm RAG — Retrieval-Augmented Generation with local embeddings.
 
 Pure stdlib. No OpenAI embeddings API required.
 Upgrades from basic TF-IDF to:
@@ -13,8 +13,8 @@ Upgrades from basic TF-IDF to:
 
 Usage:
   from salmalm.rag import rag_engine
-  results = rag_engine.search("지트700 DB 스키마")
-  context = rag_engine.build_context("지트700 DB 스키마", max_chars=3000)
+  results = rag_engine.search("DB schema")
+  context = rag_engine.build_context("DB schema", max_chars=3000)
 """
 
 
@@ -297,7 +297,7 @@ class RAGEngine:
         if not results:
             return ""
 
-        parts = ["[검색된 관련 정보]"]
+        parts = ["[Retrieved relevant information]"]
         total = 0
         for r in results:
             snippet = f"\n--- {r['source']}#L{r['line']} (relevance: {r['score']}) ---\n{r['text']}"

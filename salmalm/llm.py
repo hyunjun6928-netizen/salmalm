@@ -1,4 +1,4 @@
-"""삶앎 LLM — Multi-provider API calls with caching and fallback."""
+"""SalmAlm LLM — Multi-provider API calls with caching and fallback."""
 
 from __future__ import annotations
 

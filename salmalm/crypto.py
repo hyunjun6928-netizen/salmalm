@@ -1,4 +1,4 @@
-"""삶앎 crypto — AES-256-GCM vault with HMAC-CTR fallback."""
+"""SalmAlm crypto — AES-256-GCM vault with HMAC-CTR fallback."""
 
 from __future__ import annotations
 

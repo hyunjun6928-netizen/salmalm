@@ -1,8 +1,8 @@
 from __future__ import annotations
-"""삶앎 MCP (Model Context Protocol) — Server + Client.
+"""SalmAlm MCP (Model Context Protocol) — Server + Client.
 
 Implements MCP 2025-03-26 spec (simplified):
-  - **MCP Server**: Exposes 삶앎 tools to external MCP clients (Cursor, VS Code, etc.)
+  - **MCP Server**: Exposes SalmAlm tools to external MCP clients (Cursor, VS Code, etc.)
     Transport: stdio (subprocess) or SSE (HTTP)
   - **MCP Client**: Connects to external MCP servers to import their tools
     Transport: stdio (subprocess) or SSE (HTTP)
@@ -61,11 +61,11 @@ def _rpc_response(id: int, result: Any = None, error: dict = None) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════
-#  MCP SERVER — expose 삶앎 tools to external clients
+#  MCP SERVER — expose SalmAlm tools to external clients
 # ══════════════════════════════════════════════════════════════
 
 class MCPServer:
-    """MCP Server that exposes 삶앎 tools via JSON-RPC 2.0."""
+    """MCP Server that exposes SalmAlm tools via JSON-RPC 2.0."""
 
     SERVER_INFO = {
         "name": "salmalm",
@@ -89,7 +89,7 @@ class MCPServer:
         self._tool_executor = executor
 
     def _convert_tool_to_mcp(self, tool: dict) -> dict:
-        """Convert 삶앎 tool definition to MCP tool format."""
+        """Convert SalmAlm tool definition to MCP tool format."""
         return {
             "name": tool["name"],
             "description": tool.get("description", ""),
@@ -121,7 +121,7 @@ class MCPServer:
         if method == "tools/list":
             tools = [self._convert_tool_to_mcp(t) for t in self._tools]
             cursor = params.get("cursor")
-            # Simple pagination: return all (삶앎 has ~30 tools, no pagination needed)
+            # Simple pagination: return all (SalmAlm has ~30 tools, no pagination needed)
             return _rpc_response(msg_id, {"tools": tools})
 
         if method == "tools/call":
@@ -196,16 +196,16 @@ class MCPServer:
             return _rpc_response(msg_id, {"prompts": [
                 {
                     "name": "analyze",
-                    "description": "분석 요청 프롬프트",
+                    "description": "Analysis request prompt",
                     "arguments": [
-                        {"name": "topic", "description": "분석할 주제", "required": True}
+                        {"name": "topic", "description": "Topic to analyze", "required": True}
                     ],
                 },
                 {
                     "name": "code_review",
-                    "description": "코드 리뷰 프롬프트",
+                    "description": "Code review prompt",
                     "arguments": [
-                        {"name": "file_path", "description": "리뷰할 파일 경로", "required": True}
+                        {"name": "file_path", "description": "File path to review", "required": True}
                     ],
                 },
             ]})
@@ -216,22 +216,22 @@ class MCPServer:
             if name == "analyze":
                 topic = args.get("topic", "unknown")
                 return _rpc_response(msg_id, {
-                    "description": f"'{topic}' 분석",
+                    "description": f"'{topic}' Analysis",
                     "messages": [
                         {"role": "user", "content": {
                             "type": "text",
-                            "text": f"다음 주제를 심층 분석해줘: {topic}"
+                            "text": f"Deep analysis of topic: {topic}"
                         }}
                     ],
                 })
             if name == "code_review":
                 fp = args.get("file_path", "")
                 return _rpc_response(msg_id, {
-                    "description": f"'{fp}' 코드 리뷰",
+                    "description": f"'{fp}' Code review",
                     "messages": [
                         {"role": "user", "content": {
                             "type": "text",
-                            "text": f"다음 파일을 보안/성능/가독성 관점에서 코드 리뷰해줘: {fp}"
+                            "text": f"Review this file for security/performance/readability: {fp}"
                         }}
                     ],
                 })

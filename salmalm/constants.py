@@ -1,9 +1,9 @@
-"""삶앎 constants — paths, costs, thresholds."""
+"""SalmAlm constants — paths, costs, thresholds."""
 from datetime import timedelta, timezone
 from pathlib import Path
 
-VERSION = "0.9.0"
-APP_NAME = "삶앎 (SalmAlm)"
+VERSION = "0.9.1"
+APP_NAME = "SalmAlm"
 KST = timezone(timedelta(hours=9))
 
 # Paths — resolved relative to project root (parent of salmalm/)
@@ -102,14 +102,14 @@ MODEL_COSTS = {
 
 # Model routing thresholds
 SIMPLE_QUERY_MAX_CHARS = 200  # short queries → cheap model
-COMPLEX_INDICATORS = ['코드', '분석', '보안', '최적화', '설계', '구현',
+COMPLEX_INDICATORS = ['code', 'analyze', 'security', 'optimize', 'design', 'implement',
                        'code', 'analyze', 'security', 'build', 'implement',
-                       'refactor', '디버그', 'debug', '아키텍처', '리팩토링',
-                       '마이그레이션', 'migration', '서버', 'server', '배포', 'deploy',
-                       '버그', 'bug', '수정', 'fix', '작성', 'write', '만들어',
-                       '개발', 'develop', '테스트', 'test', '검증', 'audit',
-                       '비교', 'compare', '변환', 'convert', '자동화', 'automate']
-TOOL_HINT_KEYWORDS = ['파일', 'file', '실행', 'exec', 'run', '검색', 'search',
-                       '웹', 'web', '이미지', 'image', '메모리', 'memory',
-                       '시스템', 'system', '크론', 'cron', '스크린샷', 'screenshot']
+                       'refactor', 'debug', 'architecture',
+                       'migration', 'server', 'deploy',
+                       'bug', 'fix', 'write',
+                       'develop', 'test', 'audit',
+                       'compare', 'convert', 'automate']
+TOOL_HINT_KEYWORDS = ['file', 'exec', 'run', 'search',
+                       'web', 'image', 'memory',
+                       'system', 'cron', 'screenshot']
 

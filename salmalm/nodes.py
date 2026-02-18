@@ -1,5 +1,5 @@
 from __future__ import annotations
-"""삶앎 Node Control — lightweight remote agent management.
+"""SalmAlm Node Control — lightweight remote agent management.
 
 Manages remote machines via SSH (subprocess) or HTTP agent protocol.
 Simpler than OpenClaw's node system but covers core use cases:

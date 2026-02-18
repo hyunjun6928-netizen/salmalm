@@ -1,4 +1,4 @@
-"""삶앎 Intelligence Engine — TaskClassifier + IntelligenceEngine + process_message."""
+"""SalmAlm Intelligence Engine — TaskClassifier + IntelligenceEngine + process_message."""
 
 from __future__ import annotations
 
@@ -40,24 +40,24 @@ class TaskClassifier:
 
     # Intent categories with weighted keywords
     INTENTS = {
-        'code': {'keywords': ['코드', 'code', '구현', '함수', 'function', 'class', '버그',
-                               'bug', 'fix', '수정', '리팩', 'refactor', '디버그', 'debug',
-                               'API', '서버', 'server', '배포', 'deploy', '빌드', 'build'],
+        'code': {'keywords': ['code', 'implement', 'function', 'function', 'class', 
+                               'bug', 'fix', 'refactor', 'refactor', 'debug',
+                               'API', 'server', 'deploy', 'deploy', 'build'],
                  'tier': 3, 'thinking': True, 'max_tools': 30},
-        'analysis': {'keywords': ['분석', 'analyze', '비교', 'compare', '검토', 'review',
-                                   '감사', 'audit', '조사', '보안', 'security', '성능'],
+        'analysis': {'keywords': ['analyze', 'compare', 'review',
+                                   'audit', 'security', 'performance'],
                      'tier': 3, 'thinking': True, 'max_tools': 20},
-        'creative': {'keywords': ['작성', 'write', '글', '이야기', 'story', '시', 'poem',
-                                   '번역', 'translate', '요약', 'summarize'],
+        'creative': {'keywords': ['write', 'story', 'poem',
+                                   'translate', 'summarize'],
                      'tier': 2, 'thinking': False, 'max_tools': 10},
-        'search': {'keywords': ['검색', 'search', '찾아', 'find', '뉴스', 'news',
-                                 '최신', 'latest', '날씨', 'weather', '가격', 'price'],
+        'search': {'keywords': ['search', 'find', 'news',
+                                 'latest', 'weather', 'price'],
                    'tier': 2, 'thinking': False, 'max_tools': 15},
-        'system': {'keywords': ['파일', 'file', '실행', 'exec', 'run', '설치', 'install',
-                                 '프로세스', 'process', '디스크', 'disk', '메모리'],
+        'system': {'keywords': ['file', 'exec', 'run', 'install',
+                                 'process', 'disk', 'memory'],
                    'tier': 2, 'thinking': False, 'max_tools': 20},
-        'memory': {'keywords': ['기억', 'remember', '메모', 'memo', '기록', 'record',
-                                 '일기', 'diary', '학습', 'learn'],
+        'memory': {'keywords': ['remember', 'memo', 'record',
+                                 'diary', 'learn'],
                    'tier': 1, 'thinking': False, 'max_tools': 5},
         'chat': {'keywords': [], 'tier': 1, 'thinking': False, 'max_tools': 3},
     }
@@ -328,7 +328,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 continue
 
             # Final response
-            response = result.get('content', '응답을 생성할 수 없습니다.')
+            response = result.get('content', 'Could not generate a response.')
 
             # PHASE 3: REFLECT — self-evaluation for complex tasks
             if self._should_reflect(classification, response, iteration):
@@ -346,7 +346,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 if improved and len(improved) > len(response) * 0.5 and len(improved) > 50:
                     # Only use reflection if it's substantive and not a degradation
                     # Skip if reflection is just "the answer is fine" or similar
-                    skip_phrases = ['satisfactory', 'sufficient', 'correct', '충분', '적절', '문제없']
+                    skip_phrases = ['satisfactory', 'sufficient', 'correct', ]
                     if not any(p in improved[:100].lower() for p in skip_phrases):
                         response = improved
                     log.info(f"🔍 Reflection improved: {len(response)} chars")
@@ -365,12 +365,12 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             if m['role'] == 'assistant':
                 content = m.get('content', '')
                 if isinstance(content, str) and content:
-                    return content + f"\n\n⚠️ (도구 실행 {max_tools}회 도달)"
+                    return content + f"\n\n⚠️ (Tool execution limit reached ({max_tools}))"
                 elif isinstance(content, list):
                     texts = [b['text'] for b in content if b.get('type') == 'text']
                     if texts:
-                        return '\n'.join(texts) + f"\n\n⚠️ (도구 실행 {max_tools}회 도달)"
-        return f"⚠️ 도구 실행 한도 초과 ({max_tools}회). 질문을 더 구체적으로 해주세요."
+                        return '\n'.join(texts) + f"\n\n⚠️ (Tool execution limit reached ({max_tools}))"
+        return f"⚠️ Tool execution limit exceeded ({max_tools}). Please be more specific."
 
 
 # Singleton
@@ -388,45 +388,45 @@ async def process_message(session_id: str, user_message: str,
     cmd = user_message.strip()
     if cmd == '/clear':
         session.messages = [m for m in session.messages if m['role'] == 'system'][:1]
-        return '대화가 초기화되었습니다.'
+        return 'Conversation cleared.'
     if cmd == '/help':
         from .tools import TOOL_DEFINITIONS
         tool_count = len(TOOL_DEFINITIONS)
-        return f"""😈 **삶앎 v{VERSION}** — Personal AI Gateway
+        return f"""😈 **SalmAlm v{VERSION}** — Personal AI Gateway
 
-📌 **명령어**
-/clear — 대화 초기화
-/help — 이 도움말
-/model <이름> — 모델 변경
-/think <질문> — 🧠 심층 추론 (Opus)
-/plan <질문> — 📋 계획 → 실행
-/status — 사용량 + 비용
-/tools — 도구 목록
+📌 **Commands**
+/clear — Clear conversation
+/help — This help
+/model <name> — Change model
+/think <question> — 🧠 Deep reasoning (Opus)
+/plan <question> — 📋 Plan → Execute
+/status — Usage + Cost
+/tools — Tool list
 
-🤖 **모델 별칭** (27개)
+🤖 **Model Aliases** (27)
 claude, sonnet, opus, haiku, gpt, gpt5, o3, o4mini,
 grok, grok4, gemini, flash, deepseek, llama, auto ...
 
-🔧 **도구** ({tool_count}개)
-파일 읽기/쓰기, 코드 실행, 웹 검색, RAG 검색,
-시스템 모니터, 크론 작업, 이미지 분석, TTS ...
+🔧 **Tools** ({tool_count})
+File R/W, code exec, web search, RAG search,
+system monitor, cron jobs, image analysis, TTS ...
 
 🧠 **Intelligence Engine**
-자동 의도 분류(7단계) → 모델 선택 → 병렬 도구 → 자기 평가
+Auto intent classification (7 levels) → Model routing → Parallel tools → Self-evaluation
 
-💡 **팁**: 그냥 자연어로 말하면 됩니다. 파일 읽어줘, 검색해줘, 코드 짜줘 등"""
+💡 **Tip**: Just speak naturally. Read a file, search the web, write code, etc."""
     if cmd == '/status':
         return execute_tool('usage_report', {})
     if cmd == '/tools':
         from .tools import TOOL_DEFINITIONS
-        lines = [f'🔧 **도구 목록** ({len(TOOL_DEFINITIONS)}개)\n']
+        lines = [f'🔧 **Tool List** ({len(TOOL_DEFINITIONS)})\n']
         for t in TOOL_DEFINITIONS:
             lines.append(f"• **{t['name']}** — {t['description'][:60]}")
         return '\n'.join(lines)
     if cmd.startswith('/think '):
         think_msg = cmd[7:].strip()
         if not think_msg:
-            return '사용법: /think <질문>'
+            return 'Usage: /think <question>'
         session.add_user(think_msg)
         session.messages = compact_messages(session.messages)
         classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
@@ -437,7 +437,7 @@ grok, grok4, gemini, flash, deepseek, llama, auto ...
     if cmd.startswith('/plan '):
         plan_msg = cmd[6:].strip()
         if not plan_msg:
-            return '사용법: /plan <작업 설명>'
+            return 'Usage: /plan <task description>'
         session.add_user(plan_msg)
         session.messages = compact_messages(session.messages)
         classification = {'intent': 'code', 'tier': 3, 'thinking': True,
@@ -448,15 +448,15 @@ grok, grok4, gemini, flash, deepseek, llama, auto ...
         model_name = cmd[7:].strip()
         if model_name == 'auto':
             router.set_force_model(None)
-            return '모델 변경: auto (자동 라우팅) — 설정 저장됨 ✅'
+            return 'Model changed: auto (auto-routing) — saved ✅'
         if '/' in model_name:
             router.set_force_model(model_name)
-            return f'모델 변경: {model_name} — 설정 저장됨 ✅'
+            return f'Model changed: {model_name} — saved ✅'
         if model_name in MODEL_ALIASES:
             resolved = MODEL_ALIASES[model_name]
             router.set_force_model(resolved)
-            return f'모델 변경: {model_name} → {resolved} — 설정 저장됨 ✅'
-        return f'알 수 없는 모델: {model_name}\\n가능: {", ".join(sorted(MODEL_ALIASES.keys()))}'
+            return f'Model changed: {model_name} → {resolved} — saved ✅'
+        return f'Unknown model: {model_name}\\nAvailable: {", ".join(sorted(MODEL_ALIASES.keys()))}'
 
     # --- Normal message processing ---
     if image_data:
@@ -464,7 +464,7 @@ grok, grok4, gemini, flash, deepseek, llama, auto ...
         log.info(f"🖼️ Image attached: {mime}, {len(b64)//1024}KB base64")
         content = [
             {'type': 'image', 'source': {'type': 'base64', 'media_type': mime, 'data': b64}},
-            {'type': 'text', 'text': user_message or '이 이미지를 분석해줘.'}
+            {'type': 'text', 'text': user_message or 'Analyze this image.'}
         ]
         session.messages.append({'role': 'user', 'content': content})
     else:
@@ -519,14 +519,14 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
     # Build summary
     task_preview = user_message[:80] + ('...' if len(user_message) > 80 else '')
     resp_preview = response[:150] + ('...' if len(response) > 150 else '')
-    notify_text = f"✅ 작업 완료 [{intent}]\n📝 요청: {task_preview}\n💬 결과: {resp_preview}"
+    notify_text = f"✅ Task completed [{intent}]\n📝 Request: {task_preview}\n💬 Result: {resp_preview}"
 
     # Telegram notification (if task came from web)
     if session_id != 'telegram' and _tg_bot and _tg_bot.token:
         owner_id = vault.get('telegram_owner_id') if vault.is_unlocked else None
         if owner_id:
             try:
-                _tg_bot.send_message(owner_id, f"🔔 삶앎 웹챗 작업 완료\n{notify_text}")
+                _tg_bot.send_message(owner_id, f"🔔 SalmAlm webchat Task completed\n{notify_text}")
             except Exception as e:
                 log.error(f"TG notify error: {e}")
 
@@ -540,7 +540,7 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
                 web_session._notifications = []
             web_session._notifications.append({
                 'time': __import__('time').time(),
-                'text': f"🔔 삶앎 텔레그램 작업 완료\n{notify_text}"
+                'text': f"🔔 SalmAlm telegram Task completed\n{notify_text}"
             })
             # Keep max 20 notifications
             web_session._notifications = web_session._notifications[-20:]

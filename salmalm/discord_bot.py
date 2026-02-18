@@ -1,4 +1,4 @@
-"""삶앎 Discord Bot — Pure stdlib Discord Gateway + HTTP API."""
+"""SalmAlm Discord Bot — Pure stdlib Discord Gateway + HTTP API."""
 from __future__ import annotations
 
 import asyncio
@@ -268,7 +268,7 @@ class DiscordBot:
                                 self.send_message(channel_id, chunk, reply_to=message_id)
                     except Exception as e:
                         log.error(f'Discord message handler error: {e}')
-                        self.send_message(channel_id, f'❌ 오류: {str(e)[:200]}', reply_to=message_id)
+                        self.send_message(channel_id, f'❌ Error: {str(e)[:200]}', reply_to=message_id)
 
     async def poll(self):
         """Main gateway loop."""

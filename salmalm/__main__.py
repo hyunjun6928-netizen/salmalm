@@ -57,9 +57,9 @@ def main() -> None:
                     data = _json.loads(resp.read())
                 latest = data.get('info', {}).get('version', '')
                 if latest and latest != VERSION:
-                    return f"⬆️  새 버전 {latest} 발견! 업그레이드: pip install --upgrade salmalm"
+                    return f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
             except Exception:
-                pass  # 네트워크 없어도 조용히 넘김
+                pass  # silently skip if no network
             return ""
 
         async def _main():

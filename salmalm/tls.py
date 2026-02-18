@@ -1,5 +1,5 @@
 from __future__ import annotations
-"""삶앎 TLS — Self-signed certificate generation + HTTPS server wrapper.
+"""SalmAlm TLS — Self-signed certificate generation + HTTPS server wrapper.
 
 Pure stdlib (ssl module). Generates self-signed certs on first run.
 Production: replace with Let's Encrypt or reverse proxy (nginx/caddy).

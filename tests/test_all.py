@@ -371,7 +371,7 @@ class TestEngineAliases(unittest.TestCase):
 
     def test_task_classifier(self):
         from salmalm.engine import TaskClassifier
-        result = TaskClassifier.classify("이 코드를 리팩토링해줘")
+        result = TaskClassifier.classify("refactor this code please")
         self.assertEqual(result['intent'], 'code')
         self.assertGreaterEqual(result['tier'], 2)
 

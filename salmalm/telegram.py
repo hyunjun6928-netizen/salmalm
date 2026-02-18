@@ -1,4 +1,4 @@
-"""삶앎 Telegram bot."""
+"""SalmAlm Telegram bot."""
 from __future__ import annotations
 
 import asyncio, json, re, textwrap, time, urllib.request
@@ -156,13 +156,13 @@ class TelegramBot:
                 save_path = WORKSPACE_DIR / 'uploads' / fname
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
-                file_info = f'[📷 이미지 저장: uploads/{fname} ({len(data)//1024}KB)]'
+                file_info = f'[📷 Image saved: uploads/{fname} ({len(data)//1024}KB)]'
                 log.info(f"📷 Photo saved: {save_path}")
                 # Prepare vision data
                 import base64 as _b64
                 _image_data = (_b64.b64encode(data).decode(), 'image/jpeg')
             except Exception as e:
-                file_info = f'[📷 이미지 다운로드 실패: {e}]'
+                file_info = f'[📷 Image download failed: {e}]'
 
         # Handle documents
         if msg.get('document'):
@@ -172,17 +172,17 @@ class TelegramBot:
                 save_path = WORKSPACE_DIR / 'uploads' / (doc.get('file_name', fname))
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
-                file_info = f'[📎 파일 저장: uploads/{save_path.name} ({len(data)//1024}KB)]'
+                file_info = f'[📎 File saved: uploads/{save_path.name} ({len(data)//1024}KB)]'
                 log.info(f"📎 File saved: {save_path}")
                 # If text file, include content preview
                 if save_path.suffix in ('.txt', '.md', '.py', '.js', '.json', '.csv', '.log', '.html', '.css', '.sh', '.bat'):
                     try:
                         content = data.decode('utf-8', errors='replace')[:3000]
-                        file_info += f'\n[파일 내용 미리보기]\n{content}'
+                        file_info += f'\n[File content preview]\n{content}'
                     except Exception:
                         pass
             except Exception as e:
-                file_info = f'[📎 파일 다운로드 실패: {e}]'
+                file_info = f'[📎 File download failed: {e}]'
 
         # Handle voice/audio
         if msg.get('voice') or msg.get('audio'):
@@ -192,7 +192,7 @@ class TelegramBot:
                 save_path = WORKSPACE_DIR / 'uploads' / fname
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
-                file_info = f'[🎤 음성 저장: uploads/{fname} ({len(data)//1024}KB)]'
+                file_info = f'[🎤 Voice saved: uploads/{fname} ({len(data)//1024}KB)]'
                 log.info(f"🎤 Voice saved: {save_path}")
                 # Whisper transcription
                 api_key = vault.get('openai_api_key')
@@ -215,13 +215,13 @@ class TelegramBot:
                             result = json.loads(resp.read())
                         transcript = result.get('text', '')
                         if transcript:
-                            file_info = f'[🎤 음성 전사]\n{transcript}'
+                            file_info = f'[🎤 Voice transcription]\n{transcript}'
                             log.info(f"🎤 Transcribed: {transcript[:100]}")
                     except Exception as we:
                         log.error(f"Whisper error: {we}")
-                        file_info += f'\n[전사 실패: {we}]'
+                        file_info += f'\n[Transcription failed: {we}]'
             except Exception as e:
-                file_info = f'[🎤 음성 다운로드 실패: {e}]'
+                file_info = f'[🎤 Voice download failed: {e}]'
 
         # Build final message
         if file_info:
@@ -254,20 +254,20 @@ class TelegramBot:
             if img_path.exists():
                 self._send_photo(chat_id, img_path, response[:1000])
             else:
-                self.send_message(chat_id, f'{response}\n\n⏱️ {_elapsed:.1f}초')
+                self.send_message(chat_id, f'{response}\n\n⏱️ {_elapsed:.1f}s')
         elif audio_match:
             audio_path = WORKSPACE_DIR / audio_match.group(0)
             if audio_path.exists():
                 self._send_audio(chat_id, audio_path, response[:1000])
             else:
-                self.send_message(chat_id, f'{response}\n\n⏱️ {_elapsed:.1f}초')
+                self.send_message(chat_id, f'{response}\n\n⏱️ {_elapsed:.1f}s')
         else:
-            self.send_message(chat_id, f'{response}\n\n⏱️ {_elapsed:.1f}초')
+            self.send_message(chat_id, f'{response}\n\n⏱️ {_elapsed:.1f}s')
 
     async def _handle_command(self, chat_id, text: str):
         cmd = text.split()[0].lower()
         if cmd == '/start':
-            self.send_message(chat_id, f'😈 {APP_NAME} v{VERSION} running\n낄낄')
+            self.send_message(chat_id, f'😈 {APP_NAME} v{VERSION} running\nready')
         elif cmd == '/usage':
             report = execute_tool('usage_report', {})
             self.send_message(chat_id, report)
@@ -277,7 +277,7 @@ class TelegramBot:
                 router.force_model = parts[1] if parts[1] != 'auto' else None
                 self.send_message(chat_id, f'Model changed: {parts[1]}')
             else:
-                current = router.force_model or 'auto (라우팅)'
+                current = router.force_model or 'auto (routing)'
                 models = '\n'.join(f'  {m}' for tier in router.TIERS.values() for m in tier)
                 self.send_message(chat_id, f'Current: {current}\n\nAvailable:\n{models}\n\n/model auto — auto')
         elif cmd == '/compact':
@@ -293,14 +293,14 @@ class TelegramBot:
         elif cmd == '/help':
             self.send_message(chat_id, textwrap.dedent(f"""
                 😈 {APP_NAME} v{VERSION}
-                /usage — 토큰 사용량/비용
-                /model [name|auto] — 모델 변경
-                /compact — 대화 압축
-                /clear — 대화 초기화
-                /help — 이 messages
+                /usage — Token usage/cost
+                /model [name|auto] — Change model
+                /compact — Compact conversation
+                /clear — Clear conversation
+                /help — This help
             """).strip())
         else:
-            self.send_message(chat_id, f'❓ 알 수 없는 명령: {cmd}\n/help 참조')
+            self.send_message(chat_id, f'❓ Unknown command: {cmd}\n/help See /help')
 
     def stop(self):
         self._running = False

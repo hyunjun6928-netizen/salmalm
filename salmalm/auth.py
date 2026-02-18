@@ -1,4 +1,4 @@
-"""삶앎 Auth — Multi-user authentication, session isolation, RBAC, rate limiting.
+"""SalmAlm Auth — Multi-user authentication, session isolation, RBAC, rate limiting.
 
 Features:
   - JWT-like token auth (HMAC-SHA256, no external deps)

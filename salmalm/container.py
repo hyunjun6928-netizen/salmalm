@@ -1,4 +1,4 @@
-"""삶앎 DI Container — Lightweight service registry.
+"""SalmAlm DI Container — Lightweight service registry.
 
 Provides a central registry for all singleton services,
 replacing scattered global instances. Supports:

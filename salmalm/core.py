@@ -1,4 +1,4 @@
-"""삶앎 core — audit, cache, usage, router, compaction, search,
+"""SalmAlm core — audit, cache, usage, router, compaction, search,
 subagent, skills, session, cron, daily."""
 import asyncio, hashlib, json, math, os, re, sqlite3, textwrap, threading, time
 from collections import OrderedDict
@@ -215,7 +215,7 @@ class ModelRouter:
 
     def _has_key(self, provider: str) -> bool:
         if provider == 'ollama':
-            return True  # Ollama는 항상 사용 가능 (로컬)
+            return True  # Ollama always available (local)
         if provider in self._OR_PROVIDERS:
             return bool(vault.get('openrouter_api_key'))
         return bool(vault.get(f'{provider}_api_key'))
@@ -287,7 +287,7 @@ def compact_messages(messages: list, model: str = None) -> list:
             new_content = []
             for block in m['content']:
                 if isinstance(block, dict) and block.get('type') == 'image':
-                    new_content.append({'type': 'text', 'text': '[이미지 첨부됨]'})
+                    new_content.append({'type': 'text', 'text': '[Image attached]'})
                 else:
                     new_content.append(block)
             trimmed.append({**m, 'content': new_content})
@@ -327,7 +327,7 @@ def compact_messages(messages: list, model: str = None) -> list:
     # Pick cheapest available model for summarization (avoid hardcoded google)
     summary_model = router._pick_available(1)
     _summ_msgs = [
-        {'role': 'system', 'content': '다음 대화를 핵심만 간결하게 한국어로 요약해. 결정사항, 작업 내용, 중요 맥락 위주로 5~8문장.'},
+        {'role': 'system', 'content': 'Summarize the following conversation concisely. Focus on decisions, tasks, and key context in 5-8 sentences.'},
         {'role': 'user', 'content': summary_text}
     ]
     # Note: call_llm is sync (urllib). Always call directly since compact_messages
@@ -335,7 +335,7 @@ def compact_messages(messages: list, model: str = None) -> list:
     summary_result = call_llm(_summ_msgs, model=summary_model, max_tokens=800)
 
     compacted = system_msgs + [
-        {'role': 'system', 'content': f'[이전 대화 요약]\n{summary_result["content"]}'}
+        {'role': 'system', 'content': f'[Previous conversation summary]\n{summary_result["content"]}'}
     ] + recent
 
     log.info(f"📦 Stage 3 compacted: {len(messages)} → {len(compacted)} messages, "
@@ -506,7 +506,7 @@ class SubAgent:
                 # Notify via Telegram
                 if agent_info['notify_telegram'] and _tg_bot and _tg_bot.token:
                     summary = result[:500] + ('...' if len(result) > 500 else '')
-                    msg = f'🤖 **서브에이전트 완료** [{agent_id}]\n\n📋 작업: {task[:100]}\n\n{summary}'
+                    msg = f'🤖 **Sub-agent completed** [{agent_id}]\n\n📋 Task: {task[:100]}\n\n{summary}'
                     try:
                         _tg_bot._api('sendMessage', {
                             'chat_id': _tg_bot.owner_id,
@@ -520,7 +520,7 @@ class SubAgent:
                     del _sessions[session_id]
 
             except Exception as e:
-                agent_info['result'] = f'❌ 서브에이전트 오류: {e}'
+                agent_info['result'] = f'❌ Sub-agent error: {e}'
                 agent_info['status'] = 'error'
                 agent_info['completed'] = datetime.now(KST).isoformat()
                 log.error(f"Sub-agent {agent_id} error: {e}")
@@ -776,7 +776,7 @@ class LLMCronManager:
                     summary = response[:800] + ('...' if len(response) > 800 else '')
                     _tg_bot.send_message(
                         _tg_bot.owner_id,
-                        f"⏰ 삶앎 스케줄 작업 완료: {job['name']}\n\n{summary}")
+                        f"⏰ SalmAlm scheduled task completed: {job['name']}\n\n{summary}")
 
                 # One-shot jobs: auto-disable
                 if job['schedule']['kind'] == 'at':

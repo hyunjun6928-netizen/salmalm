@@ -1,5 +1,5 @@
 from __future__ import annotations
-"""삶앎 Production Logging — structured JSON logs, rotation, request tracking.
+"""SalmAlm Production Logging — structured JSON logs, rotation, request tracking.
 
 Upgrades from basic logging to:
   - Structured JSON log format (machine-parseable)
