@@ -13,7 +13,10 @@ Provides production-grade stability:
 
 
 import os
-import resource
+try:
+    import resource
+except ImportError:
+    resource = None  # Windows
 import threading
 import time
 import traceback
@@ -165,6 +168,8 @@ class HealthMonitor:
         """Check system resources."""
         info = {}
         try:
+            if resource is None:
+                raise OSError("resource module unavailable")
             usage = resource.getrusage(resource.RUSAGE_SELF)
             info["memory_mb"] = round(usage.ru_maxrss / 1024, 1)  # Linux: KB
             info["user_time"] = round(usage.ru_utime, 2)

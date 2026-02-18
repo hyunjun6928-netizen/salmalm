@@ -802,8 +802,23 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         has_ollama = bool(vault.get('ollama_url'))
         return not (has_api_key or has_ollama)
 
+    def _auto_unlock_localhost(self):
+        """Auto-unlock vault for localhost connections."""
+        if vault.is_unlocked:
+            return True
+        ip = self._get_client_ip()
+        if ip not in ('127.0.0.1', '::1', 'localhost'):
+            return False
+        pw = os.environ.get('SALMALM_VAULT_PW', 'salmalm_local')
+        if VAULT_FILE.exists():
+            return vault.unlock(pw)
+        else:
+            vault.create(pw)
+            return True
+
     def _do_get_inner(self):
         if self.path == '/' or self.path == '/index.html':
+            self._auto_unlock_localhost()
             if not vault.is_unlocked:
                 self._html(UNLOCK_HTML)
             elif self._needs_onboarding():
@@ -1010,6 +1025,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'ok': False, 'error': '비밀번호 틀림'}, 401)
 
         elif self.path in ('/api/chat', '/api/chat/stream'):
+            self._auto_unlock_localhost()
             if not vault.is_unlocked:
                 self._json({'error': 'Vault locked'}, 403)
                 return
