@@ -1,8 +1,11 @@
-# 😈 삶앎 (SalmAlm) v0.7.0
+# 😈 삶앎 (SalmAlm) v0.7.2
 
-**Personal AI Gateway — Pure Python, Zero Dependencies**
+**Personal AI Gateway — Pure Python**
 
-OpenClaw에 도전하는 개인 AI 게이트웨이. 외부 라이브러리 0개, 순수 Python stdlib만으로 구축.
+> [🇺🇸 English](README_EN.md)
+
+OpenClaw에 도전하는 개인 AI 게이트웨이. 순수 Python stdlib 기반, 외부 런타임 의존성 없이 구축.
+암호화(`cryptography`)만 선택적 의존성으로, 설치 시 AES-256-GCM을 사용하고 없으면 HMAC-CTR 폴백.
 
 ## ✨ Features
 
@@ -16,8 +19,8 @@ OpenClaw에 도전하는 개인 AI 게이트웨이. 외부 라이브러리 0개,
 | 📡 **Nodes** | SSH/HTTP 원격 노드 제어, Wake-on-LAN |
 | 🏥 **Stability** | Circuit Breaker, 8개 컴포넌트 헬스체크, 자동 복구, 셀프테스트 |
 | 💬 **Telegram** | 비동기 long-polling, 이미지/파일 처리 |
-| 🌐 **Web UI** | 다크/라이트 테마, 마크다운 렌더링, 파일 업로드 |
-| 🔐 **Vault** | AES-256-GCM 암호화 키 저장소 |
+| 🌐 **Web UI** | 다크/라이트 테마, 마크다운 렌더링, 파일 업로드, SSE 스트리밍 |
+| 🔐 **Security** | AES-256-GCM 볼트, JWT 인증, RBAC, CORS 화이트리스트, 레이트 리밋, PBKDF2 |
 | 📊 **Cost Tracking** | 모델별 토큰/비용 실시간 추적 (27개 모델) |
 | ⏰ **Cron** | LLM 기반 스케줄 작업, cron 표현식/인터벌/원샷 지원 |
 | 🔧 **30 Tools** | exec, 파일 CRUD, 웹 검색, RAG, MCP, 브라우저, 노드, 헬스체크 등 |
@@ -25,50 +28,58 @@ OpenClaw에 도전하는 개인 AI 게이트웨이. 외부 라이브러리 0개,
 
 ## 📊 Stats
 
-- **15 modules** / **7,334 lines** of Python
+- **19 modules** / ~8,500 lines of Python
 - **30 built-in tools** + plugin extensibility
-- **27 LLM models** supported (Anthropic, OpenAI, xAI, Google, DeepSeek, Meta)
-- **0 external dependencies** — pure stdlib
-- **14/14 self-test** on startup
+- **27 LLM models** (Anthropic, OpenAI, xAI, Google, DeepSeek, Meta)
+- **1 optional dependency** (`cryptography` for AES-256-GCM — graceful fallback without it)
+- **18/18 self-test** on startup
 
 ## 🏗️ Architecture
 
 ```
 salmalm/
-├── __init__.py      (15)   — logging setup
-├── constants.py     (83)   — paths, costs, thresholds
-├── crypto.py       (135)   — AES-256-GCM vault
-├── core.py        (1039)   — audit, cache, router, cron, sessions
-├── llm.py          (275)   — LLM API calls (4 providers)
-├── tools.py       (1333)   — 30 tool definitions + executor
-├── prompt.py       (118)   — system prompt builder
-├── engine.py       (513)   — Intelligence Engine (Plan→Execute→Reflect)
-├── telegram.py     (303)   — Telegram bot
-├── web.py         (1015)   — Web UI + HTTP API
-├── ws.py           (382)   — WebSocket server (RFC 6455)
-├── rag.py          (343)   — BM25 RAG engine
-├── mcp.py          (584)   — MCP server + client
-├── browser.py      (438)   — Chrome CDP automation
-├── nodes.py        (356)   — Remote node control
-├── stability.py    (402)   — Health monitor + auto-recovery
-└── plugins/               — Drop-in tool plugins
+├── __init__.py         — logging setup
+├── constants.py        — paths, costs, thresholds
+├── crypto.py           — AES-256-GCM vault (+ HMAC-CTR fallback)
+├── core.py             — audit, cache, router, cron, sessions
+├── llm.py              — LLM API calls (4 providers)
+├── tools.py            — 30 tool definitions + executor
+├── prompt.py           — system prompt builder
+├── engine.py           — Intelligence Engine (Plan→Execute→Reflect)
+├── telegram.py         — Telegram bot
+├── web.py              — Web UI + HTTP API + CORS + auth middleware
+├── ws.py               — WebSocket server (RFC 6455)
+├── rag.py              — BM25 RAG engine
+├── mcp.py              — MCP server + client
+├── browser.py          — Chrome CDP automation
+├── nodes.py            — Remote node control
+├── stability.py        — Health monitor + auto-recovery
+├── auth.py             — JWT auth, RBAC, rate limiter
+├── tls.py              — Self-signed TLS cert generation
+├── logging_ext.py      — JSON structured logging
+├── docs.py             — Auto-generated API docs
+└── plugins/            — Drop-in tool plugins
 ```
 
 ## 🚀 Quick Start
 
 ```bash
-# Clone
 git clone https://github.com/hyunjun6928-netizen/salmalm.git
 cd salmalm
 
-# First run — creates vault
+# (Optional) Install AES-256-GCM support
+pip install cryptography
+
+# First run — creates vault (set password at web UI)
 python3 server.py
 
-# Open http://127.0.0.1:18800 and set master password
+# Open http://127.0.0.1:18800
 # Configure API keys in Settings (Anthropic/OpenAI/xAI/Google)
 
-# With auto-unlock
-SALMALM_VAULT_PW=your_password python3 server.py
+# With auto-unlock (use .env file, NOT hardcoded)
+cp .env.example .env
+# Edit .env with your vault password
+./start.sh
 ```
 
 ## 🔑 API Keys
@@ -81,32 +92,44 @@ Store in the encrypted vault via Web UI:
 - `brave_api_key` — Web search
 - `telegram_token` + `telegram_owner_id` — Telegram bot
 
+## 🔐 Security
+
+- **CORS**: Same-origin whitelist only (127.0.0.1/localhost)
+- **Auth**: JWT tokens (HMAC-SHA256) + API keys + RBAC (admin/user/readonly)
+- **Vault**: AES-256-GCM encrypted key storage (PBKDF2 200K iterations)
+- **Rate Limiting**: Token bucket per user/IP (configurable per role)
+- **Upload**: Filename sanitization, 50MB limit, path traversal prevention
+- **Exec**: Command blocklist + pattern matching + subprocess isolation
+- **Passwords**: PBKDF2-HMAC-SHA256, random default admin password
+
 ## 📡 API Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/status` | Version, usage, model |
-| `GET /api/health` | Full health check (8 components) |
-| `POST /api/chat` | Send message `{"message": "...", "session": "web"}` |
-| `GET /api/rag` | RAG index stats |
-| `GET /api/rag/search?q=...` | BM25 search |
-| `GET /api/mcp` | MCP servers & tools |
-| `GET /api/nodes` | Remote nodes |
-| `GET /api/ws/status` | WebSocket server status |
-| `GET /api/dashboard` | Sessions, usage, cron, plugins |
-| `ws://127.0.0.1:18801` | WebSocket real-time |
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /api/status` | ❌ | Version, usage, model |
+| `GET /api/health` | ❌ | Health check (8 components) |
+| `POST /api/auth/login` | ❌ | Get JWT token |
+| `POST /api/unlock` | ❌ | Unlock vault |
+| `POST /api/chat` | ✅ | Send message |
+| `POST /api/chat/stream` | ✅ | SSE streaming chat |
+| `POST /api/vault` | 🔒 | Vault CRUD (admin/loopback) |
+| `GET /api/dashboard` | ✅ | Sessions, usage, cron |
+| `GET /api/rag/search?q=...` | ✅ | BM25 search |
+| `GET /docs` | ❌ | Auto-generated API docs |
+| `ws://127.0.0.1:18801` | — | WebSocket real-time |
 
 ## 🆚 vs OpenClaw
 
 | | OpenClaw | 삶앎 |
 |--|---------|------|
-| Code | 438K lines | 7.3K lines |
-| Dependencies | npm hundreds | **0** |
+| Code | 438K lines | ~8.5K lines |
+| Dependencies | npm hundreds | **1 optional** |
 | RAG | OpenAI API (can die) | **Local BM25 (always works)** |
 | WebSocket | SSE/polling | **RFC 6455** |
 | Health check | Basic | **Circuit Breaker + auto-recovery** |
 | Cost tracking | Black box | **Per-model real-time** |
 | Intent routing | Single model | **7-tier auto-classification** |
+| Auth | Token-based | **JWT + RBAC + rate limit** |
 
 ## 📜 License
 

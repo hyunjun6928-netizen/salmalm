@@ -1,6 +1,7 @@
 """삶앎 Web UI — HTML + WebHandler."""
 import asyncio, gzip, http.server, json, re, secrets, time
 from pathlib import Path
+from typing import Optional
 
 from .constants import *
 from .crypto import vault, log
@@ -641,9 +642,20 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass  # Suppress default logging
 
+    # Allowed origins for CORS (same-host only)
+    _ALLOWED_ORIGINS = {
+        'http://127.0.0.1:18800', 'http://localhost:18800',
+        'http://127.0.0.1:18801', 'http://localhost:18801',
+        'https://127.0.0.1:18800', 'https://localhost:18800',
+    }
+
     def _cors(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Headers', '*')
+        origin = self.headers.get('Origin', '')
+        if origin in self._ALLOWED_ORIGINS:
+            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Vary', 'Origin')
+        # No Origin header (same-origin requests, curl, etc) → no CORS headers needed
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key')
 
     def _maybe_gzip(self, body: bytes) -> bytes:
         """Compress body if client accepts gzip and body is large enough."""
@@ -678,6 +690,36 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    # Public endpoints (no auth required)
+    _PUBLIC_PATHS = {
+        '/', '/index.html', '/api/status', '/api/health', '/api/unlock',
+        '/api/auth/login', '/docs',
+    }
+
+    def _require_auth(self, min_role: str = 'user') -> Optional[dict]:
+        """Check auth for protected endpoints. Returns user dict or sends 401 and returns None.
+        If vault is locked, also rejects (403)."""
+        path = self.path.split('?')[0]
+        if path in self._PUBLIC_PATHS or path.startswith('/uploads/'):
+            return {'username': 'local', 'role': 'admin', 'id': 0}  # public
+
+        # Try token/api-key auth first
+        user = extract_auth(dict(self.headers))
+        if user:
+            role_rank = {'admin': 3, 'user': 2, 'readonly': 1}
+            if role_rank.get(user.get('role', ''), 0) >= role_rank.get(min_role, 2):
+                return user
+            self._json({'error': 'Insufficient permissions'}, 403)
+            return None
+
+        # Fallback: if request is from loopback AND vault is unlocked, allow (single-user local mode)
+        ip = self._get_client_ip()
+        if ip in ('127.0.0.1', '::1', 'localhost') and vault.is_unlocked:
+            return {'username': 'local', 'role': 'admin', 'id': 0}
+
+        self._json({'error': 'Authentication required'}, 401)
+        return None
 
     def _get_client_ip(self) -> str:
         return self.headers.get('X-Forwarded-For', self.client_address[0] if self.client_address else '?').split(',')[0].strip()
@@ -992,6 +1034,12 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not vault.is_unlocked:
                 self._json({'error': 'Vault locked'}, 403)
                 return
+            # Vault ops require admin
+            user = extract_auth(dict(self.headers))
+            ip = self._get_client_ip()
+            if not user and ip not in ('127.0.0.1', '::1', 'localhost'):
+                self._json({'error': 'Admin access required'}, 403)
+                return
             action = body.get('action')
             if action == 'set':
                 vault.set(body['key'], body['value'])
@@ -1032,7 +1080,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     fname_match = re.search(r'filename="([^"]+)"', header)
                     if not fname_match:
                         continue
-                    fname = fname_match.group(1)
+                    fname = Path(fname_match.group(1)).name  # basename only (prevent path traversal)
+                    # Reject suspicious filenames
+                    if not fname or '..' in fname or not re.match(r'^[\w.\- ]+$', fname):
+                        self._json({'error': 'Invalid filename'}, 400)
+                        return
                     file_data = part[header_end+4:]
                     # Remove trailing \r\n--
                     if file_data.endswith(b'\r\n'):
@@ -1041,6 +1093,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         file_data = file_data[:-2]
                     if file_data.endswith(b'\r\n'):
                         file_data = file_data[:-2]
+                    # Size limit: 50MB
+                    if len(file_data) > 50 * 1024 * 1024:
+                        self._json({'error': 'File too large (max 50MB)'}, 413)
+                        return
                     # Save
                     save_dir = WORKSPACE_DIR / 'uploads'
                     save_dir.mkdir(exist_ok=True)

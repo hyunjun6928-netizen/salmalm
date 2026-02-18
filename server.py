@@ -171,7 +171,7 @@ async def main():
             except Exception as e:
                 log.error(f"Heartbeat LLM error: {e}")
 
-    cron.add_job('heartbeat', 1800, heartbeat_job)
+    # cron.add_job('heartbeat', 1800, heartbeat_job)  # 주인놈 요청으로 비활성화
 
     # ══ LLM Cron Jobs: scheduled tasks with LLM execution ══
     from salmalm.core import LLMCronManager
@@ -184,7 +184,7 @@ async def main():
             return
         await llm_cron.tick()
 
-    cron.add_job('llm_cron', 60, llm_cron_tick)  # Check every 60s
+    # cron.add_job('llm_cron', 60, llm_cron_tick)  # 주인놈 요청으로 비활성화
 
     # ══ Startup self-test ══
     selftest = health_monitor.startup_selftest()
@@ -201,7 +201,7 @@ async def main():
     # ══ Watchdog: auto-recovery every 5 min ══
     async def _watchdog():
         await watchdog_tick(health_monitor)
-    cron.add_job('watchdog', 300, _watchdog)
+    # cron.add_job('watchdog', 300, _watchdog)  # 주인놈 요청으로 비활성화
 
     asyncio.create_task(cron.run())
 

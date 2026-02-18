@@ -188,13 +188,13 @@ class AuthManager:
         )''')
         conn.commit()
 
-        # Create default admin if no users exist
+        # Create default admin if no users exist (random password)
         count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
         if count == 0:
-            default_pw = 'salmalm_admin_2026'
+            default_pw = base64.urlsafe_b64encode(os.urandom(18)).decode().rstrip('=')
             self._create_user_db(conn, 'admin', default_pw, 'admin')
-            log.info(f"👤 Default admin user created (username: admin, password: {default_pw})")
-            log.warning("⚠️ Change the default admin password immediately!")
+            log.info(f"👤 Default admin created: admin / {default_pw}")
+            log.warning("⚠️ Save this password! It won't be shown again.")
         conn.close()
         self._initialized = True
 
