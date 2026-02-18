@@ -5,8 +5,28 @@ import os
 import sys
 
 
+def _ensure_windows_shortcut():
+    """Create a 'SalmAlm.bat' on Desktop for easy launch (once)."""
+    try:
+        desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
+        bat = os.path.join(desktop, 'SalmAlm.bat')
+        if os.path.exists(bat):
+            return
+        python_exe = sys.executable
+        content = f'@echo off\ntitle SalmAlm\n"{python_exe}" -m salmalm\npause\n'
+        with open(bat, 'w') as f:
+            f.write(content)
+        print(f"📌 Created desktop shortcut: {bat}")
+    except Exception:
+        pass  # non-critical
+
+
 def main() -> None:
     """CLI entry point — start the salmalm server."""
+    # Windows: create desktop shortcut on first run
+    if sys.platform == 'win32' and not getattr(sys, 'frozen', False):
+        _ensure_windows_shortcut()
+
     # Ensure working directory has required folders
     for d in ('memory', 'workspace', 'uploads', 'plugins'):
         os.makedirs(d, exist_ok=True)
