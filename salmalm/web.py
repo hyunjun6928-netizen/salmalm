@@ -591,8 +591,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     fetch('/api/check-update').then(function(r){return r.json()}).then(function(d){
       document.getElementById('cur-ver').textContent=d.current;
       if(d.latest&&d.latest!==d.current){
-        re.innerHTML='<span style="color:#fbbf24">🆕 New version v'+d.latest+'  available!</span>';
-        document.getElementById('do-update-btn').style.display='inline-block';
+        if(d.exe){
+          re.innerHTML='<span style="color:#fbbf24">🆕 New version v'+d.latest+' available!</span> <a href="'+d.download_url+'" target="_blank" style="color:#60a5fa">⬇️ Download</a>';
+        }else{
+          re.innerHTML='<span style="color:#fbbf24">🆕 New version v'+d.latest+' available!</span>';
+          document.getElementById('do-update-btn').style.display='inline-block';
+        }
       }else{re.innerHTML='<span style="color:#4ade80">✅ You are up to date (v'+d.current+')</span>';
         document.getElementById('do-update-btn').style.display='none'}
     }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ Check failed: '+e.message+'</span>'})};
@@ -983,7 +987,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 resp = urllib.request.urlopen('https://pypi.org/pypi/salmalm/json', timeout=10)
                 data = json.loads(resp.read().decode())
                 latest = data.get('info', {}).get('version', VERSION)
-                self._json({'current': VERSION, 'latest': latest})
+                is_exe = getattr(sys, 'frozen', False)
+                result = {'current': VERSION, 'latest': latest, 'exe': is_exe}
+                if is_exe:
+                    result['download_url'] = 'https://github.com/hyunjun6928-netizen/salmalm/releases/latest'
+                self._json(result)
             except Exception as e:
                 self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
         elif self.path == '/api/metrics':

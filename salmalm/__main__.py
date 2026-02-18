@@ -57,6 +57,9 @@ def main() -> None:
                     data = _json.loads(resp.read())
                 latest = data.get('info', {}).get('version', '')
                 if latest and latest != VERSION:
+                    if getattr(sys, 'frozen', False):
+                        return (f"⬆️  New version {latest} available!\n"
+                                f"   Download: https://github.com/hyunjun6928-netizen/salmalm/releases/latest")
                     return f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
             except Exception:
                 pass  # silently skip if no network
