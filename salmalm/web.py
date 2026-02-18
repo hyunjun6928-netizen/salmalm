@@ -1,5 +1,7 @@
 """SalmAlm Web UI — HTML + WebHandler."""
-import asyncio, gzip, http.server, json, os, re, secrets, time
+import warnings
+warnings.filterwarnings('ignore', category=SyntaxWarning, module='web')
+import asyncio, gzip, http.server, json, os, re, secrets, sys, time
 from pathlib import Path
 from typing import Optional
 

@@ -1,4 +1,4 @@
-# 😈 삶앎 (SalmAlm) v0.9.1
+# 😈 삶앎 (SalmAlm) v0.9.2
 
 **Personal AI Gateway — Pure Python**
 
