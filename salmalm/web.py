@@ -1180,6 +1180,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 if val:
                     vault.set(key, val)
                     saved.append(key.replace('_api_key', ''))
+            dc_token = body.get('discord_token', '').strip()
+            if dc_token:
+                vault.set('discord_token', dc_token)
+                saved.append('discord')
             ollama_url = body.get('ollama_url', '').strip()
             if ollama_url:
                 vault.set('ollama_url', ollama_url)
@@ -1294,6 +1298,12 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 </div>
 <div class="divider"></div>
 <div class="step">
+<label>🎮 Discord Bot Token (선택)</label>
+<input type="password" id="discord" placeholder="MTIz...">
+<div class="hint">선택사항. <a href="https://discord.com/developers/applications" target="_blank" style="color:#7c5cfc">봇 만들기 →</a> MESSAGE CONTENT intent 필수</div>
+</div>
+<div class="divider"></div>
+<div class="step">
 <label>🦙 Ollama (로컬 LLM — API 키 불필요)</label>
 <input type="text" id="ollama" placeholder="http://localhost:11434/v1" value="">
 <div class="hint">Ollama가 설치되어 있다면 URL 입력. API 키 없이 무료로 사용 가능! <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">설치하기 →</a></div>
@@ -1312,6 +1322,8 @@ async function save(){
     const v=document.getElementById(k).value.trim();
     if(v) body[k+'_api_key']=v;
   });
+  const dc=document.getElementById('discord').value.trim();
+  if(dc) body.discord_token=dc;
   const ollama=document.getElementById('ollama').value.trim();
   if(ollama) body.ollama_url=ollama;
   if(!Object.keys(body).length){

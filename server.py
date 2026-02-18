@@ -39,6 +39,7 @@ from salmalm.core import (
     _sessions, cron, CronScheduler
 )
 from salmalm.telegram import telegram_bot
+from salmalm.discord_bot import discord_bot
 from salmalm.web import WebHandler
 from salmalm.ws import ws_server, StreamingResponse
 from salmalm.rag import rag_engine
@@ -212,6 +213,20 @@ async def main():
         if tg_token and tg_owner:
             telegram_bot.configure(tg_token, tg_owner)
             asyncio.create_task(telegram_bot.poll())
+
+        # ══ Discord bot ══
+        dc_token = vault.get('discord_token')
+        if dc_token:
+            discord_bot.configure(dc_token, vault.get('discord_owner_id'))
+
+            @discord_bot.on_message
+            async def handle_discord(content, msg_data):
+                from salmalm.engine import process_message
+                author = msg_data.get('author', {})
+                session_id = f"discord_{author.get('id', 'unknown')}"
+                return await process_message(session_id, content)
+
+            asyncio.create_task(discord_bot.poll())
 
     rag_stats = rag_engine.get_stats()
     mcp_count = len(mcp_manager.list_servers())
