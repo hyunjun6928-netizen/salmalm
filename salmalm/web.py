@@ -1214,7 +1214,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         {'x-api-key': body['anthropic_api_key'],
                          'content-type': 'application/json',
                          'anthropic-version': '2023-06-01'},
-                        {'model': 'claude-3-5-haiku-20241022', 'max_tokens': 10,
+                        {'model': 'claude-haiku-4-5-20250414', 'max_tokens': 10,
                          'messages': [{'role': 'user', 'content': 'ping'}]},
                         timeout=15
                     )
