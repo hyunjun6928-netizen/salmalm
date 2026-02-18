@@ -345,7 +345,11 @@ class AuthManager:
 
 # ── Request authentication middleware ────────────────────────
 
-def extract_auth(headers: dict) -> Optional[dict]:
+def extract_auth(headers) -> Optional[dict]:
+    """Extract user from headers. Accepts dict (case-sensitive) or HTTPMessage (case-insensitive)."""
+    # Normalize dict to lowercase keys for reliable lookup
+    if isinstance(headers, dict):
+        headers = {k.lower(): v for k, v in headers.items()}
     """Extract user from request headers (Bearer token or API key)."""
     auth_header = headers.get('authorization', '')
     if auth_header.startswith('Bearer '):

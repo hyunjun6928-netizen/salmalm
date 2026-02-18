@@ -46,3 +46,6 @@ REVIEW_*.md
 .clipboard.json
 rag.db*
 plugins/
+dist/
+build/
+*.egg-info/
