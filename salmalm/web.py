@@ -243,8 +243,19 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <button onclick="fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:document.getElementById('s-ollama-url').value})}).then(function(){alert('저장됨')})" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px">Ollama URL 저장</button>
   </div>
   <div class="settings-card">
-    <h3>🔐 Vault 키 관리</h3>
-    <div id="vault-keys"></div>
+    <h3>🔑 API 키 관리</h3>
+    <label>Anthropic API Key</label>
+    <div style="display:flex;gap:6px"><input id="sk-anthropic" type="password" placeholder="sk-ant-..."><button class="btn" onclick="saveKey('anthropic_api_key','sk-anthropic')">저장</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('anthropic')">테스트</button></div>
+    <label>OpenAI API Key</label>
+    <div style="display:flex;gap:6px"><input id="sk-openai" type="password" placeholder="sk-..."><button class="btn" onclick="saveKey('openai_api_key','sk-openai')">저장</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('openai')">테스트</button></div>
+    <label>xAI API Key (Grok)</label>
+    <div style="display:flex;gap:6px"><input id="sk-xai" type="password" placeholder="xai-..."><button class="btn" onclick="saveKey('xai_api_key','sk-xai')">저장</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('xai')">테스트</button></div>
+    <label>Google API Key (Gemini)</label>
+    <div style="display:flex;gap:6px"><input id="sk-google" type="password" placeholder="AIza..."><button class="btn" onclick="saveKey('google_api_key','sk-google')">저장</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('google')">테스트</button></div>
+    <label>Brave Search API Key</label>
+    <div style="display:flex;gap:6px"><input id="sk-brave" type="password" placeholder="BSA..."><button class="btn" onclick="saveKey('brave_api_key','sk-brave')">저장</button></div>
+    <div id="key-test-result" style="margin-top:8px;font-size:12px"></div>
+    <div id="vault-keys" style="margin-top:12px"></div>
   </div>
   <div class="settings-card" id="usage-card">
     <h3>📊 토큰 사용량</h3>
@@ -565,6 +576,25 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       document.getElementById('usage-detail').innerHTML=h});
   };
   window.showUsage=window.showSettings;
+  window.saveKey=function(vaultKey,inputId){
+    var v=document.getElementById(inputId).value.trim();
+    if(!v){alert('키를 입력하세요');return}
+    fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'set',key:vaultKey,value:v})})
+    .then(function(r){return r.json()}).then(function(d){
+      var re=document.getElementById('key-test-result');
+      re.innerHTML='<span style="color:#4ade80">✅ '+vaultKey+' 저장됨</span>';
+      document.getElementById(inputId).value='';
+      window.showSettings()})};
+  window.testKey=function(provider){
+    var re=document.getElementById('key-test-result');
+    re.innerHTML='<span style="color:var(--text2)">⏳ '+provider+' 테스트 중...</span>';
+    fetch('/api/test-key',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({provider:provider})})
+    .then(function(r){return r.json()}).then(function(d){
+      re.innerHTML=d.ok?'<span style="color:#4ade80">'+d.result+'</span>':'<span style="color:#f87171">'+d.result+'</span>'})
+    .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ 오류: '+e.message+'</span>'})
+  };
   window.setModel=function(m){modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
     fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'/model '+(m==='auto'?'auto':m),session:'web'})})};
 
@@ -1009,6 +1039,48 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': str(e)}, 400)
             return
 
+        if self.path == '/api/test-key':
+            provider = body.get('provider', '')
+            from .llm import _http_post
+            tests = {
+                'anthropic': lambda: _http_post(
+                    'https://api.anthropic.com/v1/messages',
+                    {'x-api-key': vault.get('anthropic_api_key') or '',
+                     'content-type': 'application/json', 'anthropic-version': '2023-06-01'},
+                    {'model': 'claude-haiku-4-5-20250414', 'max_tokens': 10,
+                     'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
+                'openai': lambda: _http_post(
+                    'https://api.openai.com/v1/chat/completions',
+                    {'Authorization': 'Bearer ' + (vault.get('openai_api_key') or ''),
+                     'Content-Type': 'application/json'},
+                    {'model': 'gpt-4.1-nano', 'max_tokens': 10,
+                     'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
+                'xai': lambda: _http_post(
+                    'https://api.x.ai/v1/chat/completions',
+                    {'Authorization': 'Bearer ' + (vault.get('xai_api_key') or ''),
+                     'Content-Type': 'application/json'},
+                    {'model': 'grok-3-mini', 'max_tokens': 10,
+                     'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
+                'google': lambda: (lambda k: __import__('urllib.request', fromlist=['urlopen']).urlopen(
+                    __import__('urllib.request', fromlist=['Request']).Request(
+                        f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={k}',
+                        data=json.dumps({'contents': [{'parts': [{'text': 'ping'}]}]}).encode(),
+                        headers={'Content-Type': 'application/json'}), timeout=15))(vault.get('google_api_key') or ''),
+            }
+            if provider not in tests:
+                self._json({'ok': False, 'result': f'❌ 알 수 없는 프로바이더: {provider}'})
+                return
+            key = vault.get(f'{provider}_api_key') if provider != 'google' else vault.get('google_api_key')
+            if not key:
+                self._json({'ok': False, 'result': f'❌ {provider} API 키가 저장되어 있지 않습니다'})
+                return
+            try:
+                tests[provider]()
+                self._json({'ok': True, 'result': f'✅ {provider} API 연결 성공!'})
+            except Exception as e:
+                self._json({'ok': False, 'result': f'❌ {provider} 테스트 실패: {str(e)[:120]}'})
+            return
+
         if self.path == '/api/unlock':
             password = body.get('password', '')
             if VAULT_FILE.exists():
@@ -1204,40 +1276,52 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if ollama_url:
                 vault.set('ollama_url', ollama_url)
                 saved.append('ollama')
-            # Test the first available key
-            test_result = None
+            # Test all provided keys
+            from .llm import _http_post
+            test_results = []
             if body.get('anthropic_api_key'):
                 try:
-                    from .llm import _http_post
-                    resp = _http_post(
-                        'https://api.anthropic.com/v1/messages',
-                        {'x-api-key': body['anthropic_api_key'],
-                         'content-type': 'application/json',
+                    _http_post('https://api.anthropic.com/v1/messages',
+                        {'x-api-key': body['anthropic_api_key'], 'content-type': 'application/json',
                          'anthropic-version': '2023-06-01'},
                         {'model': 'claude-haiku-4-5-20250414', 'max_tokens': 10,
-                         'messages': [{'role': 'user', 'content': 'ping'}]},
-                        timeout=15
-                    )
-                    test_result = '✅ Anthropic API 연결 성공!'
+                         'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
+                    test_results.append('✅ Anthropic OK')
                 except Exception as e:
-                    test_result = f'⚠️ Anthropic 테스트 실패: {str(e)[:100]}'
-            elif body.get('openai_api_key'):
+                    test_results.append(f'⚠️ Anthropic: {str(e)[:80]}')
+            if body.get('openai_api_key'):
                 try:
-                    from .llm import _http_post
-                    resp = _http_post(
-                        'https://api.openai.com/v1/chat/completions',
-                        {'Authorization': f'Bearer {body["openai_api_key"]}',
-                         'Content-Type': 'application/json'},
-                        {'model': 'gpt-4o-mini', 'max_tokens': 10,
-                         'messages': [{'role': 'user', 'content': 'ping'}]},
-                        timeout=15
-                    )
-                    test_result = '✅ OpenAI API 연결 성공!'
+                    _http_post('https://api.openai.com/v1/chat/completions',
+                        {'Authorization': f'Bearer {body["openai_api_key"]}', 'Content-Type': 'application/json'},
+                        {'model': 'gpt-4.1-nano', 'max_tokens': 10,
+                         'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
+                    test_results.append('✅ OpenAI OK')
                 except Exception as e:
-                    test_result = f'⚠️ OpenAI 테스트 실패: {str(e)[:100]}'
+                    test_results.append(f'⚠️ OpenAI: {str(e)[:80]}')
+            if body.get('xai_api_key'):
+                try:
+                    _http_post('https://api.x.ai/v1/chat/completions',
+                        {'Authorization': f'Bearer {body["xai_api_key"]}', 'Content-Type': 'application/json'},
+                        {'model': 'grok-3-mini', 'max_tokens': 10,
+                         'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
+                    test_results.append('✅ xAI OK')
+                except Exception as e:
+                    test_results.append(f'⚠️ xAI: {str(e)[:80]}')
+            if body.get('google_api_key'):
+                try:
+                    import urllib.request
+                    gk = body['google_api_key']
+                    req = urllib.request.Request(
+                        f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gk}',
+                        data=json.dumps({'contents': [{'parts': [{'text': 'ping'}]}]}).encode(),
+                        headers={'Content-Type': 'application/json'})
+                    urllib.request.urlopen(req, timeout=15)
+                    test_results.append('✅ Google OK')
+                except Exception as e:
+                    test_results.append(f'⚠️ Google: {str(e)[:80]}')
             audit_log('onboarding', f'keys: {", ".join(saved)}')
-            self._json({'ok': True, 'saved': saved,
-                        'test_result': test_result or '키가 저장되었습니다.'})
+            test_result = ' | '.join(test_results) if test_results else '키가 저장되었습니다.'
+            self._json({'ok': True, 'saved': saved, 'test_result': test_result})
             return
 
         elif self.path == '/api/config/telegram':
