@@ -1,0 +1,2 @@
+[console_scripts]
+salmalm = salmalm.__main__:main

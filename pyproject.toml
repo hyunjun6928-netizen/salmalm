@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "salmalm"
-version = "0.7.2"
+version = "0.8.0"
 description = "Personal AI Gateway — Pure Python, minimal dependencies"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.10"
 authors = [{name = "Nightmare Dolsoe", email = "dolsoe@salmalm.dev"}]
 keywords = ["ai", "gateway", "llm", "agent", "local", "chatgpt"]
@@ -15,7 +15,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Web Environment",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -40,7 +39,7 @@ Repository = "https://github.com/hyunjun6928-netizen/salmalm"
 include = ["salmalm*"]
 
 [tool.setuptools.package-data]
-salmalm = ["../server.py", "../start.sh", "../.env.example"]
+salmalm = ["py.typed"]
 
 [tool.mypy]
 python_version = "3.12"
