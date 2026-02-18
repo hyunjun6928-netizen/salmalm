@@ -26,6 +26,15 @@ def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8', errors='replace')
         log.error(f"HTTP {e.code}: {err_body[:300]}")
+        # Friendly error messages
+        if e.code == 401:
+            raise ValueError(f'API 키가 유효하지 않습니다 (401). 키를 확인하세요.') from e
+        elif e.code == 429:
+            raise ValueError(f'요청 한도 초과 (429). 잠시 후 다시 시도하세요.') from e
+        elif e.code == 402:
+            raise ValueError(f'API 잔액 부족 (402). 결제 정보를 확인하세요.') from e
+        elif e.code == 529:
+            raise ValueError(f'서버 과부하 (529). 잠시 후 다시 시도하세요.') from e
         raise
 
 
@@ -64,7 +73,9 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
     else:
         api_key = vault.get(f'{provider}_api_key')
     if not api_key:
-        return {'content': f'❌ {provider} API 키가 설정되지 않았습니다.', 'tool_calls': [],
+        return {'content': f'❌ {provider} API 키가 설정되지 않았습니다.\n\n'
+                f'💡 웹 UI 설정에서 `{provider}_api_key`를 추가하거나,\n'
+                f'다른 모델로 변경해보세요: `/model auto`', 'tool_calls': [],
                 'usage': {'input': 0, 'output': 0}, 'model': model}
 
     log.info(f"🤖 LLM call: {model} ({len(messages)} msgs, tools={len(tools or [])})")

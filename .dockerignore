@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+.env
+.vault.enc
+audit.db
+auth.db
+memory.db
+cache.db
+*.log
+.git
+uploads/*
+memory/*
+workspace/*

@@ -390,24 +390,39 @@ async def process_message(session_id: str, user_message: str,
         session.messages = [m for m in session.messages if m['role'] == 'system'][:1]
         return '대화가 초기화되었습니다.'
     if cmd == '/help':
-        return """😈 **삶앎 v{ver} 명령어**
+        from .tools import TOOL_DEFINITIONS
+        tool_count = len(TOOL_DEFINITIONS)
+        return f"""😈 **삶앎 v{VERSION}** — Personal AI Gateway
 
-**/clear** — 대화 초기화
-**/help** — 이 도움말
-**/model <이름>** — 모델 변경 (35+ 별칭 지원)
-**/think <질문>** — 🧠 강제 Thinking 모드 (Opus + 심층 추론)
-**/plan <질문>** — 📋 계획 수립 후 실행 (복잡한 작업용)
-**/status** — 사용량 + 비용
+📌 **명령어**
+/clear — 대화 초기화
+/help — 이 도움말
+/model <이름> — 모델 변경
+/think <질문> — 🧠 심층 추론 (Opus)
+/plan <질문> — 📋 계획 → 실행
+/status — 사용량 + 비용
+/tools — 도구 목록
 
-**모델 별칭:** auto, claude, sonnet, opus, haiku, gpt, gpt5, gpt5.1,
-gpt4.1, 4.1mini, 4.1nano, o3, o3mini, o4mini, grok, grok4, grok3,
-grok3mini, gemini, flash, deepseek, r1, dschat, llama, maverick, scout
-또는 전체 경로: /model openai/o3
+🤖 **모델 별칭** (27개)
+claude, sonnet, opus, haiku, gpt, gpt5, o3, o4mini,
+grok, grok4, gemini, flash, deepseek, llama, auto ...
 
-**Intelligence Engine:** 자동 의도 분류 → 적응형 모델 선택 →
-계획 수립 → 병렬 도구 실행 → 자기 평가 반영""".format(ver=VERSION)
+🔧 **도구** ({tool_count}개)
+파일 읽기/쓰기, 코드 실행, 웹 검색, RAG 검색,
+시스템 모니터, 크론 작업, 이미지 분석, TTS ...
+
+🧠 **Intelligence Engine**
+자동 의도 분류(7단계) → 모델 선택 → 병렬 도구 → 자기 평가
+
+💡 **팁**: 그냥 자연어로 말하면 됩니다. 파일 읽어줘, 검색해줘, 코드 짜줘 등"""
     if cmd == '/status':
         return execute_tool('usage_report', {})
+    if cmd == '/tools':
+        from .tools import TOOL_DEFINITIONS
+        lines = [f'🔧 **도구 목록** ({len(TOOL_DEFINITIONS)}개)\n']
+        for t in TOOL_DEFINITIONS:
+            lines.append(f"• **{t['name']}** — {t['description'][:60]}")
+        return '\n'.join(lines)
     if cmd.startswith('/think '):
         think_msg = cmd[7:].strip()
         if not think_msg:

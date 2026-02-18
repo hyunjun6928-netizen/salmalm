@@ -61,6 +61,22 @@ python3 server.py
 # Add your API keys in Settings (Anthropic/OpenAI/xAI/Google)
 ```
 
+### Docker
+
+```bash
+docker build -t salmalm .
+docker run -p 18800:18800 -e SALMALM_VAULT_PW=your_password salmalm
+```
+
+### Local LLM (Ollama — no API key needed)
+
+```bash
+ollama pull llama3.2
+python3 server.py
+# In onboarding wizard, enter Ollama URL: http://localhost:11434/v1
+# Use: /model ollama/llama3.2
+```
+
 ### Auto-unlock (for unattended startup)
 
 ```bash

@@ -773,11 +773,13 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                                         duration_ms=duration)
 
     def _needs_onboarding(self) -> bool:
-        """Check if first-run onboarding is needed (no API keys configured)."""
+        """Check if first-run onboarding is needed (no API keys or Ollama configured)."""
         if not vault.is_unlocked:
             return False
         providers = ['anthropic_api_key', 'openai_api_key', 'xai_api_key', 'google_api_key']
-        return not any(vault.get(k) for k in providers)
+        has_api_key = any(vault.get(k) for k in providers)
+        has_ollama = bool(vault.get('ollama_url'))
+        return not (has_api_key or has_ollama)
 
     def _do_get_inner(self):
         if self.path == '/' or self.path == '/index.html':
@@ -1149,7 +1151,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not vault.is_unlocked:
                 self._json({'error': 'Vault locked'}, 403)
                 return
-            # Save all provided API keys
+            # Save all provided API keys + Ollama URL
             saved = []
             for key in ('anthropic_api_key', 'openai_api_key', 'xai_api_key',
                         'google_api_key', 'brave_api_key'):
@@ -1157,6 +1159,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 if val:
                     vault.set(key, val)
                     saved.append(key.replace('_api_key', ''))
+            ollama_url = body.get('ollama_url', '').strip()
+            if ollama_url:
+                vault.set('ollama_url', ollama_url)
+                saved.append('ollama')
             # Test the first available key
             test_result = None
             if body.get('anthropic_api_key'):
@@ -1265,6 +1271,12 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 <input type="password" id="brave" placeholder="BSA...">
 <div class="hint">선택사항. <a href="https://brave.com/search/api/" target="_blank" style="color:#7c5cfc">무료 발급 →</a></div>
 </div>
+<div class="divider"></div>
+<div class="step">
+<label>🦙 Ollama (로컬 LLM — API 키 불필요)</label>
+<input type="text" id="ollama" placeholder="http://localhost:11434/v1" value="">
+<div class="hint">Ollama가 설치되어 있다면 URL 입력. API 키 없이 무료로 사용 가능! <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">설치하기 →</a></div>
+</div>
 
 <button id="btn" onclick="save()">저장 & 테스트</button>
 <div class="result" id="result"></div>
@@ -1279,8 +1291,10 @@ async function save(){
     const v=document.getElementById(k).value.trim();
     if(v) body[k+'_api_key']=v;
   });
+  const ollama=document.getElementById('ollama').value.trim();
+  if(ollama) body.ollama_url=ollama;
   if(!Object.keys(body).length){
-    show('최소 1개의 API 키를 입력하세요','err');
+    show('최소 1개의 API 키 또는 Ollama URL을 입력하세요','err');
     btn.disabled=false; btn.textContent='저장 & 테스트'; return;
   }
   try{

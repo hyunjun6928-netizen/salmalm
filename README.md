@@ -82,6 +82,24 @@ cp .env.example .env
 ./start.sh
 ```
 
+## 🐳 Docker
+
+```bash
+docker build -t salmalm .
+docker run -p 18800:18800 -e SALMALM_VAULT_PW=your_password salmalm
+# Open http://localhost:18800
+```
+
+## 🦙 Ollama (로컬 LLM, API 키 불필요)
+
+```bash
+# Ollama 설치 후
+ollama pull llama3.2
+python3 server.py
+# 온보딩에서 Ollama URL 입력: http://localhost:11434/v1
+# /model ollama/llama3.2 로 사용
+```
+
 ## 🔑 API Keys
 
 Store in the encrypted vault via Web UI:
