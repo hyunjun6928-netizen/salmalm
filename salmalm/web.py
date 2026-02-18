@@ -170,7 +170,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div class="nav-item" onclick="quickCmd('Convert to speech: Hello world')">🔊 TTS</div>
     </div>
     <div class="nav-section">Admin</div>
-    <div class="nav-item" onclick="showSettings()">⚙️ Settings</div>
+    <div class="nav-item" onclick="showSettings()"data-i18n="nav-settings">⚙️ Settings</div>
     <div class="nav-item" onclick="showUsage()">📊 Usage</div>
   </div>
   <div class="side-footer">
@@ -196,7 +196,14 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
 <div id="settings">
   <div class="settings-card">
-    <h3>🤖 Model Settings</h3>
+    <h3 data-i18n="h-lang">🌐 Language</h3>
+    <select id="s-lang" onchange="setLang(this.value)" style="width:200px">
+      <option value="en">English</option>
+      <option value="ko">한국어</option>
+    </select>
+  </div>
+  <div class="settings-card">
+    <h3 data-i18n="h-model">🤖 Model Settings</h3>
     <label>Default Model</label>
     <select id="s-model" onchange="setModel(this.value)">
       <optgroup label="🔄 Auto">
@@ -243,7 +250,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <button onclick="fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:document.getElementById('s-ollama-url').value})}).then(function(){alert('Saved')})" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px">Save Ollama URL</button>
   </div>
   <div class="settings-card">
-    <h3>🔑 API Key Management</h3>
+    <h3 data-i18n="h-keys">🔑 API Key Management</h3>
     <label>Anthropic API Key</label>
     <div style="display:flex;gap:6px"><input id="sk-anthropic" type="password" placeholder="sk-ant-..."><button class="btn" onclick="saveKey('anthropic_api_key','sk-anthropic')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('anthropic')">Test</button></div>
     <label>OpenAI API Key</label>
@@ -262,10 +269,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="usage-detail"></div>
   </div>
   <div class="settings-card">
-    <h3>🔄 Update</h3>
+    <h3 data-i18n="h-update">🔄 Update</h3>
     <div style="display:flex;gap:8px;align-items:center">
       <span id="update-ver" style="font-size:13px;color:var(--text2)">Current: v<span id="cur-ver"></span></span>
-      <button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="checkUpdate()">Check for Updates</button>
+      <button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="checkUpdate()"data-i18n="btn-check">Check for Updates</button>
       <button class="btn" id="do-update-btn" style="display:none" onclick="doUpdate()">⬆️ Update</button>
     </div>
     <div id="update-result" style="margin-top:8px;font-size:12px"></div>
@@ -274,7 +281,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
 <div id="input-area">
   <div class="input-box">
-    <textarea id="input" rows="1" placeholder="Type a message..."></textarea>
+    <textarea id="input" rows="1" placeholder="Type a message..." data-i18n="input-ph"></textarea>
     <button id="send-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
     </button>
@@ -573,6 +580,53 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   input.addEventListener('input',function(){input.style.height='auto';input.style.height=Math.min(input.scrollHeight,150)+'px'});
   btn.addEventListener('click',function(){doSend()});
 
+  /* --- i18n --- */
+  var _i18n={
+    en:{
+      'nav-chat':'💬 Chat','nav-settings':'⚙️ Settings',
+      'h-model':'🤖 Model Settings','h-keys':'🔑 API Key Management','h-update':'🔄 Update','h-lang':'🌐 Language',
+      'lbl-model':'Default Model','lbl-ollama':'Ollama URL',
+      'btn-save':'Save','btn-test':'Test','btn-check':'Check for Updates','btn-update':'⬆️ Update',
+      'btn-export':'📥 Export','btn-send':'Send',
+      'lbl-anthropic':'Anthropic API Key','lbl-openai':'OpenAI API Key',
+      'lbl-xai':'xAI API Key (Grok)','lbl-google':'Google API Key (Gemini)','lbl-brave':'Brave Search API Key',
+      'welcome-title':'Welcome to SalmAlm','welcome-sub':'Your personal AI gateway',
+      'input-ph':'Type a message...',
+      'usage-input':'Input','usage-output':'Output','usage-cost':'Cost','usage-uptime':'Uptime',
+      'h-vault':'🗝️ Stored Keys','h-usage':'📊 Usage',
+      'update-uptodate':'✅ You are up to date','update-checking':'⏳ Checking PyPI...',
+      'update-new':'🆕 New version','update-available':'available!','update-download':'⬇️ Download',
+      'update-installing':'Running pip install --upgrade salmalm...',
+    },
+    ko:{
+      'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정',
+      'h-model':'🤖 모델 설정','h-keys':'🔑 API 키 관리','h-update':'🔄 업데이트','h-lang':'🌐 언어',
+      'lbl-model':'기본 모델','lbl-ollama':'Ollama URL',
+      'btn-save':'저장','btn-test':'테스트','btn-check':'업데이트 확인','btn-update':'⬆️ 업데이트',
+      'btn-export':'📥 내보내기','btn-send':'전송',
+      'lbl-anthropic':'Anthropic API 키','lbl-openai':'OpenAI API 키',
+      'lbl-xai':'xAI API 키 (Grok)','lbl-google':'Google API 키 (Gemini)','lbl-brave':'Brave Search API 키',
+      'welcome-title':'삶앎에 오신 것을 환영합니다','welcome-sub':'나만의 AI 게이트웨이',
+      'input-ph':'메시지를 입력하세요...',
+      'usage-input':'입력','usage-output':'출력','usage-cost':'비용','usage-uptime':'가동시간',
+      'h-vault':'🗝️ 저장된 키','h-usage':'📊 사용량',
+      'update-uptodate':'✅ 최신 버전입니다','update-checking':'⏳ PyPI 확인 중...',
+      'update-new':'🆕 새 버전','update-available':'사용 가능!','update-download':'⬇️ 다운로드',
+      'update-installing':'pip install --upgrade salmalm 실행 중...',
+    }
+  };
+  var _lang=localStorage.getItem('salmalm-lang')||'en';
+  function t(k){return (_i18n[_lang]||_i18n.en)[k]||(_i18n.en[k]||k)}
+  function applyLang(){
+    document.querySelectorAll('[data-i18n]').forEach(function(el){
+      var k=el.getAttribute('data-i18n');
+      if(el.tagName==='INPUT'||el.tagName==='TEXTAREA')el.placeholder=t(k);
+      else el.textContent=t(k);
+    });
+    var sel=document.getElementById('s-lang');
+    if(sel)sel.value=_lang;
+  }
+  window.setLang=function(v){_lang=v;localStorage.setItem('salmalm-lang',v);applyLang()};
   /* --- Settings --- */
   window.showChat=function(){settingsEl.style.display='none';chat.style.display='flex';inputArea.style.display='block'};
   window.showSettings=function(){chat.style.display='none';inputArea.style.display='none';settingsEl.style.display='block';
@@ -698,6 +752,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       }
     }catch(e){}
   },30000);
+  applyLang();
 })();
 </script></body></html>'''
 
