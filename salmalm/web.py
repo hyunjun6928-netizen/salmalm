@@ -816,6 +816,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         """Check rate limit. Returns True if OK, sends 429 if exceeded."""
         ip = self._get_client_ip()
         user = extract_auth(dict(self.headers))
+        if not user and ip in ('127.0.0.1', '::1', 'localhost') and vault.is_unlocked:
+            user = {'username': 'local', 'role': 'admin'}
         role = user.get('role', 'anonymous') if user else 'anonymous'
         key = user.get('username', ip) if user else ip
         try:
