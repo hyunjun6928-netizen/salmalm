@@ -10,11 +10,14 @@ def _ensure_windows_shortcut():
     try:
         import subprocess as _sp
         python_exe = sys.executable
+        work_dir = os.path.join(os.path.expanduser('~'), 'SalmAlm')
         cmd = (
             "$ws = New-Object -ComObject WScript.Shell; "
             "$lnk = $ws.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\\SalmAlm.lnk'); "
             f"$lnk.TargetPath = '{python_exe}'; "
             "$lnk.Arguments = '-m salmalm'; "
+            f"$lnk.WorkingDirectory = '{work_dir}'; "
+            "$lnk.Description = 'SalmAlm - Personal AI Gateway'; "
             "$lnk.Save(); "
             "Write-Host 'Created SalmAlm shortcut on Desktop'"
         )
@@ -28,6 +31,13 @@ def _ensure_windows_shortcut():
 
 def main() -> None:
     """CLI entry point — start the salmalm server."""
+    # Set working directory to a fixed location (not cwd)
+    if not getattr(sys, 'frozen', False):
+        home = os.path.expanduser('~')
+        work_dir = os.path.join(home, 'SalmAlm')
+        os.makedirs(work_dir, exist_ok=True)
+        os.chdir(work_dir)
+
     # Windows: create desktop shortcut on first run
     if sys.platform == 'win32' and not getattr(sys, 'frozen', False):
         _ensure_windows_shortcut()
