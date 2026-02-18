@@ -544,6 +544,14 @@ def execute_tool(name: str, args: dict) -> str:
         elif name == 'web_fetch':
             url = args['url']
             max_chars = args.get('max_chars', 10000)
+            # SSRF protection: block internal/private IPs
+            from urllib.parse import urlparse
+            _host = urlparse(url).hostname or ''
+            _blocked = ('localhost', '127.', '10.', '192.168.', '172.16.',
+                        '172.17.', '172.18.', '172.19.', '172.2', '172.30.', '172.31.',
+                        '169.254.', '0.0.0.0', '::1', 'metadata.google', '169.254.169.254')
+            if any(_host.startswith(b) or _host == b for b in _blocked):
+                return f'❌ 내부 네트워크 접근 차단: {_host}'
             req = urllib.request.Request(url, headers={
                 'User-Agent': 'Mozilla/5.0 (SalmAlm/0.1)'
             })

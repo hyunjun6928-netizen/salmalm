@@ -676,16 +676,25 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self._cors()
+        self._security_headers()
         body = self._maybe_gzip(body)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _security_headers(self):
+        """Add security headers to all responses."""
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
 
     def _html(self, content: str):
         body = content.encode('utf-8')
         self.send_response(200)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
         self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self._security_headers()
         body = self._maybe_gzip(body)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
