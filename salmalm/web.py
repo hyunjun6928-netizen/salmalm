@@ -694,7 +694,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     # Public endpoints (no auth required)
     _PUBLIC_PATHS = {
         '/', '/index.html', '/api/status', '/api/health', '/api/unlock',
-        '/api/auth/login', '/docs',
+        '/api/auth/login', '/api/onboarding', '/docs',
     }
 
     def _require_auth(self, min_role: str = 'user') -> Optional[dict]:
@@ -767,10 +767,19 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                                         ip=self._get_client_ip(),
                                         duration_ms=duration)
 
+    def _needs_onboarding(self) -> bool:
+        """Check if first-run onboarding is needed (no API keys configured)."""
+        if not vault.is_unlocked:
+            return False
+        providers = ['anthropic_api_key', 'openai_api_key', 'xai_api_key', 'google_api_key']
+        return not any(vault.get(k) for k in providers)
+
     def _do_get_inner(self):
         if self.path == '/' or self.path == '/index.html':
             if not vault.is_unlocked:
                 self._html(UNLOCK_HTML)
+            elif self._needs_onboarding():
+                self._html(ONBOARDING_HTML)
             else:
                 self._html(WEB_HTML)
         elif self.path == '/api/notifications':
@@ -1131,6 +1140,54 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': str(e)[:200]}, 500)
                 return
 
+        elif self.path == '/api/onboarding':
+            if not vault.is_unlocked:
+                self._json({'error': 'Vault locked'}, 403)
+                return
+            # Save all provided API keys
+            saved = []
+            for key in ('anthropic_api_key', 'openai_api_key', 'xai_api_key',
+                        'google_api_key', 'brave_api_key'):
+                val = body.get(key, '').strip()
+                if val:
+                    vault.set(key, val)
+                    saved.append(key.replace('_api_key', ''))
+            # Test the first available key
+            test_result = None
+            if body.get('anthropic_api_key'):
+                try:
+                    from .llm import _http_post
+                    resp = _http_post(
+                        'https://api.anthropic.com/v1/messages',
+                        {'x-api-key': body['anthropic_api_key'],
+                         'content-type': 'application/json',
+                         'anthropic-version': '2023-06-01'},
+                        {'model': 'claude-haiku-3.5-20241022', 'max_tokens': 10,
+                         'messages': [{'role': 'user', 'content': 'ping'}]},
+                        timeout=15
+                    )
+                    test_result = '✅ Anthropic API 연결 성공!'
+                except Exception as e:
+                    test_result = f'⚠️ Anthropic 테스트 실패: {str(e)[:100]}'
+            elif body.get('openai_api_key'):
+                try:
+                    from .llm import _http_post
+                    resp = _http_post(
+                        'https://api.openai.com/v1/chat/completions',
+                        {'Authorization': f'Bearer {body["openai_api_key"]}',
+                         'Content-Type': 'application/json'},
+                        {'model': 'gpt-4.1-nano', 'max_tokens': 10,
+                         'messages': [{'role': 'user', 'content': 'ping'}]},
+                        timeout=15
+                    )
+                    test_result = '✅ OpenAI API 연결 성공!'
+                except Exception as e:
+                    test_result = f'⚠️ OpenAI 테스트 실패: {str(e)[:100]}'
+            audit_log('onboarding', f'keys: {", ".join(saved)}')
+            self._json({'ok': True, 'saved': saved,
+                        'test_result': test_result or '키가 저장되었습니다.'})
+            return
+
         elif self.path == '/api/config/telegram':
             if not vault.is_unlocked:
                 self._json({'error': 'Vault locked'}, 403)
@@ -1142,6 +1199,97 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         else:
             self._json({'error': 'Not found'}, 404)
 
+
+ONBOARDING_HTML = '''<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>삶앎 — 설정 마법사</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.wizard{background:#1a1d27;padding:40px;border-radius:16px;border:1px solid #2a2d37;max-width:520px;width:100%}
+h1{color:#a78bfa;margin-bottom:4px;font-size:24px}
+.sub{color:#888;font-size:13px;margin-bottom:32px}
+.step{margin-bottom:20px}
+.step label{display:block;font-size:13px;color:#aaa;margin-bottom:6px;font-weight:500}
+.step input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f1117;color:#e0e0e0;font-size:14px;font-family:monospace}
+.step input:focus{border-color:#7c5cfc;outline:none}
+.step .hint{font-size:11px;color:#666;margin-top:4px}
+.required::after{content:" *";color:#f87171}
+.divider{border-top:1px solid #2a2d37;margin:24px 0}
+button{width:100%;padding:14px;border-radius:8px;border:none;background:#4f46e5;color:#fff;font-size:16px;cursor:pointer;font-weight:500;margin-top:8px}
+button:hover{background:#4338ca}
+button:disabled{opacity:0.5;cursor:not-allowed}
+.skip{text-align:center;margin-top:16px}
+.skip a{color:#666;font-size:13px;cursor:pointer;text-decoration:underline}
+.skip a:hover{color:#aaa}
+.result{margin-top:16px;padding:12px;border-radius:8px;font-size:14px;display:none}
+.result.ok{background:#0f2a1f;border:1px solid #34d399;color:#34d399;display:block}
+.result.err{background:#2a0f0f;border:1px solid #f87171;color:#f87171;display:block}
+.progress{display:flex;gap:8px;margin-bottom:24px}
+.progress .dot{width:10px;height:10px;border-radius:50%;background:#333}
+.progress .dot.active{background:#7c5cfc}
+.progress .dot.done{background:#34d399}
+</style></head><body>
+<div class="wizard">
+<h1>😈 삶앎 설정 마법사</h1>
+<p class="sub">AI Gateway를 사용하려면 최소 1개의 API 키가 필요합니다</p>
+<div class="progress"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
+
+<div class="step">
+<label class="required">Anthropic API Key (Claude)</label>
+<input type="password" id="anthropic" placeholder="sk-ant-...">
+<div class="hint">가장 추천. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c5cfc">발급하기 →</a></div>
+</div>
+<div class="step">
+<label>OpenAI API Key (GPT)</label>
+<input type="password" id="openai" placeholder="sk-...">
+<div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7c5cfc">발급하기 →</a></div>
+</div>
+<div class="step">
+<label>xAI API Key (Grok)</label>
+<input type="password" id="xai" placeholder="xai-...">
+</div>
+<div class="step">
+<label>Google API Key (Gemini)</label>
+<input type="password" id="google" placeholder="AIza...">
+</div>
+<div class="divider"></div>
+<div class="step">
+<label>Brave Search API Key (웹 검색용)</label>
+<input type="password" id="brave" placeholder="BSA...">
+<div class="hint">선택사항. <a href="https://brave.com/search/api/" target="_blank" style="color:#7c5cfc">무료 발급 →</a></div>
+</div>
+
+<button id="btn" onclick="save()">저장 & 테스트</button>
+<div class="result" id="result"></div>
+<div class="skip"><a onclick="location.reload()">건너뛰기 (나중에 설정)</a></div>
+</div>
+<script>
+async function save(){
+  const btn=document.getElementById('btn');
+  btn.disabled=true; btn.textContent='테스트 중...';
+  const body={};
+  ['anthropic','openai','xai','google','brave'].forEach(k=>{
+    const v=document.getElementById(k).value.trim();
+    if(v) body[k+'_api_key']=v;
+  });
+  if(!Object.keys(body).length){
+    show('최소 1개의 API 키를 입력하세요','err');
+    btn.disabled=false; btn.textContent='저장 & 테스트'; return;
+  }
+  try{
+    const r=await fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d.ok){
+      show(d.test_result+' ('+d.saved.join(', ')+' 저장됨)','ok');
+      btn.textContent='✅ 완료! 3초 후 이동...';
+      setTimeout(()=>location.reload(),3000);
+    }else{show(d.error,'err');btn.disabled=false;btn.textContent='저장 & 테스트';}
+  }catch(e){show('네트워크 오류: '+e,'err');btn.disabled=false;btn.textContent='저장 & 테스트';}
+}
+function show(msg,type){const el=document.getElementById('result');el.textContent=msg;el.className='result '+type;}
+</script></body></html>'''
 
 UNLOCK_HTML = '''<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8">
