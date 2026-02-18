@@ -2074,23 +2074,68 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     addMsg('system','😈 새 대화가 시작되었습니다.');
   };
 
+  /* --- Theme --- */
+  var _theme=localStorage.getItem('salm_theme')||'dark';
+  if(_theme==='light')document.documentElement.setAttribute('data-theme','light');
+  window.toggleTheme=function(){
+    _theme=_theme==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',_theme==='light'?'light':'');
+    localStorage.setItem('salm_theme',_theme);
+    var btn=document.getElementById('theme-toggle');
+    btn.textContent=_theme==='dark'?'🌙':'☀️';
+  };
+  document.getElementById('theme-toggle').textContent=_theme==='dark'?'🌙':'☀️';
+
+  /* --- Sidebar toggle (mobile) --- */
+  window.toggleSidebar=function(){
+    var sb=document.getElementById('sidebar'),ov=document.getElementById('side-overlay');
+    sb.classList.toggle('open');ov.classList.toggle('open');
+  };
+
+  /* --- Quick command from sidebar --- */
+  window.quickCmd=function(msg){
+    input.value=msg;doSend();
+    /* close sidebar on mobile */
+    var sb=document.getElementById('sidebar');if(sb.classList.contains('open'))toggleSidebar();
+  };
+
   /* --- Helpers --- */
+  var _copyId=0;
   function renderMd(t){
-    if(t.startsWith('<img ')||t.startsWith('<audio '))return t; /* already HTML */
-    return t.replace(/```([\\s\\S]*?)```/g,'<pre><code>$1</code></pre>')
-            .replace(/`([^`]+)`/g,'<code>$1</code>')
-            .replace(/\\*\\*([^*]+)\\*\\*/g,'<strong>$1</strong>')
-            .replace(/\\*([^*]+)\\*/g,'<em>$1</em>')
-            .replace(/^### (.+)$/gm,'<h4 style="margin:4px 0;font-size:13px">$1</h4>')
-            .replace(/^## (.+)$/gm,'<h3 style="margin:6px 0;font-size:14px">$1</h3>')
-            .replace(/^# (.+)$/gm,'<h2 style="margin:8px 0;font-size:15px">$1</h2>')
-            .replace(/^[•\\-] (.+)$/gm,'<div style="padding-left:12px">• $1</div>')
-            .replace(/^(\\d+)\\. (.+)$/gm,'<div style="padding-left:12px">$1. $2</div>')
-            .replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g,'<a href="$2" target="_blank" style="color:var(--accent2)">$1</a>')
-            .replace(/uploads\\/([\\w.-]+\\.(png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0" alt="$1">')
-            .replace(/uploads\\/([\\w.-]+\\.(mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1')
-            .replace(/\\n/g,'<br>');
+    if(t.startsWith('<img ')||t.startsWith('<audio '))return t;
+    /* Code blocks with copy button */
+    t=t.replace(/```(\\w+)?\\n?([\\s\\S]*?)```/g,function(_,lang,code){
+      _copyId++;var id='cp'+_copyId;
+      return '<pre style="position:relative"><button class="copy-btn" onclick="copyCode(\''+id+'\')" id="btn'+id+'">📋 복사</button><code id="'+id+'">'+(lang?'/* '+lang+' */\\n':'')+code.replace(/</g,'&lt;')+'</code></pre>';
+    });
+    t=t.replace(/`([^`]+)`/g,'<code>$1</code>');
+    t=t.replace(/\\*\\*([^*]+)\\*\\*/g,'<strong>$1</strong>');
+    t=t.replace(/\\*([^*]+)\\*/g,'<em>$1</em>');
+    /* Tables */
+    t=t.replace(/^\\|(.+)\\|\\s*$/gm,function(_,row){
+      var cells=row.split('|').map(function(c){return c.trim()});
+      if(cells.every(function(c){return /^[-:]+$/.test(c)}))return '';
+      return '<tr>'+cells.map(function(c){return '<td style="padding:4px 8px;border:1px solid var(--border)">'+c+'</td>'}).join('')+'</tr>';
+    });
+    t=t.replace(/((<tr>.*?<[/]tr>\\s*)+)/g,'<table style="border-collapse:collapse;margin:8px 0;font-size:13px">$1<\/table>');
+    t=t.replace(/^### (.+)$/gm,'<h4 style="margin:8px 0 4px;font-size:13px;color:var(--accent2)">$1</h4>');
+    t=t.replace(/^## (.+)$/gm,'<h3 style="margin:10px 0 6px;font-size:14px;color:var(--accent2)">$1</h3>');
+    t=t.replace(/^# (.+)$/gm,'<h2 style="margin:12px 0 8px;font-size:16px;color:var(--accent2)">$1</h2>');
+    t=t.replace(/^[•\\-] (.+)$/gm,'<div style="padding-left:16px;position:relative"><span style="position:absolute;left:4px">•</span>$1</div>');
+    t=t.replace(/^(\\d+)\\. (.+)$/gm,'<div style="padding-left:16px">$1. $2</div>');
+    t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1<\/a>');
+    t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" onclick="window.open(this.src)">');
+    t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"><\/audio> 🔊 $1');
+    t=t.replace(/\\n/g,'<br>');
+    return t;
   }
+  window.copyCode=function(id){
+    var el=document.getElementById(id);if(!el)return;
+    navigator.clipboard.writeText(el.textContent).then(function(){
+      var btn=document.getElementById('btn'+id);btn.textContent='✅ 복사됨';
+      setTimeout(function(){btn.textContent='📋 복사'},1500);
+    });
+  };
   function addMsg(role,text,model){
     const row=document.createElement('div');row.className='msg-row '+role;
     const av=document.createElement('div');av.className='avatar';
