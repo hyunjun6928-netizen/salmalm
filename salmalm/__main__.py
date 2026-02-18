@@ -8,7 +8,21 @@ import sys
 def _ensure_windows_shortcut():
     """Create a 'SalmAlm.bat' on Desktop for easy launch (once)."""
     try:
-        desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
+        # Try Windows shell API first (handles localized Desktop names)
+        desktop = None
+        try:
+            import subprocess as _sp
+            result = _sp.run(
+                ['powershell', '-Command', '[Environment]::GetFolderPath("Desktop")'],
+                capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                desktop = result.stdout.strip()
+        except Exception:
+            pass
+        if not desktop:
+            desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
+        if not os.path.isdir(desktop):
+            return
         bat = os.path.join(desktop, 'SalmAlm.bat')
         if os.path.exists(bat):
             return
@@ -17,8 +31,8 @@ def _ensure_windows_shortcut():
         with open(bat, 'w') as f:
             f.write(content)
         print(f"📌 Created desktop shortcut: {bat}")
-    except Exception:
-        pass  # non-critical
+    except Exception as e:
+        print(f"⚠️  Could not create desktop shortcut: {e}")
 
 
 def main() -> None:
