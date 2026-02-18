@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-삶앎 (SalmAlm) v0.7.0 — Personal AI Gateway
+삶앎 (SalmAlm) — Personal AI Gateway
 Modularized entry point.
 
 Modules (19):

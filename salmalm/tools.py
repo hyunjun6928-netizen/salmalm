@@ -430,18 +430,40 @@ def _is_safe_command(cmd: str) -> tuple[bool, str]:
 
 
 def _resolve_path(path: str, writing: bool = False) -> Path:
-    """Resolve path, preventing traversal outside workspace."""
+    """Resolve path, preventing traversal outside allowed directories.
+
+    Read: workspace + home directory
+    Write: workspace only (stricter)
+    """
     p = Path(path)
     if not p.is_absolute():
         p = WORKSPACE_DIR / p
     p = p.resolve()
-    # Allow workspace and home directory access
-    allowed = [WORKSPACE_DIR, Path.home()]
-    if not any(str(p).startswith(str(a)) for a in allowed):
-        raise PermissionError(f'접근 불가: {p}')
+
+    if writing:
+        # Write operations: workspace only
+        try:
+            p.relative_to(WORKSPACE_DIR.resolve())
+        except ValueError:
+            raise PermissionError(f'쓰기 불가 (workspace 외부): {p}')
+    else:
+        # Read operations: workspace + home
+        allowed = [WORKSPACE_DIR.resolve(), Path.home().resolve()]
+        if not any(_is_subpath(p, a) for a in allowed):
+            raise PermissionError(f'접근 불가: {p}')
+
     if writing and p.name in PROTECTED_FILES:
         raise PermissionError(f'보호된 파일: {p.name}')
     return p
+
+
+def _is_subpath(path: Path, parent: Path) -> bool:
+    """Check if path is under parent (safe, no startswith tricks)."""
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
 
 
 def execute_tool(name: str, args: dict) -> str:
@@ -455,8 +477,18 @@ def execute_tool(name: str, args: dict) -> str:
                 return f'❌ {reason}'
             timeout = min(args.get('timeout', 30), 120)
             try:
+                # Use shell=False by default (safer), shell=True only for pipes/redirects
+                import shlex
+                needs_shell = any(c in cmd for c in ['|', '>', '<', '&&', '||', ';', '`', '$(' ])
+                if needs_shell:
+                    run_args = {'args': cmd, 'shell': True}
+                else:
+                    try:
+                        run_args = {'args': shlex.split(cmd), 'shell': False}
+                    except ValueError:
+                        run_args = {'args': cmd, 'shell': True}
                 result = subprocess.run(
-                    cmd, shell=True, capture_output=True, text=True,
+                    **run_args, capture_output=True, text=True,
                     timeout=timeout, cwd=str(WORKSPACE_DIR)
                 )
                 output = result.stdout[-5000:] if result.stdout else ''
@@ -517,12 +549,36 @@ def execute_tool(name: str, args: dict) -> str:
             })
             with urllib.request.urlopen(req, timeout=15) as resp:
                 raw = resp.read().decode('utf-8', errors='replace')
-            # Simple HTML to text
-            text = re.sub(r'<script[^>]*>.*?</script>', '', raw, flags=re.S)
-            text = re.sub(r'<style[^>]*>.*?</style>', '', text, flags=re.S)
-            text = re.sub(r'<[^>]+>', ' ', text)
-            text = re.sub(r'\s+', ' ', text).strip()
-            return text[:max_chars]
+            # HTML to text using html.parser (robust, no regex fragility)
+            from html.parser import HTMLParser
+
+            class _TextExtractor(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self._parts: list = []
+                    self._skip = False
+                    self._skip_tags = {'script', 'style', 'noscript', 'svg'}
+
+                def handle_starttag(self, tag, attrs):
+                    if tag.lower() in self._skip_tags:
+                        self._skip = True
+                    elif tag.lower() in ('br', 'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr'):
+                        self._parts.append('\n')
+
+                def handle_endtag(self, tag):
+                    if tag.lower() in self._skip_tags:
+                        self._skip = False
+
+                def handle_data(self, data):
+                    if not self._skip:
+                        self._parts.append(data)
+
+                def get_text(self) -> str:
+                    return re.sub(r'\n{3,}', '\n\n', ''.join(self._parts)).strip()
+
+            extractor = _TextExtractor()
+            extractor.feed(raw)
+            return extractor.get_text()[:max_chars]
 
         elif name == 'memory_read':
             fname = args['file']

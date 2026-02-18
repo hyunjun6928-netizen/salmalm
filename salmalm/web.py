@@ -1,5 +1,5 @@
 """삶앎 Web UI — HTML + WebHandler."""
-import asyncio, gzip, http.server, json, re, secrets, time
+import asyncio, gzip, http.server, json, os, re, secrets, time
 from pathlib import Path
 from typing import Optional
 
@@ -702,7 +702,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         If vault is locked, also rejects (403)."""
         path = self.path.split('?')[0]
         if path in self._PUBLIC_PATHS or path.startswith('/uploads/'):
-            return {'username': 'local', 'role': 'admin', 'id': 0}  # public
+            return {'username': 'public', 'role': 'public', 'id': 0}  # skip auth for public endpoints
 
         # Try token/api-key auth first
         user = extract_auth(dict(self.headers))
@@ -722,7 +722,12 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         return None
 
     def _get_client_ip(self) -> str:
-        return self.headers.get('X-Forwarded-For', self.client_address[0] if self.client_address else '?').split(',')[0].strip()
+        """Get client IP. Only trusts X-Forwarded-For if SALMALM_TRUST_PROXY is set."""
+        if os.environ.get('SALMALM_TRUST_PROXY'):
+            xff = self.headers.get('X-Forwarded-For')
+            if xff:
+                return xff.split(',')[0].strip()
+        return self.client_address[0] if self.client_address else '?'
 
     def _check_rate_limit(self) -> bool:
         """Check rate limit. Returns True if OK, sends 429 if exceeded."""
