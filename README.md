@@ -4,7 +4,7 @@
 
 > [🇺🇸 English](README_EN.md)
 
-OpenClaw에 도전하는 개인 AI 게이트웨이. 순수 Python stdlib 기반, 외부 런타임 의존성 없이 구축.
+개인 AI 게이트웨이. 순수 Python stdlib 기반, 외부 런타임 의존성 없이 구축.
 암호화(`cryptography`)만 선택적 의존성으로, 설치 시 AES-256-GCM을 사용하고 없으면 HMAC-CTR 폴백.
 
 ## ✨ Features
@@ -135,19 +135,6 @@ Store in the encrypted vault via Web UI:
 | `GET /api/rag/search?q=...` | ✅ | BM25 search |
 | `GET /docs` | ❌ | Auto-generated API docs |
 | `ws://127.0.0.1:18801` | — | WebSocket real-time |
-
-## 🆚 vs OpenClaw
-
-| | OpenClaw | 삶앎 |
-|--|---------|------|
-| Code | 438K lines | ~8.5K lines |
-| Dependencies | npm hundreds | **1 optional** |
-| RAG | OpenAI API (can die) | **Local BM25 (always works)** |
-| WebSocket | SSE/polling | **RFC 6455** |
-| Health check | Basic | **Circuit Breaker + auto-recovery** |
-| Cost tracking | Black box | **Per-model real-time** |
-| Intent routing | Single model | **7-tier auto-classification** |
-| Auth | Token-based | **JWT + RBAC + rate limit** |
 
 ## 📜 License
 
