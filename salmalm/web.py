@@ -261,6 +261,15 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <h3>📊 토큰 사용량</h3>
     <div id="usage-detail"></div>
   </div>
+  <div class="settings-card">
+    <h3>🔄 업데이트</h3>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="update-ver" style="font-size:13px;color:var(--text2)">현재: v<span id="cur-ver"></span></span>
+      <button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="checkUpdate()">최신 버전 확인</button>
+      <button class="btn" id="do-update-btn" style="display:none" onclick="doUpdate()">⬆️ 업데이트</button>
+    </div>
+    <div id="update-result" style="margin-top:8px;font-size:12px"></div>
+  </div>
 </div>
 
 <div id="input-area">
@@ -576,6 +585,29 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       document.getElementById('usage-detail').innerHTML=h});
   };
   window.showUsage=window.showSettings;
+  window.checkUpdate=function(){
+    var re=document.getElementById('update-result');
+    re.innerHTML='<span style="color:var(--text2)">⏳ PyPI 확인 중...</span>';
+    fetch('/api/check-update').then(function(r){return r.json()}).then(function(d){
+      document.getElementById('cur-ver').textContent=d.current;
+      if(d.latest&&d.latest!==d.current){
+        re.innerHTML='<span style="color:#fbbf24">🆕 새 버전 v'+d.latest+' 사용 가능!</span>';
+        document.getElementById('do-update-btn').style.display='inline-block';
+      }else{re.innerHTML='<span style="color:#4ade80">✅ 최신 버전입니다 (v'+d.current+')</span>';
+        document.getElementById('do-update-btn').style.display='none'}
+    }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ 확인 실패: '+e.message+'</span>'})};
+  window.doUpdate=function(){
+    var re=document.getElementById('update-result');
+    var btn=document.getElementById('do-update-btn');
+    btn.disabled=true;btn.textContent='⏳ 설치 중...';
+    re.innerHTML='<span style="color:var(--text2)">pip install --upgrade salmalm 실행 중... (최대 30초)</span>';
+    fetch('/api/do-update',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ v'+d.version+' 설치 완료! 서버를 재시작하세요.</span>';
+        var rb=document.createElement('button');rb.className='btn';rb.style.marginTop='8px';rb.textContent='🔄 지금 재시작';
+        rb.onclick=function(){fetch('/api/restart',{method:'POST'});setTimeout(function(){location.reload()},3000)};re.appendChild(rb);
+      }else{re.innerHTML='<span style="color:#f87171">❌ 실패: '+d.error+'</span>'}
+      btn.disabled=false;btn.textContent='⬆️ 업데이트'})
+    .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>';btn.disabled=false;btn.textContent='⬆️ 업데이트'})};
   window.saveKey=function(vaultKey,inputId){
     var v=document.getElementById(inputId).value.trim();
     if(!v){alert('키를 입력하세요');return}
@@ -943,6 +975,15 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         'unlocked': vault.is_unlocked,
                         'usage': get_usage_report(),
                         'model': router.force_model or 'auto'})
+        elif self.path == '/api/check-update':
+            try:
+                import urllib.request
+                resp = urllib.request.urlopen('https://pypi.org/pypi/salmalm/json', timeout=10)
+                data = json.loads(resp.read().decode())
+                latest = data.get('info', {}).get('version', VERSION)
+                self._json({'current': VERSION, 'latest': latest})
+            except Exception as e:
+                self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
         elif self.path == '/api/metrics':
             self._json(request_logger.get_metrics())
         elif self.path == '/api/cert':
@@ -1037,6 +1078,34 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'ok': True, 'user': user})
             except ValueError as e:
                 self._json({'error': str(e)}, 400)
+            return
+
+        if self.path == '/api/do-update':
+            try:
+                import subprocess, sys
+                result = subprocess.run(
+                    [sys.executable, '-m', 'pip', 'install', '--upgrade', '--no-cache-dir', 'salmalm'],
+                    capture_output=True, text=True, timeout=60)
+                if result.returncode == 0:
+                    # Get installed version
+                    ver_result = subprocess.run(
+                        [sys.executable, '-c', 'from salmalm.constants import VERSION; print(VERSION)'],
+                        capture_output=True, text=True, timeout=10)
+                    new_ver = ver_result.stdout.strip() or '?'
+                    audit_log('update', f'upgraded to v{new_ver}')
+                    self._json({'ok': True, 'version': new_ver, 'output': result.stdout[-200:]})
+                else:
+                    self._json({'ok': False, 'error': result.stderr[-200:]})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)[:200]})
+            return
+
+        if self.path == '/api/restart':
+            import sys, subprocess
+            audit_log('restart', 'user-initiated restart')
+            self._json({'ok': True, 'message': '재시작 중...'})
+            # Restart the server process
+            os.execv(sys.executable, [sys.executable] + sys.argv)
             return
 
         if self.path == '/api/test-key':
