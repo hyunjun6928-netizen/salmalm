@@ -422,16 +422,16 @@ def _is_safe_command(cmd: str) -> tuple[bool, str]:
     """Check if command is safe to execute (allowlist + blocklist double defense)."""
     first_word = cmd.strip().split()[0].split('/')[-1] if cmd.strip() else ''
     if not first_word:
-        return False, '빈 명령어'
+        return False, 'Empty command'
     # Blocklist takes priority (even if somehow in allowlist)
     if first_word in EXEC_BLOCKLIST:
-        return False, f'차단된 명령어: {first_word}'
+        return False, f'Blocked command: {first_word}'
     for pattern in EXEC_BLOCKLIST_PATTERNS:
         if re.search(pattern, cmd):
-            return False, f'차단된 패턴: {pattern}'
+            return False, f'Blocked pattern: {pattern}'
     # Allowlist check — unknown commands blocked
     if first_word not in EXEC_ALLOWLIST:
-        return False, f'허용되지 않은 명령어: {first_word} (EXEC_ALLOWLIST에 없음)'
+        return False, f'Command not in allowlist: {first_word} (not in EXEC_ALLOWLIST)'
     return True, ''
 
 
@@ -504,12 +504,12 @@ def execute_tool(name: str, args: dict) -> str:
                     output += f'\n[exit code]: {result.returncode}'
                 return output or '(no output)'
             except subprocess.TimeoutExpired:
-                return f'❌ 타임아웃 ({timeout}초)'
+                return f'❌ Timeout ({timeout}s)'
 
         elif name == 'read_file':
             p = _resolve_path(args['path'])
             if not p.exists():
-                return f'❌ 파일 없음: {p}'
+                return f'❌ File not found: {p}'
             text = p.read_text(encoding='utf-8', errors='replace')
             lines = text.splitlines()
             offset = args.get('offset', 1) - 1
@@ -527,15 +527,15 @@ def execute_tool(name: str, args: dict) -> str:
             p = _resolve_path(args['path'], writing=True)
             text = p.read_text(encoding='utf-8')
             if args['old_text'] not in text:
-                return f'❌ 텍스트를 찾을 수 없음'
+                return f'❌ Text not found'
             text = text.replace(args['old_text'], args['new_text'], 1)
             p.write_text(text, encoding='utf-8')
-            return f'✅ 수정 완료: {p}'
+            return f'✅ File edited: {p}'
 
         elif name == 'web_search':
             api_key = vault.get('brave_api_key')
             if not api_key:
-                return '❌ Brave Search API 키가 없습니다'
+                return '❌ Brave Search API key not found'
             query = urllib.parse.quote(args['query'])
             count = min(args.get('count', 5), 10)
             resp = _http_get(
@@ -545,7 +545,7 @@ def execute_tool(name: str, args: dict) -> str:
             results = []
             for r in resp.get('web', {}).get('results', [])[:count]:
                 results.append(f"**{r['title']}**\n{r['url']}\n{r.get('description', '')}\n")
-            return '\n'.join(results) or '결과 없음'
+            return '\n'.join(results) or 'No results'
 
         elif name == 'web_fetch':
             url = args['url']
@@ -557,7 +557,7 @@ def execute_tool(name: str, args: dict) -> str:
                         '172.17.', '172.18.', '172.19.', '172.2', '172.30.', '172.31.',
                         '169.254.', '0.0.0.0', '::1', 'metadata.google', '169.254.169.254')
             if any(_host.startswith(b) or _host == b for b in _blocked):
-                return f'❌ 내부 네트워크 접근 차단: {_host}'
+                return f'❌ Internal network access blocked: {_host}'
             req = urllib.request.Request(url, headers={
                 'User-Agent': 'Mozilla/5.0 (SalmAlm/0.1)'
             })
@@ -601,7 +601,7 @@ def execute_tool(name: str, args: dict) -> str:
             else:
                 p = MEMORY_DIR / fname
             if not p.exists():
-                return f'❌ 파일 없음: {fname}'
+                return f'❌ File not found: {fname}'
             return p.read_text(encoding='utf-8')[:30000]
 
         elif name == 'memory_write':
@@ -612,7 +612,7 @@ def execute_tool(name: str, args: dict) -> str:
                 p = MEMORY_DIR / fname
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(args['content'], encoding='utf-8')
-            return f'✅ {fname} 저장 완료'
+            return f'✅ {fname} saved'
 
         elif name == 'usage_report':
             report = get_usage_report()
@@ -631,7 +631,7 @@ def execute_tool(name: str, args: dict) -> str:
             # Use TF-IDF semantic search
             results = _tfidf.search(query, max_results)
             if not results:
-                return f'검색 결과 없음: "{query}"'
+                return f'No results for: "{query}"'
             out = []
             for score, label, lineno, snippet in results:
                 out.append(f'📍 {label}#{lineno} (similarity:{score:.3f})\n{snippet}\n')
@@ -642,14 +642,14 @@ def execute_tool(name: str, args: dict) -> str:
             if action == 'spawn':
                 task = args.get('task', '')
                 if not task:
-                    return '❌ task가 필요합니다'
+                    return '❌ Task is required'
                 model = args.get('model')
                 agent_id = SubAgent.spawn(task, model=model)
-                return f'🤖 서브에이전트 생성됨: [{agent_id}]\n작업: {task[:100]}\n완료 시 텔레그램으로 알림됩니다.'
+                return f'🤖 Sub-agent spawned: [{agent_id}]\nTask: {task[:100]}\nWill notify on completion.'
             elif action == 'list':
                 agents = SubAgent.list_agents()
                 if not agents:
-                    return '📋 실행 중인 서브에이전트가 없습니다.'
+                    return '📋 No running sub-agents.'
                 lines = []
                 for a in agents:
                     icon = '🟢' if a['status'] == 'running' else '✅' if a['status'] == 'completed' else '❌'
@@ -662,17 +662,17 @@ def execute_tool(name: str, args: dict) -> str:
                     return f'❌ {info["error"]}'
                 status = info['status']
                 if status == 'running':
-                    return f'⏳ [{agent_id}] 아직 실행 중입니다.\n시작: {info["started"]}'
+                    return f'⏳ [{agent_id}] Still running.\nStarted: {info["started"]}'
                 result = info.get('result', '(결과 없음)')
-                return f'{"✅" if status == "completed" else "❌"} [{agent_id}] {status}\n시작: {info["started"]}\n완료: {info["completed"]}\n\n{result[:3000]}'
-            return f'❌ 알 수 없는 action: {action}'
+                return f'{"✅" if status == "completed" else "❌"} [{agent_id}] {status}\nStarted: {info["started"]}\nFinished: {info["completed"]}\n\n{result[:3000]}'
+            return f'❌ Unknown action: {action}'
 
         elif name == 'skill_manage':
             action = args.get('action', 'list')
             if action == 'list':
                 skills = SkillLoader.scan()
                 if not skills:
-                    return '📚 등록된 스킬이 없습니다.\nskills/ 폴더에 스킬 디렉토리를 만들고 SKILL.md를 넣으세요.'
+                    return '📚 No skills registered.\nCreate a skill directory in skills/ and add SKILL.md.'
                 lines = []
                 for s in skills:
                     lines.append(f'📚 **{s["name"]}** ({s["dir_name"]})\n   {s["description"]}\n   크기: {s["size"]}자')
@@ -681,15 +681,15 @@ def execute_tool(name: str, args: dict) -> str:
                 skill_name = args.get('skill_name', '')
                 content = SkillLoader.load(skill_name)
                 if not content:
-                    return f'❌ 스킬 "{skill_name}"을 찾을 수 없습니다'
-                return f'📚 스킬 로드됨: {skill_name}\n\n{content[:5000]}'
+                    return f'❌ Skill "{skill_name}" not found'
+                return f'📚 Skill loaded: {skill_name}\n\n{content[:5000]}'
             elif action == 'match':
                 query = args.get('query', '')
                 content = SkillLoader.match(query)
                 if not content:
-                    return '매칭되는 스킬이 없습니다.'
-                return f'📚 자동 매칭 스킬:\n\n{content[:5000]}'
-            return f'❌ 알 수 없는 action: {action}'
+                    return 'No matching skill found.'
+                return f'📚 Auto-matched skill:\n\n{content[:5000]}'
+            return f'❌ Unknown action: {action}'
 
         elif name == 'image_generate':
             prompt = args['prompt']
@@ -703,7 +703,7 @@ def execute_tool(name: str, args: dict) -> str:
             if provider == 'xai':
                 api_key = vault.get('xai_api_key')
                 if not api_key:
-                    return '❌ xAI API 키가 없습니다'
+                    return '❌ xAI API key not found'
                 resp = _http_post(
                     'https://api.x.ai/v1/images/generations',
                     {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
@@ -716,7 +716,7 @@ def execute_tool(name: str, args: dict) -> str:
             else:
                 api_key = vault.get('openai_api_key')
                 if not api_key:
-                    return '❌ OpenAI API 키가 없습니다'
+                    return '❌ OpenAI API key not found'
                 resp = _http_post(
                     'https://api.openai.com/v1/images/generations',
                     {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
@@ -729,14 +729,14 @@ def execute_tool(name: str, args: dict) -> str:
 
             size_kb = len(img_data) / 1024
             log.info(f"🎨 Image generated: {fname} ({size_kb:.1f}KB)")
-            return f'✅ 이미지 생성 완료: uploads/{fname} ({size_kb:.1f}KB)\n프롬프트: {prompt}'
+            return f'✅ 이미지 생성 Finished: uploads/{fname} ({size_kb:.1f}KB)\nPrompt: {prompt}'
 
         elif name == 'tts':
             text = args['text']
             voice = args.get('voice', 'nova')
             api_key = vault.get('openai_api_key')
             if not api_key:
-                return '❌ OpenAI API 키가 없습니다'
+                return '❌ OpenAI API key not found'
             save_dir = WORKSPACE_DIR / 'uploads'
             save_dir.mkdir(exist_ok=True)
             fname = f"tts_{int(time.time())}.mp3"
@@ -754,7 +754,7 @@ def execute_tool(name: str, args: dict) -> str:
             save_path.write_bytes(audio)
             size_kb = len(audio) / 1024
             log.info(f"🔊 TTS generated: {fname} ({size_kb:.1f}KB)")
-            return f'✅ 음성 생성 완료: uploads/{fname} ({size_kb:.1f}KB)\n텍스트: {text[:100]}'
+            return f'✅ 음성 생성 Finished: uploads/{fname} ({size_kb:.1f}KB)\nText: {text[:100]}'
 
         elif name == 'python_eval':
             code = args.get('code', '')
@@ -770,7 +770,7 @@ def execute_tool(name: str, args: dict) -> str:
             code_lower = code.lower().replace(' ', '')
             for blocked in _EVAL_BLOCKLIST:
                 if blocked.lower().replace(' ', '') in code_lower:
-                    return f'❌ 보안 차단: `{blocked}` 사용 불가. python_eval은 계산/데이터 처리 전용입니다.'
+                    return f'❌ Security blocked: `{blocked}` not allowed. python_eval is for computation only.'
             # Execute in isolated subprocess (no network, limited imports)
             wrapper = f'''
 import json, math, re, statistics, collections, itertools, functools, datetime, hashlib, base64, random, string, textwrap, csv, io
@@ -815,7 +815,7 @@ else:
                     output += f'\n[stderr]: {result.stderr[-2000:]}'
                 return output or '(no output)'
             except subprocess.TimeoutExpired:
-                return f'❌ Python 실행 타임아웃 ({timeout_sec}초)'
+                return f'❌ Python execution timeout ({timeout_sec}s)'
 
         elif name == 'system_monitor':
             detail = args.get('detail', 'overview')
@@ -876,7 +876,7 @@ else:
                         '172.17.', '172.18.', '172.19.', '172.2', '172.30.', '172.31.',
                         '169.254.', '0.0.0.0', '::1', 'metadata.google', '169.254.169.254')
             if any(_host.startswith(b) or _host == b for b in _blocked):
-                return f'❌ 내부 네트워크 접근 차단: {_host}'
+                return f'❌ Internal network access blocked: {_host}'
             headers.setdefault('User-Agent', f'SalmAlm/{VERSION}')
             data = body_str.encode('utf-8') if body_str else None
             try:
@@ -1008,7 +1008,7 @@ else:
                         'size': len(content[:50000])  # 저장된 실제 크기
                     }
                     clip_file.write_text(json.dumps(clips, ensure_ascii=False, indent=2))
-                    return f'📋 [{slot}] 저장 완료 ({len(content[:50000])}자)'
+                    return f'📋 [{slot}] saved ({len(content[:50000])}자)'
 
                 elif action == 'paste':
                     if slot not in clips:
@@ -1030,7 +1030,7 @@ else:
                     clip_file.write_text('{}')
                     return '🗑️ 클립보드 전체 삭제 완료'
 
-                return f'❌ 알 수 없는 action: {action}'
+                return f'❌ Unknown action: {action}'
 
         elif name == 'hash_text':
             import hashlib, secrets, string
@@ -1063,7 +1063,7 @@ else:
                 token = secrets.token_hex((length + 1) // 2)[:length]  # 홀수 길이 정확 처리
                 return f'🎫 토큰 ({len(token)}자): {token}'
 
-            return f'❌ 알 수 없는 action: {action}'
+            return f'❌ Unknown action: {action}'
 
         elif name == 'regex_test':
             pattern = args.get('pattern', '')
@@ -1126,7 +1126,7 @@ else:
                         lines.append(f'  {i}. "{preview}"')
                     return '\n'.join(lines)
 
-                return f'❌ 알 수 없는 action: {action}'
+                return f'❌ Unknown action: {action}'
 
             # Run with timeout using threading
             import concurrent.futures
@@ -1175,7 +1175,7 @@ else:
                         _llm_cron.save_jobs()
                         return f"⏰ {j['name']}: {'활성화' if j['enabled'] else '비활성화'}"
                 return f'❌ 작업 없음: {job_id}'
-            return f'❌ 알 수 없는 action: {action}'
+            return f'❌ Unknown action: {action}'
 
         elif name == 'plugin_manage':
             from .core import PluginLoader
@@ -1194,7 +1194,7 @@ else:
             elif action == 'reload':
                 count = PluginLoader.reload()
                 return f'🔌 플러그인 리로드: {count}개 도구 로드됨'
-            return f'❌ 알 수 없는 action: {action}'
+            return f'❌ Unknown action: {action}'
 
         elif name == 'browser':
             import asyncio
@@ -1271,7 +1271,7 @@ else:
                     (save_dir / fname).write_bytes(b64mod.b64decode(b64))
                     return f'📄 PDF 저장: uploads/{fname}'
                 return '❌ PDF 생성 실패'
-            return f'❌ 알 수 없는 action: {action}'
+            return f'❌ Unknown action: {action}'
 
         elif name == 'node_manage':
             from .nodes import node_manager
@@ -1329,7 +1329,7 @@ else:
                     return '❌ mac이 필요합니다'
                 result = node_manager.wake_on_lan(mac)
                 return json.dumps(result, ensure_ascii=False)
-            return f'❌ 알 수 없는 action: {action}'
+            return f'❌ Unknown action: {action}'
 
         elif name == 'health_check':
             from .stability import health_monitor
@@ -1366,9 +1366,9 @@ else:
                 except RuntimeError:
                     recovered = asyncio.run(health_monitor.auto_recover())
                 if recovered:
-                    return f'🔧 복구 완료: {", ".join(recovered)}'
+                    return f'🔧 복구 Finished: {", ".join(recovered)}'
                 return '🔧 복구할 컴포넌트 없음 (모두 정상)'
-            return f'❌ 알 수 없는 action: {action}'
+            return f'❌ Unknown action: {action}'
 
         elif name == 'mcp_manage':
             from .mcp import mcp_manager
@@ -1408,7 +1408,7 @@ else:
                 for t in all_mcp:
                     lines.append(f"  🔧 {t['name']}: {t['description'][:80]}")
                 return '\n'.join(lines)
-            return f'❌ 알 수 없는 action: {action}'
+            return f'❌ Unknown action: {action}'
 
         elif name == 'rag_search':
             from .rag import rag_engine

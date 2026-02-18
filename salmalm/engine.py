@@ -185,7 +185,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             try:
                 outputs[tc_id] = f.result(timeout=60)
             except Exception as e:
-                outputs[tc_id] = f'❌ 도구 실행 오류: {e}'
+                outputs[tc_id] = f'❌ Tool execution error: {e}'
         log.info(f"⚡ Parallel: {len(tool_calls)} tools completed")
         return outputs
 
@@ -257,7 +257,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         except Exception as e:
             log.error(f"Engine.run error: {e}")
             import traceback; traceback.print_exc()
-            error_msg = f'❌ 처리 중 오류 발생: {type(e).__name__}: {e}'
+            error_msg = f'❌ Processing error: {type(e).__name__}: {e}'
             session.add_assistant(error_msg)
             return error_msg
 
@@ -304,17 +304,17 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                         log.warning(f"🔪🔪 Nuclear truncation: → {len(session.messages)} msgs")
                         result = call_llm(session.messages, model=model, tools=tools)
                         if result.get('error'):
-                            session.add_assistant("⚠️ 컨텍스트가 너무 큽니다. /clear로 초기화해주세요.")
-                            return "⚠️ 컨텍스트가 너무 큽니다. /clear로 대화를 초기화해주세요."
+                            session.add_assistant("⚠️ Context too large. Use /clear to reset.")
+                            return "⚠️ Context too large. Use /clear to reset."
                 elif msg_count > 4:
                     session.messages = session.messages[:1] + session.messages[-4:]
                     result = call_llm(session.messages, model=model, tools=tools)
                     if result.get('error'):
-                        session.add_assistant("⚠️ 컨텍스트가 너무 큽니다. /clear로 초기화해주세요.")
-                        return "⚠️ 컨텍스트가 너무 큽니다. /clear로 대화를 초기화해주세요."
+                        session.add_assistant("⚠️ Context too large. Use /clear to reset.")
+                        return "⚠️ Context too large. Use /clear to reset."
                 else:
-                    session.add_assistant("⚠️ 컨텍스트가 너무 큽니다. /clear로 초기화해주세요.")
-                    return "⚠️ 컨텍스트가 너무 큽니다. /clear로 대화를 초기화해주세요."
+                    session.add_assistant("⚠️ Context too large. Use /clear to reset.")
+                    return "⚠️ Context too large. Use /clear to reset."
 
             if result.get('thinking'):
                 log.info(f"🧠 Thinking: {len(result['thinking'])} chars")

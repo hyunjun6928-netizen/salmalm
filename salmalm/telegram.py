@@ -65,7 +65,7 @@ class TelegramBot:
             urllib.request.urlopen(req, timeout=30)
         except Exception as e:
             log.error(f"Send photo error: {e}")
-            self.send_message(chat_id, f'📷 이미지 전송 실패: {e}')
+            self.send_message(chat_id, f'📷 Image send failed: {e}')
 
     def _send_audio(self, chat_id, path: Path, caption: str = ''):
         """Send an audio file to Telegram."""
@@ -87,7 +87,7 @@ class TelegramBot:
             urllib.request.urlopen(req, timeout=30)
         except Exception as e:
             log.error(f"Send audio error: {e}")
-            self.send_message(chat_id, f'🔊 음성 전송 실패: {e}')
+            self.send_message(chat_id, f'🔊 Voice send failed: {e}')
 
     def send_typing(self, chat_id):
         try:
@@ -267,7 +267,7 @@ class TelegramBot:
     async def _handle_command(self, chat_id, text: str):
         cmd = text.split()[0].lower()
         if cmd == '/start':
-            self.send_message(chat_id, f'😈 {APP_NAME} v{VERSION} 가동 중\n낄낄')
+            self.send_message(chat_id, f'😈 {APP_NAME} v{VERSION} running\n낄낄')
         elif cmd == '/usage':
             report = execute_tool('usage_report', {})
             self.send_message(chat_id, report)
@@ -275,21 +275,21 @@ class TelegramBot:
             parts = text.split(maxsplit=1)
             if len(parts) > 1:
                 router.force_model = parts[1] if parts[1] != 'auto' else None
-                self.send_message(chat_id, f'모델 변경: {parts[1]}')
+                self.send_message(chat_id, f'Model changed: {parts[1]}')
             else:
                 current = router.force_model or 'auto (라우팅)'
                 models = '\n'.join(f'  {m}' for tier in router.TIERS.values() for m in tier)
-                self.send_message(chat_id, f'현재: {current}\n\n사용 가능:\n{models}\n\n/model auto — 자동')
+                self.send_message(chat_id, f'Current: {current}\n\nAvailable:\n{models}\n\n/model auto — auto')
         elif cmd == '/compact':
             session = get_session(f'telegram_{chat_id}')
             before = len(session.messages)
             session.messages = compact_messages(session.messages)
-            self.send_message(chat_id, f'압축: {before} → {len(session.messages)} 메시지')
+            self.send_message(chat_id, f'Compacted: {before} → {len(session.messages)} messages')
         elif cmd == '/clear':
             session = get_session(f'telegram_{chat_id}')
             session.messages = []
             session.add_system(build_system_prompt())
-            self.send_message(chat_id, '🗑️ 대화 초기화')
+            self.send_message(chat_id, '🗑️ Chat cleared')
         elif cmd == '/help':
             self.send_message(chat_id, textwrap.dedent(f"""
                 😈 {APP_NAME} v{VERSION}
@@ -297,7 +297,7 @@ class TelegramBot:
                 /model [name|auto] — 모델 변경
                 /compact — 대화 압축
                 /clear — 대화 초기화
-                /help — 이 메시지
+                /help — 이 messages
             """).strip())
         else:
             self.send_message(chat_id, f'❓ 알 수 없는 명령: {cmd}\n/help 참조')
