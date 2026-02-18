@@ -1,5 +1,8 @@
 """삶앎 Telegram bot."""
+from __future__ import annotations
+
 import asyncio, json, re, textwrap, time, urllib.request
+from typing import Any, Dict, List, Optional
 
 from .constants import *
 from .crypto import vault, log

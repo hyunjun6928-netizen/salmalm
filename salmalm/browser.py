@@ -1,3 +1,4 @@
+from __future__ import annotations
 """삶앎 Browser Automation — Chrome DevTools Protocol (CDP) over WebSocket.
 
 Pure stdlib. No Playwright/Selenium/Puppeteer needed.
@@ -21,6 +22,7 @@ Usage:
   text = await browser.get_text()
   screenshot = await browser.screenshot()  # base64 PNG
 """
+
 
 import asyncio
 import base64

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """삶앎 Production Logging — structured JSON logs, rotation, request tracking.
 
 Upgrades from basic logging to:
@@ -8,6 +9,7 @@ Upgrades from basic logging to:
   - Error aggregation
   - Correlation IDs for request tracing
 """
+
 
 import json
 import logging

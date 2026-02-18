@@ -1,3 +1,4 @@
+from __future__ import annotations
 """삶앎 Node Control — lightweight remote agent management.
 
 Manages remote machines via SSH (subprocess) or HTTP agent protocol.
@@ -24,6 +25,7 @@ Nodes are configured in nodes.json:
   }
 }
 """
+
 
 import json
 import os

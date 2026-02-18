@@ -1,3 +1,4 @@
+from __future__ import annotations
 """삶앎 WebSocket server — RFC 6455 over asyncio, pure stdlib.
 
 Provides real-time bidirectional communication:
@@ -10,6 +11,7 @@ Protocol:
   Client sends JSON: {"type": "message", "text": "...", "session": "web"}
   Server sends JSON: {"type": "chunk"|"done"|"tool"|"error"|"pong", ...}
 """
+
 
 import asyncio
 import base64

@@ -1,7 +1,9 @@
+from __future__ import annotations
 """삶앎 API Documentation — auto-generated from tool definitions and endpoints.
 
 Serves an interactive API documentation page at /docs.
 """
+
 
 from .constants import VERSION
 from .crypto import log

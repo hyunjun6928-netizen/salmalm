@@ -1,3 +1,4 @@
+from __future__ import annotations
 """삶앎 Stability Engine — health monitoring, auto-recovery, watchdog.
 
 Provides production-grade stability:
@@ -9,6 +10,7 @@ Provides production-grade stability:
   - Startup self-test (verify all modules loadable)
   - Error rate tracking (circuit breaker pattern)
 """
+
 
 import os
 import resource

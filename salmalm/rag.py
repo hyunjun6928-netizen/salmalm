@@ -1,3 +1,4 @@
+from __future__ import annotations
 """삶앎 RAG — Retrieval-Augmented Generation with local embeddings.
 
 Pure stdlib. No OpenAI embeddings API required.
@@ -15,6 +16,7 @@ Usage:
   results = rag_engine.search("지트700 DB 스키마")
   context = rag_engine.build_context("지트700 DB 스키마", max_chars=3000)
 """
+
 
 import hashlib
 import json

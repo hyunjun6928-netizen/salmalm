@@ -1,6 +1,10 @@
+"""삶앎 LLM — Multi-provider API calls with caching and fallback."""
+
+from __future__ import annotations
+
 import json
 import time
-from typing import Any, Optional
+from typing import Any, Callable, Dict, List, Optional
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -9,10 +13,10 @@ from .constants import DEFAULT_MAX_TOKENS
 from .crypto import vault, log
 from .core import response_cache, router, track_usage
 
-_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+_UA: str = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
 
-def _http_post(url: str, headers: dict, body: dict, timeout: int = 120) -> dict:
+def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120) -> dict:
     data = json.dumps(body).encode('utf-8')
     headers.setdefault('User-Agent', _UA)
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
@@ -25,16 +29,18 @@ def _http_post(url: str, headers: dict, body: dict, timeout: int = 120) -> dict:
         raise
 
 
-def _http_get(url: str, headers: dict = None, timeout: int = 30) -> dict:
-    h = headers or {}
+def _http_get(url: str, headers: Optional[Dict[str, str]] = None, timeout: int = 30) -> dict:
+    h: Dict[str, str] = headers or {}
     h.setdefault('User-Agent', _UA)
     req = urllib.request.Request(url, headers=h)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode('utf-8'))
 
 
-def call_llm(messages: list, model: str = None, tools: list = None,
-             max_tokens: int = DEFAULT_MAX_TOKENS, thinking: bool = False) -> dict:
+def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
+             tools: Optional[List[dict]] = None,
+             max_tokens: int = DEFAULT_MAX_TOKENS,
+             thinking: bool = False) -> Dict[str, Any]:
     """Call LLM API. Returns {'content': str, 'tool_calls': list, 'usage': dict}."""
     if not model:
         last_user = next((m['content'] for m in reversed(messages)
@@ -118,8 +124,10 @@ def call_llm(messages: list, model: str = None, tools: list = None,
                 'usage': {'input': 0, 'output': 0}, 'model': model}
 
 
-def _call_provider(provider, api_key, model_id, messages, tools, max_tokens,
-                    thinking: bool = False):
+def _call_provider(provider: str, api_key: str, model_id: str,
+                    messages: List[Dict[str, Any]],
+                    tools: Optional[List[dict]], max_tokens: int,
+                    thinking: bool = False) -> Dict[str, Any]:
     if provider == 'anthropic':
         return _call_anthropic(api_key, model_id, messages, tools, max_tokens,
                                 thinking=thinking)
@@ -144,8 +152,9 @@ def _call_provider(provider, api_key, model_id, messages, tools, max_tokens,
         raise ValueError(f'Unknown provider: {provider}')
 
 
-def _call_anthropic(api_key, model_id, messages, tools, max_tokens,
-                     thinking: bool = False):
+def _call_anthropic(api_key: str, model_id: str, messages: List[Dict[str, Any]],
+                     tools: Optional[List[dict]], max_tokens: int,
+                     thinking: bool = False) -> Dict[str, Any]:
     system_msgs = [m['content'] for m in messages if m['role'] == 'system']
     chat_msgs = [m for m in messages if m['role'] != 'system']
 
@@ -198,7 +207,9 @@ def _call_anthropic(api_key, model_id, messages, tools, max_tokens,
     return result
 
 
-def _call_openai(api_key, model_id, messages, tools, max_tokens, base_url):
+def _call_openai(api_key: str, model_id: str, messages: List[Dict[str, Any]],
+                  tools: Optional[List[dict]], max_tokens: int,
+                  base_url: str) -> Dict[str, Any]:
     # Convert Anthropic-style image blocks to OpenAI format
     converted_msgs = []
     for m in messages:
@@ -242,7 +253,8 @@ def _call_openai(api_key, model_id, messages, tools, max_tokens, base_url):
     }
 
 
-def _call_google(api_key, model_id, messages, max_tokens, tools=None):
+def _call_google(api_key: str, model_id: str, messages: List[Dict[str, Any]],
+                  max_tokens: int, tools: Optional[List[dict]] = None) -> Dict[str, Any]:
     # Gemini API — with optional tool support
     parts = []
     for m in messages:

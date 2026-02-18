@@ -1,3 +1,4 @@
+from __future__ import annotations
 """삶앎 MCP (Model Context Protocol) — Server + Client.
 
 Implements MCP 2025-03-26 spec (simplified):
@@ -17,6 +18,7 @@ Usage:
   mcp_manager.add_server("filesystem", command=["npx", "@modelcontextprotocol/server-filesystem", "/tmp"])
   tools = mcp_manager.list_tools()
 """
+
 
 import asyncio
 import json

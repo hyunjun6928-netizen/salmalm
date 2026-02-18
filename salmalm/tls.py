@@ -1,3 +1,4 @@
+from __future__ import annotations
 """삶앎 TLS — Self-signed certificate generation + HTTPS server wrapper.
 
 Pure stdlib (ssl module). Generates self-signed certs on first run.
@@ -8,6 +9,7 @@ Usage:
   ensure_cert()  # Generate self-signed cert if missing
   server = create_https_server(('0.0.0.0', 443), handler)
 """
+
 
 import os
 import ssl

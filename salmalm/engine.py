@@ -1,6 +1,11 @@
 """삶앎 Intelligence Engine — TaskClassifier + IntelligenceEngine + process_message."""
-import asyncio, json
+
+from __future__ import annotations
+
+import asyncio
+import json
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .constants import VERSION
 from .crypto import log
@@ -58,7 +63,7 @@ class TaskClassifier:
     }
 
     @classmethod
-    def classify(cls, message: str, context_len: int = 0) -> dict:
+    def classify(cls, message: str, context_len: int = 0) -> Dict[str, Any]:
         msg = message.lower()
         msg_len = len(message)
         scores = {}
@@ -373,9 +378,9 @@ _engine = IntelligenceEngine()
 
 
 async def process_message(session_id: str, user_message: str,
-                          model_override: str = None,
-                          image_data: tuple = None,
-                          on_tool: callable = None) -> str:
+                          model_override: Optional[str] = None,
+                          image_data: Optional[Tuple[str, str]] = None,
+                          on_tool: Optional[Callable[[str, Any], None]] = None) -> str:
     """Process a user message through the Intelligence Engine pipeline."""
     session = get_session(session_id)
 
