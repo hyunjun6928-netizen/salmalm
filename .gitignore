@@ -17,6 +17,13 @@ memory/
 # Uploads
 uploads/
 
+# Config (local)
+.model_pref
+mcp_servers.json
+nodes.json
+cron_jobs.json
+llm_cron_jobs.json
+
 # Python
 __pycache__/
 *.pyc
@@ -28,3 +35,14 @@ __pycache__/
 Thumbs.db
 salmalm_out.log
 *.bak
+
+# Temp/backup
+*.log
+server.py.v050_backup
+server_monolith.py
+salmalm_*.log
+salmalm_*.md
+REVIEW_*.md
+.clipboard.json
+rag.db*
+plugins/

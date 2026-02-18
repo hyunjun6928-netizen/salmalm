@@ -1,0 +1,1039 @@
+"""삶앎 core — audit, cache, usage, router, compaction, search,
+subagent, skills, session, cron, daily."""
+import asyncio, hashlib, json, math, os, re, sqlite3, textwrap, threading, time
+from collections import OrderedDict
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+from .constants import *
+from .crypto import vault, log
+
+# ============================================================
+_audit_lock = threading.Lock()
+
+
+def _init_audit_db():
+    conn = sqlite3.connect(str(AUDIT_DB))
+    conn.execute('''CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts TEXT NOT NULL, event TEXT NOT NULL,
+        detail TEXT, prev_hash TEXT, hash TEXT NOT NULL
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS usage_stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts TEXT NOT NULL, model TEXT NOT NULL,
+        input_tokens INTEGER, output_tokens INTEGER, cost REAL
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS session_store (
+        session_id TEXT PRIMARY KEY,
+        messages TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )''')
+    conn.commit()
+    conn.close()
+
+
+def audit_log(event: str, detail: str = ''):
+    with _audit_lock:
+        conn = sqlite3.connect(str(AUDIT_DB))
+        row = conn.execute(
+            'SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1'
+        ).fetchone()
+        prev = row[0] if row else '0' * 64
+        ts = datetime.now(KST).isoformat()
+        payload = f"{ts}|{event}|{detail}|{prev}"
+        h = hashlib.sha256(payload.encode()).hexdigest()
+        conn.execute(
+            'INSERT INTO audit_log (ts, event, detail, prev_hash, hash) VALUES (?,?,?,?,?)',
+            (ts, event, detail[:500], prev, h)
+        )
+        conn.commit()
+        conn.close()
+
+
+
+class ResponseCache:
+    """Simple TTL cache for LLM responses to avoid duplicate calls."""
+
+    def __init__(self, max_size=100, ttl=CACHE_TTL):
+        self._cache: OrderedDict = OrderedDict()
+        self._max_size = max_size
+        self._ttl = ttl
+
+    def _key(self, model: str, messages: list) -> str:
+        content = json.dumps({'m': model, 'msgs': messages[-3:]}, sort_keys=True)
+        return hashlib.sha256(content.encode()).hexdigest()[:16]
+
+    def get(self, model: str, messages: list) -> Optional[str]:
+        k = self._key(model, messages)
+        if k in self._cache:
+            entry = self._cache[k]
+            if time.time() - entry['ts'] < self._ttl:
+                self._cache.move_to_end(k)
+                log.info(f"💰 Cache hit — saved API call")
+                return entry['response']
+            del self._cache[k]
+        return None
+
+    def put(self, model: str, messages: list, response: str):
+        k = self._key(model, messages)
+        self._cache[k] = {'response': response, 'ts': time.time()}
+        if len(self._cache) > self._max_size:
+            self._cache.popitem(last=False)
+
+
+response_cache = ResponseCache()
+
+
+response_cache = ResponseCache()
+
+_usage_lock = threading.Lock()
+_usage = {'total_input': 0, 'total_output': 0, 'total_cost': 0.0,
+          'by_model': {}, 'session_start': time.time()}
+
+def _restore_usage():
+    """Restore cumulative usage from SQLite on startup."""
+    try:
+        conn = sqlite3.connect(str(AUDIT_DB))
+        rows = conn.execute('SELECT model, SUM(input_tokens), SUM(output_tokens), SUM(cost), COUNT(*) FROM usage_stats GROUP BY model').fetchall()
+        for model, inp, out, cost, calls in rows:
+            short = model.split('/')[-1] if '/' in model else model
+            _usage['total_input'] += (inp or 0)
+            _usage['total_output'] += (out or 0)
+            _usage['total_cost'] += (cost or 0)
+            _usage['by_model'][short] = {'input': inp or 0, 'output': out or 0,
+                                          'cost': cost or 0, 'calls': calls or 0}
+        conn.close()
+        if _usage['total_cost'] > 0:
+            log.info(f"📊 Usage restored: ${_usage['total_cost']:.4f} total")
+    except Exception as e:
+        log.warning(f"Usage restore failed: {e}")
+
+
+def track_usage(model: str, input_tokens: int, output_tokens: int):
+    with _usage_lock:
+        short = model.split('/')[-1] if '/' in model else model
+        cost_info = MODEL_COSTS.get(short, {'input': 1.0, 'output': 5.0})
+        cost = (input_tokens * cost_info['input'] + output_tokens * cost_info['output']) / 1_000_000
+        _usage['total_input'] += input_tokens
+        _usage['total_output'] += output_tokens
+        _usage['total_cost'] += cost
+        if short not in _usage['by_model']:
+            _usage['by_model'][short] = {'input': 0, 'output': 0, 'cost': 0.0, 'calls': 0}
+        _usage['by_model'][short]['input'] += input_tokens
+        _usage['by_model'][short]['output'] += output_tokens
+        _usage['by_model'][short]['cost'] += cost
+        _usage['by_model'][short]['calls'] += 1
+        # Persist to SQLite
+        try:
+            conn = sqlite3.connect(str(AUDIT_DB))
+            conn.execute('INSERT INTO usage_stats (ts, model, input_tokens, output_tokens, cost) VALUES (?,?,?,?,?)',
+                         (datetime.now(KST).isoformat(), model, input_tokens, output_tokens, cost))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+
+def get_usage_report() -> dict:
+    with _usage_lock:
+        elapsed = time.time() - _usage['session_start']
+        return {**_usage, 'elapsed_hours': round(elapsed / 3600, 2)}
+
+
+
+class ModelRouter:
+    """Routes queries to appropriate models based on complexity."""
+
+    # Tier 1: cheap & fast, Tier 2: balanced, Tier 3: powerful
+    TIERS = {
+        1: ['google/gemini-3-flash-preview', 'openai/gpt-4.1-nano',
+            'openai/gpt-4.1-mini', 'xai/grok-3-mini'],
+        2: ['anthropic/claude-sonnet-4-20250514', 'openai/gpt-5.3-codex',
+            'xai/grok-4', 'google/gemini-3-pro-preview', 'openai/gpt-4.1',
+            'ollama/llama3.3', 'ollama/qwen3'],
+        3: ['anthropic/claude-opus-4-6', 'openai/o3',
+            'anthropic/claude-sonnet-4-20250514', 'openai/gpt-5.1-codex',
+            'ollama/llama3.3'],
+    }
+
+    _MODEL_PREF_FILE = BASE_DIR / '.model_pref'
+
+    def __init__(self):
+        self.default_tier = 2
+        self.force_model: Optional[str] = None
+        # Restore persisted model preference
+        try:
+            if self._MODEL_PREF_FILE.exists():
+                saved = self._MODEL_PREF_FILE.read_text().strip()
+                if saved and saved != 'auto':
+                    self.force_model = saved
+                    log.info(f"🔧 Restored model preference: {saved}")
+        except Exception:
+            pass
+
+    def set_force_model(self, model: Optional[str]):
+        """Set and persist model preference."""
+        self.force_model = model
+        try:
+            if model:
+                self._MODEL_PREF_FILE.write_text(model)
+            elif self._MODEL_PREF_FILE.exists():
+                self._MODEL_PREF_FILE.unlink()
+        except Exception as e:
+            log.error(f"Failed to persist model pref: {e}")
+
+    def route(self, user_message: str, has_tools: bool = False,
+              iteration: int = 0) -> str:
+        if self.force_model:
+            return self.force_model
+
+        msg = user_message.lower()
+        msg_len = len(user_message)
+
+        # Tool-heavy iterations → always Tier 2+
+        if iteration > 2:
+            return self._pick_available(2)
+
+        # Tier 3: complex tasks
+        complex_score = sum(1 for kw in COMPLEX_INDICATORS if kw in msg)
+        tool_hint_score = sum(1 for kw in TOOL_HINT_KEYWORDS if kw in msg)
+        if complex_score >= 2 or msg_len > 1000 or (complex_score >= 1 and tool_hint_score >= 1):
+            return self._pick_available(3)
+
+        # Tier 2: tool usage likely or medium complexity
+        if has_tools and (tool_hint_score >= 1 or msg_len > 300):
+            return self._pick_available(2)
+
+        # Tier 1: simple queries only
+        if msg_len < SIMPLE_QUERY_MAX_CHARS and not has_tools and complex_score == 0:
+            return self._pick_available(1)
+
+        # Tier 2: default
+        return self._pick_available(2)
+
+    _OR_PROVIDERS = frozenset(['deepseek', 'meta-llama', 'mistralai', 'qwen'])
+
+    def _has_key(self, provider: str) -> bool:
+        if provider == 'ollama':
+            return True  # Ollama는 항상 사용 가능 (로컬)
+        if provider in self._OR_PROVIDERS:
+            return bool(vault.get('openrouter_api_key'))
+        return bool(vault.get(f'{provider}_api_key'))
+
+    def _pick_available(self, tier: int) -> str:
+        models = self.TIERS.get(tier, self.TIERS[2])
+        for m in models:
+            provider = m.split('/')[0]
+            if self._has_key(provider):
+                return m
+        # Fallback: try any available model
+        for t in [2, 1, 3]:
+            for m in self.TIERS.get(t, []):
+                provider = m.split('/')[0]
+                if self._has_key(provider):
+                    return m
+        return 'google/gemini-3-flash-preview'  # last resort
+
+
+router = ModelRouter()
+
+
+# ============================================================
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimate. Korean ≈ 1.5 tokens/char, English ≈ 0.3 tokens/word."""
+    if not text:
+        return 0
+    return max(len(text) // 3, len(text.split()) * 2)
+
+
+def _msg_content_str(msg: dict) -> str:
+    """Extract text content from a message (handles list content blocks)."""
+    c = msg.get('content', '')
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        return ' '.join(b.get('text', '') for b in c if isinstance(b, dict) and b.get('type') == 'text')
+    return str(c)
+
+
+def compact_messages(messages: list, model: str = None) -> list:
+    """Multi-stage compaction: trim tool results → drop old tools → summarize.
+    Hard limit: max 100 messages, max 500K chars (≈125K tokens)."""
+    MAX_MESSAGES = 100
+    MAX_CHARS = 500_000
+
+    # Hard message count limit
+    if len(messages) > MAX_MESSAGES:
+        system_msgs = [m for m in messages if m['role'] == 'system'][:1]
+        recent = [m for m in messages if m['role'] != 'system'][-40:]
+        messages = system_msgs + recent
+        log.warning(f"🔪 Hard msg limit: truncated to {len(messages)} messages")
+
+    total_chars = sum(len(_msg_content_str(m)) for m in messages)
+
+    # Hard char limit — emergency truncation
+    if total_chars > MAX_CHARS:
+        system_msgs = [m for m in messages if m['role'] == 'system'][:1]
+        recent = [m for m in messages if m['role'] != 'system'][-20:]
+        messages = system_msgs + recent
+        total_chars = sum(len(_msg_content_str(m)) for m in messages)
+        log.warning(f"🔪 Hard char limit: truncated to {len(messages)} msgs ({total_chars} chars)")
+
+    if total_chars < COMPACTION_THRESHOLD:
+        return messages
+
+    log.info(f"📦 Compacting {len(messages)} messages ({total_chars} chars)")
+
+    # Stage 1: Trim long tool results (keep first 500 chars)
+    trimmed = []
+    for m in messages:
+        if m['role'] == 'tool' and len(_msg_content_str(m)) > 500:
+            trimmed.append({**m, 'content': _msg_content_str(m)[:500] + '\n... [truncated]'})
+        elif m['role'] == 'user' and isinstance(m.get('content'), list):
+            # Strip base64 image data from old messages
+            new_content = []
+            for block in m['content']:
+                if isinstance(block, dict) and block.get('type') == 'image':
+                    new_content.append({'type': 'text', 'text': '[이미지 첨부됨]'})
+                else:
+                    new_content.append(block)
+            trimmed.append({**m, 'content': new_content})
+        else:
+            trimmed.append(m)
+
+    total_after_trim = sum(len(_msg_content_str(m)) for m in trimmed)
+    if total_after_trim < COMPACTION_THRESHOLD:
+        log.info(f"📦 Stage 1 sufficient: {total_chars} → {total_after_trim} chars")
+        return trimmed
+
+    # Stage 2: Drop old tool messages entirely, keep last 10 messages
+    system_msgs = [m for m in trimmed if m['role'] == 'system']
+    non_system = [m for m in trimmed if m['role'] != 'system']
+    recent = non_system[-10:]
+    old = non_system[:-10]
+
+    # Drop tool/tool_result messages from old, keep user/assistant
+    old_important = [m for m in old if m['role'] in ('user', 'assistant')]
+
+    stage2 = system_msgs + old_important + recent
+    total_after_drop = sum(len(_msg_content_str(m)) for m in stage2)
+    if total_after_drop < COMPACTION_THRESHOLD:
+        log.info(f"📦 Stage 2 sufficient: {total_chars} → {total_after_drop} chars")
+        return stage2
+
+    # Stage 3: Summarize old messages
+    to_summarize = old_important
+    if not to_summarize:
+        return system_msgs + recent
+
+    summary_text = '\n'.join(
+        f"[{m['role']}]: {_msg_content_str(m)[:300]}" for m in to_summarize[-20:]
+    )
+
+    from .llm import call_llm
+    summary_result = call_llm(
+        [{'role': 'system', 'content': '다음 대화를 핵심만 간결하게 한국어로 요약해. 결정사항, 작업 내용, 중요 맥락 위주로 5~8문장.'},
+         {'role': 'user', 'content': summary_text}],
+        model='google/gemini-3-flash-preview',
+        max_tokens=800
+    )
+
+    compacted = system_msgs + [
+        {'role': 'system', 'content': f'[이전 대화 요약]\n{summary_result["content"]}'}
+    ] + recent
+
+    log.info(f"📦 Stage 3 compacted: {len(messages)} → {len(compacted)} messages, "
+             f"{total_chars} → {sum(len(_msg_content_str(m)) for m in compacted)} chars")
+    return compacted
+
+
+
+# ============================================================
+import math
+
+class TFIDFSearch:
+    """Lightweight TF-IDF + cosine similarity search. No external deps."""
+
+    def __init__(self):
+        self._docs: list = []        # [(label, line_no, text, tokens)]
+        self._idf: dict = {}         # term -> IDF score
+        self._built = False
+        self._last_index_time = 0
+        self._stop_words = frozenset([
+            '의', '가', '이', '은', '는', '을', '를', '에', '에서', '로', '으로',
+            '와', '과', '도', '만', '부터', '까지', '에게', '한테', '에서의',
+            'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
+            'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+            'that', 'this', 'it', 'not', 'no', 'if', 'then', 'so', 'as', 'by',
+        ])
+
+    def _tokenize(self, text: str) -> list:
+        """Split text into normalized tokens."""
+        text = text.lower()
+        # Split on non-alphanumeric (keeping Korean chars)
+        tokens = re.findall(r'[\w가-힣]+', text)
+        return [t for t in tokens if len(t) > 1 and t not in self._stop_words]
+
+    def _index_files(self):
+        """Build index from MEMORY.md, memory/*.md, uploads/*.txt etc."""
+        now = time.time()
+        if self._built and now - self._last_index_time < 300:  # Re-index every 5 min
+            return
+
+        self._docs = []
+        doc_freq = {}  # term -> number of docs containing it
+        search_files = []
+
+        if MEMORY_FILE.exists():
+            search_files.append(('MEMORY.md', MEMORY_FILE))
+        for f in sorted(MEMORY_DIR.glob('*.md')):
+            search_files.append((f'memory/{f.name}', f))
+        uploads_dir = WORKSPACE_DIR / 'uploads'
+        if uploads_dir.exists():
+            for f in uploads_dir.glob('*'):
+                if f.suffix.lower() in ('.txt', '.md', '.py', '.js', '.json', '.csv',
+                                         '.html', '.css', '.log', '.xml', '.yaml', '.yml'):
+                    search_files.append((f'uploads/{f.name}', f))
+        # Also index skills
+        skills_dir = WORKSPACE_DIR / 'skills'
+        if skills_dir.exists():
+            for f in skills_dir.glob('**/*.md'):
+                search_files.append((f'skills/{f.relative_to(skills_dir)}', f))
+
+        for label, fpath in search_files:
+            try:
+                text = fpath.read_text(encoding='utf-8', errors='replace')
+                lines = text.splitlines()
+                # Index in chunks of 3 lines for context
+                for i in range(0, len(lines), 2):
+                    chunk = '\n'.join(lines[i:i+3])
+                    if not chunk.strip():
+                        continue
+                    tokens = self._tokenize(chunk)
+                    if not tokens:
+                        continue
+                    # TF for this chunk
+                    tf = {}
+                    for t in tokens:
+                        tf[t] = tf.get(t, 0) + 1
+                    self._docs.append((label, i + 1, chunk, tf))
+                    # Doc frequency
+                    for t in set(tokens):
+                        doc_freq[t] = doc_freq.get(t, 0) + 1
+            except Exception:
+                continue
+
+        # Compute IDF
+        n_docs = len(self._docs)
+        if n_docs > 0:
+            self._idf = {t: math.log(n_docs / (1 + df))
+                         for t, df in doc_freq.items()}
+        self._built = True
+        self._last_index_time = now
+        log.info(f"🔍 TF-IDF index built: {len(self._docs)} chunks from {len(search_files)} files")
+
+    def search(self, query: str, max_results: int = 5) -> list:
+        """Search with TF-IDF + cosine similarity. Returns [(score, label, lineno, snippet)]."""
+        self._index_files()
+        if not self._docs:
+            return []
+
+        query_tokens = self._tokenize(query)
+        if not query_tokens:
+            return []
+
+        # Query TF-IDF vector
+        query_tf = {}
+        for t in query_tokens:
+            query_tf[t] = query_tf.get(t, 0) + 1
+        query_vec = {t: tf * self._idf.get(t, 0) for t, tf in query_tf.items()}
+        query_norm = math.sqrt(sum(v ** 2 for v in query_vec.values()))
+        if query_norm == 0:
+            return []
+
+        # Score each document
+        scored = []
+        for label, lineno, chunk, doc_tf in self._docs:
+            doc_vec = {t: tf * self._idf.get(t, 0) for t, tf in doc_tf.items()}
+            # Cosine similarity
+            dot = sum(query_vec.get(t, 0) * doc_vec.get(t, 0)
+                      for t in set(query_vec) | set(doc_vec))
+            doc_norm = math.sqrt(sum(v ** 2 for v in doc_vec.values()))
+            if doc_norm == 0:
+                continue
+            similarity = dot / (query_norm * doc_norm)
+            if similarity > 0.05:  # Threshold
+                scored.append((similarity, label, lineno, chunk))
+
+        scored.sort(key=lambda x: -x[0])
+        return scored[:max_results]
+
+
+_tfidf = TFIDFSearch()
+
+
+
+_tfidf = TFIDFSearch()
+
+# ============================================================
+class SubAgent:
+    """Background task executor with notification on completion."""
+
+    _agents: dict = {}  # id -> {task, status, result, thread, started, completed}
+    _counter = 0
+    _lock = threading.Lock()
+
+    @classmethod
+    def spawn(cls, task: str, model: str = None, notify_telegram: bool = True) -> str:
+        """Spawn a background sub-agent. Returns agent ID."""
+        with cls._lock:
+            cls._counter += 1
+            agent_id = f'sub-{cls._counter}'
+
+        agent_info = {
+            'id': agent_id, 'task': task, 'model': model,
+            'status': 'running', 'result': None,
+            'started': datetime.now(KST).isoformat(),
+            'completed': None, 'notify_telegram': notify_telegram
+        }
+
+        def _run():
+            try:
+                # Create isolated session
+                session_id = f'subagent-{agent_id}'
+                session = get_session(session_id)
+                # Run through the engine
+                from .engine import process_message
+                loop = asyncio.new_event_loop()
+                result = loop.run_until_complete(
+                    process_message(session_id, task, model_override=model))
+                loop.close()
+                agent_info['result'] = result
+                agent_info['status'] = 'completed'
+                agent_info['completed'] = datetime.now(KST).isoformat()
+                log.info(f"🤖 Sub-agent {agent_id} completed: {len(result)} chars")
+
+                # Notify via Telegram
+                if agent_info['notify_telegram'] and _tg_bot and _tg_bot.token:
+                    summary = result[:500] + ('...' if len(result) > 500 else '')
+                    msg = f'🤖 **서브에이전트 완료** [{agent_id}]\n\n📋 작업: {task[:100]}\n\n{summary}'
+                    try:
+                        _tg_bot._api('sendMessage', {
+                            'chat_id': _tg_bot.owner_id,
+                            'text': msg, 'parse_mode': 'Markdown'
+                        })
+                    except Exception as e:
+                        log.warning(f"Sub-agent notification failed: {e}")
+
+                # Clean up session after a while
+                if session_id in _sessions:
+                    del _sessions[session_id]
+
+            except Exception as e:
+                agent_info['result'] = f'❌ 서브에이전트 오류: {e}'
+                agent_info['status'] = 'error'
+                agent_info['completed'] = datetime.now(KST).isoformat()
+                log.error(f"Sub-agent {agent_id} error: {e}")
+
+        t = threading.Thread(target=_run, daemon=True, name=f'subagent-{agent_id}')
+        agent_info['thread'] = t
+        cls._agents[agent_id] = agent_info
+        t.start()
+        log.info(f"🤖 Sub-agent {agent_id} spawned: {task[:80]}")
+        return agent_id
+
+    @classmethod
+    def list_agents(cls) -> list:
+        return [{'id': a['id'], 'task': a['task'][:60], 'status': a['status'],
+                 'started': a['started'], 'completed': a['completed']}
+                for a in cls._agents.values()]
+
+    @classmethod
+    def get_result(cls, agent_id: str) -> dict:
+        agent = cls._agents.get(agent_id)
+        if not agent:
+            return {'error': f'Agent {agent_id} not found'}
+        return {'id': agent['id'], 'task': agent['task'], 'status': agent['status'],
+                'result': agent['result'], 'started': agent['started'],
+                'completed': agent['completed']}
+
+
+
+class SkillLoader:
+    """Load skills from skills/ directory. Each skill = folder with SKILL.md."""
+
+    _cache: dict = {}
+    _last_scan = 0
+
+    @classmethod
+    def scan(cls) -> list:
+        """Scan skills directory, return list of available skills."""
+        now = time.time()
+        if cls._cache and now - cls._last_scan < 120:
+            return list(cls._cache.values())
+
+        skills_dir = WORKSPACE_DIR / 'skills'
+        if not skills_dir.exists():
+            skills_dir.mkdir(exist_ok=True)
+            return []
+
+        cls._cache = {}
+        for skill_dir in sorted(skills_dir.iterdir()):
+            if not skill_dir.is_dir():
+                continue
+            skill_md = skill_dir / 'SKILL.md'
+            if not skill_md.exists():
+                continue
+            try:
+                content = skill_md.read_text(encoding='utf-8', errors='replace')
+                # Extract metadata from first few lines
+                lines = content.splitlines()
+                name = skill_dir.name
+                description = ''
+                for line in lines[:10]:
+                    if line.startswith('# '):
+                        name = line[2:].strip()
+                    elif line.startswith('> ') or (line.strip() and not line.startswith('#')):
+                        description = line.lstrip('> ').strip()
+                        break
+                cls._cache[skill_dir.name] = {
+                    'name': name, 'dir_name': skill_dir.name,
+                    'description': description,
+                    'path': str(skill_md), 'size': len(content)
+                }
+            except Exception:
+                continue
+
+        cls._last_scan = now
+        log.info(f"📚 Skills scanned: {len(cls._cache)} found")
+        return list(cls._cache.values())
+
+    @classmethod
+    def load(cls, skill_name: str) -> str:
+        """Load a skill's SKILL.md content."""
+        cls.scan()
+        skill = cls._cache.get(skill_name)
+        if not skill:
+            return None
+        try:
+            return Path(skill['path']).read_text(encoding='utf-8', errors='replace')
+        except Exception:
+            return None
+
+    @classmethod
+    def match(cls, user_message: str) -> str:
+        """Auto-detect which skill matches the user's request. Returns skill content or None."""
+        skills = cls.scan()
+        if not skills:
+            return None
+        msg = user_message.lower()
+        best_match = None
+        best_score = 0
+        for skill in skills:
+            desc = skill['description'].lower()
+            name = skill['name'].lower()
+            # Simple keyword matching against skill description
+            desc_words = set(re.findall(r'[\w가-힣]+', desc + ' ' + name))
+            msg_words = set(re.findall(r'[\w가-힣]+', msg))
+            overlap = len(desc_words & msg_words)
+            if overlap > best_score:
+                best_score = overlap
+                best_match = skill
+        if best_score >= 2:  # At least 2 keyword matches
+            content = cls.load(best_match['dir_name'])
+            if content:
+                log.info(f"📚 Skill matched: {best_match['name']} (score={best_score})")
+                return content
+        return None
+
+# ============================================================
+# LLM CRON MANAGER — Scheduled tasks with LLM execution
+# ============================================================
+class LLMCronManager:
+    """Manages LLM-powered scheduled tasks (like OpenClaw cron jobs)."""
+
+    _JOBS_FILE = BASE_DIR / '.cron_jobs.json'
+
+    def __init__(self):
+        self.jobs: list[dict] = []
+
+    def load_jobs(self):
+        """Load persisted cron jobs from file."""
+        try:
+            if self._JOBS_FILE.exists():
+                self.jobs = json.loads(self._JOBS_FILE.read_text())
+                log.info(f"⏰ Loaded {len(self.jobs)} LLM cron jobs")
+        except Exception as e:
+            log.error(f"Failed to load cron jobs: {e}")
+            self.jobs = []
+
+    def save_jobs(self):
+        """Persist cron jobs to file."""
+        try:
+            self._JOBS_FILE.write_text(json.dumps(self.jobs, ensure_ascii=False, indent=2))
+        except Exception as e:
+            log.error(f"Failed to save cron jobs: {e}")
+
+    def add_job(self, name: str, schedule: dict, prompt: str,
+                model: str = None, notify: bool = True) -> dict:
+        """Add a new LLM cron job.
+        schedule: {'kind': 'cron', 'expr': '0 6 * * *', 'tz': 'Asia/Seoul'}
+                  {'kind': 'every', 'seconds': 3600}
+                  {'kind': 'at', 'time': '2026-02-18T06:00:00+09:00'}
+        """
+        import uuid as _uuid
+        job = {
+            'id': str(_uuid.uuid4())[:8],
+            'name': name,
+            'schedule': schedule,
+            'prompt': prompt,
+            'model': model,
+            'notify': notify,
+            'enabled': True,
+            'created': datetime.now(KST).isoformat(),
+            'last_run': None,
+            'run_count': 0
+        }
+        self.jobs.append(job)
+        self.save_jobs()
+        log.info(f"⏰ LLM cron job added: {name} ({job['id']})")
+        return job
+
+    def remove_job(self, job_id: str) -> bool:
+        before = len(self.jobs)
+        self.jobs = [j for j in self.jobs if j['id'] != job_id]
+        if len(self.jobs) < before:
+            self.save_jobs()
+            return True
+        return False
+
+    def list_jobs(self) -> list:
+        return [{'id': j['id'], 'name': j['name'], 'schedule': j['schedule'],
+                 'enabled': j['enabled'], 'last_run': j['last_run'],
+                 'run_count': j['run_count']} for j in self.jobs]
+
+    def _should_run(self, job: dict) -> bool:
+        """Check if a job should run now."""
+        if not job['enabled']:
+            return False
+        sched = job['schedule']
+        now = datetime.now(KST)
+
+        if sched['kind'] == 'every':
+            if not job['last_run']:
+                return True
+            elapsed = (now - datetime.fromisoformat(job['last_run'])).total_seconds()
+            return elapsed >= sched['seconds']
+
+        elif sched['kind'] == 'cron':
+            # Simple cron: minute hour day month weekday
+            expr = sched['expr'].split()
+            if len(expr) != 5:
+                return False
+            checks = [
+                (expr[0], now.minute), (expr[1], now.hour),
+                (expr[2], now.day), (expr[3], now.month),
+                (expr[4], now.weekday())  # 0=Monday
+            ]
+            for field, val in checks:
+                if field == '*':
+                    continue
+                try:
+                    if ',' in field:
+                        if val not in [int(x) for x in field.split(',')]:
+                            return False
+                    elif '-' in field:
+                        lo, hi = field.split('-')
+                        if not (int(lo) <= val <= int(hi)):
+                            return False
+                    elif int(field) != val:
+                        return False
+                except ValueError:
+                    return False
+            # Don't run twice in same minute
+            if job['last_run']:
+                last = datetime.fromisoformat(job['last_run'])
+                if (now - last).total_seconds() < 60:
+                    return False
+            return True
+
+        elif sched['kind'] == 'at':
+            target = datetime.fromisoformat(sched['time'])
+            if job['last_run']:
+                return False  # One-shot, already ran
+            return now >= target
+
+        return False
+
+    async def tick(self):
+        """Check and execute due jobs."""
+        for job in self.jobs:
+            if not self._should_run(job):
+                continue
+            log.info(f"⏰ LLM cron firing: {job['name']} ({job['id']})")
+            try:
+                from .engine import process_message
+                response = await process_message(
+                    f"cron-{job['id']}", job['prompt'],
+                    model_override=job.get('model'))
+                job['last_run'] = datetime.now(KST).isoformat()
+                job['run_count'] = job.get('run_count', 0) + 1
+                self.save_jobs()
+                log.info(f"⏰ Cron completed: {job['name']} ({len(response)} chars)")
+
+                # Notify via Telegram
+                if job.get('notify') and _tg_bot and _tg_bot.token and _tg_bot.owner_id:
+                    summary = response[:800] + ('...' if len(response) > 800 else '')
+                    _tg_bot.send_message(
+                        _tg_bot.owner_id,
+                        f"⏰ 삶앎 스케줄 작업 완료: {job['name']}\n\n{summary}")
+
+                # One-shot jobs: auto-disable
+                if job['schedule']['kind'] == 'at':
+                    job['enabled'] = False
+                    self.save_jobs()
+
+            except Exception as e:
+                log.error(f"LLM cron error ({job['name']}): {e}")
+                job['last_run'] = datetime.now(KST).isoformat()
+                self.save_jobs()
+
+
+# ============================================================
+# PLUGIN LOADER — Auto-load tools from plugins/ directory
+# ============================================================
+class PluginLoader:
+    """Discover and load tool plugins from plugins/*.py files."""
+
+    _plugins: dict = {}  # name -> {module, tools}
+
+    @classmethod
+    def scan(cls) -> int:
+        """Scan plugins/ directory and load all .py files as tool providers."""
+        plugins_dir = BASE_DIR / 'plugins'
+        if not plugins_dir.exists():
+            plugins_dir.mkdir(exist_ok=True)
+            # Create example plugin
+            example = plugins_dir / '_example_plugin.py'
+            if not example.exists():
+                example.write_text('''"""
+Example Plugin — Drop .py files in plugins/ to auto-load tools.
+
+Each plugin must define:
+  TOOLS = [...]  # List of tool definition dicts
+  def execute(name, args) -> str:  # Tool executor
+
+Tool definition format:
+  {'name': 'my_tool', 'description': '...', 'input_schema': {'type': 'object', 'properties': {...}, 'required': [...]}}
+"""
+
+TOOLS = [
+    {
+        'name': 'example_echo',
+        'description': 'Echo back the input (example plugin).',
+        'input_schema': {
+            'type': 'object',
+            'properties': {'text': {'type': 'string', 'description': 'Text to echo'}},
+            'required': ['text']
+        }
+    }
+]
+
+def execute(name: str, args: dict) -> str:
+    if name == 'example_echo':
+        return f'🔊 Echo: {args.get("text", "")}'
+    return f'Unknown tool: {name}'
+''', encoding='utf-8')
+            return 0
+
+        count = 0
+        for py_file in sorted(plugins_dir.glob('*.py')):
+            if py_file.name.startswith('_'):
+                continue  # Skip _example and __init__
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(
+                    f'salmalm_plugin_{py_file.stem}', py_file)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+
+                tools = getattr(mod, 'TOOLS', [])
+                execute_fn = getattr(mod, 'execute', None)
+                if tools and execute_fn:
+                    cls._plugins[py_file.stem] = {
+                        'module': mod, 'tools': tools,
+                        'execute': execute_fn, 'path': str(py_file)
+                    }
+                    count += len(tools)
+                    log.info(f"🔌 Plugin loaded: {py_file.stem} ({len(tools)} tools)")
+            except Exception as e:
+                log.error(f"Plugin load error ({py_file.name}): {e}")
+
+        log.info(f"🔌 Plugins: {len(cls._plugins)} loaded, {count} tools total")
+        return count
+
+    @classmethod
+    def get_all_tools(cls) -> list:
+        """Return all tool definitions from all plugins."""
+        tools = []
+        for plugin in cls._plugins.values():
+            tools.extend(plugin['tools'])
+        return tools
+
+    @classmethod
+    def execute(cls, tool_name: str, args: dict) -> str:
+        """Execute a plugin tool by name."""
+        for plugin in cls._plugins.values():
+            tool_names = [t['name'] for t in plugin['tools']]
+            if tool_name in tool_names:
+                return plugin['execute'](tool_name, args)
+        return None  # Not a plugin tool
+
+    @classmethod
+    def reload(cls) -> int:
+        """Reload all plugins."""
+        cls._plugins = {}
+        return cls.scan()
+
+
+# Global telegram bot reference (set during startup)
+_tg_bot = None
+_llm_cron = None
+
+class Session:
+    def __init__(self, session_id: str):
+        self.id = session_id
+        self.messages: list = []
+        self.created = time.time()
+        self.last_active = time.time()
+
+    def add_system(self, content: str):
+        # Replace existing system message
+        self.messages = [m for m in self.messages if m['role'] != 'system']
+        self.messages.insert(0, {'role': 'system', 'content': content})
+
+    def _persist(self):
+        """Save session to SQLite (only text messages, skip image data)."""
+        try:
+            # Filter out large binary data from messages
+            saveable = []
+            for m in self.messages[-50:]:  # Keep last 50 messages
+                if isinstance(m.get('content'), list):
+                    # Multimodal — save text parts only
+                    texts = [b for b in m['content'] if b.get('type') == 'text']
+                    if texts:
+                        saveable.append({**m, 'content': texts})
+                elif isinstance(m.get('content'), str):
+                    saveable.append(m)
+            conn = sqlite3.connect(str(AUDIT_DB))
+            conn.execute('INSERT OR REPLACE INTO session_store (session_id, messages, updated_at) VALUES (?,?,?)',
+                         (self.id, json.dumps(saveable, ensure_ascii=False), datetime.now(KST).isoformat()))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            log.warning(f"Session persist error: {e}")
+
+    def add_user(self, content: str):
+        self.messages.append({'role': 'user', 'content': content})
+        self.last_active = time.time()
+
+    def add_assistant(self, content: str):
+        self.messages.append({'role': 'assistant', 'content': content})
+        self._persist()
+
+    def add_tool_results(self, results: list):
+        """Add tool results as a single user message with all results.
+        results: list of {'tool_use_id': str, 'content': str}
+        """
+        content = [{'type': 'tool_result', 'tool_use_id': r['tool_use_id'],
+                     'content': r['content']} for r in results]
+        self.messages.append({'role': 'user', 'content': content})
+
+
+_sessions: dict[str, Session] = {}
+
+
+def get_session(session_id: str) -> Session:
+    if session_id not in _sessions:
+        _sessions[session_id] = Session(session_id)
+        # Try to restore from SQLite
+        try:
+            conn = sqlite3.connect(str(AUDIT_DB))
+            row = conn.execute('SELECT messages FROM session_store WHERE session_id=?', (session_id,)).fetchone()
+            conn.close()
+            if row:
+                restored = json.loads(row[0])
+                _sessions[session_id].messages = restored
+                log.info(f"📋 Session restored: {session_id} ({len(restored)} msgs)")
+                # Refresh system prompt
+                from .prompt import build_system_prompt
+                _sessions[session_id].add_system(build_system_prompt(full=False))
+                return _sessions[session_id]
+        except Exception as e:
+            log.warning(f"Session restore error: {e}")
+        from .prompt import build_system_prompt
+        _sessions[session_id].add_system(build_system_prompt(full=True))
+        log.info(f"📋 New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
+    return _sessions[session_id]
+
+
+
+class CronScheduler:
+    """Simple cron-like scheduler."""
+
+    def __init__(self):
+        self.jobs: list[dict] = []
+        self._running = False
+
+    def add_job(self, name: str, interval_seconds: int, callback, **kwargs):
+        self.jobs.append({
+            'name': name, 'interval': interval_seconds,
+            'callback': callback, 'kwargs': kwargs,
+            'last_run': 0, 'enabled': True
+        })
+
+    async def run(self):
+        self._running = True
+        log.info(f"⏰ Cron scheduler started ({len(self.jobs)} jobs)")
+        while self._running:
+            now = time.time()
+            for job in self.jobs:
+                if not job['enabled']:
+                    continue
+                if now - job['last_run'] >= job['interval']:
+                    try:
+                        log.info(f"⏰ Running cron: {job['name']}")
+                        if asyncio.iscoroutinefunction(job['callback']):
+                            await job['callback'](**job['kwargs'])
+                        else:
+                            job['callback'](**job['kwargs'])
+                        job['last_run'] = now
+                    except Exception as e:
+                        log.error(f"Cron error ({job['name']}): {e}")
+            await asyncio.sleep(10)
+
+    def stop(self):
+        self._running = False
+
+
+cron = CronScheduler()
+
+
+# ============================================================
+# DAILY MEMORY LOG
+# ============================================================
+def write_daily_log(entry: str):
+    """Append to today's memory log."""
+    today = datetime.now(KST).strftime('%Y-%m-%d')
+    log_file = MEMORY_DIR / f'{today}.md'
+    MEMORY_DIR.mkdir(exist_ok=True)
+    header = f'# {today} Daily Log\n\n' if not log_file.exists() else ''
+    with open(log_file, 'a', encoding='utf-8') as f:
+        ts = datetime.now(KST).strftime('%H:%M')
+        f.write(f'{header}- [{ts}] {entry}\n')
+
+
+
+cron = CronScheduler()
