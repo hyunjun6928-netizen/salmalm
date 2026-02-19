@@ -4,9 +4,9 @@ import sys
 
 try:
     from .constants import VERSION
-    __version__ = '0.11.11'
+    __version__ = '0.11.12'
 except Exception:
-    __version__ = '0.11.11'
+    __version__ = '0.11.12'
 
 log = logging.getLogger('salmalm')
 app = None  # Will be set below if runtime (not during build)

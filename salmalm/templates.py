@@ -1191,24 +1191,57 @@ h1{color:#a78bfa;font-size:26px;margin-bottom:8px}
 </style></head><body>
 <div class="box">
 <h1>😈 SalmAlm</h1>
-<p class="sub">처음 오신 것을 환영합니다!<br>시작하기 전에 하나만 물어볼게요.</p>
-<p style="font-size:15px;color:#ccc;margin-bottom:20px;font-weight:500">🔒 마스터 비밀번호를 설정하시겠습니까?</p>
+<p class="sub" id="t-sub"></p>
+<p style="font-size:15px;color:#ccc;margin-bottom:20px;font-weight:500" id="t-ask"></p>
 <div class="choice">
-  <button id="btn-yes" data-action="pickTrue">네, 설정할게요</button>
-  <button id="btn-no" data-action="pickFalse">아니요, 바로 시작</button>
+  <button id="btn-yes" data-action="pickTrue"></button>
+  <button id="btn-no" data-action="pickFalse"></button>
 </div>
 <div class="pw-area" id="pw-area">
-  <label>비밀번호 (4자 이상)</label>
-  <input type="password" id="pw1" placeholder="비밀번호 입력">
-  <label>비밀번호 확인</label>
-  <input type="password" id="pw2" placeholder="다시 입력" data-enter-action="go">
+  <label id="t-pw-label"></label>
+  <input type="password" id="pw1">
+  <label id="t-pw-confirm"></label>
+  <input type="password" id="pw2" data-enter-action="go">
 </div>
-<button class="go" id="go-btn" data-action="go">다음 →</button>
+<button class="go" id="go-btn" data-action="go"></button>
 <div class="err" id="err"></div>
-<div class="hint" id="hint-yes" style="display:none">비밀번호를 설정하면 브라우저를 열 때마다 입력해야 합니다.<br>나중에 설정에서 변경하거나 해제할 수 있습니다.</div>
-<div class="hint" id="hint-no" style="display:none">비밀번호 없이 바로 사용합니다.<br>나중에 설정에서 비밀번호를 추가할 수 있습니다.</div>
+<div class="hint" id="hint-yes" style="display:none"></div>
+<div class="hint" id="hint-no" style="display:none"></div>
 </div>
 <script>
+const L=localStorage.getItem('salmalm-lang')||'en';
+const T=L==='ko'?{
+  sub:'처음 오신 것을 환영합니다!<br>시작하기 전에 하나만 물어볼게요.',
+  ask:'🔒 마스터 비밀번호를 설정하시겠습니까?',
+  yes:'네, 설정할게요',no:'아니요, 바로 시작',
+  pwl:'비밀번호 (4자 이상)',pwc:'비밀번호 확인',
+  pp1:'비밀번호 입력',pp2:'다시 입력',
+  go:'다음 →',
+  hy:'비밀번호를 설정하면 브라우저를 열 때마다 입력해야 합니다.<br>나중에 설정에서 변경하거나 해제할 수 있습니다.',
+  hn:'비밀번호 없이 바로 사용합니다.<br>나중에 설정에서 비밀번호를 추가할 수 있습니다.',
+  e1:'비밀번호를 입력하세요',e2:'4자 이상 입력하세요',e3:'비밀번호가 일치하지 않습니다',e4:'오류 발생',e5:'네트워크 오류'
+}:{
+  sub:'Welcome!<br>One quick question before we start.',
+  ask:'🔒 Would you like to set a master password?',
+  yes:'Yes, set password',no:'No, start now',
+  pwl:'Password (4+ characters)',pwc:'Confirm password',
+  pp1:'Enter password',pp2:'Re-enter',
+  go:'Next →',
+  hy:'You will need to enter the password each time you open the browser.<br>You can change or remove it later in Settings.',
+  hn:'You can start without a password.<br>You can add one later in Settings.',
+  e1:'Please enter a password',e2:'Must be 4+ characters',e3:'Passwords do not match',e4:'Error occurred',e5:'Network error'
+};
+document.getElementById('t-sub').innerHTML=T.sub;
+document.getElementById('t-ask').textContent=T.ask;
+document.getElementById('btn-yes').textContent=T.yes;
+document.getElementById('btn-no').textContent=T.no;
+document.getElementById('t-pw-label').textContent=T.pwl;
+document.getElementById('t-pw-confirm').textContent=T.pwc;
+document.getElementById('pw1').placeholder=T.pp1;
+document.getElementById('pw2').placeholder=T.pp2;
+document.getElementById('go-btn').textContent=T.go;
+document.getElementById('hint-yes').innerHTML=T.hy;
+document.getElementById('hint-no').innerHTML=T.hn;
 let usePw=null;
 function pick(yes){
   usePw=yes;
@@ -1226,17 +1259,17 @@ async function go(){
   err.style.display='none';
   if(usePw){
     const p1=document.getElementById('pw1').value,p2=document.getElementById('pw2').value;
-    if(!p1){err.textContent='비밀번호를 입력하세요';err.style.display='block';return}
-    if(p1.length<4){err.textContent='4자 이상 입력하세요';err.style.display='block';return}
-    if(p1!==p2){err.textContent='비밀번호가 일치하지 않습니다';err.style.display='block';return}
+    if(!p1){err.textContent=T.e1;err.style.display='block';return}
+    if(p1.length<4){err.textContent=T.e2;err.style.display='block';return}
+    if(p1!==p2){err.textContent=T.e3;err.style.display='block';return}
   }
   const body={use_password:usePw,password:usePw?document.getElementById('pw1').value:''};
   try{
     const r=await fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
     if(d.ok)location.reload();
-    else{err.textContent=d.error||'오류 발생';err.style.display='block'}
-  }catch(e){err.textContent='네트워크 오류';err.style.display='block'}
+    else{err.textContent=d.error||T.e4;err.style.display='block'}
+  }catch(e){err.textContent=T.e5;err.style.display='block'}
 }
 </script></body></html>'''
 
@@ -1262,17 +1295,16 @@ button:hover{background:#4338ca}
 <input type="password" id="pw" placeholder="Master password" data-enter-action="unlock">
 <button data-action="unlock">Unlock</button>
 <div class="error" id="err"></div>
-<div style="margin-top:24px;font-size:13px;color:#999;line-height:1.8;text-align:left;max-width:400px">
-<p style="color:#bbb;font-weight:600;margin-bottom:8px">🔑 처음이신가요?</p>
-<p>서버를 시작할 때 설정한 마스터 비밀번호를 입력하세요.</p>
-<p style="margin-top:12px;color:#bbb;font-weight:600">비밀번호를 모르겠다면:</p>
-<p>서버를 실행한 <b>cmd/터미널 창</b>을 확인하세요.<br>아래와 같이 비밀번호가 표시되어 있습니다:</p>
-<code style="display:block;background:#252838;padding:8px 12px;border-radius:6px;font-size:12px;color:#7c83ff;margin:8px 0">Password: salmalm_local</code>
-<p style="margin-top:12px;color:#bbb;font-weight:600">비밀번호를 잊으셨다면:</p>
-<p>vault를 초기화하고 다시 시작하세요:</p>
-<code style="display:block;background:#252838;padding:6px 10px;border-radius:4px;font-size:11px;color:#aaa;margin:4px 0">del %USERPROFILE%\\.salmalm\\vault.enc</code>
-<span style="font-size:11px;color:#666">(Linux/Mac: rm ~/.salmalm/vault.enc)</span>
-</div>
+<div id="unlock-help" style="margin-top:24px;font-size:13px;color:#999;line-height:1.8;text-align:left;max-width:400px"></div>
+<script>
+(function(){
+  var L=localStorage.getItem('salmalm-lang')||'en';
+  var h=L==='ko'?
+    '<p style="color:#bbb;font-weight:600;margin-bottom:8px">🔑 처음이신가요?</p><p>서버를 시작할 때 설정한 마스터 비밀번호를 입력하세요.</p><p style="margin-top:12px;color:#bbb;font-weight:600">비밀번호를 모르겠다면:</p><p>서버를 실행한 <b>cmd/터미널 창</b>을 확인하세요.</p><code style="display:block;background:#252838;padding:8px 12px;border-radius:6px;font-size:12px;color:#7c83ff;margin:8px 0">Password: salmalm_local</code><p style="margin-top:12px;color:#bbb;font-weight:600">비밀번호를 잊으셨다면:</p><p>vault를 초기화하고 다시 시작하세요:</p><code style="display:block;background:#252838;padding:6px 10px;border-radius:4px;font-size:11px;color:#aaa;margin:4px 0">del %USERPROFILE%\\\\.salmalm\\\\vault.enc</code><span style="font-size:11px;color:#666">(Linux/Mac: rm ~/.salmalm/vault.enc)</span>':
+    '<p style="color:#bbb;font-weight:600;margin-bottom:8px">🔑 First time?</p><p>Enter the master password you set when starting the server.</p><p style="margin-top:12px;color:#bbb;font-weight:600">Don\\x27t know the password?</p><p>Check the <b>cmd/terminal window</b> where you started the server.</p><code style="display:block;background:#252838;padding:8px 12px;border-radius:6px;font-size:12px;color:#7c83ff;margin:8px 0">Password: salmalm_local</code><p style="margin-top:12px;color:#bbb;font-weight:600">Forgot your password?</p><p>Reset the vault and restart:</p><code style="display:block;background:#252838;padding:6px 10px;border-radius:4px;font-size:11px;color:#aaa;margin:4px 0">del %USERPROFILE%\\\\.salmalm\\\\vault.enc</code><span style="font-size:11px;color:#666">(Linux/Mac: rm ~/.salmalm/vault.enc)</span>';
+  document.getElementById('unlock-help').innerHTML=h;
+})();
+</script>
 </div>
 <script>
 async function unlock(){

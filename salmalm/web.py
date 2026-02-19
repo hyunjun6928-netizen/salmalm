@@ -421,13 +421,18 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(svg.encode())
 
         elif self.path == '/sw.js':
-            sw_js = '''const CACHE='salmalm-v1';
-self.addEventListener('install',e=>{self.skipWaiting()});
-self.addEventListener('activate',e=>{e.waitUntil(clients.claim())});
-self.addEventListener('fetch',e=>{
+            _ver = VERSION  # already imported via wildcard at module level
+            sw_js = f'''const CACHE='salmalm-v{_ver}';
+self.addEventListener('install',e=>{{self.skipWaiting()}});
+self.addEventListener('activate',e=>{{
+  e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim()))
+}});
+self.addEventListener('fetch',e=>{{
   if(e.request.method!=='GET')return;
-  e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))
-});'''
+  e.respondWith(fetch(e.request).then(r=>{{
+    if(r.ok){{const c=r.clone();caches.open(CACHE).then(ca=>ca.put(e.request,c))}}return r
+  }}).catch(()=>caches.match(e.request)))
+}});'''
             self.send_response(200)
             self._cors()
             self.send_header('Content-Type', 'application/javascript')
