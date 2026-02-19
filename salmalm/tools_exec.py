@@ -1,20 +1,82 @@
-"""Exec tools: exec, python_eval."""
-import subprocess, sys, json, re
+"""Exec tools: exec, python_eval, background session management."""
+import subprocess, sys, json, re, os, time
 from .tool_registry import register
 from .tools_common import _is_safe_command
 from .constants import WORKSPACE_DIR
+from .exec_approvals import (check_approval, check_env_override, BackgroundSession,
+                              BLOCKED_ENV_OVERRIDES)
 
 
 @register('exec')
 def handle_exec(args: dict) -> str:
     cmd = args.get('command', '')
+    background = args.get('background', False)
+    yield_ms = args.get('yieldMs', 0)
+    notify_on_exit = args.get('notifyOnExit', False)
+    env = args.get('env', None)
+
+    # Basic safety check
     safe, reason = _is_safe_command(cmd)
     if not safe:
         return f'{reason}'
-    timeout = min(args.get('timeout', 30), 120)  # Max 120s, default 30s
+
+    # Env var security: block PATH, LD_*, DYLD_* overrides
+    if env:
+        env_safe, blocked = check_env_override(env)
+        if not env_safe:
+            return f'❌ Blocked environment variable overrides: {", ".join(blocked)} (binary hijacking prevention)'
+
+    # Approval system check
+    approved, approval_reason, needs_confirm = check_approval(cmd)
+    if not approved and not needs_confirm:
+        return f'❌ Command denied: {approval_reason}'
+    if needs_confirm:
+        return (f'⚠️ **Approval required**: {approval_reason}\n'
+                f'Command: `{cmd[:200]}`\n'
+                f'Reply with `/approve` to execute or `/deny` to cancel.')
+
+    # Default timeout: 1800s (30 min) for background, 120s for foreground
+    if background:
+        timeout = min(args.get('timeout', 1800), 7200)  # Max 2h for background
+    else:
+        timeout = min(args.get('timeout', 30), 1800)  # Max 30min for foreground
+
+    # Background execution
+    if background:
+        session = BackgroundSession(cmd, timeout=timeout, notify_on_exit=notify_on_exit, env=env)
+        sid = session.start()
+        return f'🔄 Background session started: `{sid}`\nCommand: `{cmd[:100]}`\nTimeout: {timeout}s'
+
+    # yieldMs: start foreground, yield to background after N ms
+    if yield_ms > 0:
+        session = BackgroundSession(cmd, timeout=timeout, notify_on_exit=notify_on_exit, env=env)
+        sid = session.start()
+        # Wait for yieldMs
+        time.sleep(yield_ms / 1000.0)
+        poll = session.poll()
+        if poll['status'] in ('completed', 'error', 'timeout'):
+            # Already finished
+            output = poll['stdout_tail']
+            if poll['stderr_tail']:
+                output += f'\n[stderr]: {poll["stderr_tail"]}'
+            if poll['exit_code'] and poll['exit_code'] != 0:
+                output += f'\n[exit code]: {poll["exit_code"]}'
+            return output or '(no output)'
+        return (f'🔄 Yielded to background: `{sid}`\n'
+                f'Status: {poll["status"]} ({poll["elapsed_s"]}s elapsed)\n'
+                f'Use `exec_session poll {sid}` to check progress.')
+
+    # Foreground execution (original behavior)
     try:
         import shlex
         needs_shell = any(c in cmd for c in ['|', '>', '<', '&&', '||', ';', '`', '$('])
+
+        # Build environment
+        run_env = None
+        if env:
+            run_env = dict(os.environ)
+            run_env.update(env)
+
         if needs_shell:
             run_args = {'args': cmd, 'shell': True}
         else:
@@ -22,9 +84,12 @@ def handle_exec(args: dict) -> str:
                 run_args = {'args': shlex.split(cmd), 'shell': False}
             except ValueError:
                 run_args = {'args': cmd, 'shell': True}
+        extra_kwargs = {}
+        if run_env:
+            extra_kwargs['env'] = run_env
         result = subprocess.run(
             **run_args, capture_output=True, text=True,
-            timeout=timeout, cwd=str(WORKSPACE_DIR)
+            timeout=timeout, cwd=str(WORKSPACE_DIR), **extra_kwargs
         )
         # Output truncation: 50KB max
         MAX_OUTPUT = 50 * 1024
@@ -38,6 +103,45 @@ def handle_exec(args: dict) -> str:
         return output or '(no output)'
     except subprocess.TimeoutExpired:
         return f'Timeout ({timeout}s)'
+
+
+@register('exec_session')
+def handle_exec_session(args: dict) -> str:
+    """Manage background exec sessions: list, poll, kill."""
+    action = args.get('action', 'list')
+
+    if action == 'list':
+        sessions = BackgroundSession.list_sessions()
+        if not sessions:
+            return '📋 No background sessions.'
+        lines = ['📋 **Background Sessions**\n']
+        for s in sessions:
+            icon = {'running': '🔄', 'completed': '✅', 'error': '❌',
+                    'timeout': '⏰', 'killed': '💀'}.get(s['status'], '❓')
+            lines.append(f"{icon} `{s['session_id']}` — {s['command']} [{s['status']}] ({s['elapsed_s']}s)")
+        return '\n'.join(lines)
+
+    elif action == 'poll':
+        sid = args.get('session_id', '')
+        session = BackgroundSession.get_session(sid)
+        if not session:
+            return f'❌ Session {sid} not found'
+        poll = session.poll()
+        output = f"📊 **{poll['session_id']}** [{poll['status']}]\n"
+        output += f"Elapsed: {poll['elapsed_s']}s"
+        if poll['exit_code'] is not None:
+            output += f" | Exit: {poll['exit_code']}"
+        if poll['stdout_tail']:
+            output += f"\n\n```\n{poll['stdout_tail'][-2000:]}\n```"
+        if poll['stderr_tail']:
+            output += f"\n[stderr]: {poll['stderr_tail'][-500:]}"
+        return output
+
+    elif action == 'kill':
+        sid = args.get('session_id', '')
+        return BackgroundSession.kill_session(sid)
+
+    return f'❌ Unknown action: {action}. Use list, poll, or kill.'
 
 
 @register('python_eval')

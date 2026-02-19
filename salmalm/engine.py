@@ -28,6 +28,22 @@ from .llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthrop
 # ============================================================
 # Session Pruning — soft-trim / hard-clear old tool results
 # ============================================================
+# ── Cache TTL tracking for pruning ──
+_last_api_call_time: float = 0.0
+_CACHE_TTL_SECONDS = 300  # 5 minutes default
+
+def _should_prune_for_cache() -> bool:
+    """Only prune if cache TTL has expired since last API call."""
+    global _last_api_call_time
+    if _last_api_call_time == 0:
+        return True
+    return (_time.time() - _last_api_call_time) >= _CACHE_TTL_SECONDS
+
+def _record_api_call_time():
+    """Record timestamp of API call for TTL tracking."""
+    global _last_api_call_time
+    _last_api_call_time = _time.time()
+
 _PRUNE_KEEP_LAST_ASSISTANTS = 3
 _PRUNE_SOFT_LIMIT = 4000
 _PRUNE_HARD_LIMIT = 50_000
@@ -856,10 +872,14 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                                and provider == 'anthropic'
                                and ('opus' in model or 'sonnet' in model))
 
-            # Session pruning — trim old tool results before LLM call
-            pruned_messages, prune_stats = prune_context(session.messages)
-            if prune_stats['soft_trimmed'] or prune_stats['hard_cleared']:
-                log.info(f"[PRUNE] soft={prune_stats['soft_trimmed']} hard={prune_stats['hard_cleared']}")
+            # Session pruning — only when cache TTL expired (preserves Anthropic prompt cache)
+            if _should_prune_for_cache():
+                pruned_messages, prune_stats = prune_context(session.messages)
+                if prune_stats['soft_trimmed'] or prune_stats['hard_cleared']:
+                    log.info(f"[PRUNE] soft={prune_stats['soft_trimmed']} hard={prune_stats['hard_cleared']}")
+            else:
+                pruned_messages = session.messages
+                prune_stats = {'soft_trimmed': 0, 'hard_cleared': 0, 'unchanged': 0}
 
             # Status callback: typing/thinking
             if on_status:
@@ -880,6 +900,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 on_token=on_token, on_status=on_status)
             # Clean internal flag
             result.pop('_failed', None)
+            # Record API call time for cache TTL tracking
+            _record_api_call_time()
 
             # ── Token overflow: aggressive truncation + retry once ──
             if result.get('error') == 'token_overflow':
@@ -911,8 +933,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     session.add_assistant("⚠️ Context too large. Use /clear to reset.")
                     return "⚠️ Context too large. Use /clear to reset."
 
-            # Audit API call
+            # Record usage for /usage command
             usage = result.get('usage', {})
+            record_response_usage(_session_id, result.get('model', model), usage)
+
+            # Audit API call
             api_detail = {
                 'model': result.get('model', model),
                 'input_tokens': usage.get('input', 0),
@@ -1322,36 +1347,114 @@ def _cmd_security(cmd, session, **_):
     from .security import security_auditor
     return security_auditor.format_report()
 
+def estimate_tokens(text: str) -> int:
+    """Estimate tokens: Korean /2, English /4, mixed weighted."""
+    if not text:
+        return 0
+    kr_chars = sum(1 for c in text if '\uac00' <= c <= '\ud7a3' or '\u3131' <= c <= '\u318e')
+    kr_ratio = kr_chars / max(len(text), 1)
+    if kr_ratio > 0.3:
+        return int(len(text) / 2)
+    elif kr_ratio < 0.05:
+        return int(len(text) / 4)
+    return int(len(text) / 3)
+
+
+# ── Model pricing (USD per 1M tokens) ──
+MODEL_PRICING = {
+    'claude-opus-4': {'input': 15.0, 'output': 75.0, 'cache_read': 1.5, 'cache_write': 18.75},
+    'claude-sonnet-4': {'input': 3.0, 'output': 15.0, 'cache_read': 0.3, 'cache_write': 3.75},
+    'claude-haiku-3.5': {'input': 0.25, 'output': 1.25, 'cache_read': 0.03, 'cache_write': 0.3},
+}
+
+
+def _get_pricing(model: str) -> dict:
+    """Get pricing for a model string (fuzzy match)."""
+    m = model.lower()
+    for key, pricing in MODEL_PRICING.items():
+        if key.replace('-', '') in m.replace('-', '').replace('/', ''):
+            return pricing
+    # Default to sonnet pricing
+    return MODEL_PRICING['claude-sonnet-4']
+
+
+def estimate_cost(model: str, usage: dict) -> float:
+    """Estimate cost in USD from usage dict."""
+    pricing = _get_pricing(model)
+    inp = usage.get('input', 0)
+    out = usage.get('output', 0)
+    cache_write = usage.get('cache_creation_input_tokens', 0)
+    cache_read = usage.get('cache_read_input_tokens', 0)
+    # Subtract cached tokens from regular input
+    regular_input = max(0, inp - cache_write - cache_read)
+    cost = (
+        regular_input * pricing['input'] / 1_000_000 +
+        out * pricing['output'] / 1_000_000 +
+        cache_write * pricing['cache_write'] / 1_000_000 +
+        cache_read * pricing['cache_read'] / 1_000_000
+    )
+    return cost
+
+
+# ── Session usage tracking ──
+_session_usage: Dict[str, dict] = {}  # session_id -> {responses: [...], mode: 'off'}
+
+
+def _get_session_usage(session_id: str) -> dict:
+    if session_id not in _session_usage:
+        _session_usage[session_id] = {'responses': [], 'mode': 'off', 'total_cost': 0.0}
+    return _session_usage[session_id]
+
+
+def record_response_usage(session_id: str, model: str, usage: dict):
+    """Record per-response usage for /usage command."""
+    su = _get_session_usage(session_id)
+    cost = estimate_cost(model, usage)
+    su['responses'].append({
+        'model': model, 'input': usage.get('input', 0),
+        'output': usage.get('output', 0),
+        'cache_read': usage.get('cache_read_input_tokens', 0),
+        'cache_write': usage.get('cache_creation_input_tokens', 0),
+        'cost': cost,
+    })
+    su['total_cost'] += cost
+
+
 def _cmd_context(cmd, session, **_):
     """Show context window token usage breakdown."""
+    sub = cmd.strip().split()
+    detail_mode = len(sub) > 1 and sub[1] == 'detail'
+
     from .prompt import build_system_prompt
-
-    def _estimate_tokens(text: str) -> int:
-        """Estimate tokens: mix of Korean/English → len/3 as heuristic."""
-        if not text:
-            return 0
-        # Count Korean chars
-        kr_chars = sum(1 for c in text if '\uac00' <= c <= '\ud7a3' or '\u3131' <= c <= '\u318e')
-        kr_ratio = kr_chars / max(len(text), 1)
-        # Korean-heavy → /2, English-heavy → /4, mixed → /3
-        if kr_ratio > 0.3:
-            return int(len(text) / 2)
-        elif kr_ratio < 0.05:
-            return int(len(text) / 4)
-        return int(len(text) / 3)
-
     sys_prompt = build_system_prompt(full=False)
-    sys_tokens = _estimate_tokens(sys_prompt)
+    sys_tokens = estimate_tokens(sys_prompt)
 
     # Tool schemas
     tool_tokens = 0
+    tool_text = ''
+    tool_details = []
     try:
         from .tools import TOOL_DEFINITIONS
+        for t in TOOL_DEFINITIONS:
+            schema_text = json.dumps({'name': t['name'], 'description': t['description'],
+                                      'input_schema': t['input_schema']})
+            tool_details.append((t['name'], len(schema_text), estimate_tokens(schema_text)))
         tool_text = json.dumps([{'name': t['name'], 'description': t['description'],
                                  'input_schema': t['input_schema']} for t in TOOL_DEFINITIONS])
-        tool_tokens = _estimate_tokens(tool_text)
+        tool_tokens = estimate_tokens(tool_text)
     except Exception:
-        pass
+        TOOL_DEFINITIONS = []
+
+    # Injected files breakdown
+    from .constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, BASE_DIR
+    from .prompt import USER_SOUL_FILE
+    file_details = []
+    for label, path in [('SOUL.md', SOUL_FILE), ('USER_SOUL.md', USER_SOUL_FILE),
+                        ('AGENTS.md', AGENTS_FILE), ('MEMORY.md', MEMORY_FILE),
+                        ('USER.md', USER_FILE), ('TOOLS.md', BASE_DIR / 'TOOLS.md')]:
+        if path.exists():
+            raw = path.read_text(encoding='utf-8')
+            file_details.append((label, len(raw), estimate_tokens(raw)))
 
     # Conversation history
     history_text = ''
@@ -1363,21 +1466,81 @@ def _cmd_context(cmd, session, **_):
             for block in c:
                 if isinstance(block, dict):
                     history_text += block.get('content', '') or block.get('text', '') or ''
-    history_tokens = _estimate_tokens(history_text)
+    history_tokens = estimate_tokens(history_text)
 
     total = sys_tokens + tool_tokens + history_tokens
 
-    return f"""📊 **Context Window Usage**
+    lines = [f"""📊 **Context Window Usage**
 
 | Component | Chars | ~Tokens |
 |-----------|------:|--------:|
 | System Prompt | {len(sys_prompt):,} | {sys_tokens:,} |
-| Tool Schemas (all {len(TOOL_DEFINITIONS)}) | {len(tool_text):,} | {tool_tokens:,} |
+| Tool Schemas ({len(TOOL_DEFINITIONS)}) | {len(tool_text):,} | {tool_tokens:,} |
 | Conversation ({len(session.messages)} msgs) | {len(history_text):,} | {history_tokens:,} |
-| **Total** | | **{total:,}** |
+| **Total** | | **{total:,}** |"""]
 
-💡 Intent-based injection reduces tools to ≤15 per call.
-Dynamic max_tokens: chat=1024, search=2048, code=4096."""
+    if detail_mode:
+        lines.append('\n📁 **Injected Files**')
+        for label, chars, tokens in sorted(file_details, key=lambda x: -x[2]):
+            lines.append(f'  • {label}: {chars:,} chars / ~{tokens:,} tokens')
+
+        lines.append(f'\n🔧 **Tool Schemas (top 10 by size)**')
+        for name, chars, tokens in sorted(tool_details, key=lambda x: -x[2])[:10]:
+            lines.append(f'  • {name}: {chars:,} chars / ~{tokens:,} tokens')
+
+    lines.append('\n💡 Intent-based injection reduces tools to ≤15 per call.')
+    lines.append('🔒 Prompt caching: system prompt + tool schemas marked ephemeral.')
+    return '\n'.join(lines)
+
+
+def _cmd_usage(cmd, session, *, session_id='', **_):
+    """Handle /usage tokens|full|cost|off commands."""
+    parts = cmd.strip().split()
+    sub = parts[1] if len(parts) > 1 else 'tokens'
+    su = _get_session_usage(session_id)
+
+    if sub == 'off':
+        su['mode'] = 'off'
+        return '📊 Usage footer: **OFF**'
+    elif sub == 'tokens':
+        su['mode'] = 'tokens'
+        if not su['responses']:
+            return '📊 Usage tracking: **ON** (tokens mode). No responses yet.'
+        last = su['responses'][-1]
+        return (f'📊 Usage mode: **tokens**\n'
+                f'Last: in={last["input"]:,} out={last["output"]:,} '
+                f'(cache_read={last["cache_read"]:,} cache_write={last["cache_write"]:,})')
+    elif sub == 'full':
+        su['mode'] = 'full'
+        if not su['responses']:
+            return '📊 Usage tracking: **ON** (full mode). No responses yet.'
+        lines = ['📊 **Usage (full)**\n']
+        for i, r in enumerate(su['responses'][-10:], 1):
+            model_short = r['model'].split('/')[-1][:20]
+            lines.append(f'{i}. {model_short} | in:{r["input"]:,} out:{r["output"]:,} | ${r["cost"]:.4f}')
+        lines.append(f'\n💰 Session total: **${su["total_cost"]:.4f}**')
+        return '\n'.join(lines)
+    elif sub == 'cost':
+        lines = ['💰 **Session Cost Summary**\n']
+        if not su['responses']:
+            lines.append('No API calls yet.')
+        else:
+            lines.append(f'Requests: {len(su["responses"])}')
+            total_in = sum(r['input'] for r in su['responses'])
+            total_out = sum(r['output'] for r in su['responses'])
+            total_cache_read = sum(r['cache_read'] for r in su['responses'])
+            total_cache_write = sum(r['cache_write'] for r in su['responses'])
+            lines.append(f'Input tokens: {total_in:,} (cache read: {total_cache_read:,}, cache write: {total_cache_write:,})')
+            lines.append(f'Output tokens: {total_out:,}')
+            lines.append(f'**Total cost: ${su["total_cost"]:.4f}**')
+            if total_cache_read > 0:
+                # Estimate savings from cache
+                pricing = _get_pricing(su['responses'][-1]['model'])
+                saved = total_cache_read * (pricing['input'] - pricing['cache_read']) / 1_000_000
+                lines.append(f'💡 Cache savings: ~${saved:.4f}')
+        return '\n'.join(lines)
+    else:
+        return '📊 `/usage tokens|full|cost|off`'
 
 
 def _cmd_soul(cmd, session, **_):
@@ -1433,6 +1596,45 @@ def _cmd_voice(cmd, session, **_):
         session.tts_voice = arg
         return f'🎙️ Voice: **{arg}** — saved ✅'
     return f'Available voices: {", ".join(valid_voices)}'
+
+def _cmd_subagents(cmd, session, **_):
+    """Handle /subagents commands: list, stop, log, info."""
+    from .agents import SubAgent
+    parts = cmd.split(maxsplit=2)
+    sub = parts[1] if len(parts) > 1 else 'list'
+    arg = parts[2] if len(parts) > 2 else ''
+
+    if sub == 'list':
+        agents = SubAgent.list_agents()
+        if not agents:
+            return '🤖 No active sub-agents.'
+        lines = ['🤖 **Sub-agents**\n']
+        for i, a in enumerate(agents, 1):
+            icon = {'running': '🔄', 'completed': '✅', 'error': '❌', 'stopped': '⏹'}.get(a['status'], '❓')
+            lines.append(f"{icon} #{i} `{a['id']}` — {a['label']} [{a['status']}] "
+                         f"({a['runtime_s']}s, ${a.get('estimated_cost', 0):.4f})")
+        return '\n'.join(lines)
+
+    elif sub == 'stop':
+        if not arg:
+            return '❌ Usage: /subagents stop <id|#N|all>'
+        return SubAgent.stop_agent(arg)
+
+    elif sub == 'log':
+        log_parts = arg.split(maxsplit=1)
+        agent_id = log_parts[0] if log_parts else ''
+        limit = int(log_parts[1]) if len(log_parts) > 1 and log_parts[1].isdigit() else 20
+        if not agent_id:
+            return '❌ Usage: /subagents log <id|#N> [limit]'
+        return SubAgent.get_log(agent_id, limit)
+
+    elif sub == 'info':
+        if not arg:
+            return '❌ Usage: /subagents info <id|#N>'
+        return SubAgent.get_info(arg)
+
+    return '❌ Usage: /subagents list|stop|log|info <args>'
+
 
 def _cmd_agent(cmd, session, *, session_id='', **_):
     from .agents import agent_manager
@@ -1534,16 +1736,21 @@ _SLASH_COMMANDS = {
     '/soul': _cmd_soul,
     '/soul reset': _cmd_soul_reset,
     '/context': _cmd_context,
+    '/context detail': _cmd_context,
 }
+
+# Also add /usage to prefix commands
 
 # Prefix-match slash commands (checked with startswith)
 _SLASH_PREFIX_COMMANDS = [
+    ('/usage', _cmd_usage),
     ('/think ', _cmd_think),
     ('/plan ', _cmd_plan),
     ('/compare ', _cmd_compare),
     ('/model ', _cmd_model),
     ('/tts', _cmd_tts),
     ('/voice', _cmd_voice),
+    ('/subagents', _cmd_subagents),
     ('/agent', _cmd_agent),
     ('/hooks', _cmd_hooks),
     ('/plugins', _cmd_plugins),

@@ -431,15 +431,25 @@ def stream_anthropic(messages: List[Dict[str, Any]], model: Optional[str] = None
     else:
         body['max_tokens'] = max_tokens
     if system_msgs:
-        body['system'] = '\n'.join(system_msgs)
+        sys_text = '\n'.join(system_msgs)
+        body['system'] = [
+            {'type': 'text', 'text': sys_text,
+             'cache_control': {'type': 'ephemeral'}}
+        ]
     if tools:
-        body['tools'] = tools
+        # Mark last tool with cache_control for tool schema caching
+        cached_tools = list(tools)
+        if cached_tools:
+            cached_tools[-1] = {**cached_tools[-1],
+                                'cache_control': {'type': 'ephemeral'}}
+        body['tools'] = cached_tools
 
     data = json.dumps(body).encode('utf-8')
     headers = {
         'x-api-key': api_key,
         'content-type': 'application/json',
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
         'User-Agent': _UA,
     }
     req = urllib.request.Request(
@@ -510,6 +520,8 @@ def stream_anthropic(messages: List[Dict[str, Any]], model: Optional[str] = None
                         msg = event.get('message', {})
                         u = msg.get('usage', {})
                         usage['input'] = u.get('input_tokens', 0)
+                        usage['cache_creation_input_tokens'] = u.get('cache_creation_input_tokens', 0)
+                        usage['cache_read_input_tokens'] = u.get('cache_read_input_tokens', 0)
 
         # Track usage
         track_usage(model, usage['input'], usage['output'])

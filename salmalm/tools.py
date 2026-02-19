@@ -3,14 +3,30 @@
 TOOL_DEFINITIONS = [
     {
         'name': 'exec',
-        'description': 'Execute shell commands. Dangerous commands are blocked.',
+        'description': 'Execute shell commands. Supports background=true for async, yieldMs for auto-background. Dangerous commands require approval.',
         'input_schema': {
             'type': 'object',
             'properties': {
                 'command': {'type': 'string', 'description': 'Shell command to execute'},
-                'timeout': {'type': 'integer', 'description': 'Timeout in seconds', 'default': 30}
+                'timeout': {'type': 'integer', 'description': 'Timeout in seconds (default 30, max 1800 fg / 7200 bg)'},
+                'background': {'type': 'boolean', 'description': 'Run in background, return immediately'},
+                'yieldMs': {'type': 'integer', 'description': 'Wait N ms then auto-background if not finished'},
+                'notifyOnExit': {'type': 'boolean', 'description': 'Notify on completion (background only)'},
+                'env': {'type': 'object', 'description': 'Environment variables (PATH/LD_*/DYLD_* blocked)'}
             },
             'required': ['command']
+        }
+    },
+    {
+        'name': 'exec_session',
+        'description': 'Manage background exec sessions: list, poll status, kill.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'list | poll | kill', 'enum': ['list', 'poll', 'kill']},
+                'session_id': {'type': 'string', 'description': 'Background session ID (for poll/kill)'}
+            },
+            'required': ['action']
         }
     },
     {

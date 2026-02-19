@@ -1,0 +1,21 @@
+{
+  "deny": [
+    "sub_agent",
+    "cron_manage",
+    "plugin_manage",
+    "mcp_manage",
+    "node_manage",
+    "google_calendar",
+    "gmail",
+    "email_inbox",
+    "email_read",
+    "email_send",
+    "email_search",
+    "notification",
+    "reminder",
+    "workflow",
+    "browser"
+  ],
+  "allow": [],
+  "notes": "deny takes priority over allow. Empty allow = all tools except denied."
+}

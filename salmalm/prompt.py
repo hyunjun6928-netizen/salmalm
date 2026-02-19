@@ -134,16 +134,38 @@ def _truncate_file(text: str, limit: int = MAX_FILE_CHARS) -> str:
     return '… [truncated]\n' + text[-limit:]
 
 
-def build_system_prompt(full: bool = True) -> str:
+def build_system_prompt(full: bool = True, mode: str = 'full') -> str:
     """Build system prompt from SOUL.md + context files.
     full=True: load everything (first message / refresh)
     full=False: minimal reload (mid-conversation refresh)
+    mode='minimal': subagent prompt — Tooling + Workspace + Runtime only
+                    (excludes SOUL.md, USER.md, HEARTBEAT.md, MEMORY.md)
+    mode='full': normal prompt (default)
 
     Token-optimized: per-file truncation, memory caps, selective loading.
     User SOUL.md (~/.salmalm/SOUL.md) is prepended if it exists.
     """
     global _agents_loaded_full
     parts = []
+
+    # ── Minimal mode for subagents: Tooling + Workspace + Runtime only ──
+    if mode == 'minimal':
+        parts.append(f"[SalmAlm SubAgent — v{VERSION}]")
+        parts.append(f"Workspace: {WORKSPACE_DIR}")
+        now = datetime.now(KST)
+        parts.append(f"Current: {now.strftime('%Y-%m-%d %H:%M')} KST")
+        parts.append("You are a sub-agent. Complete your assigned task. "
+                      "Stay focused, be concise, and return results.")
+        # Tool instructions (abbreviated)
+        parts.append("Use tools as needed. exec for shell, read_file/write_file/edit_file for files, "
+                      "web_search/web_fetch for web. Verify results after writing.")
+        result = '\n\n'.join(parts)
+        try:
+            from .edge_cases import substitute_prompt_variables
+            result = substitute_prompt_variables(result)
+        except Exception:
+            pass
+        return result
 
     # User SOUL.md (custom persona — prepended before everything)
     user_soul = get_user_soul()
@@ -207,9 +229,9 @@ def build_system_prompt(full: bool = True) -> str:
     if hb_file.exists():
         parts.append(_truncate_file(hb_file.read_text(encoding='utf-8')))
 
-    # Context
-    now = datetime.now(KST)
-    parts.append(f"Current: {now.strftime('%Y-%m-%d %H:%M')} KST")
+    # Context — timezone only (exact time via /status or session_status tool)
+    # Injecting exact time every minute destroys Anthropic prompt cache
+    parts.append("Timezone: Asia/Seoul (KST)")
 
     # Available skills
     if full:

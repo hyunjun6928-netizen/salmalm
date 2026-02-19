@@ -7,6 +7,9 @@ from pathlib import Path
 from .constants import WORKSPACE_DIR, BASE_DIR, KST
 from .crypto import log
 
+# Auto-archive delay (seconds after completion)
+_ARCHIVE_DELAY_SEC = 3600  # 60 minutes
+
 
 def _core():
     """Lazy import to avoid circular dependency."""
@@ -14,19 +17,50 @@ def _core():
     return core
 
 
+def _load_tool_policy() -> dict:
+    """Load subagent tool policy from config file."""
+    policy_file = Path(__file__).parent / 'subagent_tool_policy.json'
+    user_policy = Path.home() / '.salmalm' / 'subagent_tool_policy.json'
+    # User override takes priority
+    for f in (user_policy, policy_file):
+        if f.exists():
+            try:
+                return json.loads(f.read_text(encoding='utf-8'))
+            except Exception:
+                pass
+    return {'deny': [], 'allow': []}
+
+
+def _filter_tools_for_subagent(tools: list) -> list:
+    """Filter tool definitions based on subagent tool policy. Deny overrides allow."""
+    policy = _load_tool_policy()
+    deny = set(policy.get('deny', []))
+    allow = set(policy.get('allow', []))
+    filtered = []
+    for t in tools:
+        name = t.get('name', '')
+        if name in deny:
+            continue
+        if allow and name not in allow:
+            continue
+        filtered.append(t)
+    return filtered
+
+
 # ============================================================
 class SubAgent:
     """Background task executor with notification on completion."""
 
-    _agents: dict = {}  # id -> {task, status, result, thread, started, completed}
+    _agents: dict = {}  # id -> {task, status, result, thread, started, completed, ...}
     _counter = 0
     _lock = threading.Lock()
+    _archive_timers: dict = {}  # id -> Timer
     MAX_CONCURRENT = 5  # Max concurrent sub-agents
     MAX_DEPTH = 2       # Max nesting depth (sub-agent spawning sub-agents)
 
     @classmethod
     def spawn(cls, task: str, model: Optional[str] = None, notify_telegram: bool = True,
-              _depth: int = 0) -> str:
+              _depth: int = 0, label: str = '') -> str:
         """Spawn a background sub-agent. Returns agent ID."""
         if _depth >= cls.MAX_DEPTH:
             raise ValueError(f'Sub-agent nesting depth limit ({cls.MAX_DEPTH}) reached')
@@ -39,15 +73,20 @@ class SubAgent:
 
         agent_info = {
             'id': agent_id, 'task': task, 'model': model,
+            'label': label or task[:40],
             'status': 'running', 'result': None,
             'started': datetime.now(KST).isoformat(),
-            'completed': None, 'notify_telegram': notify_telegram
+            'started_ts': time.time(),
+            'completed': None, 'completed_ts': None,
+            'notify_telegram': notify_telegram,
+            'transcript': [],  # full message log
+            'token_usage': {'input': 0, 'output': 0},
+            'estimated_cost': 0.0,
+            'archived': False,
         }
 
         def _run():
             try:
-                # Create isolated session with its own event loop
-                # (avoids cross-loop issues with main loop resources)
                 session_id = f'subagent-{agent_id}'
                 session = _core().get_session(session_id)
                 from .engine import process_message
@@ -55,13 +94,51 @@ class SubAgent:
                     process_message(session_id, task, model_override=model))
                 agent_info['result'] = result
                 agent_info['status'] = 'completed'
-                agent_info['completed'] = datetime.now(KST).isoformat()
-                log.info(f"[BOT] Sub-agent {agent_id} completed: {len(result)} chars")
+                now = datetime.now(KST)
+                agent_info['completed'] = now.isoformat()
+                agent_info['completed_ts'] = time.time()
+                runtime_s = agent_info['completed_ts'] - agent_info['started_ts']
+
+                # Collect transcript from session
+                try:
+                    agent_info['transcript'] = [
+                        {'role': m.get('role', '?'),
+                         'content': m.get('content', '')[:500] if isinstance(m.get('content'), str) else str(m.get('content', ''))[:500]}
+                        for m in session.messages if m.get('role') != 'system'
+                    ]
+                except Exception:
+                    pass
+
+                # Collect token usage from session metrics
+                try:
+                    from .edge_cases import usage_tracker
+                    # Rough estimate from result length
+                    out_tokens = len(result) // 3
+                    in_tokens = len(task) // 3
+                    agent_info['token_usage'] = {'input': in_tokens, 'output': out_tokens}
+                    model_name = (model or 'sonnet').lower()
+                    if 'opus' in model_name:
+                        cost = (in_tokens * 15 + out_tokens * 75) / 1_000_000
+                    elif 'haiku' in model_name:
+                        cost = (in_tokens * 0.25 + out_tokens * 1.25) / 1_000_000
+                    else:
+                        cost = (in_tokens * 3 + out_tokens * 15) / 1_000_000
+                    agent_info['estimated_cost'] = round(cost, 6)
+                except Exception:
+                    pass
+
+                log.info(f"[BOT] Sub-agent {agent_id} completed: {len(result)} chars, {runtime_s:.1f}s")
+
+                # Build announce summary with stats
+                summary = result[:500] + ('...' if len(result) > 500 else '')
+                stats_line = (f"⏱ {runtime_s:.1f}s | "
+                              f"📊 in:{agent_info['token_usage']['input']} out:{agent_info['token_usage']['output']} | "
+                              f"💰 ${agent_info['estimated_cost']:.4f}")
+                msg = (f'🤖 **Sub-agent completed** [{agent_id}]\n'
+                       f'📋 Task: {task[:100]}\n{stats_line}\n\n{summary}')
 
                 # Notify via Telegram
                 if agent_info['notify_telegram'] and _core()._tg_bot and _core()._tg_bot.token:
-                    summary = result[:500] + ('...' if len(result) > 500 else '')
-                    msg = f'🤖 **Sub-agent completed** [{agent_id}]\n\n📋 Task: {task[:100]}\n\n{summary}'
                     try:
                         _core()._tg_bot._api('sendMessage', {
                             'chat_id': _core()._tg_bot.owner_id,
@@ -69,6 +146,9 @@ class SubAgent:
                         })
                     except Exception as e:
                         log.warning(f"Sub-agent notification failed: {e}")
+
+                # Schedule auto-archive
+                cls._schedule_archive(agent_id)
 
                 # Clean up session after a while
                 if session_id in _core()._sessions:
@@ -78,7 +158,9 @@ class SubAgent:
                 agent_info['result'] = f'❌ Sub-agent error: {e}'
                 agent_info['status'] = 'error'
                 agent_info['completed'] = datetime.now(KST).isoformat()
+                agent_info['completed_ts'] = time.time()
                 log.error(f"Sub-agent {agent_id} error: {e}")
+                cls._schedule_archive(agent_id)
 
         t = threading.Thread(target=_run, daemon=True, name=f'subagent-{agent_id}')
         agent_info['thread'] = t  # type: ignore[assignment]
@@ -88,11 +170,134 @@ class SubAgent:
         return agent_id
 
     @classmethod
+    def _schedule_archive(cls, agent_id: str):
+        """Schedule auto-archive after _ARCHIVE_DELAY_SEC."""
+        def _do_archive():
+            agent = cls._agents.get(agent_id)
+            if agent and not agent.get('archived'):
+                agent['archived'] = True
+                # Rename conceptually — mark as archived
+                agent['status'] = f"{agent['status']}.archived.{int(time.time())}"
+                log.info(f"[BOT] Sub-agent {agent_id} auto-archived")
+            cls._archive_timers.pop(agent_id, None)
+
+        timer = threading.Timer(_ARCHIVE_DELAY_SEC, _do_archive)
+        timer.daemon = True
+        cls._archive_timers[agent_id] = timer
+        timer.start()
+
+    @classmethod
     def list_agents(cls) -> list:
-        """List all running sub-agents with their status."""
-        return [{'id': a['id'], 'task': a['task'][:60], 'status': a['status'],
-                 'started': a['started'], 'completed': a['completed']}
-                for a in cls._agents.values()]
+        """List all sub-agents with their status, label, and runtime."""
+        result = []
+        now_ts = time.time()
+        for a in cls._agents.values():
+            if a.get('archived'):
+                continue
+            runtime = (a.get('completed_ts') or now_ts) - a['started_ts']
+            result.append({
+                'id': a['id'], 'label': a.get('label', a['task'][:40]),
+                'task': a['task'][:60], 'status': a['status'],
+                'started': a['started'], 'completed': a['completed'],
+                'runtime_s': round(runtime, 1),
+                'token_usage': a.get('token_usage', {}),
+                'estimated_cost': a.get('estimated_cost', 0),
+            })
+        return result
+
+    @classmethod
+    def stop_agent(cls, agent_id: str) -> str:
+        """Stop a running sub-agent."""
+        if agent_id == 'all':
+            stopped = []
+            for aid, a in cls._agents.items():
+                if a['status'] == 'running':
+                    a['status'] = 'stopped'
+                    a['completed'] = datetime.now(KST).isoformat()
+                    a['completed_ts'] = time.time()
+                    stopped.append(aid)
+            return f'⏹ Stopped {len(stopped)} sub-agents: {", ".join(stopped)}' if stopped else '⚠️ No running sub-agents'
+
+        # Support #N shorthand
+        if agent_id.startswith('#'):
+            try:
+                idx = int(agent_id[1:]) - 1
+                keys = list(cls._agents.keys())
+                if 0 <= idx < len(keys):
+                    agent_id = keys[idx]
+            except ValueError:
+                return f'❌ Invalid index: {agent_id}'
+
+        agent = cls._agents.get(agent_id)
+        if not agent:
+            return f'❌ Agent {agent_id} not found'
+        if agent['status'] != 'running':
+            return f'⚠️ Agent {agent_id} is not running (status: {agent["status"]})'
+        agent['status'] = 'stopped'
+        agent['completed'] = datetime.now(KST).isoformat()
+        agent['completed_ts'] = time.time()
+        return f'⏹ Stopped sub-agent {agent_id}'
+
+    @classmethod
+    def get_log(cls, agent_id: str, limit: int = 20) -> str:
+        """Get sub-agent transcript."""
+        # Support #N shorthand
+        if agent_id.startswith('#'):
+            try:
+                idx = int(agent_id[1:]) - 1
+                keys = list(cls._agents.keys())
+                if 0 <= idx < len(keys):
+                    agent_id = keys[idx]
+            except ValueError:
+                return f'❌ Invalid index: {agent_id}'
+
+        agent = cls._agents.get(agent_id)
+        if not agent:
+            return f'❌ Agent {agent_id} not found'
+        transcript = agent.get('transcript', [])
+        if not transcript:
+            if agent['result']:
+                return f'📜 [{agent_id}] Result:\n{agent["result"][:2000]}'
+            return f'📜 [{agent_id}] No transcript available'
+        lines = [f'📜 **Transcript** [{agent_id}] ({len(transcript)} messages, showing last {limit})\n']
+        for entry in transcript[-limit:]:
+            role = entry.get('role', '?')
+            content = entry.get('content', '')[:300]
+            icon = {'user': '👤', 'assistant': '🤖', 'tool': '🔧'}.get(role, '❓')
+            lines.append(f'{icon} **{role}**: {content}')
+        return '\n'.join(lines)
+
+    @classmethod
+    def get_info(cls, agent_id: str) -> str:
+        """Get detailed metadata for a sub-agent."""
+        # Support #N shorthand
+        if agent_id.startswith('#'):
+            try:
+                idx = int(agent_id[1:]) - 1
+                keys = list(cls._agents.keys())
+                if 0 <= idx < len(keys):
+                    agent_id = keys[idx]
+            except ValueError:
+                return f'❌ Invalid index: {agent_id}'
+
+        agent = cls._agents.get(agent_id)
+        if not agent:
+            return f'❌ Agent {agent_id} not found'
+        now_ts = time.time()
+        runtime = (agent.get('completed_ts') or now_ts) - agent['started_ts']
+        usage = agent.get('token_usage', {})
+        return (f'🤖 **Sub-agent Info** [{agent_id}]\n'
+                f'📋 Label: {agent.get("label", "—")}\n'
+                f'📝 Task: {agent["task"][:200]}\n'
+                f'📊 Status: {agent["status"]}\n'
+                f'🕐 Started: {agent["started"]}\n'
+                f'✅ Completed: {agent.get("completed", "—")}\n'
+                f'⏱ Runtime: {runtime:.1f}s\n'
+                f'📊 Tokens: in={usage.get("input", 0)} out={usage.get("output", 0)}\n'
+                f'💰 Est. cost: ${agent.get("estimated_cost", 0):.4f}\n'
+                f'📜 Transcript: {len(agent.get("transcript", []))} messages\n'
+                f'📦 Archived: {agent.get("archived", False)}\n'
+                f'🤖 Model: {agent.get("model", "auto")}')
 
     @classmethod
     def get_result(cls, agent_id: str) -> dict:

@@ -100,7 +100,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     _PUBLIC_PATHS = {
         '/', '/index.html', '/api/status', '/api/health', '/api/unlock',
         '/api/auth/login', '/api/users/register', '/api/onboarding', '/api/setup', '/docs',
-        '/api/google/callback', '/webhook/telegram',
+        '/api/google/callback', '/webhook/telegram', '/webhook/slack',
     }
 
     def _require_auth(self, min_role: str = 'user') -> Optional[dict]:
@@ -483,6 +483,22 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 notifications = web_session._notifications
                 web_session._notifications = []  # clear after read
             self._json({'notifications': notifications})
+        elif self.path == '/api/presence':
+            if not self._require_auth('user'): return
+            from .presence import presence_manager
+            self._json({
+                'clients': presence_manager.list_all(),
+                'counts': presence_manager.count_by_state(),
+                'total': presence_manager.count(),
+            })
+
+        elif self.path == '/api/channels':
+            if not self._require_auth('user'): return
+            from .channel_router import channel_router
+            self._json({
+                'channels': channel_router.list_channels(),
+            })
+
         elif self.path == '/api/dashboard':
             if not self._require_auth('user'): return
             # Dashboard data: sessions, costs, tools, cron jobs
@@ -2030,6 +2046,41 @@ self.addEventListener('fetch',e=>{{
                 if result is None:
                     result = {'error': 'No available node for this tool'}
             self._json(result)  # type: ignore[arg-type]
+
+        elif self.path == '/webhook/slack':
+            # Slack Event API webhook
+            from .slack_bot import slack_bot
+            if not slack_bot.bot_token:
+                self._json({'error': 'Slack not configured'}, 503)
+                return
+            # Verify request
+            ts = self.headers.get('X-Slack-Request-Timestamp', '')
+            sig = self.headers.get('X-Slack-Signature', '')
+            raw_body = json.dumps(body).encode() if isinstance(body, dict) else b''
+            if not slack_bot.verify_request(ts, sig, raw_body):
+                self._json({'error': 'Invalid signature'}, 403)
+                return
+            result = slack_bot.handle_event(body)
+            if result:
+                self._json(result)
+            else:
+                self._json({'ok': True})
+
+        elif self.path == '/api/presence':
+            # Register/heartbeat presence
+            instance_id = body.get('instanceId', '')
+            if not instance_id:
+                self._json({'error': 'instanceId required'}, 400)
+                return
+            from .presence import presence_manager
+            entry = presence_manager.register(
+                instance_id,
+                host=body.get('host', ''),
+                ip=self._get_client_ip(),
+                mode=body.get('mode', 'web'),
+                user_agent=body.get('userAgent', ''),
+            )
+            self._json({'ok': True, 'state': entry.state})
 
         elif self.path == '/webhook/telegram':
             # Telegram webhook endpoint

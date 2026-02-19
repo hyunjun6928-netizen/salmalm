@@ -279,6 +279,19 @@ class WebSocketServer:
         self.clients[client._id] = client
         log.info(f"[FAST] WS client connected (session={session_id}, total={len(self.clients)})")
 
+        # Auto-register presence
+        try:
+            from .presence import presence_manager
+            peer = writer.get_extra_info('peername')
+            ip = peer[0] if peer else ''
+            presence_manager.register(
+                f'ws_{client._id}', ip=ip, mode='websocket',
+                host=headers.get('host', ''),
+                user_agent=headers.get('user-agent', ''),
+            )
+        except Exception:
+            pass
+
         if self._on_connect:
             try:
                 await self._on_connect(client)
@@ -345,6 +358,12 @@ class WebSocketServer:
         finally:
             client.connected = False
             self.clients.pop(client._id, None)
+            # Unregister presence
+            try:
+                from .presence import presence_manager
+                presence_manager.unregister(f'ws_{client._id}')
+            except Exception:
+                pass
             if self._on_disconnect:
                 try:
                     await self._on_disconnect(client)
