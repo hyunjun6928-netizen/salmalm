@@ -466,23 +466,23 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     'https://api.anthropic.com/v1/messages',
                     {'x-api-key': vault.get('anthropic_api_key') or '',
                      'content-type': 'application/json', 'anthropic-version': '2023-06-01'},
-                    {'model': 'claude-haiku-4-5-20250414', 'max_tokens': 10,
+                    {'model': TEST_MODELS['anthropic'], 'max_tokens': 10,
                      'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
                 'openai': lambda: _http_post(
                     'https://api.openai.com/v1/chat/completions',
                     {'Authorization': 'Bearer ' + (vault.get('openai_api_key') or ''),
                      'Content-Type': 'application/json'},
-                    {'model': 'gpt-4.1-nano', 'max_tokens': 10,
+                    {'model': TEST_MODELS['openai'], 'max_tokens': 10,
                      'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
                 'xai': lambda: _http_post(
                     'https://api.x.ai/v1/chat/completions',
                     {'Authorization': 'Bearer ' + (vault.get('xai_api_key') or ''),
                      'Content-Type': 'application/json'},
-                    {'model': 'grok-3-mini', 'max_tokens': 10,
+                    {'model': TEST_MODELS['xai'], 'max_tokens': 10,
                      'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
                 'google': lambda: (lambda k: __import__('urllib.request', fromlist=['urlopen']).urlopen(
                     __import__('urllib.request', fromlist=['Request']).Request(
-                        f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={k}',
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={k}",
                         data=json.dumps({'contents': [{'parts': [{'text': 'ping'}]}]}).encode(),
                         headers={'Content-Type': 'application/json'}), timeout=15))(vault.get('google_api_key') or ''),
             }
@@ -609,34 +609,23 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': 'multipart required'}, 400)
                 return
             try:
-                boundary = content_type.split('boundary=')[1].strip()
                 raw = self.rfile.read(length)
-                # Simple multipart parser
-                parts = raw.split(f'--{boundary}'.encode())
-                for part in parts:
-                    if b'filename="' not in part:
+                # Parse multipart using stdlib email.parser (robust edge-case handling)
+                import email.parser, email.policy
+                header_bytes = f"Content-Type: {content_type}\r\n\r\n".encode()
+                msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(header_bytes + raw)
+                for part in msg.walk():
+                    fname_raw = part.get_filename()
+                    if not fname_raw:
                         continue
-                    # Extract filename
-                    header_end = part.find(b'\r\n\r\n')
-                    if header_end < 0:
-                        continue
-                    header = part[:header_end].decode('utf-8', errors='replace')
-                    fname_match = re.search(r'filename="([^"]+)"', header)
-                    if not fname_match:
-                        continue
-                    fname = Path(fname_match.group(1)).name  # basename only (prevent path traversal)
+                    fname = Path(fname_raw).name  # basename only (prevent path traversal)
                     # Reject suspicious filenames
                     if not fname or '..' in fname or not re.match(r'^[\w.\- ]+$', fname):
                         self._json({'error': 'Invalid filename'}, 400)
                         return
-                    file_data = part[header_end+4:]
-                    # Remove trailing \r\n--
-                    if file_data.endswith(b'\r\n'):
-                        file_data = file_data[:-2]
-                    if file_data.endswith(b'--'):
-                        file_data = file_data[:-2]
-                    if file_data.endswith(b'\r\n'):
-                        file_data = file_data[:-2]
+                    file_data = part.get_payload(decode=True)
+                    if not file_data:
+                        continue
                     # Size limit: 50MB
                     if len(file_data) > 50 * 1024 * 1024:
                         self._json({'error': 'File too large (max 50MB)'}, 413)
@@ -703,7 +692,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     _http_post('https://api.anthropic.com/v1/messages',
                         {'x-api-key': body['anthropic_api_key'], 'content-type': 'application/json',
                          'anthropic-version': '2023-06-01'},
-                        {'model': 'claude-haiku-4-5-20250414', 'max_tokens': 10,
+                        {'model': TEST_MODELS['anthropic'], 'max_tokens': 10,
                          'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
                     test_results.append('✅ Anthropic OK')
                 except Exception as e:
@@ -712,7 +701,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     _http_post('https://api.openai.com/v1/chat/completions',
                         {'Authorization': f'Bearer {body["openai_api_key"]}', 'Content-Type': 'application/json'},
-                        {'model': 'gpt-4.1-nano', 'max_tokens': 10,
+                        {'model': TEST_MODELS['openai'], 'max_tokens': 10,
                          'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
                     test_results.append('✅ OpenAI OK')
                 except Exception as e:
@@ -721,7 +710,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 try:
                     _http_post('https://api.x.ai/v1/chat/completions',
                         {'Authorization': f'Bearer {body["xai_api_key"]}', 'Content-Type': 'application/json'},
-                        {'model': 'grok-3-mini', 'max_tokens': 10,
+                        {'model': TEST_MODELS['xai'], 'max_tokens': 10,
                          'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
                     test_results.append('✅ xAI OK')
                 except Exception as e:
@@ -731,7 +720,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     import urllib.request
                     gk = body['google_api_key']
                     req = urllib.request.Request(
-                        f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gk}',
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={gk}",
                         data=json.dumps({'contents': [{'parts': [{'text': 'ping'}]}]}).encode(),
                         headers={'Content-Type': 'application/json'})
                     urllib.request.urlopen(req, timeout=15)

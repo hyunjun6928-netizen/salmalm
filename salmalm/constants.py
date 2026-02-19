@@ -2,7 +2,7 @@
 from datetime import timedelta, timezone
 from pathlib import Path
 
-VERSION = "0.10.5"
+VERSION = "0.10.6"
 APP_NAME = "SalmAlm"
 KST = timezone(timedelta(hours=9))
 
@@ -106,6 +106,78 @@ MODEL_COSTS = {
     'llama-4-maverick': {'input': 0.20, 'output': 0.60},
     'llama-4-scout': {'input': 0.15, 'output': 0.40},
 }
+
+# ============================================================
+# Model Registry — single source of truth for all model references
+# ============================================================
+MODELS = {
+    # Anthropic
+    'opus': 'anthropic/claude-opus-4-6',
+    'sonnet': 'anthropic/claude-sonnet-4-20250514',
+    'haiku': 'anthropic/claude-haiku-3.5-20241022',
+    # OpenAI
+    'gpt5.3': 'openai/gpt-5.3-codex',
+    'gpt5.1': 'openai/gpt-5.1-codex',
+    'gpt4.1': 'openai/gpt-4.1',
+    'gpt4.1mini': 'openai/gpt-4.1-mini',
+    'gpt4.1nano': 'openai/gpt-4.1-nano',
+    'o3': 'openai/o3',
+    'o4mini': 'openai/o4-mini',
+    # xAI
+    'grok4': 'xai/grok-4',
+    'grok3': 'xai/grok-3',
+    'grok3mini': 'xai/grok-3-mini',
+    # Google
+    'gemini3pro': 'google/gemini-3-pro-preview',
+    'gemini3flash': 'google/gemini-3-flash-preview',
+    'gemini2.5pro': 'google/gemini-2.5-pro',
+    'gemini2.5flash': 'google/gemini-2.5-flash',
+    # DeepSeek (via OpenRouter)
+    'deepseek-r1': 'openrouter/deepseek/deepseek-r1',
+    'deepseek-chat': 'openrouter/deepseek/deepseek-chat',
+    # Meta (via OpenRouter)
+    'maverick': 'openrouter/meta-llama/llama-4-maverick',
+    'scout': 'openrouter/meta-llama/llama-4-scout',
+}
+
+# Tier-based model routing pools (cheapest → most capable)
+MODEL_TIERS = {
+    1: [MODELS['gemini3flash'], MODELS['gpt4.1nano'], MODELS['gpt4.1mini'], MODELS['grok3mini']],
+    2: [MODELS['sonnet'], MODELS['gpt5.3'], MODELS['grok4'], MODELS['gemini3pro'], MODELS['gpt4.1'], MODELS['gpt5.1']],
+    3: [MODELS['opus'], MODELS['o3'], MODELS['sonnet'], MODELS['gpt5.1'], MODELS['grok4']],
+}
+
+# Fallback models per provider (cheapest reliable model)
+FALLBACK_MODELS = {
+    'anthropic': 'claude-sonnet-4-20250514',
+    'xai': 'grok-4',
+    'google': 'gemini-3-flash-preview',
+}
+
+# API validation test models (lightweight, for key testing)
+TEST_MODELS = {
+    'anthropic': 'claude-haiku-4-5-20250414',
+    'openai': 'gpt-4.1-nano',
+    'xai': 'grok-3-mini',
+    'google': 'gemini-2.0-flash',
+}
+
+# User-facing model aliases (for /model command)
+MODEL_ALIASES = {
+    'claude': MODELS['sonnet'], 'sonnet': MODELS['sonnet'],
+    'opus': MODELS['opus'], 'haiku': MODELS['haiku'],
+    'gpt': MODELS['gpt5.3'], 'gpt5': MODELS['gpt5.3'],
+    'gpt5.1': MODELS['gpt5.1'], 'gpt4.1': MODELS['gpt4.1'],
+    '4.1mini': MODELS['gpt4.1mini'], '4.1nano': MODELS['gpt4.1nano'],
+    'o3': MODELS['o3'], 'o4mini': MODELS['o4mini'],
+    'grok': MODELS['grok4'], 'grok4': MODELS['grok4'],
+    'grok3': MODELS['grok3'], 'grok3mini': MODELS['grok3mini'],
+    'gemini': MODELS['gemini3pro'], 'flash': MODELS['gemini3flash'],
+    'deepseek': MODELS['deepseek-r1'], 'maverick': MODELS['maverick'], 'scout': MODELS['scout'],
+}
+
+# Model for /commands processing (cheap + capable)
+COMMAND_MODEL = MODELS['opus']
 
 # Model routing thresholds
 SIMPLE_QUERY_MAX_CHARS = 200  # short queries → cheap model

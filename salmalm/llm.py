@@ -9,7 +9,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .constants import DEFAULT_MAX_TOKENS
+from .constants import DEFAULT_MAX_TOKENS, FALLBACK_MODELS
 from .crypto import vault, log
 from .core import response_cache, router, track_usage
 
@@ -107,9 +107,9 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
             fb_key = vault.get(f'{fb_provider}_api_key')
             if not fb_key:
                 continue
-            fb_models = {'anthropic': 'claude-sonnet-4-20250514', 'xai': 'grok-4',
-                         'google': 'gemini-3-flash-preview'}
-            fb_model_id = fb_models[fb_provider]
+            fb_model_id = FALLBACK_MODELS.get(fb_provider)
+            if not fb_model_id:
+                continue
             log.info(f"🔄 Fallback: {provider} → {fb_provider}/{fb_model_id}")
             try:
                 if not tools:

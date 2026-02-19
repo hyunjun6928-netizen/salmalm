@@ -64,12 +64,12 @@ class ResponseCache:
         self._max_size = max_size
         self._ttl = ttl
 
-    def _key(self, model: str, messages: list) -> str:
-        content = json.dumps({'m': model, 'msgs': messages[-3:]}, sort_keys=True)
+    def _key(self, model: str, messages: list, session_id: str = '') -> str:
+        content = json.dumps({'s': session_id, 'm': model, 'msgs': messages[-3:]}, sort_keys=True)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
-    def get(self, model: str, messages: list) -> Optional[str]:
-        k = self._key(model, messages)
+    def get(self, model: str, messages: list, session_id: str = '') -> Optional[str]:
+        k = self._key(model, messages, session_id)
         if k in self._cache:
             entry = self._cache[k]
             if time.time() - entry['ts'] < self._ttl:
@@ -79,8 +79,8 @@ class ResponseCache:
             del self._cache[k]
         return None
 
-    def put(self, model: str, messages: list, response: str):
-        k = self._key(model, messages)
+    def put(self, model: str, messages: list, response: str, session_id: str = ''):
+        k = self._key(model, messages, session_id)
         self._cache[k] = {'response': response, 'ts': time.time()}
         if len(self._cache) > self._max_size:
             self._cache.popitem(last=False)
@@ -146,17 +146,8 @@ def get_usage_report() -> dict:
 class ModelRouter:
     """Routes queries to appropriate models based on complexity."""
 
-    # Tier 1: cheap & fast, Tier 2: balanced, Tier 3: powerful
-    TIERS = {
-        1: ['google/gemini-3-flash-preview', 'openai/gpt-4.1-nano',
-            'openai/gpt-4.1-mini', 'xai/grok-3-mini'],
-        2: ['anthropic/claude-sonnet-4-20250514', 'openai/gpt-5.3-codex',
-            'xai/grok-4', 'google/gemini-3-pro-preview', 'openai/gpt-4.1',
-            'ollama/llama3.3', 'ollama/qwen3'],
-        3: ['anthropic/claude-opus-4-6', 'openai/o3',
-            'anthropic/claude-sonnet-4-20250514', 'openai/gpt-5.1-codex',
-            'ollama/llama3.3'],
-    }
+    # Tier pools sourced from constants.py MODEL_TIERS (single source of truth)
+    TIERS = MODEL_TIERS
 
     _MODEL_PREF_FILE = BASE_DIR / '.model_pref'
 

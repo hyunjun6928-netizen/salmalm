@@ -8,7 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .constants import (VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG,
-                        INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN)
+                        INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN,
+                        MODEL_ALIASES as _CONST_ALIASES, COMMAND_MODEL)
 from .crypto import log
 from .core import router, compact_messages, get_session, _sessions
 from .prompt import build_system_prompt
@@ -21,24 +22,8 @@ async def _call_llm_async(*args, **kwargs):
     return await asyncio.to_thread(_call_llm_sync, *args, **kwargs)
 
 # ============================================================
-MODEL_ALIASES = {
-    'auto': None,
-    'claude': 'anthropic/claude-sonnet-4-20250514',
-    'sonnet': 'anthropic/claude-sonnet-4-20250514',
-    'opus': 'anthropic/claude-opus-4-6',
-    'haiku': 'anthropic/claude-haiku-3.5-20241022',
-    'gpt': 'openai/gpt-5.3-codex', 'gpt5': 'openai/gpt-5.3-codex',
-    'gpt5.1': 'openai/gpt-5.1-codex', 'gpt4.1': 'openai/gpt-4.1',
-    '4.1mini': 'openai/gpt-4.1-mini', '4.1nano': 'openai/gpt-4.1-nano',
-    'o3': 'openai/o3', 'o3mini': 'openai/o3-mini', 'o4mini': 'openai/o4-mini',
-    'grok': 'xai/grok-4', 'grok4': 'xai/grok-4',
-    'grok3': 'xai/grok-3', 'grok3mini': 'xai/grok-3-mini',
-    'gemini': 'google/gemini-3-pro-preview', 'flash': 'google/gemini-3-flash-preview',
-    'deepseek': 'deepseek/deepseek-r1', 'r1': 'deepseek/deepseek-r1',
-    'dschat': 'deepseek/deepseek-chat',
-    'llama': 'meta-llama/llama-4-maverick', 'maverick': 'meta-llama/llama-4-maverick',
-    'scout': 'meta-llama/llama-4-scout',
-}
+# Model aliases — sourced from constants.py (single source of truth)
+MODEL_ALIASES = {'auto': None, **_CONST_ALIASES}
 
 
 class TaskClassifier:
@@ -443,7 +428,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
                           'thinking_budget': 16000, 'max_tools': 30, 'score': 5}
         return await _engine.run(session, think_msg,
-                                  model_override='anthropic/claude-opus-4-6',
+                                  model_override=COMMAND_MODEL,
                                   on_tool=on_tool, classification=classification)
     if cmd.startswith('/plan '):
         plan_msg = cmd[6:].strip()
