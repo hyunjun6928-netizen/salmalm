@@ -1,9 +1,7 @@
-version: "3.8"
-
 services:
   salmalm:
     build: .
-    # Or use: image: python:3.12-slim + command below
+    container_name: salmalm
     ports:
       - "127.0.0.1:18800:18800"
       - "127.0.0.1:18801:18801"
@@ -12,10 +10,18 @@ services:
       - ./data/workspace:/app/workspace
       - ./data/uploads:/app/uploads
       - ./data/plugins:/app/plugins
+      - ./data/data:/app/data
     environment:
-      - SALMALM_BIND=0.0.0.0    # Required inside container
-      # - SALMALM_VAULT_PW=changeme  # Optional: vault encryption
-      # Add your API keys:
-      # - ANTHROPIC_API_KEY=sk-...
-      # - OPENAI_API_KEY=sk-...
+      - SALMALM_BIND=0.0.0.0
+      # API Keys (set in .env or export before running)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - SALMALM_MODEL=${SALMALM_MODEL:-}
+      # - SALMALM_VAULT_PW=changeme
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18800/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

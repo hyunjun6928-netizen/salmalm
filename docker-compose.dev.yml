@@ -1,0 +1,25 @@
+# Development override — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  salmalm:
+    build:
+      context: .
+      target: runtime
+    volumes:
+      # Mount source for hot-reload
+      - ./salmalm:/app/salmalm:ro
+      - ./data/memory:/app/memory
+      - ./data/workspace:/app/workspace
+      - ./data/uploads:/app/uploads
+      - ./data/plugins:/app/plugins
+      - ./data/data:/app/data
+    environment:
+      - SALMALM_BIND=0.0.0.0
+      - SALMALM_DEBUG=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    ports:
+      - "127.0.0.1:18800:18800"
+      - "127.0.0.1:18801:18801"
+    command: ["python", "-m", "salmalm", "start", "--debug"]

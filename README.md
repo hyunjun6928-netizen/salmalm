@@ -156,6 +156,61 @@ Discord  ──►                ├── RAG Engine
 
 ---
 
+## 🐳 Docker
+
+### Quick Start / 빠른 시작
+
+```bash
+# Clone and run
+git clone https://github.com/hyunjun6928-netizen/salmalm.git
+cd salmalm
+
+# Set API keys
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Start
+docker compose up -d
+
+# Check health
+docker compose ps
+curl http://localhost:18800/api/health
+```
+
+### Development / 개발 모드
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+소스 코드가 마운트되어 수정 시 바로 반영됩니다. `SALMALM_DEBUG=1` 활성화.
+
+### Data Persistence / 데이터 영속화
+
+All data is stored in `./data/` on the host:
+모든 데이터는 호스트의 `./data/`에 저장됩니다:
+
+```
+data/
+  memory/      # Session memory / 세션 메모리
+  workspace/   # Workspace files / 작업 파일
+  uploads/     # Uploaded files / 업로드 파일
+  plugins/     # Custom plugins / 커스텀 플러그인
+```
+
+### Environment Variables / 환경 변수
+
+| Variable | Description |
+|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `OPENAI_API_KEY` | OpenAI API key (optional) |
+| `SALMALM_MODEL` | Default model override |
+| `SALMALM_DEBUG` | Enable debug mode (`1`) |
+
+You can also create a `.env` file in the project root.
+프로젝트 루트에 `.env` 파일을 만들어도 됩니다.
+
+---
+
 ## 📋 Commands / 명령어
 
 | Command | Description / 설명 |
