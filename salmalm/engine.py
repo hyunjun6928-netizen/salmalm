@@ -393,7 +393,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
                 # Mid-loop compaction: 메시지 40개 넘으면 즉시 압축
                 if len(session.messages) > 40:
-                    session.messages = compact_messages(session.messages)
+                    session.messages = compact_messages(session.messages, session=session)
                     log.info(f"[CUT] Mid-loop compaction: -> {len(session.messages)} msgs")
 
                 iteration += 1
@@ -498,7 +498,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         if not think_msg:
             return 'Usage: /think <question>'
         session.add_user(think_msg)
-        session.messages = compact_messages(session.messages)
+        session.messages = compact_messages(session.messages, session=session)
         classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
                           'thinking_budget': 16000, 'score': 5}
         return await _engine.run(session, think_msg,
@@ -509,7 +509,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         if not plan_msg:
             return 'Usage: /plan <task description>'
         session.add_user(plan_msg)
-        session.messages = compact_messages(session.messages)
+        session.messages = compact_messages(session.messages, session=session)
         classification = {'intent': 'code', 'tier': 3, 'thinking': True,
                           'thinking_budget': 10000, 'score': 5}
         return await _engine.run(session, plan_msg, model_override=model_override,
@@ -544,7 +544,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         session.add_user(user_message)
 
     # Context management
-    session.messages = compact_messages(session.messages)
+    session.messages = compact_messages(session.messages, session=session)
     if len(session.messages) % 20 == 0:
         session.add_system(build_system_prompt(full=False))
 

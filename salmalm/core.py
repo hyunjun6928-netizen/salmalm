@@ -273,11 +273,21 @@ def _msg_content_str(msg: dict) -> str:
     return str(c)
 
 
-def compact_messages(messages: list, model: Optional[str] = None) -> list:
+def compact_messages(messages: list, model: Optional[str] = None,
+                     session: Optional['Session'] = None) -> list:
     """Multi-stage compaction: trim tool results → drop old tools → summarize.
-    Hard limit: max 100 messages, max 500K chars (≈125K tokens)."""
+    Hard limit: max 100 messages, max 500K chars (≈125K tokens).
+    OpenClaw-style: flush memory before compaction."""
     MAX_MESSAGES = 100
     MAX_CHARS = 500_000
+
+    # OpenClaw-style: pre-compaction memory flush
+    total_chars_check = sum(len(_msg_content_str(m)) for m in messages)
+    if session and total_chars_check > COMPACTION_THRESHOLD * 0.8:
+        try:
+            memory_manager.flush_before_compaction(session)
+        except Exception as e:
+            log.warning(f"[MEM] Memory flush error: {e}")
 
     # Hard message count limit
     if len(messages) > MAX_MESSAGES:
@@ -491,6 +501,112 @@ class TFIDFSearch:
 
 _tfidf = TFIDFSearch()
 
+
+# ============================================================
+# MEMORY MANAGER — OpenClaw-style MEMORY.md + daily logs
+# ============================================================
+
+class MemoryManager:
+    """OpenClaw-style memory management.
+
+    Two-layer memory:
+    - MEMORY.md: curated long-term memory (loaded in main session only)
+    - memory/YYYY-MM-DD.md: daily append-only logs
+
+    Features:
+    - Keyword search across all memory files
+    - Pre-compaction memory flush (save durable notes before context compaction)
+    - Daily log auto-creation
+    - Memory file listing and reading
+    """
+
+    def __init__(self):
+        self._search = _tfidf
+
+    def read(self, filename: str) -> str:
+        """Read a memory file. Supports MEMORY.md and memory/YYYY-MM-DD.md."""
+        if filename == 'MEMORY.md':
+            if MEMORY_FILE.exists():
+                return MEMORY_FILE.read_text(encoding='utf-8', errors='replace')
+            return '(MEMORY.md does not exist yet)'
+        # Daily log
+        fpath = MEMORY_DIR / filename
+        if fpath.exists() and str(fpath.resolve()).startswith(str(MEMORY_DIR.resolve())):
+            return fpath.read_text(encoding='utf-8', errors='replace')
+        return f'(File not found: {filename})'
+
+    def write(self, filename: str, content: str, append: bool = False) -> str:
+        """Write to a memory file."""
+        MEMORY_DIR.mkdir(exist_ok=True)
+        if filename == 'MEMORY.md':
+            fpath = MEMORY_FILE
+        else:
+            fpath = MEMORY_DIR / filename
+            if not str(fpath.resolve()).startswith(str(MEMORY_DIR.resolve())):
+                return '❌ Invalid memory path'
+        if append and fpath.exists():
+            existing = fpath.read_text(encoding='utf-8', errors='replace')
+            content = existing + '\n' + content
+        fpath.write_text(content, encoding='utf-8')
+        # Invalidate search index
+        self._search._built = False
+        return f'✅ Written to {filename} ({len(content)} chars)'
+
+    def search(self, query: str, max_results: int = 5) -> list:
+        """Search across all memory files using TF-IDF."""
+        return self._search.search(query, max_results=max_results)
+
+    def list_files(self) -> list:
+        """List all memory files."""
+        files = []
+        if MEMORY_FILE.exists():
+            stat = MEMORY_FILE.stat()
+            files.append({'name': 'MEMORY.md', 'size': stat.st_size,
+                          'modified': datetime.fromtimestamp(stat.st_mtime, KST).isoformat()})
+        MEMORY_DIR.mkdir(exist_ok=True)
+        for f in sorted(MEMORY_DIR.glob('*.md'), reverse=True):
+            stat = f.stat()
+            files.append({'name': f.name, 'size': stat.st_size,
+                          'modified': datetime.fromtimestamp(stat.st_mtime, KST).isoformat()})
+        return files
+
+    def flush_before_compaction(self, session: 'Session') -> str:
+        """OpenClaw-style pre-compaction memory flush.
+
+        Called when session is close to compaction threshold.
+        Saves important context from the session to daily log.
+        """
+        if session._memory_flushed:
+            return ''
+        session._memory_flushed = True
+
+        # Extract key decisions/facts from recent messages
+        recent_user = [m['content'] for m in session.messages[-10:]
+                       if m.get('role') == 'user' and isinstance(m.get('content'), str)]
+        recent_assistant = [m['content'] for m in session.messages[-10:]
+                           if m.get('role') == 'assistant' and isinstance(m.get('content'), str)]
+
+        if not recent_user:
+            return ''
+
+        # Auto-save a summary to daily log
+        today = datetime.now(KST).strftime('%Y-%m-%d')
+        ts = datetime.now(KST).strftime('%H:%M')
+        summary_parts = []
+        for msg in recent_user[-3:]:
+            summary_parts.append(f"  Q: {msg[:100]}")
+        for msg in recent_assistant[-2:]:
+            summary_parts.append(f"  A: {msg[:150]}")
+
+        entry = f"- [{ts}] [session:{session.id}] Pre-compaction flush\n" + '\n'.join(summary_parts)
+        write_daily_log(entry)
+        log.info(f"[MEM] Pre-compaction memory flush for session {session.id}")
+        return entry
+
+
+memory_manager = MemoryManager()
+
+
 # ============================================================
 # LLM CRON MANAGER — Scheduled tasks with LLM execution
 # ============================================================
@@ -649,11 +765,22 @@ class LLMCronManager:
 # ============================================================
 # PLUGIN LOADER — Auto-load tools from plugins/ directory
 class Session:
+    """OpenClaw-style isolated session with its own context.
+
+    Each session has:
+    - Unique ID and isolated message history
+    - No cross-contamination between sessions
+    - Automatic memory flush before compaction
+    - Session metadata tracking
+    """
+
     def __init__(self, session_id: str):
         self.id = session_id
         self.messages: list = []
         self.created = time.time()
         self.last_active = time.time()
+        self.metadata: dict = {}  # Arbitrary session metadata
+        self._memory_flushed = False  # Track if pre-compaction memory flush happened
 
     def add_system(self, content: str):
         # Replace existing system message
