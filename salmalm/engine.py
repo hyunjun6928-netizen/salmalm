@@ -52,7 +52,7 @@ class TaskClassifier:
         'memory': {'keywords': ['remember', '기억', 'memo', '메모', 'record', '기록',
                                  'diary', '일지', 'learn', '학습'],
                    'tier': 1, 'thinking': False, 'max_tools': 20},
-        'chat': {'keywords': [], 'tier': 1, 'thinking': False, 'max_tools': 30},
+        'chat': {'keywords': [], 'tier': 1, 'thinking': False, 'max_tools': 50},
     }
 
     @classmethod
@@ -361,12 +361,12 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             if m['role'] == 'assistant':
                 content = m.get('content', '')
                 if isinstance(content, str) and content:
-                    return content + f"\n\n⚠️ (Tool execution limit reached ({max_tools}))"
+                    return content + f"\n\n⚠️ 도구 호출 한도에 도달했습니다. 더 구체적으로 요청해 주세요."
                 elif isinstance(content, list):
                     texts = [b['text'] for b in content if b.get('type') == 'text']
                     if texts:
-                        return '\n'.join(texts) + f"\n\n⚠️ (Tool execution limit reached ({max_tools}))"
-        return f"⚠️ Tool execution limit exceeded ({max_tools}). Please be more specific."
+                        return '\n'.join(texts) + f"\n\n⚠️ 도구 호출 한도에 도달했습니다. 더 구체적으로 요청해 주세요."
+        return f"⚠️ 도구 호출 한도에 도달했습니다. 더 구체적으로 요청해 주세요."
 
 
 # Singleton
