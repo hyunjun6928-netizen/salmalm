@@ -78,11 +78,19 @@ class TestToolHandlersCoverage5(unittest.TestCase):
 
     def test_http_request_get(self):
         from salmalm.tool_handlers import execute_tool
-        result = execute_tool('http_request', {
-            'url': 'https://httpbin.org/get',
-            'method': 'GET'
-        })
-        self.assertIn('httpbin', result.lower() if isinstance(result, str) else str(result).lower())
+        from unittest.mock import patch, MagicMock
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.read.return_value = b'{"origin": "1.2.3.4"}'
+        mock_resp.getheader.return_value = 'application/json'
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        with patch('urllib.request.urlopen', return_value=mock_resp):
+            result = execute_tool('http_request', {
+                'url': 'https://httpbin.org/get',
+                'method': 'GET'
+            })
+        self.assertIn('origin', str(result).lower())
 
     def test_http_request_invalid_url(self):
         from salmalm.tool_handlers import execute_tool

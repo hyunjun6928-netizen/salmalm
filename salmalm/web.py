@@ -100,6 +100,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     _PUBLIC_PATHS = {
         '/', '/index.html', '/api/status', '/api/health', '/api/unlock',
         '/api/auth/login', '/api/onboarding', '/api/setup', '/docs',
+        '/api/google/callback',
     }
 
     def _require_auth(self, min_role: str = 'user') -> Optional[dict]:
@@ -388,11 +389,84 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': 'Admin access required'}, 403)
             else:
                 self._json({'users': auth_manager.list_users()})
+        elif self.path == '/api/google/auth':
+            if not self._require_auth('user'): return
+            client_id = vault.get('google_client_id') or ''
+            if not client_id:
+                self._json({'error': 'Set google_client_id in vault first (Settings > Vault)'}, 400)
+                return
+            import urllib.parse
+            port = self.server.server_address[1]
+            redirect_uri = f'http://localhost:{port}/api/google/callback'
+            params = urllib.parse.urlencode({
+                'client_id': client_id,
+                'redirect_uri': redirect_uri,
+                'response_type': 'code',
+                'scope': 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/calendar',
+                'access_type': 'offline',
+                'prompt': 'consent',
+            })
+            url = f'https://accounts.google.com/o/oauth2/v2/auth?{params}'
+            self.send_response(302)
+            self.send_header('Location', url)
+            self.end_headers()
+        elif self.path.startswith('/api/google/callback'):
+            import urllib.parse
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            code = params.get('code', [''])[0]
+            error = params.get('error', [''])[0]
+            if error:
+                self._html(f'<html><body><h2>Google OAuth Error</h2><p>{error}</p><p><a href="/">Back</a></p></body></html>')
+                return
+            if not code:
+                self._html('<html><body><h2>No code received</h2><p><a href="/">Back</a></p></body></html>')
+                return
+            client_id = vault.get('google_client_id') or ''
+            client_secret = vault.get('google_client_secret') or ''
+            port = self.server.server_address[1]
+            redirect_uri = f'http://localhost:{port}/api/google/callback'
+            try:
+                data = json.dumps({
+                    'code': code,
+                    'client_id': client_id,
+                    'client_secret': client_secret,
+                    'redirect_uri': redirect_uri,
+                    'grant_type': 'authorization_code',
+                }).encode()
+                req = urllib.request.Request(
+                    'https://oauth2.googleapis.com/token',
+                    data=data,
+                    headers={'Content-Type': 'application/json'},
+                    method='POST')
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    result = json.loads(resp.read())
+                access_token = result.get('access_token', '')
+                refresh_token = result.get('refresh_token', '')
+                if refresh_token:
+                    vault.set('google_refresh_token', refresh_token)
+                if access_token:
+                    vault.set('google_access_token', access_token)
+                scopes = result.get('scope', '')
+                self._html(f'''<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
+                    <h2 style="color:#22c55e">\\u2705 Google Connected!</h2>
+                    <p>Refresh token saved to vault.</p>
+                    <p style="font-size:0.85em;color:#666">Scopes: {scopes}</p>
+                    <p><a href="/" style="color:#6366f1">\\u2190 Back to SalmAlm</a></p>
+                    </body></html>''')
+                log.info(f"[OK] Google OAuth2 connected (scopes: {scopes})")
+            except Exception as e:
+                log.error(f"Google OAuth2 token exchange failed: {e}")
+                self._html(f'''<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
+                    <h2 style="color:#ef4444">\\u274c Token Exchange Failed</h2>
+                    <p>{str(e)[:200]}</p>
+                    <p><a href="/" style="color:#6366f1">\\u2190 Back</a></p>
+                    </body></html>''')
         elif self.path == '/manifest.json':
             manifest = {
                 "name": "SalmAlm — Personal AI Gateway",
                 "short_name": "SalmAlm",
-                "description": "Your personal AI gateway. 31 tools, 6 providers, zero dependencies.",
+                "description": "Your personal AI gateway. 43 tools, 6 providers, zero dependencies.",
                 "start_url": "/",
                 "display": "standalone",
                 "background_color": "#0f172a",

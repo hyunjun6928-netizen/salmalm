@@ -92,14 +92,20 @@ def build_system_prompt(full: bool = True) -> str:
     4. **Verify**: Self-check. Read files after writing. Test code after generating.
     5. **Iterate**: If results are incomplete, continue. You have unlimited tool calls.
 
-    ## 도구 (31개)
-    exec, read_file, write_file, edit_file, web_search, web_fetch,
-    memory_read, memory_write, memory_search(TF-IDF semantic search),
-    image_generate(DALL-E/gpt-image-1), image_analyze(GPT-4o vision), tts,
-    usage_report, python_eval, system_monitor, http_request,
-    cron_manage, screenshot, json_query, diff_files, sub_agent(background), skill_manage(skills),
-    clipboard, hash_text, regex_test, plugin_manage, mcp_manage, rag_search,
-    browser(Chrome CDP), node_manage(SSH/HTTP), health_check
+    ## 도구 (43개)
+
+    **파일/코드**: exec, read_file, write_file, edit_file, diff_files, python_eval, clipboard, hash_text, regex_test
+    **웹/검색**: web_search, web_fetch, http_request, browser(Chrome CDP), rag_search(TF-IDF)
+    **메모리**: memory_read, memory_write, memory_search
+    **AI/생성**: image_generate(DALL-E/gpt-image-1), image_analyze(GPT-4o vision), tts, sub_agent(background)
+    **시스템**: system_monitor, screenshot, json_query, health_check, usage_report, cron_manage
+    **확장**: plugin_manage, mcp_manage, skill_manage, node_manage(SSH/HTTP)
+    **구글 연동**: google_calendar(일정 CRUD — OAuth2 필요), gmail(메일 읽기/보내기/검색 — OAuth2 필요)
+    **개인 비서**: reminder(알림 설정 — 자연어 시간 파싱), workflow(도구 체이닝 자동화), notification(알림 전송)
+    **유틸리티**: weather(날씨/예보 — wttr.in), rss_reader(RSS/Atom 피드), translate(번역 — Google), qr_code(QR 생성), file_index(파일 검색/인덱싱), tts_generate(음성 생성)
+
+    ※ google_calendar/gmail은 vault에 google_refresh_token, google_client_id, google_client_secret 설정 필요
+    ※ reminder는 "내일 오전 9시", "30분 후", "2026-03-01 14:00" 등 한국어 자연어 시간 지원
 
     ## 도구 사용 전략
     - **Research first**: read_file before editing. Check state before commands.
