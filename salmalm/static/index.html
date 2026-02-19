@@ -333,6 +333,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div class="input-box">
     <textarea id="input" rows="1" placeholder="Type a message..." data-i18n="input-ph"></textarea>
     <button id="thinking-btn" data-action="toggleThinking" title="Extended Thinking" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🧠</button>
+    <button id="attach-btn" title="Attach file" onclick="document.getElementById('file-input-hidden').click()" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">📎</button>
+    <input type="file" id="file-input-hidden" accept="image/png,image/jpeg,image/gif,image/webp,.txt,.md,.py,.js,.json,.csv,.html,.css,.pdf" style="display:none" onchange="if(this.files[0])window.setFile(this.files[0]);this.value=''">
     <button id="mic-btn" data-action="toggleMic" title="Voice input" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🎤</button>
     <button id="send-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
@@ -385,15 +387,31 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         return;
       }
       var html='';
+      var childMap={};
       d.sessions.forEach(function(s){
+        if(s.parent_session_id){
+          if(!childMap[s.parent_session_id])childMap[s.parent_session_id]=[];
+          childMap[s.parent_session_id].push(s);
+        }
+      });
+      var rendered={};
+      function renderSession(s,indent){
+        if(rendered[s.id])return '';
+        rendered[s.id]=true;
         var active=s.id===_currentSession?' style="background:var(--accent-dim);border-radius:8px"':'';
         var title=s.title||s.id;
         if(title.length>40)title=title.slice(0,40)+'...';
-        html+='<div class="nav-item session-item"'+active+' data-action="switchSession" data-sid="'+s.id+'">'
-          +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</span>'
+        var pad=indent?'padding-left:'+(10+indent*16)+'px;':'';
+        var icon=s.parent_session_id?'↳ ':'';
+        var h='<div class="nav-item session-item"'+active+' data-action="switchSession" data-sid="'+s.id+'" style="'+pad+'">'
+          +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+icon+title+'</span>'
           +'<span class="session-del" data-action="deleteSession" data-sid="'+s.id+'" title="Delete" style="opacity:0.4;cursor:pointer;padding:2px 4px;font-size:11px">✕</span>'
           +'</div>';
-      });
+        if(childMap[s.id]){childMap[s.id].forEach(function(c){h+=renderSession(c,(indent||0)+1);});}
+        return h;
+      }
+      d.sessions.forEach(function(s){if(!s.parent_session_id)html+=renderSession(s,0);});
+      d.sessions.forEach(function(s){if(!rendered[s.id])html+=renderSession(s,1);});
       el.innerHTML=html;
     }).catch(function(){});
   }
@@ -561,7 +579,22 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     av.textContent=role==='user'?'👤':'😈';
     const wrap=document.createElement('div');
     const bubble=document.createElement('div');bubble.className='bubble';
-    bubble.innerHTML=renderMd(text);
+    /* Parse inline buttons marker: <!--buttons:["a","b","c"]--> */
+    var _btnLabels=[];
+    var _cleanText=text.replace(/<!--buttons:(\[.*?\])-->/g,function(_,j){try{_btnLabels=JSON.parse(j)}catch(e){}return ''});
+    bubble.innerHTML=renderMd(_cleanText);
+    if(role==='assistant'&&_btnLabels.length>0){
+      var _btnRow=document.createElement('div');_btnRow.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-top:8px';
+      _btnLabels.forEach(function(label){
+        var _b=document.createElement('button');_b.textContent=label;
+        _b.style.cssText='padding:6px 14px;border-radius:16px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-size:13px;transition:all 0.15s';
+        _b.onmouseenter=function(){_b.style.background='var(--accent)';_b.style.color='#fff'};
+        _b.onmouseleave=function(){_b.style.background='transparent';_b.style.color='var(--accent)'};
+        _b.onclick=function(){input.value=label;doSend()};
+        _btnRow.appendChild(_b);
+      });
+      bubble.appendChild(_btnRow);
+    }
     wrap.appendChild(bubble);
     var meta_parts=[];
     if(model)meta_parts.push(model);
@@ -581,6 +614,23 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       };
       mt.appendChild(regenBtn);
     }
+    var branchBtn=document.createElement('span');
+    branchBtn.textContent=' 🌿';branchBtn.style.cssText='cursor:pointer;opacity:0;transition:opacity 0.15s;font-size:12px';
+    branchBtn.title='Branch from here';
+    branchBtn.onclick=function(){
+      var allMsgs=chat.querySelectorAll('.msg-row');
+      var idx=-1;for(var bi=0;bi<allMsgs.length;bi++){if(allMsgs[bi]===row){idx=bi;break;}}
+      if(idx<0)return;
+      fetch('/api/sessions/branch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+        body:JSON.stringify({session_id:_currentSession,message_index:idx})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.ok){switchSession(d.new_session_id);loadSessionList();}
+        else{alert(d.error||'Branch failed');}
+      });
+    };
+    mt.appendChild(branchBtn);
+    row.onmouseenter=function(){branchBtn.style.opacity='0.7'};
+    row.onmouseleave=function(){branchBtn.style.opacity='0'};
     wrap.appendChild(mt);
     row.appendChild(av);row.appendChild(wrap);
     chat.appendChild(row);chat.scrollTop=999999;
@@ -606,6 +656,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* --- File handling --- */
   window.setFile=function(file){
+    if(file.type.startsWith('image/')&&file.size>5*1024*1024){alert('Image too large (max 5MB)');return}
     pendingFile=file;
     const isImg=file.type.startsWith('image/');
     fileIconEl.textContent=isImg?'🖼️':'📎';
@@ -627,10 +678,16 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   });
 
   /* --- Drag & drop --- */
-  inputArea.addEventListener('dragenter',function(e){e.preventDefault();e.stopPropagation();inputArea.style.outline='2px solid var(--accent)'});
-  inputArea.addEventListener('dragover',function(e){e.preventDefault();e.stopPropagation()});
-  inputArea.addEventListener('dragleave',function(e){e.preventDefault();inputArea.style.outline=''});
-  inputArea.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();inputArea.style.outline='';
+  /* Fullscreen dropzone overlay */
+  var _dragCtr=0;
+  var _dropOv=document.createElement('div');
+  _dropOv.style.cssText='display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(99,102,241,0.15);z-index:9999;pointer-events:none;align-items:center;justify-content:center';
+  _dropOv.innerHTML='<div style="padding:32px 48px;background:var(--bg2);border:3px dashed var(--accent);border-radius:16px;color:var(--accent);font-size:20px;font-weight:600;pointer-events:none">📎 Drop image or file here</div>';
+  document.body.appendChild(_dropOv);
+  document.addEventListener('dragenter',function(e){e.preventDefault();_dragCtr++;if(_dragCtr===1)_dropOv.style.display='flex'});
+  document.addEventListener('dragleave',function(e){e.preventDefault();_dragCtr--;if(_dragCtr<=0){_dragCtr=0;_dropOv.style.display='none'}});
+  document.addEventListener('dragover',function(e){e.preventDefault()});
+  document.addEventListener('drop',function(e){e.preventDefault();_dragCtr=0;_dropOv.style.display='none';
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)window.setFile(f)});
 
   /* --- WebSocket Connection Manager --- */
@@ -706,7 +763,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     return new Promise(function(resolve){
       if(!_wsReady||!_ws||_ws.readyState!==WebSocket.OPEN){resolve({fallback:true});return}
       _wsPendingResolve=resolve;
-      _ws.send(JSON.stringify({type:'message',text:msg,session:session}));
+      var _wsPayload={type:'message',text:msg,session:session};
+      if(window._pendingWsImage){_wsPayload.image=window._pendingWsImage.data;_wsPayload.image_mime=window._pendingWsImage.mime;window._pendingWsImage=null}
+      _ws.send(JSON.stringify(_wsPayload));
     });
   }
 
@@ -806,7 +865,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       try{
         var ur=await fetch('/api/upload',{method:'POST',body:fd});
         var ud=await ur.json();
-        if(ud.ok){fileMsg=ud.info;if(ud.image_base64){imgData=ud.image_base64;imgMime=ud.image_mime}}
+        if(ud.ok){fileMsg=ud.info;if(ud.image_base64){imgData=ud.image_base64;imgMime=ud.image_mime;window._pendingWsImage={data:imgData,mime:imgMime}}}
         else addMsg('assistant','❌ Upload failed: '+(ud.error||''));
       }catch(ue){addMsg('assistant','❌ Upload error: '+ue.message)}
       window.clearFile();

@@ -92,7 +92,9 @@ async def main():
         if msg_type == 'message':
             text = data.get('text', '').strip()
             session_id = client.session_id or 'web'
-            if not text:
+            image_b64 = data.get('image')
+            image_mime = data.get('image_mime', 'image/png')
+            if not text and not image_b64:
                 await client.send_json({'type': 'error', 'error': 'Empty message'})
                 return
             stream = StreamingResponse(client)
@@ -100,7 +102,8 @@ async def main():
                 await stream.send_tool_call(name, args)
             try:
                 from salmalm.engine import process_message
-                response = await process_message(session_id, text, on_tool=on_tool)
+                image_data = (image_b64, image_mime) if image_b64 else None
+                response = await process_message(session_id, text or '', image_data=image_data, on_tool=on_tool)
                 await stream.send_done(response)
             except Exception as e:
                 await stream.send_error(str(e)[:200])

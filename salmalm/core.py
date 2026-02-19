@@ -39,6 +39,21 @@ def _get_db() -> sqlite3.Connection:
             messages TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )''')
+        try:
+            conn.execute('ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL')
+        except Exception:
+            pass
+        try:
+            conn.execute('ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL')
+        except Exception:
+            pass
+        conn.execute('''CREATE TABLE IF NOT EXISTS session_message_backup (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            messages_json TEXT NOT NULL,
+            removed_at TEXT NOT NULL,
+            reason TEXT DEFAULT 'rollback'
+        )''')
         conn.commit()
         _thread_local.audit_conn = conn
     return conn
@@ -60,6 +75,21 @@ def _init_audit_db():
         session_id TEXT PRIMARY KEY,
         messages TEXT NOT NULL,
         updated_at TEXT NOT NULL
+    )''')
+    try:
+        conn.execute('ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL')
+    except Exception:
+        pass
+    try:
+        conn.execute('ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL')
+    except Exception:
+        pass
+    conn.execute('''CREATE TABLE IF NOT EXISTS session_message_backup (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        messages_json TEXT NOT NULL,
+        removed_at TEXT NOT NULL,
+        reason TEXT DEFAULT 'rollback'
     )''')
     conn.commit()
 
@@ -565,10 +595,11 @@ class LLMCronManager:
             log.error(f"Failed to save cron jobs: {e}")
 
     def add_job(self, name: str, schedule: dict, prompt: str,
-                model: Optional[str] = None, notify: bool = True) -> dict:
+                model: Optional[str] = None, notify=True) -> dict:
         """Add a new LLM cron job.
         schedule: {'kind': 'cron', 'expr': '0 6 * * *', 'tz': 'Asia/Seoul'}
                   {'kind': 'every', 'seconds': 3600}
+        notify: True/False or dict e.g. {"channel":"telegram","chat_id":"123"}
                   {'kind': 'at', 'time': '2026-02-18T06:00:00+09:00'}
         """
         import uuid as _uuid
@@ -687,23 +718,52 @@ class LLMCronManager:
                 self.save_jobs()
                 log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
 
-                # Notify via Telegram
-                if job.get('notify') and _tg_bot and _tg_bot.token and _tg_bot.owner_id:
-                    summary = response[:800] + ('...' if len(response) > 800 else '')
-                    _tg_bot.send_message(
-                        _tg_bot.owner_id,
-                        f"⏰ SalmAlm scheduled task completed: {job['name']}\n\n{summary}")
+                # Notification routing
+                notify_cfg = job.get('notify')
+                notified = False
+                summary = response[:800] + ('...' if len(response) > 800 else '')
+                notify_text = f"⏰ SalmAlm scheduled task completed: {job['name']}\n\n{summary}"
 
-                # Notify via web (store for polling)
-                if job.get('notify'):
+                if isinstance(notify_cfg, dict):
+                    ch = notify_cfg.get('channel', '')
+                    try:
+                        if ch == 'telegram':
+                            chat_id = notify_cfg.get('chat_id', '')
+                            if chat_id and _tg_bot and _tg_bot.token:
+                                _tg_bot.send_message(chat_id, notify_text)
+                                notified = True
+                        elif ch == 'discord':
+                            channel_id = notify_cfg.get('channel_id', '')
+                            if channel_id:
+                                try:
+                                    import salmalm.discord_bot as _dmod
+                                    dbot = getattr(_dmod, '_bot', None)
+                                    if dbot and hasattr(dbot, 'send_message'):
+                                        dbot.send_message(channel_id, notify_text)
+                                        notified = True
+                                except Exception:
+                                    pass
+                    except Exception as e:
+                        log.warning(f"[CRON] Notification routing failed for {job['name']}: {e}")
+                elif notify_cfg:
+                    if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
+                        try:
+                            _tg_bot.send_message(_tg_bot.owner_id, notify_text)
+                            notified = True
+                        except Exception as e:
+                            log.warning(f"[CRON] Telegram notify failed: {e}")
+
+                # Fallback to web notification on failure, or always store for UI
+                if notify_cfg:
                     web_session = _sessions.get('web')
                     if web_session:
-                        if not hasattr(web_session, '_notifications'):
-                            web_session._notifications = []
-                        web_session._notifications.append({
-                            'time': time.time(),
-                            'text': f"⏰ Cron [{job['name']}]: {response[:200]}"
-                        })
+                        if not notified or True:  # Always store in web for visibility
+                            if not hasattr(web_session, '_notifications'):
+                                web_session._notifications = []
+                            web_session._notifications.append({
+                                'time': time.time(),
+                                'text': f"⏰ Cron [{job['name']}]: {response[:200]}"
+                            })
 
                 # Log to daily memory
                 write_daily_log(f"[CRON] {job['name']}: {response[:150]}")
@@ -861,6 +921,99 @@ def get_session(session_id: str) -> Session:
             log.info(f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
         return _sessions[session_id]
 
+
+def rollback_session(session_id: str, count: int) -> dict:
+    """Roll back the last `count` user+assistant message pairs.
+
+    Removed messages are backed up in session_message_backup table.
+    Returns {'ok': True, 'removed': <int>} or {'ok': False, 'error': ...}.
+    """
+    session = get_session(session_id)
+    non_system = [(i, m) for i, m in enumerate(session.messages) if m.get('role') != 'system']
+    pairs_removed = 0
+    indices_to_remove = []
+    j = len(non_system) - 1
+    while pairs_removed < count and j >= 0:
+        idx_j, msg_j = non_system[j]
+        if msg_j['role'] == 'assistant':
+            indices_to_remove.append(idx_j)
+            if j - 1 >= 0 and non_system[j - 1][1]['role'] == 'user':
+                indices_to_remove.append(non_system[j - 1][0])
+                j -= 2
+            else:
+                j -= 1
+            pairs_removed += 1
+        elif msg_j['role'] == 'user':
+            indices_to_remove.append(idx_j)
+            j -= 1
+            pairs_removed += 1
+        else:
+            j -= 1
+
+    if not indices_to_remove:
+        return {'ok': False, 'error': 'No messages to rollback'}
+
+    removed_msgs = [session.messages[i] for i in sorted(indices_to_remove)]
+    conn = _get_db()
+    conn.execute(
+        'INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)',
+        (session_id, json.dumps(removed_msgs, ensure_ascii=False),
+         datetime.now(KST).isoformat(), 'rollback'))
+    conn.commit()
+
+    for i in sorted(indices_to_remove, reverse=True):
+        session.messages.pop(i)
+
+    session._persist()
+    try:
+        save_session_to_disk(session_id)
+    except Exception:
+        pass
+    audit_log('session_rollback', f'{session_id}: removed {pairs_removed} pairs')
+    return {'ok': True, 'removed': pairs_removed}
+
+
+def branch_session(session_id: str, message_index: int) -> dict:
+    """Create a new session branching from session_id at message_index.
+
+    Copies messages[0:message_index+1] into a new session.
+    Returns {'ok': True, 'new_session_id': ...} or error.
+    """
+    import uuid as _uuid
+    session = get_session(session_id)
+    if message_index < 0 or message_index >= len(session.messages):
+        return {'ok': False, 'error': f'Invalid message_index: {message_index}'}
+
+    new_id = f"branch-{_uuid.uuid4().hex[:8]}"
+    new_session = Session(new_id)
+    new_session.messages = json.loads(json.dumps(session.messages[:message_index + 1]))
+    new_session.metadata['parent_session_id'] = session_id
+    new_session.metadata['branch_index'] = message_index
+
+    with _session_lock:
+        _sessions[new_id] = new_session
+
+    new_session._persist()
+
+    conn = _get_db()
+    try:
+        conn.execute('ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL')
+    except Exception:
+        pass
+    try:
+        conn.execute('ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL')
+    except Exception:
+        pass
+    conn.execute('UPDATE session_store SET parent_session_id=?, branch_index=? WHERE session_id=?',
+                 (session_id, message_index, new_id))
+    conn.commit()
+
+    try:
+        save_session_to_disk(new_id)
+    except Exception:
+        pass
+    audit_log('session_branch', f'{session_id} -> {new_id} at index {message_index}')
+    return {'ok': True, 'new_session_id': new_id, 'parent_session_id': session_id}
 
 
 _SESSIONS_DIR = Path.home() / '.salmalm' / 'sessions'

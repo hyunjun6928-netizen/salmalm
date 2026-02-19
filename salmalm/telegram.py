@@ -29,20 +29,43 @@ class TelegramBot:
             return _http_post(url, {'Content-Type': 'application/json'}, data)
         return _http_get(url)
 
-    def send_message(self, chat_id, text: str, parse_mode: Optional[str] = None):
-        # Split long messages
-        """Send a text message to a Telegram chat."""
+    def _extract_buttons(self, text: str):
+        """Extract inline button markers. Returns (clean_text, buttons_list)."""
+        buttons = []
+        import re as _re2
+        def _repl(m):
+            try:
+                import json as _j2
+                buttons.extend(_j2.loads(m.group(1)))
+            except Exception:
+                pass
+            return ''
+        clean = _re2.sub(r'<!--buttons:(\[.*?\])-->', _repl, text)
+        return clean.strip(), buttons
+
+    def send_message(self, chat_id, text: str, parse_mode: Optional[str] = None,
+                     reply_markup: Optional[dict] = None):
+        """Send a text message to a Telegram chat, with optional inline keyboard."""
+        text, btn_labels = self._extract_buttons(text)
+        if btn_labels and not reply_markup:
+            reply_markup = {'inline_keyboard': [
+                [{'text': label, 'callback_data': f'btn:{label}'[:64]} for label in btn_labels]
+            ]}
         chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
-        for chunk in chunks:
+        for idx, chunk in enumerate(chunks):
             data = {'chat_id': chat_id, 'text': chunk}
             if parse_mode:
                 data['parse_mode'] = parse_mode
+            if reply_markup and idx == len(chunks) - 1:
+                data['reply_markup'] = reply_markup
             try:
                 self._api('sendMessage', data)
             except Exception as e:
-                # Retry without parse_mode
                 if parse_mode:
-                    self._api('sendMessage', {'chat_id': chat_id, 'text': chunk})
+                    data2 = {'chat_id': chat_id, 'text': chunk}
+                    if reply_markup and idx == len(chunks) - 1:
+                        data2['reply_markup'] = reply_markup
+                    self._api('sendMessage', data2)
 
     def _send_photo(self, chat_id, path: Path, caption: str = ''):
         """Send a photo file to Telegram."""
@@ -108,7 +131,7 @@ class TelegramBot:
                 # Run blocking urllib in thread to not block event loop
                 resp = await asyncio.to_thread(self._api, 'getUpdates', {
                     'offset': self.offset, 'timeout': 30,
-                    'allowed_updates': ['message']
+                    'allowed_updates': ['message', 'callback_query']
                 })
                 for update in resp.get('result', []):
                     self.offset = update['update_id'] + 1
@@ -134,6 +157,27 @@ class TelegramBot:
         return data, filename
 
     async def _handle_update(self, update: dict):
+        # Handle inline button callback queries
+        cb = update.get('callback_query')
+        if cb:
+            cb_data = cb.get('data', '')
+            cb_chat_id = cb.get('message', {}).get('chat', {}).get('id')
+            cb_user_id = str(cb.get('from', {}).get('id', ''))
+            try:
+                self._api('answerCallbackQuery', {'callback_query_id': cb['id']})
+            except Exception:
+                pass
+            if cb_user_id == self.owner_id and cb_chat_id and cb_data.startswith('btn:'):
+                btn_text = cb_data[4:]
+                self.send_typing(cb_chat_id)
+                session_id = f'telegram_{cb_chat_id}'
+                _start = time.time()
+                from .engine import process_message
+                response = await process_message(session_id, btn_text)
+                _elapsed = time.time() - _start
+                self.send_message(cb_chat_id, f"{response}\n\n⏱️ {_elapsed:.1f}s")
+            return
+
         msg = update.get('message')
         if not msg:
             return
@@ -313,4 +357,3 @@ class TelegramBot:
 telegram_bot = TelegramBot()
 _tg_bot = telegram_bot  # Reference for sub-agent notifications
 set_telegram_bot(telegram_bot)  # Register with core accessor
-
