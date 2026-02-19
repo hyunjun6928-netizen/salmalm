@@ -60,7 +60,7 @@ class TestPythonEvalBlocklist(unittest.TestCase):
 
     def _get_blocklist(self):
         tools_py = Path(__file__).parent.parent / 'salmalm' / 'tool_handlers.py'
-        content = tools_py.read_text()
+        content = tools_py.read_text(encoding='utf-8')
         match = re.search(r'_EVAL_BLOCKLIST\s*=\s*\[(.*?)\]', content, re.DOTALL)
         self.assertIsNotNone(match, "_EVAL_BLOCKLIST not found")
         return re.findall(r"'([^']+)'", match.group(1))
