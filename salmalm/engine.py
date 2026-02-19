@@ -725,7 +725,17 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         thinking_budget = classification['thinking_budget'] or (10000 if use_thinking else 0)
         iteration = 0
         consecutive_errors = 0
+        _session_id = getattr(session, 'id', '')
         while iteration < self.MAX_TOOL_ITERATIONS:
+            # Abort check (생성 중지 체크) — LibreChat style
+            from .edge_cases import abort_controller
+            if abort_controller.is_aborted(_session_id):
+                partial = abort_controller.get_partial(_session_id) or ''
+                abort_controller.clear(_session_id)
+                response = (partial + '\n\n⏹ [생성 중단됨 / Generation aborted]').strip()
+                session.add_assistant(response)
+                log.info(f"[ABORT] Generation aborted: session={_session_id}")
+                return response
             model = model_override or router.route(
                 user_message, has_tools=True, iteration=iteration)
 
@@ -811,6 +821,24 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             if usage.get('input', 0) or usage.get('output', 0):
                 audit_log('api_call', f"{model} in={usage.get('input',0)} out={usage.get('output',0)}",
                           detail_dict=api_detail)
+                # Detailed usage tracking (LibreChat style)
+                try:
+                    from .edge_cases import usage_tracker
+                    # Estimate cost (rough: Opus=$15/M, Sonnet=$3/M, Haiku=$0.25/M input)
+                    _inp, _out = usage.get('input', 0), usage.get('output', 0)
+                    _model_lower = model.lower()
+                    if 'opus' in _model_lower:
+                        _cost = (_inp * 15 + _out * 75) / 1_000_000
+                    elif 'sonnet' in _model_lower:
+                        _cost = (_inp * 3 + _out * 15) / 1_000_000
+                    elif 'haiku' in _model_lower:
+                        _cost = (_inp * 0.25 + _out * 1.25) / 1_000_000
+                    else:
+                        _cost = (_inp * 3 + _out * 15) / 1_000_000
+                    usage_tracker.record(_session_id, model, _inp, _out, _cost,
+                                         classification.get('intent', ''))
+                except Exception:
+                    pass
 
             if result.get('thinking'):
                 log.info(f"[AI] Thinking: {len(result['thinking'])} chars")
@@ -1077,6 +1105,62 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
                 f"• Hard-cleared: {stats['hard_cleared']}\n"
                 f"• Unchanged: {stats['unchanged']}\n"
                 f"• Total tool results scanned: {total}")
+    # --- Edge case commands (엣지케이스 명령) ---
+    if cmd == '/usage daily':
+        from .edge_cases import usage_tracker
+        report = usage_tracker.daily_report()
+        if not report:
+            return '📊 No usage data yet. / 아직 사용량 데이터가 없습니다.'
+        lines = ['📊 **Daily Usage Report / 일별 사용량**\n']
+        for r in report[:14]:
+            lines.append(f"• {r['date']} | {r['model'].split('/')[-1]} | "
+                         f"in:{r['input_tokens']} out:{r['output_tokens']} | "
+                         f"${r['cost']:.4f} ({r['calls']} calls)")
+        return '\n'.join(lines)
+    if cmd == '/usage monthly':
+        from .edge_cases import usage_tracker
+        report = usage_tracker.monthly_report()
+        if not report:
+            return '📊 No usage data yet. / 아직 사용량 데이터가 없습니다.'
+        lines = ['📊 **Monthly Usage Report / 월별 사용량**\n']
+        for r in report:
+            lines.append(f"• {r['month']} | {r['model'].split('/')[-1]} | "
+                         f"in:{r['input_tokens']} out:{r['output_tokens']} | "
+                         f"${r['cost']:.4f} ({r['calls']} calls)")
+        return '\n'.join(lines)
+    if cmd == '/bookmarks':
+        from .edge_cases import bookmark_manager
+        bms = bookmark_manager.list_all(limit=20)
+        if not bms:
+            return '⭐ No bookmarks yet. / 아직 북마크가 없습니다.'
+        lines = ['⭐ **Bookmarks / 북마크**\n']
+        for b in bms:
+            lines.append(f"• [{b['session_id']}#{b['message_index']}] "
+                         f"{b['preview'][:60]}{'...' if len(b.get('preview', '')) > 60 else ''}")
+        return '\n'.join(lines)
+    if cmd.startswith('/compare '):
+        compare_msg = cmd[9:].strip()
+        if not compare_msg:
+            return 'Usage: /compare <message> — Compare responses from multiple models'
+        from .edge_cases import compare_models
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    results = pool.submit(lambda: asyncio.run(compare_models(session_id, compare_msg))).result()
+            else:
+                results = loop.run_until_complete(compare_models(session_id, compare_msg))
+        except Exception:
+            results = asyncio.run(compare_models(session_id, compare_msg))
+        lines = ['🔀 **Model Comparison / 모델 비교**\n']
+        for r in results:
+            model_name = r['model'].split('/')[-1]
+            if r.get('error'):
+                lines.append(f"### ❌ {model_name}\n{r['error']}\n")
+            else:
+                lines.append(f"### 🤖 {model_name} ({r['time_ms']}ms)\n{r['response'][:500]}\n")
+        return '\n'.join(lines)
     if cmd == '/soul':
         from .prompt import get_user_soul, USER_SOUL_FILE
         content = get_user_soul()

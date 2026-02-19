@@ -307,6 +307,17 @@ class WebSocketServer:
                         })
                         continue
 
+                    # Abort handling — LibreChat style (생성 중지)
+                    if data.get('type') == 'abort':
+                        try:
+                            from .edge_cases import abort_controller
+                            sid = data.get('session', client.session_id)
+                            abort_controller.set_abort(sid)
+                            await client.send_json({'type': 'aborted', 'session': sid})
+                        except Exception as e:
+                            log.warning(f"WS abort error: {e}")
+                        continue
+
                     if self._on_message:
                         try:
                             await self._on_message(client, data)

@@ -515,6 +515,84 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 'clients': ws_server.client_count,
                 'port': ws_server.port,
             })
+        elif self.path == '/api/health/providers':
+            # Provider health check — Open WebUI style (프로바이더 상태 확인)
+            if not self._require_auth('user'): return
+            from .edge_cases import provider_health
+            force = '?force' in self.path or 'force=1' in self.path
+            self._json(provider_health.check_all(force=force))
+        elif self.path == '/api/models':
+            # Model auto-detection — Open WebUI style (모델 자동 감지)
+            if not self._require_auth('user'): return
+            from .edge_cases import model_detector
+            force = '?force' in self.path
+            models = model_detector.detect_all(force=force)
+            self._json({'models': models, 'count': len(models)})
+        elif self.path == '/api/groups':
+            # Session groups — LobeChat style (대화 주제 그룹)
+            if not self._require_auth('user'): return
+            from .edge_cases import session_groups
+            self._json({'groups': session_groups.list_groups()})
+        elif self.path == '/api/bookmarks':
+            # Message bookmarks — LobeChat style (메시지 북마크)
+            if not self._require_auth('user'): return
+            from .edge_cases import bookmark_manager
+            import urllib.parse
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            sid = params.get('session_id', [None])[0]
+            if sid:
+                self._json({'bookmarks': bookmark_manager.list_session(sid)})
+            else:
+                self._json({'bookmarks': bookmark_manager.list_all()})
+        elif self.path.startswith('/api/sessions/') and '/summary' in self.path:
+            # Conversation summary card — BIG-AGI style (대화 요약 카드)
+            if not self._require_auth('user'): return
+            m = re.match(r'^/api/sessions/([^/]+)/summary', self.path)
+            if m:
+                from .edge_cases import get_summary_card
+                card = get_summary_card(m.group(1))
+                self._json({'summary': card})
+            else:
+                self._json({'error': 'Invalid path'}, 400)
+        elif self.path.startswith('/api/sessions/') and '/alternatives' in self.path:
+            # Conversation fork alternatives — LibreChat style (대화 포크)
+            if not self._require_auth('user'): return
+            m = re.match(r'^/api/sessions/([^/]+)/alternatives/(\d+)', self.path)
+            if m:
+                from .edge_cases import conversation_fork
+                alts = conversation_fork.get_alternatives(m.group(1), int(m.group(2)))
+                self._json({'alternatives': alts})
+            else:
+                self._json({'error': 'Invalid path'}, 400)
+        elif self.path == '/api/usage/daily':
+            # Daily usage report — LibreChat style (일별 사용량)
+            if not self._require_auth('user'): return
+            from .edge_cases import usage_tracker
+            self._json({'report': usage_tracker.daily_report()})
+        elif self.path == '/api/usage/monthly':
+            # Monthly usage report — LibreChat style (월별 사용량)
+            if not self._require_auth('user'): return
+            from .edge_cases import usage_tracker
+            self._json({'report': usage_tracker.monthly_report()})
+        elif self.path == '/api/usage/models':
+            # Model cost breakdown — LibreChat style (모델별 비용)
+            if not self._require_auth('user'): return
+            from .edge_cases import usage_tracker
+            self._json({'breakdown': usage_tracker.model_breakdown()})
+        elif self.path == '/api/paste/detect':
+            # Smart paste detection — BIG-AGI style (스마트 붙여넣기)
+            # GET version reads from query param
+            if not self._require_auth('user'): return
+            import urllib.parse
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            text = params.get('text', [''])[0]
+            if text:
+                from .edge_cases import detect_paste_type
+                self._json(detect_paste_type(text))
+            else:
+                self._json({'error': 'Missing text parameter'}, 400)
         elif self.path == '/api/health':
             from .stability import health_monitor
             base_health = health_monitor.check_health()
@@ -1239,6 +1317,153 @@ self.addEventListener('fetch',e=>{{
             else:
                 self._json({'error': 'Unknown action'}, 400)
 
+        elif self.path == '/api/chat/abort':
+            # Abort generation — LibreChat style (생성 중지)
+            if not self._require_auth('user'): return
+            session_id = body.get('session', body.get('session_id', 'web'))
+            from .edge_cases import abort_controller
+            abort_controller.set_abort(session_id)
+            self._json({'ok': True, 'message': 'Abort signal sent / 중단 신호 전송됨'})
+            return
+
+        elif self.path == '/api/chat/regenerate':
+            # Regenerate response — LibreChat style (응답 재생성)
+            if not self._require_auth('user'): return
+            session_id = body.get('session_id', 'web')
+            message_index = body.get('message_index')
+            if message_index is None:
+                self._json({'error': 'Missing message_index'}, 400)
+                return
+            from .edge_cases import conversation_fork
+            try:
+                loop = asyncio.new_event_loop()
+                response = loop.run_until_complete(
+                    conversation_fork.regenerate(session_id, int(message_index)))
+                loop.close()
+                if response:
+                    self._json({'ok': True, 'response': response})
+                else:
+                    self._json({'ok': False, 'error': 'Could not regenerate'}, 400)
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)[:200]}, 500)
+            return
+
+        elif self.path == '/api/chat/compare':
+            # Compare models — BIG-AGI style (응답 비교)
+            if not self._require_auth('user'): return
+            message = body.get('message', '')
+            models = body.get('models', [])
+            session_id = body.get('session_id', 'web')
+            if not message:
+                self._json({'error': 'Missing message'}, 400)
+                return
+            from .edge_cases import compare_models
+            try:
+                loop = asyncio.new_event_loop()
+                results = loop.run_until_complete(
+                    compare_models(session_id, message, models or None))
+                loop.close()
+                self._json({'ok': True, 'results': results})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)[:200]}, 500)
+            return
+
+        elif self.path == '/api/alternatives/switch':
+            # Switch alternative — LibreChat style (대안 전환)
+            if not self._require_auth('user'): return
+            session_id = body.get('session_id', '')
+            message_index = body.get('message_index')
+            alt_id = body.get('alt_id')
+            if not all([session_id, message_index is not None, alt_id]):
+                self._json({'error': 'Missing parameters'}, 400)
+                return
+            from .edge_cases import conversation_fork
+            content = conversation_fork.switch_alternative(session_id, int(message_index), int(alt_id))
+            if content:
+                # Update session messages
+                from .core import get_session
+                session = get_session(session_id)
+                ua = [(i, m) for i, m in enumerate(session.messages)
+                      if m.get('role') in ('user', 'assistant')]
+                if int(message_index) < len(ua):
+                    real_idx = ua[int(message_index)][0]
+                    session.messages[real_idx] = {'role': 'assistant', 'content': content}
+                    session._persist()
+                self._json({'ok': True, 'content': content})
+            else:
+                self._json({'ok': False, 'error': 'Alternative not found'}, 404)
+            return
+
+        elif self.path == '/api/bookmarks':
+            # Add/remove bookmark — LobeChat style (북마크 추가/제거)
+            if not self._require_auth('user'): return
+            action = body.get('action', 'add')
+            session_id = body.get('session_id', '')
+            message_index = body.get('message_index')
+            if not session_id or message_index is None:
+                self._json({'error': 'Missing session_id or message_index'}, 400)
+                return
+            from .edge_cases import bookmark_manager
+            if action == 'add':
+                ok = bookmark_manager.add(session_id, int(message_index),
+                                          content_preview=body.get('preview', ''),
+                                          note=body.get('note', ''),
+                                          role=body.get('role', 'assistant'))
+                self._json({'ok': ok})
+            elif action == 'remove':
+                ok = bookmark_manager.remove(session_id, int(message_index))
+                self._json({'ok': ok})
+            else:
+                self._json({'error': 'Unknown action'}, 400)
+            return
+
+        elif self.path == '/api/groups':
+            # Session group CRUD — LobeChat style (그룹 관리)
+            if not self._require_auth('user'): return
+            action = body.get('action', 'create')
+            from .edge_cases import session_groups
+            if action == 'create':
+                name = body.get('name', '').strip()
+                if not name:
+                    self._json({'error': 'Missing name'}, 400)
+                    return
+                result = session_groups.create_group(name, body.get('color', '#6366f1'))
+                self._json(result)
+            elif action == 'update':
+                gid = body.get('id')
+                if not gid:
+                    self._json({'error': 'Missing id'}, 400)
+                    return
+                kwargs = {k: v for k, v in body.items() if k in ('name', 'color', 'sort_order', 'collapsed')}
+                ok = session_groups.update_group(int(gid), **kwargs)
+                self._json({'ok': ok})
+            elif action == 'delete':
+                gid = body.get('id')
+                if not gid:
+                    self._json({'error': 'Missing id'}, 400)
+                    return
+                ok = session_groups.delete_group(int(gid))
+                self._json({'ok': ok})
+            elif action == 'move':
+                sid = body.get('session_id', '')
+                gid = body.get('group_id')
+                ok = session_groups.move_session(sid, int(gid) if gid else None)
+                self._json({'ok': ok})
+            else:
+                self._json({'error': 'Unknown action'}, 400)
+            return
+
+        elif self.path == '/api/paste/detect':
+            # Smart paste detection — BIG-AGI style (스마트 붙여넣기 감지)
+            if not self._require_auth('user'): return
+            text = body.get('text', '')
+            if not text:
+                self._json({'error': 'Missing text'}, 400)
+                return
+            from .edge_cases import detect_paste_type
+            self._json(detect_paste_type(text))
+            return
+
         elif self.path in ('/api/chat', '/api/chat/stream'):
             self._auto_unlock_localhost()
             if not vault.is_unlocked:
@@ -1392,6 +1617,12 @@ self.addEventListener('fetch',e=>{{
                     if not fname or '..' in fname or not re.match(r'^[\w.\- ]+$', fname):
                         self._json({'error': 'Invalid filename'}, 400)
                         return
+                    # Validate file type (Open WebUI style)
+                    from .edge_cases import validate_upload
+                    ok, err = validate_upload(fname, len(part.get_payload(decode=True) or b''))
+                    if not ok:
+                        self._json({'error': err}, 400)
+                        return
                     file_data = part.get_payload(decode=True)
                     if not file_data:
                         continue
@@ -1407,13 +1638,22 @@ self.addEventListener('fetch',e=>{{
                     size_kb = len(file_data) / 1024
                     is_image = any(fname.lower().endswith(ext) for ext in ('.png','.jpg','.jpeg','.gif','.webp','.bmp'))
                     is_text = any(fname.lower().endswith(ext) for ext in ('.txt','.md','.py','.js','.json','.csv','.log','.html','.css','.sh','.bat','.yaml','.yml','.xml','.sql'))
+                    is_pdf = fname.lower().endswith('.pdf')
                     info = f'[{"🖼️ Image" if is_image else "📎 File"} uploaded: uploads/{fname} ({size_kb:.1f}KB)]'
-                    if is_text:
+                    if is_pdf:
+                        # PDF text extraction (Open WebUI style)
                         try:
+                            from .edge_cases import process_uploaded_file
+                            info = process_uploaded_file(fname, file_data)
+                        except Exception:
+                            info += '\n[PDF text extraction failed]'
+                    elif is_text:
+                        try:
+                            from .edge_cases import process_uploaded_file
+                            info = process_uploaded_file(fname, file_data)
+                        except Exception:
                             preview = file_data.decode('utf-8', errors='replace')[:3000]  # type: ignore[union-attr]
                             info += f'\n[File content]\n{preview}'
-                        except Exception:
-                            pass
                     log.info(f"[SEND] Web upload: {fname} ({size_kb:.1f}KB)")
                     audit_log('web_upload', fname)
                     resp = {'ok': True, 'filename': fname, 'size': len(file_data),

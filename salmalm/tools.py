@@ -660,6 +660,91 @@ TOOL_DEFINITIONS = [
             'required': ['data']
         }
     },
+    # ── Personal Assistant Tools ──────────────────────────────
+    {
+        'name': 'note',
+        'description': 'Personal knowledge base — save, search, list, delete notes. 개인 메모/지식 베이스.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'Action: save, search, list, delete', 'enum': ['save', 'search', 'list', 'delete']},
+                'content': {'type': 'string', 'description': 'Note content (for save)'},
+                'tags': {'type': 'string', 'description': 'Comma-separated tags (for save)'},
+                'query': {'type': 'string', 'description': 'Search query (for search)'},
+                'note_id': {'type': 'string', 'description': 'Note ID (for delete)'},
+                'count': {'type': 'integer', 'description': 'Number of results (for list)', 'default': 10},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'expense',
+        'description': 'Expense tracker — add, view today/month, delete expenses. 가계부/지출 추적.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'Action: add, today, month, delete', 'enum': ['add', 'today', 'month', 'delete']},
+                'amount': {'type': 'number', 'description': 'Amount in KRW (for add)'},
+                'category': {'type': 'string', 'description': 'Category: 식비,교통,쇼핑,구독,의료,생활,기타 (auto-detected if empty)'},
+                'description': {'type': 'string', 'description': 'Description (for add)'},
+                'date': {'type': 'string', 'description': 'Date YYYY-MM-DD (default: today)'},
+                'month': {'type': 'string', 'description': 'Month YYYY-MM (for month summary)'},
+                'expense_id': {'type': 'string', 'description': 'Expense ID (for delete)'},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'save_link',
+        'description': 'Save links/articles for later reading. Auto-fetches title and content. 링크/아티클 저장.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'Action: save, list, search, delete', 'enum': ['save', 'list', 'search', 'delete']},
+                'url': {'type': 'string', 'description': 'URL to save'},
+                'title': {'type': 'string', 'description': 'Title (auto-detected if empty)'},
+                'summary': {'type': 'string', 'description': '3-line summary'},
+                'tags': {'type': 'string', 'description': 'Comma-separated tags'},
+                'query': {'type': 'string', 'description': 'Search query'},
+                'link_id': {'type': 'string', 'description': 'Link ID (for delete)'},
+                'count': {'type': 'integer', 'description': 'Number of results', 'default': 10},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'pomodoro',
+        'description': 'Pomodoro timer — start focus session, break, stop, view stats. 포모도로 타이머.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'Action: start, break, stop, status', 'enum': ['start', 'break', 'stop', 'status']},
+                'duration': {'type': 'integer', 'description': 'Duration in minutes (default: 25 for focus, 5 for break)'},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'routine',
+        'description': 'Morning/evening routine automation. 아침/저녁 루틴 자동화.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'Routine name: morning, evening, list'},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'briefing',
+        'description': 'Generate daily briefing — weather, calendar, email, tasks summary. 데일리 브리핑.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'sections': {'type': 'string', 'description': 'Comma-separated sections: weather,calendar,email,tasks,notes,expenses'},
+            },
+        }
+    },
 ]
 
 

@@ -260,4 +260,13 @@ def build_system_prompt(full: bool = True) -> str:
     - When discussing tradeoffs, present both sides factually. Don't cave to social pressure.
     """).strip())
 
-    return '\n\n'.join(parts)
+    result = '\n\n'.join(parts)
+
+    # System prompt variable substitution (LobeChat style)
+    try:
+        from .edge_cases import substitute_prompt_variables
+        result = substitute_prompt_variables(result)
+    except Exception:
+        pass
+
+    return result

@@ -17,7 +17,7 @@ def _ensure_modules():
     from . import (tools_file, tools_web, tools_exec, tools_memory,
                    tools_misc, tools_system, tools_util, tools_agent,
                    tools_browser, tools_google, tools_media,
-                   tools_calendar, tools_email)  # noqa: F401
+                   tools_calendar, tools_email, tools_personal)  # noqa: F401
 
 
 def register(name):
