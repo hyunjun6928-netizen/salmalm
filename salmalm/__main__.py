@@ -220,12 +220,13 @@ def main() -> None:
             return ""
 
         async def _main():
+            # ── Phase 1: Database & Core State ──
             _init_audit_db()
             _restore_usage()
             audit_log('startup', f'{APP_NAME} v{VERSION}')
             MEMORY_DIR.mkdir(exist_ok=True)
 
-            # SLA: Initialize uptime monitor + watchdog (SLA 초기화)
+            # ── Phase 2: SLA Monitoring ──
             try:
                 from .sla import uptime_monitor, watchdog
                 uptime_monitor.on_startup()
@@ -234,7 +235,7 @@ def main() -> None:
             except Exception as e:
                 log.warning(f"[SLA] Init error: {e}")
 
-            # Initialize hooks, plugins, agents (훅/플러그인/에이전트 초기화)
+            # ── Phase 3: Extensions (hooks → plugins → agents) ──
             try:
                 from .hooks import hook_manager
                 hook_manager.fire('on_startup', {'message': f'{APP_NAME} v{VERSION} starting'})
@@ -251,6 +252,7 @@ def main() -> None:
             except Exception as e:
                 log.warning(f"Agent scan error: {e}")
 
+            # ── Phase 4: HTTP Server ──
             port = int(os.environ.get('SALMALM_PORT', 18800))
             bind_addr = os.environ.get('SALMALM_BIND', '127.0.0.1')
             server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
@@ -258,6 +260,7 @@ def main() -> None:
             web_thread.start()
             log.info(f"[WEB] Web UI: http://{bind_addr}:{port}")
 
+            # ── Phase 5: Vault Auto-unlock ──
             vault_pw = os.environ.get('SALMALM_VAULT_PW')
             if vault_pw and VAULT_FILE.exists():
                 if vault.unlock(vault_pw):
@@ -265,6 +268,7 @@ def main() -> None:
 
             _core.set_telegram_bot(telegram_bot)
 
+            # ── Phase 6: WebSocket Server ──
             ws_port = int(os.environ.get('SALMALM_WS_PORT', 18801))
             try:
                 ws_server.port = ws_port
@@ -310,11 +314,13 @@ def main() -> None:
                     'session': client.session_id,
                 })
 
+            # ── Phase 7: RAG Engine ──
             try:
                 rag_engine.reindex(force=True)
             except Exception as e:
                 log.warning(f"RAG init error: {e}")
 
+            # ── Phase 8: MCP (Model Context Protocol) ──
             try:
                 mcp_manager.load_config()
                 from salmalm.tools import TOOL_DEFINITIONS, execute_tool
@@ -324,6 +330,7 @@ def main() -> None:
             except Exception as e:
                 log.warning(f"MCP init error: {e}")
 
+            # ── Phase 9: Cron Scheduler + Background Tasks ──
             llm_cron = LLMCronManager()
             llm_cron.load_jobs()
             _core._llm_cron = llm_cron  # type: ignore[attr-defined]
@@ -332,11 +339,13 @@ def main() -> None:
             from salmalm.core import audit_log_cleanup
             cron.add_job('audit_cleanup', 86400, audit_log_cleanup, days=30)
 
+            # ── Phase 10: Self-test, Nodes, Plugins, Cron start ──
             selftest = health_monitor.startup_selftest()
             node_manager.load_config()
             PluginLoader.scan()
             asyncio.create_task(cron.run())
 
+            # ── Phase 11: Telegram Bot ──
             if vault.is_unlocked:
                 tg_token = vault.get('telegram_token')
                 tg_owner = vault.get('telegram_owner_id')

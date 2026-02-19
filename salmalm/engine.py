@@ -1014,6 +1014,404 @@ async def process_message(session_id: str, user_message: str,
                 _active_requests_event.set()
 
 
+
+# ============================================================
+# Slash Command Handlers — extracted from _process_message_inner
+# ============================================================
+
+def _cmd_clear(cmd, session, **_):
+    session.messages = [m for m in session.messages if m['role'] == 'system'][:1]
+    return 'Conversation cleared.'
+
+def _cmd_help(cmd, session, **_):
+    from .tools import TOOL_DEFINITIONS
+    tool_count = len(TOOL_DEFINITIONS)
+    return f"""😈 **SalmAlm v{VERSION}** — Personal AI Gateway
+
+📌 **Commands**
+/clear — Clear conversation
+/help — This help
+/model <name> — Change model
+/think <question> — 🧠 Deep reasoning (Opus)
+/plan <question> — 📋 Plan → Execute
+/status — Usage + Cost
+/tools — Tool list
+/uptime — Uptime stats (업타임)
+/latency — Latency stats (레이턴시)
+/health detail — Detailed health report (상세 헬스)
+/security — 🛡️ Security audit report
+
+🤖 **Model Aliases** (27)
+claude, sonnet, opus, haiku, gpt, gpt5, o3, o4mini,
+grok, grok4, gemini, flash, deepseek, llama, auto ...
+
+🔧 **Tools** ({tool_count})
+File R/W, code exec, web search, RAG search,
+system monitor, cron jobs, image analysis, TTS ...
+
+🧠 **Intelligence Engine**
+Auto intent classification (7 levels) → Model routing → Parallel tools → Self-evaluation
+
+💡 **Tip**: Just speak naturally. Read a file, search the web, write code, etc."""
+
+def _cmd_status(cmd, session, **_):
+    return execute_tool('usage_report', {})
+
+def _cmd_tools(cmd, session, **_):
+    from .tools import TOOL_DEFINITIONS
+    lines = [f'🔧 **Tool List** ({len(TOOL_DEFINITIONS)})\n']
+    for t in TOOL_DEFINITIONS:
+        lines.append(f"• **{t['name']}** — {t['description'][:60]}")
+    return '\n'.join(lines)
+
+async def _cmd_think(cmd, session, *, on_tool=None, **_):
+    think_msg = cmd[7:].strip()
+    if not think_msg:
+        return 'Usage: /think <question>'
+    session.add_user(think_msg)
+    session.messages = compact_messages(session.messages, session=session)
+    classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
+                      'thinking_budget': 16000, 'score': 5}
+    return await _engine.run(session, think_msg,
+                              model_override=COMMAND_MODEL,
+                              on_tool=on_tool, classification=classification)
+
+async def _cmd_plan(cmd, session, *, model_override=None, on_tool=None, **_):
+    plan_msg = cmd[6:].strip()
+    if not plan_msg:
+        return 'Usage: /plan <task description>'
+    session.add_user(plan_msg)
+    session.messages = compact_messages(session.messages, session=session)
+    classification = {'intent': 'code', 'tier': 3, 'thinking': True,
+                      'thinking_budget': 10000, 'score': 5}
+    return await _engine.run(session, plan_msg, model_override=model_override,
+                              on_tool=on_tool, classification=classification)
+
+def _cmd_uptime(cmd, session, **_):
+    from .sla import uptime_monitor, sla_config
+    stats = uptime_monitor.get_stats()
+    target = stats['target_pct']
+    pct = stats['monthly_uptime_pct']
+    status_icon = '🟢' if pct >= target else ('🟡' if pct >= 99.0 else '🔴')
+    lines = [
+        f'📊 **SalmAlm Uptime** / 업타임 현황\n',
+        f'{status_icon} Current uptime: **{stats["uptime_human"]}**',
+        f'📅 Month ({stats["month"]}): **{pct}%** (target: {target}%)',
+        f'📅 Today: **{stats["daily_uptime_pct"]}%**',
+        f'🕐 Started: {stats["start_time"][:19]}',
+    ]
+    incidents = stats.get('recent_incidents', [])
+    if incidents:
+        lines.append(f'\n⚠️ Recent incidents ({len(incidents)}):')
+        for inc in incidents[:5]:
+            dur = f'{inc["duration_sec"]:.0f}s' if inc['duration_sec'] else '?'
+            lines.append(f'  • {inc["start"][:19]} — {inc["reason"]} ({dur})')
+    return '\n'.join(lines)
+
+def _cmd_latency(cmd, session, **_):
+    from .sla import latency_tracker
+    stats = latency_tracker.get_stats()
+    if stats['count'] == 0:
+        return '📊 No latency data yet. / 레이턴시 데이터가 없습니다.'
+    tgt = stats['targets']
+    ttft = stats['ttft']
+    total = stats['total']
+    ttft_ok = '✅' if ttft['p95'] <= tgt['ttft_ms'] else '⚠️'
+    total_ok = '✅' if total['p95'] <= tgt['response_ms'] else '⚠️'
+    lines = [
+        f'📊 **Latency Stats** / 레이턴시 통계 ({stats["count"]} requests)\n',
+        f'{ttft_ok} **TTFT** (Time To First Token):',
+        f'  P50={ttft["p50"]:.0f}ms  P95={ttft["p95"]:.0f}ms  P99={ttft["p99"]:.0f}ms  (target: <{tgt["ttft_ms"]}ms)',
+        f'{total_ok} **Total Response Time**:',
+        f'  P50={total["p50"]:.0f}ms  P95={total["p95"]:.0f}ms  P99={total["p99"]:.0f}ms  (target: <{tgt["response_ms"]}ms)',
+    ]
+    if stats['consecutive_timeouts'] > 0:
+        lines.append(f'⚠️ Consecutive timeouts: {stats["consecutive_timeouts"]}')
+    return '\n'.join(lines)
+
+def _cmd_health_detail(cmd, session, **_):
+    from .sla import watchdog
+    report = watchdog.get_detailed_health()
+    status = report.get('status', 'unknown')
+    icon = {'healthy': '🟢', 'degraded': '🟡', 'unhealthy': '🔴'}.get(status, '⚪')
+    lines = [f'{icon} **Health Report** / 상세 헬스 리포트\n', f'Status: **{status}**\n']
+    for name, check in report.get('checks', {}).items():
+        s = check.get('status', '?')
+        ci = {'ok': '✅', 'warning': '⚠️', 'error': '❌'}.get(s, '❔')
+        extra = ''
+        if 'usage_mb' in check:
+            extra = f' ({check["usage_mb"]}MB/{check["limit_mb"]}MB)'
+        elif 'usage_pct' in check:
+            extra = f' ({check["usage_pct"]}%/{check["limit_pct"]}%)'
+        elif 'error' in check:
+            extra = f' ({check["error"][:50]})'
+        lines.append(f'{ci} {name}: {s}{extra}')
+    return '\n'.join(lines)
+
+def _cmd_prune(cmd, session, **_):
+    _, stats = prune_context(session.messages)
+    total = stats['soft_trimmed'] + stats['hard_cleared'] + stats['unchanged']
+    return (f"🧹 **Session Pruning Results**\n"
+            f"• Soft-trimmed: {stats['soft_trimmed']}\n"
+            f"• Hard-cleared: {stats['hard_cleared']}\n"
+            f"• Unchanged: {stats['unchanged']}\n"
+            f"• Total tool results scanned: {total}")
+
+def _cmd_usage_daily(cmd, session, **_):
+    from .edge_cases import usage_tracker
+    report = usage_tracker.daily_report()
+    if not report:
+        return '📊 No usage data yet. / 아직 사용량 데이터가 없습니다.'
+    lines = ['📊 **Daily Usage Report / 일별 사용량**\n']
+    for r in report[:14]:
+        lines.append(f"• {r['date']} | {r['model'].split('/')[-1]} | "
+                     f"in:{r['input_tokens']} out:{r['output_tokens']} | "
+                     f"${r['cost']:.4f} ({r['calls']} calls)")
+    return '\n'.join(lines)
+
+def _cmd_usage_monthly(cmd, session, **_):
+    from .edge_cases import usage_tracker
+    report = usage_tracker.monthly_report()
+    if not report:
+        return '📊 No usage data yet. / 아직 사용량 데이터가 없습니다.'
+    lines = ['📊 **Monthly Usage Report / 월별 사용량**\n']
+    for r in report:
+        lines.append(f"• {r['month']} | {r['model'].split('/')[-1]} | "
+                     f"in:{r['input_tokens']} out:{r['output_tokens']} | "
+                     f"${r['cost']:.4f} ({r['calls']} calls)")
+    return '\n'.join(lines)
+
+def _cmd_bookmarks(cmd, session, **_):
+    from .edge_cases import bookmark_manager
+    bms = bookmark_manager.list_all(limit=20)
+    if not bms:
+        return '⭐ No bookmarks yet. / 아직 북마크가 없습니다.'
+    lines = ['⭐ **Bookmarks / 북마크**\n']
+    for b in bms:
+        lines.append(f"• [{b['session_id']}#{b['message_index']}] "
+                     f"{b['preview'][:60]}{'...' if len(b.get('preview', '')) > 60 else ''}")
+    return '\n'.join(lines)
+
+def _cmd_compare(cmd, session, *, session_id='', **_):
+    compare_msg = cmd[9:].strip()
+    if not compare_msg:
+        return 'Usage: /compare <message> — Compare responses from multiple models'
+    from .edge_cases import compare_models
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                results = pool.submit(lambda: asyncio.run(compare_models(session_id, compare_msg))).result()
+        else:
+            results = loop.run_until_complete(compare_models(session_id, compare_msg))
+    except Exception:
+        results = asyncio.run(compare_models(session_id, compare_msg))
+    lines = ['🔀 **Model Comparison / 모델 비교**\n']
+    for r in results:
+        model_name = r['model'].split('/')[-1]
+        if r.get('error'):
+            lines.append(f"### ❌ {model_name}\n{r['error']}\n")
+        else:
+            lines.append(f"### 🤖 {model_name} ({r['time_ms']}ms)\n{r['response'][:500]}\n")
+    return '\n'.join(lines)
+
+def _cmd_security(cmd, session, **_):
+    from .security import security_auditor
+    return security_auditor.format_report()
+
+def _cmd_soul(cmd, session, **_):
+    from .prompt import get_user_soul, USER_SOUL_FILE
+    content = get_user_soul()
+    if content:
+        return f'📜 **SOUL.md** (`{USER_SOUL_FILE}`)\n\n{content}'
+    return f'📜 SOUL.md is not set. Create `{USER_SOUL_FILE}` or edit via Settings.'
+
+def _cmd_soul_reset(cmd, session, **_):
+    from .prompt import reset_user_soul
+    reset_user_soul()
+    session.add_system(build_system_prompt(full=True))
+    return '📜 SOUL.md reset to default.'
+
+def _cmd_model(cmd, session, **_):
+    model_name = cmd[7:].strip()
+    if model_name in ('auto', 'opus', 'sonnet', 'haiku'):
+        session.model_override = model_name if model_name != 'auto' else 'auto'
+        if model_name == 'auto':
+            router.set_force_model(None)
+            return 'Model: **auto** (cost-optimized routing) — saved ✅\n• simple → haiku ⚡ • moderate → sonnet • complex → opus 💎'
+        labels = {'opus': 'claude-opus-4 💎', 'sonnet': 'claude-sonnet-4', 'haiku': 'claude-haiku-3.5 ⚡'}
+        return f'Model: **{model_name}** ({labels[model_name]}) — saved ✅'
+    if '/' in model_name:
+        router.set_force_model(model_name)
+        session.model_override = model_name
+        return f'Model changed: {model_name} — saved ✅'
+    if model_name in MODEL_ALIASES:
+        resolved = MODEL_ALIASES[model_name]
+        router.set_force_model(resolved)
+        session.model_override = resolved
+        return f'Model changed: {model_name} → {resolved} — saved ✅'
+    return f'Unknown model: {model_name}\\nAvailable: auto, opus, sonnet, haiku, {", ".join(sorted(MODEL_ALIASES.keys()))}'
+
+def _cmd_tts(cmd, session, **_):
+    arg = cmd[4:].strip()
+    if arg == 'on':
+        session.tts_enabled = True
+        return '🔊 TTS: **ON** — 응답을 음성으로 전송합니다.'
+    elif arg == 'off':
+        session.tts_enabled = False
+        return '🔇 TTS: **OFF**'
+    else:
+        status = 'ON' if getattr(session, 'tts_enabled', False) else 'OFF'
+        voice = getattr(session, 'tts_voice', 'alloy')
+        return f'🔊 TTS: **{status}** (voice: {voice})\n`/tts on` · `/tts off` · `/voice alloy|nova|echo|fable|onyx|shimmer`'
+
+def _cmd_voice(cmd, session, **_):
+    arg = cmd[6:].strip()
+    valid_voices = ('alloy', 'nova', 'echo', 'fable', 'onyx', 'shimmer')
+    if arg in valid_voices:
+        session.tts_voice = arg
+        return f'🎙️ Voice: **{arg}** — saved ✅'
+    return f'Available voices: {", ".join(valid_voices)}'
+
+def _cmd_agent(cmd, session, *, session_id='', **_):
+    from .agents import agent_manager
+    parts = cmd.split(maxsplit=2)
+    sub = parts[1] if len(parts) > 1 else 'list'
+    if sub == 'list':
+        agents = agent_manager.list_agents()
+        lines = ['🤖 **Agents** (에이전트 목록)\n']
+        for a in agents:
+            lines.append(f"• **{a['id']}** — {a['display_name']}")
+        bindings = agent_manager.list_bindings()
+        if bindings:
+            lines.append('\n📌 **Bindings** (바인딩)')
+            for k, v in bindings.items():
+                lines.append(f'• {k} → {v}')
+        return '\n'.join(lines)
+    elif sub == 'create' and len(parts) > 2:
+        return agent_manager.create(parts[2])
+    elif sub == 'switch' and len(parts) > 2:
+        chat_key = f'session:{session_id}'
+        return agent_manager.switch(chat_key, parts[2])
+    elif sub == 'delete' and len(parts) > 2:
+        return agent_manager.delete(parts[2])
+    elif sub == 'bind' and len(parts) > 2:
+        bind_parts = parts[2].split()
+        if len(bind_parts) == 2:
+            return agent_manager.bind(bind_parts[0], bind_parts[1])
+        return '❌ Usage: /agent bind <chat_key> <agent_id>'
+    return '❌ Usage: /agent list|create|switch|delete|bind <args>'
+
+def _cmd_hooks(cmd, session, **_):
+    from .hooks import hook_manager
+    parts = cmd.split(maxsplit=2)
+    sub = parts[1] if len(parts) > 1 else 'list'
+    if sub == 'list':
+        hooks = hook_manager.list_hooks()
+        if not hooks:
+            return '📋 No hooks configured. Edit ~/.salmalm/hooks.json'
+        lines = ['🪝 **Hooks** (이벤트 훅)\n']
+        for event, info in hooks.items():
+            cmds_list = info['commands']
+            pc = info['plugin_callbacks']
+            lines.append(f"• **{event}**: {len(cmds_list)} commands, {pc} plugin callbacks")
+            for i, c in enumerate(cmds_list):
+                lines.append(f"  [{i}] `{c[:60]}`")
+        return '\n'.join(lines)
+    elif sub == 'test' and len(parts) > 2:
+        return hook_manager.test_hook(parts[2].strip())
+    elif sub == 'add' and len(parts) > 2:
+        add_parts = parts[2].split(maxsplit=1)
+        if len(add_parts) == 2:
+            return hook_manager.add_hook(add_parts[0], add_parts[1])
+        return '❌ Usage: /hooks add <event> <command>'
+    elif sub == 'reload':
+        hook_manager.reload()
+        return '🔄 Hooks reloaded'
+    return '❌ Usage: /hooks list|test|add|reload'
+
+def _cmd_plugins(cmd, session, **_):
+    from .plugin_manager import plugin_manager
+    parts = cmd.split(maxsplit=2)
+    sub = parts[1] if len(parts) > 1 else 'list'
+    if sub == 'list':
+        plugins = plugin_manager.list_plugins()
+        if not plugins:
+            return '🔌 No plugins found. Add to ~/.salmalm/plugins/'
+        lines = ['🔌 **Plugins** (플러그인)\n']
+        for p in plugins:
+            status = '✅' if p['enabled'] else '❌'
+            err = f" ⚠️ {p['error']}" if p.get('error') else ''
+            lines.append(f"• {status} **{p['name']}** v{p['version']} — {p['description'][:40]}{err}")
+            if p['tools']:
+                lines.append(f"  Tools: {', '.join(p['tools'])}")
+        return '\n'.join(lines)
+    elif sub == 'reload':
+        return plugin_manager.reload_all()
+    elif sub == 'enable' and len(parts) > 2:
+        return plugin_manager.enable(parts[2].strip())
+    elif sub == 'disable' and len(parts) > 2:
+        return plugin_manager.disable(parts[2].strip())
+    return '❌ Usage: /plugins list|reload|enable|disable <name>'
+
+
+# Exact-match slash commands
+_SLASH_COMMANDS = {
+    '/clear': _cmd_clear,
+    '/help': _cmd_help,
+    '/status': _cmd_status,
+    '/tools': _cmd_tools,
+    '/uptime': _cmd_uptime,
+    '/latency': _cmd_latency,
+    '/health detail': _cmd_health_detail,
+    '/health_detail': _cmd_health_detail,
+    '/prune': _cmd_prune,
+    '/usage daily': _cmd_usage_daily,
+    '/usage monthly': _cmd_usage_monthly,
+    '/bookmarks': _cmd_bookmarks,
+    '/security': _cmd_security,
+    '/soul': _cmd_soul,
+    '/soul reset': _cmd_soul_reset,
+}
+
+# Prefix-match slash commands (checked with startswith)
+_SLASH_PREFIX_COMMANDS = [
+    ('/think ', _cmd_think),
+    ('/plan ', _cmd_plan),
+    ('/compare ', _cmd_compare),
+    ('/model ', _cmd_model),
+    ('/tts', _cmd_tts),
+    ('/voice', _cmd_voice),
+    ('/agent', _cmd_agent),
+    ('/hooks', _cmd_hooks),
+    ('/plugins', _cmd_plugins),
+]
+
+
+async def _dispatch_slash_command(cmd, session, session_id, model_override, on_tool):
+    """Dispatch slash commands. Returns response string or None if not a command."""
+    # Exact match first
+    handler = _SLASH_COMMANDS.get(cmd)
+    if handler is not None:
+        result = handler(cmd, session, session_id=session_id,
+                         model_override=model_override, on_tool=on_tool)
+        if asyncio.iscoroutine(result):
+            return await result
+        return result
+
+    # Prefix match
+    for prefix, handler in _SLASH_PREFIX_COMMANDS:
+        if cmd.startswith(prefix) or (not prefix.endswith(' ') and cmd == prefix.rstrip()):
+            result = handler(cmd, session, session_id=session_id,
+                             model_override=model_override, on_tool=on_tool)
+            if asyncio.iscoroutine(result):
+                return await result
+            return result
+
+    return None
+
+
 async def _process_message_inner(session_id: str, user_message: str,
                                   model_override: Optional[str] = None,
                                   image_data: Optional[Tuple[str, str]] = None,

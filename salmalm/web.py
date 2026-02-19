@@ -263,7 +263,162 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         """True if vault file doesn't exist and no env password — brand new install."""
         return not VAULT_FILE.exists() and not os.environ.get('SALMALM_VAULT_PW', '')
 
+
+    # ── Extracted GET handlers ────────────────────────────────
+    def _get_uptime(self):
+        from .sla import uptime_monitor
+        self._json(uptime_monitor.get_stats())
+
+    def _get_latency(self):
+        from .sla import latency_tracker
+        self._json(latency_tracker.get_stats())
+
+    def _get_sla(self):
+        from .sla import uptime_monitor, latency_tracker, watchdog, sla_config
+        self._json({
+            'uptime': uptime_monitor.get_stats(),
+            'latency': latency_tracker.get_stats(),
+            'health': watchdog.get_last_report(),
+            'config': sla_config.get_all(),
+        })
+
+    def _get_sla_config(self):
+        from .sla import sla_config
+        self._json(sla_config.get_all())
+
+    def _get_nodes(self):
+        from .nodes import node_manager
+        self._json({'nodes': node_manager.list_nodes()})
+
+    def _get_gateway_nodes(self):
+        from .nodes import gateway
+        self._json({'nodes': gateway.list_nodes()})
+
+    def _get_status(self):
+        self._json({'app': APP_NAME, 'version': VERSION,
+                    'unlocked': vault.is_unlocked,
+                    'usage': get_usage_report(),
+                    'model': router.force_model or 'auto'})
+
+    def _get_metrics(self):
+        from .core import _metrics
+        usage = get_usage_report()
+        _metrics['total_cost'] = usage.get('total_cost', 0.0)
+        merged = {**request_logger.get_metrics(), **_metrics}
+        self._json(merged)
+
+    def _get_cert(self):
+        from .tls import get_cert_info
+        self._json(get_cert_info())
+
+    def _get_ws_status(self):
+        from .ws import ws_server
+        self._json({
+            'running': ws_server._running,
+            'clients': ws_server.client_count,
+            'port': ws_server.port,
+        })
+
+    def _get_usage_daily(self):
+        if not self._require_auth('user'): return
+        from .edge_cases import usage_tracker
+        self._json({'report': usage_tracker.daily_report()})
+
+    def _get_usage_monthly(self):
+        if not self._require_auth('user'): return
+        from .edge_cases import usage_tracker
+        self._json({'report': usage_tracker.monthly_report()})
+
+    def _get_usage_models(self):
+        if not self._require_auth('user'): return
+        from .edge_cases import usage_tracker
+        self._json({'breakdown': usage_tracker.model_breakdown()})
+
+    def _get_groups(self):
+        if not self._require_auth('user'): return
+        from .edge_cases import session_groups
+        self._json({'groups': session_groups.list_groups()})
+
+    def _get_models(self):
+        if not self._require_auth('user'): return
+        from .edge_cases import model_detector
+        force = '?force' in self.path
+        models = model_detector.detect_all(force=force)
+        self._json({'models': models, 'count': len(models)})
+
+    def _get_soul(self):
+        if not self._require_auth('user'): return
+        from .prompt import get_user_soul, USER_SOUL_FILE
+        self._json({'content': get_user_soul(), 'path': str(USER_SOUL_FILE)})
+
+    def _get_routing(self):
+        if not self._require_auth('user'): return
+        from .engine import get_routing_config
+        from .constants import MODELS
+        self._json({'config': get_routing_config(), 'available_models': MODELS})
+
+    def _get_failover(self):
+        if not self._require_auth('user'): return
+        from .engine import get_failover_config, _load_cooldowns
+        self._json({'config': get_failover_config(), 'cooldowns': _load_cooldowns()})
+
+    def _get_cron(self):
+        if not self._require_auth('user'): return
+        from .core import _llm_cron
+        self._json({'jobs': _llm_cron.list_jobs() if _llm_cron else []})
+
+    def _get_mcp(self):
+        if not self._require_auth('user'): return
+        from .mcp import mcp_manager
+        servers = mcp_manager.list_servers()
+        all_tools = mcp_manager.get_all_tools()
+        self._json({'servers': servers, 'total_tools': len(all_tools)})
+
+    def _get_rag(self):
+        if not self._require_auth('user'): return
+        from .rag import rag_engine
+        self._json(rag_engine.get_stats())
+
+    def _get_personas(self):
+        from .prompt import list_personas, get_active_persona
+        session_id = self.headers.get('X-Session-Id', 'web')
+        personas = list_personas()
+        active = get_active_persona(session_id)
+        self._json({'personas': personas, 'active': active})
+
+    # ── GET Route Table (exact path → method) ──
+    _GET_ROUTES = {
+        '/api/uptime': '_get_uptime',
+        '/api/latency': '_get_latency',
+        '/api/sla': '_get_sla',
+        '/api/sla/config': '_get_sla_config',
+        '/api/nodes': '_get_nodes',
+        '/api/gateway/nodes': '_get_gateway_nodes',
+        '/api/status': '_get_status',
+        '/api/metrics': '_get_metrics',
+        '/api/cert': '_get_cert',
+        '/api/ws/status': '_get_ws_status',
+        '/api/usage/daily': '_get_usage_daily',
+        '/api/usage/monthly': '_get_usage_monthly',
+        '/api/usage/models': '_get_usage_models',
+        '/api/groups': '_get_groups',
+        '/api/models': '_get_models',
+        '/api/soul': '_get_soul',
+        '/api/routing': '_get_routing',
+        '/api/failover': '_get_failover',
+        '/api/cron': '_get_cron',
+        '/api/mcp': '_get_mcp',
+        '/api/rag': '_get_rag',
+        '/api/personas': '_get_personas',
+    }
+
+
     def _do_get_inner(self):
+        # Route table dispatch for simple API endpoints
+        _clean_path = self.path.split('?')[0]
+        _handler_name = self._GET_ROUTES.get(_clean_path)
+        if _handler_name:
+            return getattr(self, _handler_name)()
         if self.path == '/' or self.path == '/index.html':
             if self._needs_first_run():
                 self._html(SETUP_HTML)
@@ -275,19 +430,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._html(ONBOARDING_HTML)
             else:
                 self._html(WEB_HTML)
-        elif self.path == '/api/soul':
-            if not self._require_auth('user'): return
-            from .prompt import get_user_soul, USER_SOUL_FILE
-            self._json({'content': get_user_soul(), 'path': str(USER_SOUL_FILE)})
-        elif self.path == '/api/routing':
-            if not self._require_auth('user'): return
-            from .engine import get_routing_config
-            from .constants import MODELS
-            self._json({'config': get_routing_config(), 'available_models': MODELS})
-        elif self.path == '/api/failover':
-            if not self._require_auth('user'): return
-            from .engine import get_failover_config, _load_cooldowns
-            self._json({'config': get_failover_config(), 'cooldowns': _load_cooldowns()})
+
+
+
         elif self.path == '/api/sessions':
             if not self._require_auth('user'): return
             from .core import _get_db
@@ -373,10 +518,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 'subagents': subagents,
                 'cost_timeline': cost_timeline
             })
-        elif self.path == '/api/cron':
-            if not self._require_auth('user'): return
-            from .core import _llm_cron  # type: ignore[attr-defined]
-            self._json({'jobs': _llm_cron.list_jobs() if _llm_cron else []})
+
         elif self.path == '/api/plugins':
             if not self._require_auth('user'): return
             from .core import PluginLoader
@@ -404,16 +546,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 'hooks': hook_manager.list_hooks(),
                 'valid_events': list(VALID_EVENTS),
             })
-        elif self.path == '/api/mcp':
-            if not self._require_auth('user'): return
-            from .mcp import mcp_manager
-            servers = mcp_manager.list_servers()
-            all_tools = mcp_manager.get_all_tools()
-            self._json({'servers': servers, 'total_tools': len(all_tools)})
-        elif self.path == '/api/rag':
-            if not self._require_auth('user'): return
-            from .rag import rag_engine
-            self._json(rag_engine.get_stats())
+
+
         elif self.path.startswith('/api/search'):
             if not self._require_auth('user'): return
             import urllib.parse
@@ -512,31 +646,14 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not self._require_auth('admin'): return
             from .security import security_auditor
             self._json(security_auditor.audit())
-        elif self.path == '/api/ws/status':
-            from .ws import ws_server
-            self._json({
-                'running': ws_server._running,
-                'clients': ws_server.client_count,
-                'port': ws_server.port,
-            })
+
         elif self.path == '/api/health/providers':
             # Provider health check — Open WebUI style (프로바이더 상태 확인)
             if not self._require_auth('user'): return
             from .edge_cases import provider_health
             force = '?force' in self.path or 'force=1' in self.path
             self._json(provider_health.check_all(force=force))
-        elif self.path == '/api/models':
-            # Model auto-detection — Open WebUI style (모델 자동 감지)
-            if not self._require_auth('user'): return
-            from .edge_cases import model_detector
-            force = '?force' in self.path
-            models = model_detector.detect_all(force=force)
-            self._json({'models': models, 'count': len(models)})
-        elif self.path == '/api/groups':
-            # Session groups — LobeChat style (대화 주제 그룹)
-            if not self._require_auth('user'): return
-            from .edge_cases import session_groups
-            self._json({'groups': session_groups.list_groups()})
+
         elif self.path == '/api/bookmarks':
             # Message bookmarks — LobeChat style (메시지 북마크)
             if not self._require_auth('user'): return
@@ -569,21 +686,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'alternatives': alts})
             else:
                 self._json({'error': 'Invalid path'}, 400)
-        elif self.path == '/api/usage/daily':
-            # Daily usage report — LibreChat style (일별 사용량)
-            if not self._require_auth('user'): return
-            from .edge_cases import usage_tracker
-            self._json({'report': usage_tracker.daily_report()})
-        elif self.path == '/api/usage/monthly':
-            # Monthly usage report — LibreChat style (월별 사용량)
-            if not self._require_auth('user'): return
-            from .edge_cases import usage_tracker
-            self._json({'report': usage_tracker.monthly_report()})
-        elif self.path == '/api/usage/models':
-            # Model cost breakdown — LibreChat style (모델별 비용)
-            if not self._require_auth('user'): return
-            from .edge_cases import usage_tracker
-            self._json({'breakdown': usage_tracker.model_breakdown()})
+
+
+
         elif self.path == '/api/paste/detect':
             # Smart paste detection — BIG-AGI style (스마트 붙여넣기)
             # GET version reads from query param
@@ -597,23 +702,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json(detect_paste_type(text))
             else:
                 self._json({'error': 'Missing text parameter'}, 400)
-        elif self.path == '/api/uptime':
-            from .sla import uptime_monitor
-            self._json(uptime_monitor.get_stats())
-        elif self.path == '/api/latency':
-            from .sla import latency_tracker
-            self._json(latency_tracker.get_stats())
-        elif self.path == '/api/sla':
-            from .sla import uptime_monitor, latency_tracker, watchdog, sla_config
-            self._json({
-                'uptime': uptime_monitor.get_stats(),
-                'latency': latency_tracker.get_stats(),
-                'health': watchdog.get_last_report(),
-                'config': sla_config.get_all(),
-            })
-        elif self.path == '/api/sla/config':
-            from .sla import sla_config
-            self._json(sla_config.get_all())
+
+
+
         elif self.path == '/api/health':
             from .stability import health_monitor
             base_health = health_monitor.check_health()
@@ -649,17 +740,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if llm_error:
                 base_health['llm_error'] = llm_error
             self._json(base_health)
-        elif self.path == '/api/nodes':
-            from .nodes import node_manager
-            self._json({'nodes': node_manager.list_nodes()})
-        elif self.path == '/api/gateway/nodes':
-            from .nodes import gateway
-            self._json({'nodes': gateway.list_nodes()})
-        elif self.path == '/api/status':
-            self._json({'app': APP_NAME, 'version': VERSION,
-                        'unlocked': vault.is_unlocked,
-                        'usage': get_usage_report(),
-                        'model': router.force_model or 'auto'})
+
+
+
         elif self.path == '/api/check-update':
             try:
                 import urllib.request
@@ -688,47 +771,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json(result)
             except Exception as e:
                 self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
-        elif self.path == '/api/agent/export' or self.path.startswith('/api/agent/export?'):
-            if not self._require_auth('user'): return
-            import urllib.parse
-            parsed = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed.query)
-            include_vault = params.get('vault', ['0'])[0] == '1'
-            include_sessions = params.get('sessions', ['1'])[0] != '0'
-            include_data = params.get('data', ['1'])[0] != '0'
-            from .migration import export_agent, export_filename
-            try:
-                zip_bytes = export_agent(
-                    include_vault=include_vault,
-                    include_sessions=include_sessions,
-                    include_data=include_data)
-                fname = export_filename()
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/zip')
-                self.send_header('Content-Disposition', f'attachment; filename="{fname}"')
-                self.send_header('Content-Length', str(len(zip_bytes)))
-                self._cors()
-                self._security_headers()
-                self.end_headers()
-                self.wfile.write(zip_bytes)
-            except Exception as e:
-                self._json({'error': f'Export failed: {e}'}, 500)
 
-        elif self.path == '/api/personas':
-            from .prompt import list_personas, get_active_persona
-            session_id = self.headers.get('X-Session-Id', 'web')
-            personas = list_personas()
-            active = get_active_persona(session_id)
-            self._json({'personas': personas, 'active': active})
-        elif self.path == '/api/metrics':
-            from .core import _metrics
-            usage = get_usage_report()
-            _metrics['total_cost'] = usage.get('total_cost', 0.0)
-            merged = {**request_logger.get_metrics(), **_metrics}
-            self._json(merged)
-        elif self.path == '/api/cert':
-            from .tls import get_cert_info
-            self._json(get_cert_info())
+
+
         elif self.path == '/api/auth/users':
             user = extract_auth(dict(self.headers))
             if not user or user.get('role') != 'admin':
@@ -1662,91 +1707,6 @@ self.addEventListener('fetch',e=>{{
             from .edge_cases import detect_paste_type
             self._json(detect_paste_type(text))
             return
-
-        elif self.path == '/api/agent/import':
-            if not self._require_auth('user'): return
-            # Accept multipart with ZIP file or raw JSON with base64
-            content_type = self.headers.get('Content-Type', '')
-            zip_data = None
-            conflict_mode = 'overwrite'
-            if 'multipart/form-data' in content_type:
-                try:
-                    raw = self.rfile.read(length)
-                    import email.parser, email.policy
-                    header_bytes = f"Content-Type: {content_type}\r\n\r\n".encode()
-                    msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(header_bytes + raw)
-                    for part in msg.walk():
-                        fname = part.get_filename()
-                        if fname and fname.endswith('.zip'):
-                            zip_data = part.get_payload(decode=True)
-                        cd = part.get('Content-Disposition', '')
-                        if 'name="conflict_mode"' in cd:
-                            conflict_mode = (part.get_payload(decode=True) or b'overwrite').decode().strip()
-                except Exception as e:
-                    self._json({'error': f'Parse error: {e}'}, 400)
-                    return
-            else:
-                import base64
-                zip_b64 = body.get('zip_base64', '')
-                conflict_mode = body.get('conflict_mode', 'overwrite')
-                if zip_b64:
-                    zip_data = base64.b64decode(zip_b64)
-            if not zip_data:
-                self._json({'error': 'No ZIP file provided / ZIP 파일이 없습니다'}, 400)
-                return
-            from .migration import import_agent
-            try:
-                result = import_agent(zip_data, conflict_mode=conflict_mode)
-                self._json(result.to_dict())
-            except Exception as e:
-                self._json({'error': f'Import failed: {e}'}, 500)
-
-        elif self.path == '/api/agent/import/preview':
-            if not self._require_auth('user'): return
-            content_type = self.headers.get('Content-Type', '')
-            zip_data = None
-            if 'multipart/form-data' in content_type:
-                try:
-                    raw = self.rfile.read(length)
-                    import email.parser, email.policy
-                    header_bytes = f"Content-Type: {content_type}\r\n\r\n".encode()
-                    msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(header_bytes + raw)
-                    for part in msg.walk():
-                        fname = part.get_filename()
-                        if fname and fname.endswith('.zip'):
-                            zip_data = part.get_payload(decode=True)
-                except Exception:
-                    pass
-            else:
-                import base64
-                zip_b64 = body.get('zip_base64', '')
-                if zip_b64:
-                    zip_data = base64.b64decode(zip_b64)
-            if not zip_data:
-                self._json({'error': 'No ZIP file'}, 400)
-                return
-            from .migration import preview_import
-            self._json(preview_import(zip_data))
-
-        elif self.path == '/api/agent/sync':
-            if not self._require_auth('user'): return
-            action = body.get('action', 'export')
-            if action == 'export':
-                from .migration import quick_sync_export
-                self._json({'ok': True, 'data': quick_sync_export()})
-            elif action == 'import':
-                data = body.get('data', {})
-                if not data:
-                    self._json({'error': 'No data provided'}, 400)
-                    return
-                from .migration import quick_sync_import
-                try:
-                    quick_sync_import(data)
-                    self._json({'ok': True, 'message': 'Quick sync imported / 빠른 동기화 완료'})
-                except Exception as e:
-                    self._json({'error': str(e)}, 500)
-            else:
-                self._json({'error': 'Unknown action. Use: export, import'}, 400)
 
         elif self.path in ('/api/chat', '/api/chat/stream'):
             self._auto_unlock_localhost()
