@@ -434,6 +434,37 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       </div>
     </div>
   </div>
+  <div class="settings-card" id="migration-card">
+    <h3>📦 Agent Migration / 에이전트 이동</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Export or import your agent's personality, memory, settings, and data.<br>에이전트의 인격, 기억, 설정, 데이터를 내보내거나 가져옵니다.</p>
+    <div style="margin-bottom:12px">
+      <strong style="font-size:12px;color:var(--text)">Export / 내보내기</strong>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0">
+        <label style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="exp-sessions" checked> Sessions</label>
+        <label style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="exp-data" checked> Data (notes/expenses)</label>
+        <label style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="exp-vault"> Vault (API keys)</label>
+      </div>
+      <button class="btn" data-action="exportAgent" style="font-size:12px">📥 Export Agent</button>
+      <button class="btn" data-action="quickSyncExport" style="background:var(--bg3);color:var(--text2);font-size:12px;margin-left:4px">⚡ Quick Sync</button>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:12px">
+      <strong style="font-size:12px;color:var(--text)">Import / 가져오기</strong>
+      <div id="import-dropzone" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;margin:8px 0;cursor:pointer;transition:border-color 0.2s" onclick="document.getElementById('import-file-input').click()">
+        <p style="font-size:13px;color:var(--text2);margin:0">📂 Drop ZIP file here or click to browse<br>ZIP 파일을 여기에 놓거나 클릭하세요</p>
+        <input type="file" id="import-file-input" accept=".zip" style="display:none">
+      </div>
+      <div id="import-preview" style="display:none;font-size:12px;color:var(--text2);margin:8px 0;padding:8px;background:var(--bg);border-radius:6px"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="import-mode" style="padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px">
+          <option value="overwrite">Overwrite / 덮어쓰기</option>
+          <option value="merge">Merge / 병합</option>
+          <option value="skip">Skip existing / 건너뛰기</option>
+        </select>
+        <button class="btn" id="import-btn" data-action="importAgent" style="font-size:12px" disabled>📤 Import Agent</button>
+      </div>
+      <div id="import-result" style="margin-top:8px;font-size:12px"></div>
+    </div>
+  </div>
   <div class="settings-card">
     <h3 data-i18n="h-update">🔄 Update</h3>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1856,6 +1887,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='setPw')window.setPw();
     else if(a==='checkUpdate')window.checkUpdate();
     else if(a==='doUpdate')window.doUpdate();
+    else if(a==='exportAgent')window.exportAgent();
+    else if(a==='importAgent')window.importAgent();
+    else if(a==='quickSyncExport')window.quickSyncExport();
     else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){addMsg('assistant','✅ Saved')})}
     else if(a==='saveRouting'){var rc={simple:document.getElementById('route-simple').value,moderate:document.getElementById('route-moderate').value,complex:document.getElementById('route-complex').value};fetch('/api/routing',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify(rc)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('route-status');if(st){st.textContent='✅ Saved!';setTimeout(function(){st.textContent=''},2000)}}).catch(function(){var st=document.getElementById('route-status');if(st)st.textContent='❌ Error'})}
     else if(a==='saveSoul'){
@@ -1986,6 +2020,66 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       }
     }).catch(function(){});
   },3000);
+
+  /* --- Agent Migration (에이전트 이동) --- */
+  window.exportAgent=function(){
+    var s=document.getElementById('exp-sessions').checked?'1':'0';
+    var d=document.getElementById('exp-data').checked?'1':'0';
+    var v=document.getElementById('exp-vault').checked?'1':'0';
+    window.open('/api/agent/export?sessions='+s+'&data='+d+'&vault='+v,'_blank');
+  };
+  window.quickSyncExport=function(){
+    fetch('/api/agent/sync',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({action:'export'})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.ok){var blob=new Blob([JSON.stringify(d.data,null,2)],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='salmalm-quick-sync.json';a.click()}
+    });
+  };
+  var _importZipData=null;
+  var dropzone=document.getElementById('import-dropzone');
+  if(dropzone){
+    dropzone.addEventListener('dragover',function(e){e.preventDefault();dropzone.style.borderColor='var(--accent)'});
+    dropzone.addEventListener('dragleave',function(){dropzone.style.borderColor='var(--border)'});
+    dropzone.addEventListener('drop',function(e){e.preventDefault();dropzone.style.borderColor='var(--border)';if(e.dataTransfer.files[0])_handleImportFile(e.dataTransfer.files[0])});
+  }
+  var impInput=document.getElementById('import-file-input');
+  if(impInput)impInput.addEventListener('change',function(){if(this.files[0])_handleImportFile(this.files[0]);this.value=''});
+  function _handleImportFile(file){
+    if(!file.name.endsWith('.zip')){document.getElementById('import-result').textContent='❌ Please select a ZIP file';return}
+    var reader=new FileReader();
+    reader.onload=function(){
+      _importZipData=reader.result;
+      document.getElementById('import-btn').disabled=false;
+      /* Preview */
+      var fd=new FormData();fd.append('file',file);
+      fetch('/api/agent/import/preview',{method:'POST',headers:{'X-Session-Token':_tok},body:fd})
+      .then(function(r){return r.json()}).then(function(d){
+        var prev=document.getElementById('import-preview');
+        if(d.ok){
+          var m=d.manifest||{};
+          prev.innerHTML='<strong>'+file.name+'</strong> ('+Math.round(d.size_bytes/1024)+'KB)<br>'+
+            'Agent: '+(m.agent_name||'?')+' · v'+(m.version||'?')+'<br>'+
+            'Sections: '+(d.sections||[]).join(', ')+'<br>'+
+            'Files: '+d.file_count;
+          prev.style.display='block';
+        }else{prev.textContent='⚠️ '+(d.error||'Preview failed');prev.style.display='block'}
+      }).catch(function(){});
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  window.importAgent=function(){
+    if(!_importZipData)return;
+    var mode=document.getElementById('import-mode').value;
+    var blob=new Blob([_importZipData],{type:'application/zip'});
+    var fd=new FormData();fd.append('file',blob,'agent-export.zip');fd.append('conflict_mode',mode);
+    document.getElementById('import-result').textContent='⏳ Importing...';
+    fetch('/api/agent/import',{method:'POST',headers:{'X-Session-Token':_tok},body:fd})
+    .then(function(r){return r.json()}).then(function(d){
+      var res=document.getElementById('import-result');
+      if(d.ok){res.innerHTML='✅ Imported: '+(d.imported||[]).join(', ')+(d.warnings&&d.warnings.length?' <br>⚠️ '+d.warnings.join('; '):'')}
+      else{res.textContent='❌ '+(d.errors||[]).join('; ')||(d.error||'Import failed')}
+      _importZipData=null;document.getElementById('import-btn').disabled=true;
+    }).catch(function(e){document.getElementById('import-result').textContent='❌ '+e});
+  };
 
   /* PWA Service Worker */
   if('serviceWorker' in navigator){

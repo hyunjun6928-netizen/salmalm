@@ -237,6 +237,28 @@ class TelegramBot:
             log.error(f"Send audio error: {e}")
             self.send_message(chat_id, f'🔊 Voice send failed: {e}')
 
+    def _send_document(self, chat_id, data: bytes, filename: str, caption: str = ''):
+        """Send a document (file) to Telegram."""
+        try:
+            boundary = f'----SalmAlm{secrets.token_hex(8)}'
+            body = b''
+            body += f'--{boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n{chat_id}\r\n'.encode()
+            if caption:
+                body += f'--{boundary}\r\nContent-Disposition: form-data; name="caption"\r\n\r\n{caption[:1000]}\r\n'.encode()
+            body += f'--{boundary}\r\nContent-Disposition: form-data; name="document"; filename="{filename}"\r\nContent-Type: application/zip\r\n\r\n'.encode()
+            body += data
+            body += f'\r\n--{boundary}--\r\n'.encode()
+            req = urllib.request.Request(
+                f'https://api.telegram.org/bot{self.token}/sendDocument',
+                data=body,
+                headers={'Content-Type': f'multipart/form-data; boundary={boundary}'},
+                method='POST'
+            )
+            urllib.request.urlopen(req, timeout=60)
+        except Exception as e:
+            log.error(f"Send document error: {e}")
+            self.send_message(chat_id, f'📎 Document send failed: {e}')
+
     def _send_tts_voice(self, chat_id, text: str, session):
         """Generate TTS audio via OpenAI API and send as voice message."""
         api_key = vault.get('openai_api_key')
@@ -544,7 +566,16 @@ class TelegramBot:
             doc = msg['document']
             try:
                 data, fname = self._download_file(doc['file_id'])
-                save_path = WORKSPACE_DIR / 'uploads' / (doc.get('file_name', fname))
+                doc_fname = doc.get('file_name', fname)
+                # Auto-detect agent import ZIP
+                if doc_fname.endswith('.zip') and 'agent-export' in doc_fname.lower():
+                    self.send_typing(chat_id)
+                    from .migration import import_agent
+                    result = import_agent(data)
+                    self.send_message(chat_id,
+                        f'📦 **Agent Import / 에이전트 가져오기**\n\n{result.summary()}')
+                    return
+                save_path = WORKSPACE_DIR / 'uploads' / doc_fname
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
                 file_info = f'[📎 File saved: uploads/{save_path.name} ({len(data)//1024}KB)]'
@@ -1116,6 +1147,52 @@ class TelegramBot:
             else:
                 result = '❌ Usage: /tr <lang> <text>\nExample: /tr en 안녕하세요'
             self.send_message(chat_id, result)
+
+        elif cmd == '/export':
+            self.send_typing(chat_id)
+            try:
+                from .migration import export_agent, export_filename
+                parts = text.split()
+                include_vault = '--vault' in parts
+                zip_bytes = export_agent(include_vault=include_vault)
+                fname = export_filename()
+                # Send as document
+                self._send_document(chat_id, zip_bytes, fname,
+                                    caption=f'📦 Agent Export ({len(zip_bytes)//1024}KB)')
+            except Exception as e:
+                self.send_message(chat_id, f'❌ Export failed: {e}')
+
+        elif cmd == '/import':
+            self.send_message(chat_id,
+                '📦 에이전트 가져오기: ZIP 파일을 이 채팅에 보내주세요.\n'
+                'Agent import: Send a ZIP file to this chat.\n'
+                '(salmalm-agent-export-*.zip)')
+
+        elif cmd == '/sync':
+            parts = text.split(maxsplit=1)
+            sub = parts[1].strip() if len(parts) > 1 else 'export'
+            if sub == 'export':
+                from .migration import quick_sync_export
+                data = quick_sync_export()
+                sync_json = json.dumps(data, ensure_ascii=False, indent=2)
+                self.send_message(chat_id,
+                    f'📋 Quick Sync Export\n```json\n{sync_json[:3500]}\n```')
+            elif sub.startswith('import'):
+                json_str = sub[len('import'):].strip()
+                if not json_str:
+                    self.send_message(chat_id, '❌ Usage: /sync import <json>')
+                    return
+                try:
+                    data = json.loads(json_str)
+                    from .migration import quick_sync_import
+                    quick_sync_import(data)
+                    self.send_message(chat_id, '✅ Quick sync imported / 빠른 동기화 완료')
+                except json.JSONDecodeError:
+                    self.send_message(chat_id, '❌ Invalid JSON')
+                except Exception as e:
+                    self.send_message(chat_id, f'❌ {e}')
+            else:
+                self.send_message(chat_id, 'Usage: /sync export | /sync import <json>')
 
         else:
             # Route unknown /commands through engine (handles /model auto/opus/sonnet/haiku etc.)

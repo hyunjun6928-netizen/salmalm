@@ -688,6 +688,32 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json(result)
             except Exception as e:
                 self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
+        elif self.path == '/api/agent/export' or self.path.startswith('/api/agent/export?'):
+            if not self._require_auth('user'): return
+            import urllib.parse
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            include_vault = params.get('vault', ['0'])[0] == '1'
+            include_sessions = params.get('sessions', ['1'])[0] != '0'
+            include_data = params.get('data', ['1'])[0] != '0'
+            from .migration import export_agent, export_filename
+            try:
+                zip_bytes = export_agent(
+                    include_vault=include_vault,
+                    include_sessions=include_sessions,
+                    include_data=include_data)
+                fname = export_filename()
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/zip')
+                self.send_header('Content-Disposition', f'attachment; filename="{fname}"')
+                self.send_header('Content-Length', str(len(zip_bytes)))
+                self._cors()
+                self._security_headers()
+                self.end_headers()
+                self.wfile.write(zip_bytes)
+            except Exception as e:
+                self._json({'error': f'Export failed: {e}'}, 500)
+
         elif self.path == '/api/personas':
             from .prompt import list_personas, get_active_persona
             session_id = self.headers.get('X-Session-Id', 'web')
@@ -1636,6 +1662,91 @@ self.addEventListener('fetch',e=>{{
             from .edge_cases import detect_paste_type
             self._json(detect_paste_type(text))
             return
+
+        elif self.path == '/api/agent/import':
+            if not self._require_auth('user'): return
+            # Accept multipart with ZIP file or raw JSON with base64
+            content_type = self.headers.get('Content-Type', '')
+            zip_data = None
+            conflict_mode = 'overwrite'
+            if 'multipart/form-data' in content_type:
+                try:
+                    raw = self.rfile.read(length)
+                    import email.parser, email.policy
+                    header_bytes = f"Content-Type: {content_type}\r\n\r\n".encode()
+                    msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(header_bytes + raw)
+                    for part in msg.walk():
+                        fname = part.get_filename()
+                        if fname and fname.endswith('.zip'):
+                            zip_data = part.get_payload(decode=True)
+                        cd = part.get('Content-Disposition', '')
+                        if 'name="conflict_mode"' in cd:
+                            conflict_mode = (part.get_payload(decode=True) or b'overwrite').decode().strip()
+                except Exception as e:
+                    self._json({'error': f'Parse error: {e}'}, 400)
+                    return
+            else:
+                import base64
+                zip_b64 = body.get('zip_base64', '')
+                conflict_mode = body.get('conflict_mode', 'overwrite')
+                if zip_b64:
+                    zip_data = base64.b64decode(zip_b64)
+            if not zip_data:
+                self._json({'error': 'No ZIP file provided / ZIP 파일이 없습니다'}, 400)
+                return
+            from .migration import import_agent
+            try:
+                result = import_agent(zip_data, conflict_mode=conflict_mode)
+                self._json(result.to_dict())
+            except Exception as e:
+                self._json({'error': f'Import failed: {e}'}, 500)
+
+        elif self.path == '/api/agent/import/preview':
+            if not self._require_auth('user'): return
+            content_type = self.headers.get('Content-Type', '')
+            zip_data = None
+            if 'multipart/form-data' in content_type:
+                try:
+                    raw = self.rfile.read(length)
+                    import email.parser, email.policy
+                    header_bytes = f"Content-Type: {content_type}\r\n\r\n".encode()
+                    msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(header_bytes + raw)
+                    for part in msg.walk():
+                        fname = part.get_filename()
+                        if fname and fname.endswith('.zip'):
+                            zip_data = part.get_payload(decode=True)
+                except Exception:
+                    pass
+            else:
+                import base64
+                zip_b64 = body.get('zip_base64', '')
+                if zip_b64:
+                    zip_data = base64.b64decode(zip_b64)
+            if not zip_data:
+                self._json({'error': 'No ZIP file'}, 400)
+                return
+            from .migration import preview_import
+            self._json(preview_import(zip_data))
+
+        elif self.path == '/api/agent/sync':
+            if not self._require_auth('user'): return
+            action = body.get('action', 'export')
+            if action == 'export':
+                from .migration import quick_sync_export
+                self._json({'ok': True, 'data': quick_sync_export()})
+            elif action == 'import':
+                data = body.get('data', {})
+                if not data:
+                    self._json({'error': 'No data provided'}, 400)
+                    return
+                from .migration import quick_sync_import
+                try:
+                    quick_sync_import(data)
+                    self._json({'ok': True, 'message': 'Quick sync imported / 빠른 동기화 완료'})
+                except Exception as e:
+                    self._json({'error': str(e)}, 500)
+            else:
+                self._json({'error': 'Unknown action. Use: export, import'}, 400)
 
         elif self.path in ('/api/chat', '/api/chat/stream'):
             self._auto_unlock_localhost()
