@@ -14,7 +14,7 @@ class TestToolHandlersCoverage5(unittest.TestCase):
     def test_json_query_basic(self):
         from salmalm.tool_handlers import execute_tool
         data = json.dumps({"name": "Alice", "age": 30})
-        result = execute_tool('json_query', {'data': data, 'query': 'name'})
+        result = execute_tool('json_query', {'data': data, 'query': '.name'})
         self.assertIn('Alice', result)
 
     def test_json_query_invalid(self):
