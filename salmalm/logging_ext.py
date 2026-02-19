@@ -172,6 +172,32 @@ class RequestLogger:
             return m
 
 
+# ── Graceful Error Recovery ──────────────────────────────────
+
+def safe_execute(func, *args, fallback=None, tag='SAFE', **kwargs):
+    """Execute a function with graceful error recovery.
+
+    Returns the result on success, or fallback on any exception.
+    Logs errors with [TAG] prefix for easy grep.
+    """
+    try:
+        return func(*args, **kwargs)
+    except Exception as e:
+        logger = logging.getLogger('salmalm')
+        logger.error(f"[{tag}] {func.__name__} failed: {type(e).__name__}: {e}")
+        return fallback
+
+
+async def safe_execute_async(coro, fallback=None, tag='SAFE'):
+    """Async version of safe_execute."""
+    try:
+        return await coro
+    except Exception as e:
+        logger = logging.getLogger('salmalm')
+        logger.error(f"[{tag}] Async task failed: {type(e).__name__}: {e}")
+        return fallback
+
+
 # ── Module instances ─────────────────────────────────────────
 
 request_logger = RequestLogger()
