@@ -386,6 +386,22 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         active = get_active_persona(session_id)
         self._json({'personas': personas, 'active': active})
 
+    def _get_thoughts(self):
+        from .thoughts import thought_stream
+        import urllib.parse as _up
+        qs = _up.parse_qs(_up.urlparse(self.path).query)
+        search_q = qs.get('q', [''])[0]
+        if search_q:
+            results = thought_stream.search(search_q)
+        else:
+            n = int(qs.get('limit', ['20'])[0])
+            results = thought_stream.list_recent(n)
+        self._json({'thoughts': results})
+
+    def _get_thoughts_stats(self):
+        from .thoughts import thought_stream
+        self._json(thought_stream.stats())
+
     # ── GET Route Table (exact path → method) ──
     _GET_ROUTES = {
         '/api/uptime': '_get_uptime',
@@ -410,6 +426,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         '/api/mcp': '_get_mcp',
         '/api/rag': '_get_rag',
         '/api/personas': '_get_personas',
+        '/api/thoughts': '_get_thoughts',
+        '/api/thoughts/stats': '_get_thoughts_stats',
     }
 
 
@@ -2133,6 +2151,25 @@ self.addEventListener('fetch',e=>{{
                 self._json({'ok': True, 'result': result[:50000]})  # type: ignore[index]
             except Exception as e:
                 self._json({'error': str(e)[:500]}, 500)
+
+        elif self.path == '/api/thoughts':
+            from .thoughts import thought_stream
+            content = body.get('content', '').strip()
+            if not content:
+                self._json({'error': 'content required'}, 400)
+                return
+            mood = body.get('mood', 'neutral')
+            tid = thought_stream.add(content, mood=mood)
+            self._json({'ok': True, 'id': tid})
+
+        elif self.path.startswith('/api/thoughts/search'):
+            from .thoughts import thought_stream
+            q = body.get('q', body.get('query', ''))
+            if not q:
+                self._json({'error': 'query required'}, 400)
+                return
+            results = thought_stream.search(q)
+            self._json({'thoughts': results})
 
         else:
             self._json({'error': 'Not found'}, 404)

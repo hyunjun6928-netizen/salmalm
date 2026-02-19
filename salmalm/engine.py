@@ -1167,6 +1167,9 @@ def _cmd_help(cmd, session, **_):
 /latency — Latency stats (레이턴시)
 /health detail — Detailed health report (상세 헬스)
 /security — 🛡️ Security audit report
+/evolve — 🧬 Self-evolving prompt (status|apply|reset|history)
+/mood — 🎭 Mood-aware response (status|on|off|sensitive)
+/think <내용> — 💭 Record a thought (or list|search|tag|stats|export)
 
 🤖 **Model Aliases** (27)
 claude, sonnet, opus, haiku, gpt, gpt5, o3, o4mini,
@@ -1195,6 +1198,11 @@ async def _cmd_think(cmd, session, *, on_tool=None, **_):
     think_msg = cmd[7:].strip()
     if not think_msg:
         return 'Usage: /think <question>'
+    # Route thought-stream subcommands
+    _thought_subs = ('list', 'search', 'tag', 'timeline', 'stats', 'export')
+    first_word = think_msg.split(None, 1)[0].lower() if think_msg else ''
+    if first_word in _thought_subs:
+        return _cmd_thought(cmd, session)
     session.add_user(think_msg)
     session.messages = compact_messages(session.messages, session=session)
     classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
@@ -1718,6 +1726,100 @@ def _cmd_plugins(cmd, session, **_):
     return '❌ Usage: /plugins list|reload|enable|disable <name>'
 
 
+# ── Self-Evolving Prompt commands ──
+def _cmd_evolve(cmd, session, **_):
+    parts = cmd.strip().split(None, 2)
+    sub = parts[1] if len(parts) > 1 else 'status'
+    from .self_evolve import prompt_evolver
+    if sub == 'status':
+        return prompt_evolver.get_status()
+    elif sub == 'apply':
+        from .prompt import USER_SOUL_FILE
+        return prompt_evolver.apply_to_soul(USER_SOUL_FILE)
+    elif sub == 'reset':
+        return prompt_evolver.reset()
+    elif sub == 'history':
+        return prompt_evolver.get_history()
+    return '❌ Usage: /evolve status|apply|reset|history'
+
+# ── Mood-Aware commands ──
+def _cmd_mood(cmd, session, **_):
+    parts = cmd.strip().split(None, 2)
+    sub = parts[1] if len(parts) > 1 else 'status'
+    from .mood import mood_detector
+    if sub == 'status':
+        # Use last user message for context
+        last_msg = ''
+        for m in reversed(session.messages):
+            if m.get('role') == 'user':
+                last_msg = str(m.get('content', ''))
+                break
+        return mood_detector.get_status(last_msg)
+    elif sub in ('off', 'on', 'sensitive'):
+        return mood_detector.set_mode(sub)
+    elif sub == 'report':
+        period = parts[2] if len(parts) > 2 else 'week'
+        return mood_detector.generate_report(period)
+    return '❌ Usage: /mood status|off|on|sensitive|report [week|month]'
+
+# ── Thought Stream commands ──
+def _cmd_thought(cmd, session, **_):
+    from .thoughts import thought_stream, _format_thoughts, _format_stats
+    text = cmd.strip()
+    # Remove /think prefix
+    if text.startswith('/thought'):
+        text = text[8:].strip()
+    elif text.startswith('/think'):
+        # Only handle /think subcommands here, not /think <question> for deep reasoning
+        text = text[6:].strip()
+
+    if not text:
+        return '❌ Usage: /think <내용> | /think list | /think search <쿼리> | /think tag <태그> | /think stats'
+
+    parts = text.split(None, 1)
+    sub = parts[0]
+    arg = parts[1].strip() if len(parts) > 1 else ''
+
+    if sub == 'list':
+        n = int(arg) if arg.isdigit() else 10
+        thoughts = thought_stream.list_recent(n)
+        return _format_thoughts(thoughts, f'💭 **최근 {n}개 생각**\n')
+    elif sub == 'search':
+        if not arg:
+            return '❌ Usage: /think search <쿼리>'
+        results = thought_stream.search(arg)
+        return _format_thoughts(results, f'🔍 **검색: {arg}**\n')
+    elif sub == 'tag':
+        if not arg:
+            return '❌ Usage: /think tag <태그>'
+        results = thought_stream.by_tag(arg)
+        return _format_thoughts(results, f'🏷️ **태그: #{arg}**\n')
+    elif sub == 'timeline':
+        results = thought_stream.timeline(arg if arg else None)
+        date_label = arg if arg else '오늘'
+        return _format_thoughts(results, f'📅 **타임라인: {date_label}**\n')
+    elif sub == 'stats':
+        return _format_stats(thought_stream.stats())
+    elif sub == 'export':
+        md = thought_stream.export_markdown()
+        return md
+    else:
+        # It's a thought to record — detect mood first
+        thought_text = text
+        mood = 'neutral'
+        try:
+            from .mood import mood_detector
+            mood, _ = mood_detector.detect(thought_text)
+        except Exception:
+            pass
+        tid = thought_stream.add(thought_text, mood=mood)
+        tags = ''
+        import re as _re2
+        found_tags = _re2.findall(r'#(\w+)', thought_text)
+        if found_tags:
+            tags = f' 🏷️ {", ".join("#" + t for t in found_tags)}'
+        return f'💭 생각 #{tid} 기록됨{tags}'
+
 # Exact-match slash commands
 _SLASH_COMMANDS = {
     '/clear': _cmd_clear,
@@ -1754,6 +1856,9 @@ _SLASH_PREFIX_COMMANDS = [
     ('/agent', _cmd_agent),
     ('/hooks', _cmd_hooks),
     ('/plugins', _cmd_plugins),
+    ('/evolve', _cmd_evolve),
+    ('/mood', _cmd_mood),
+    ('/thought', _cmd_thought),
 ]
 
 
@@ -1853,6 +1958,31 @@ async def _process_message_inner(session_id: str, user_message: str,
                 break
     except Exception as e:
         log.warning(f"RAG injection skipped: {e}")
+
+    # Mood-aware tone injection
+    try:
+        from .mood import mood_detector
+        if mood_detector.enabled:
+            _detected_mood, _mood_conf = mood_detector.detect(user_message)
+            if _detected_mood != 'neutral' and _mood_conf > 0.3:
+                _tone_hint = mood_detector.get_tone_injection(_detected_mood)
+                if _tone_hint:
+                    for i, m in enumerate(session.messages):
+                        if m.get('role') == 'system':
+                            session.messages[i] = dict(m)
+                            session.messages[i]['content'] = m['content'] + f'\n\n[감정 감지: {_detected_mood}] {_tone_hint}'
+                            break
+                mood_detector.record_mood(_detected_mood, _mood_conf)
+    except Exception as _mood_err:
+        log.debug(f"Mood detection skipped: {_mood_err}")
+
+    # Self-evolving prompt — record conversation periodically
+    try:
+        from .self_evolve import prompt_evolver
+        if len(session.messages) > 4 and len(session.messages) % 10 == 0:
+            prompt_evolver.record_conversation(session.messages)
+    except Exception:
+        pass
 
     # Classify and run through Intelligence Engine
     classification = TaskClassifier.classify(user_message, len(session.messages))
