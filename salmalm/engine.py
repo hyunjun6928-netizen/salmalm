@@ -35,24 +35,24 @@ class TaskClassifier:
                                'bug', '버그', 'fix', '수정', 'refactor', '리팩', 'debug', '디버그',
                                'API', 'server', '서버', 'deploy', '배포', 'build', '빌드',
                                '개발', '코딩', '프로그래밍'],
-                 'tier': 3, 'thinking': True, 'max_tools': 200},
+                 'tier': 3, 'thinking': True},
         'analysis': {'keywords': ['analyze', '분석', 'compare', '비교', 'review', '리뷰',
                                    'audit', '감사', 'security', '보안', 'performance', '성능',
                                    '검토', '조사', '평가', '진단'],
-                     'tier': 3, 'thinking': True, 'max_tools': 200},
+                     'tier': 3, 'thinking': True},
         'creative': {'keywords': ['write', '작성', 'story', '이야기', 'poem', '시',
                                    'translate', '번역', 'summarize', '요약', '글'],
-                     'tier': 2, 'thinking': False, 'max_tools': 50},
+                     'tier': 2, 'thinking': False},
         'search': {'keywords': ['search', '검색', 'find', '찾', 'news', '뉴스',
                                  'latest', '최신', 'weather', '날씨', 'price', '가격'],
-                   'tier': 2, 'thinking': False, 'max_tools': 50},
+                   'tier': 2, 'thinking': False},
         'system': {'keywords': ['file', '파일', 'exec', 'run', '실행', 'install', '설치',
                                  'process', '프로세스', 'disk', '디스크', 'memory', '메모리'],
-                   'tier': 2, 'thinking': False, 'max_tools': 200},
+                   'tier': 2, 'thinking': False},
         'memory': {'keywords': ['remember', '기억', 'memo', '메모', 'record', '기록',
                                  'diary', '일지', 'learn', '학습'],
-                   'tier': 1, 'thinking': False, 'max_tools': 20},
-        'chat': {'keywords': [], 'tier': 1, 'thinking': False, 'max_tools': 50},
+                   'tier': 1, 'thinking': False},
+        'chat': {'keywords': [], 'tier': 1, 'thinking': False},
     }
 
     @classmethod
@@ -94,7 +94,7 @@ class TaskClassifier:
         return {
             'intent': best, 'tier': tier, 'thinking': thinking,
             'thinking_budget': thinking_budget,
-            'max_tools': info['max_tools'], 'score': scores[best],
+            'score': scores[best],
         }
 
 
@@ -233,11 +233,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         tier = classification['tier']
         use_thinking = classification['thinking']
         thinking_budget = classification['thinking_budget']
-        max_tools = classification['max_tools']
-
         log.info(f"🧠 Intent: {classification['intent']} (tier={tier}, "
                  f"think={use_thinking}, budget={thinking_budget}, "
-                 f"max_tools={max_tools}, score={classification['score']})")
+                 f"score={classification['score']})")
 
         # PHASE 1: PLANNING — inject plan prompt for complex tasks
         if classification['intent'] in ('code', 'analysis') and classification['score'] >= 2:
@@ -248,7 +246,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         # PHASE 2: EXECUTE — tool loop
         try:
           return await self._execute_loop(session, user_message, model_override,
-                                           on_tool, classification, max_tools, tier)
+                                           on_tool, classification, tier)
         except Exception as e:
             log.error(f"Engine.run error: {e}")
             import traceback; traceback.print_exc()
@@ -257,10 +255,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             return error_msg
 
     async def _execute_loop(self, session, user_message, model_override,
-                             on_tool, classification, max_tools, tier):
+                             on_tool, classification, tier):
         use_thinking = classification['thinking']
         thinking_budget = classification['thinking_budget']
-        for iteration in range(max_tools):
+        iteration = 0
+        while True:
             model = model_override or router.route(
                 user_message, has_tools=True, iteration=iteration)
 
@@ -321,6 +320,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 self._append_tool_results(
                     session, provider, result,
                     result['tool_calls'], tool_outputs)
+                iteration += 1
                 continue
 
             # Final response
@@ -356,17 +356,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                                 if not m.get('_plan_injected')]
             return response
 
-        # Loop exhausted
-        for m in reversed(session.messages):
-            if m['role'] == 'assistant':
-                content = m.get('content', '')
-                if isinstance(content, str) and content:
-                    return content + f"\n\n⚠️ 도구 호출 한도에 도달했습니다. 더 구체적으로 요청해 주세요."
-                elif isinstance(content, list):
-                    texts = [b['text'] for b in content if b.get('type') == 'text']
-                    if texts:
-                        return '\n'.join(texts) + f"\n\n⚠️ 도구 호출 한도에 도달했습니다. 더 구체적으로 요청해 주세요."
-        return f"⚠️ 도구 호출 한도에 도달했습니다. 더 구체적으로 요청해 주세요."
+        # Unreachable (while True exits via return)
 
 
 # Singleton
@@ -426,7 +416,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         session.add_user(think_msg)
         session.messages = await asyncio.to_thread(compact_messages, session.messages)
         classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
-                          'thinking_budget': 16000, 'max_tools': 30, 'score': 5}
+                          'thinking_budget': 16000, 'score': 5}
         return await _engine.run(session, think_msg,
                                   model_override=COMMAND_MODEL,
                                   on_tool=on_tool, classification=classification)
@@ -437,7 +427,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         session.add_user(plan_msg)
         session.messages = await asyncio.to_thread(compact_messages, session.messages)
         classification = {'intent': 'code', 'tier': 3, 'thinking': True,
-                          'thinking_budget': 10000, 'max_tools': 30, 'score': 5}
+                          'thinking_budget': 10000, 'score': 5}
         return await _engine.run(session, plan_msg, model_override=model_override,
                                   on_tool=on_tool, classification=classification)
     if cmd.startswith('/model '):
