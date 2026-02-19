@@ -289,6 +289,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/api/nodes':
             from .nodes import node_manager
             self._json({'nodes': node_manager.list_nodes()})
+        elif self.path == '/api/gateway/nodes':
+            from .nodes import gateway
+            self._json({'nodes': gateway.list_nodes()})
         elif self.path == '/api/status':
             self._json({'app': APP_NAME, 'version': VERSION,
                         'unlocked': vault.is_unlocked,
@@ -723,6 +726,58 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             vault.set('telegram_token', body.get('token', ''))
             vault.set('telegram_owner_id', body.get('owner_id', ''))
             self._json({'ok': True, 'message': 'Telegram config saved. Restart required.'})
+
+        # === Gateway-Node Protocol ===
+        elif self.path == '/api/gateway/register':
+            from .nodes import gateway
+            node_id = body.get('node_id', '')
+            url = body.get('url', '')
+            if not node_id or not url:
+                self._json({'error': 'node_id and url required'}, 400)
+                return
+            result = gateway.register(
+                node_id, url,
+                token=body.get('token', ''),
+                capabilities=body.get('capabilities'),
+                name=body.get('name', ''))
+            self._json(result)
+
+        elif self.path == '/api/gateway/heartbeat':
+            from .nodes import gateway
+            node_id = body.get('node_id', '')
+            self._json(gateway.heartbeat(node_id))
+
+        elif self.path == '/api/gateway/unregister':
+            from .nodes import gateway
+            node_id = body.get('node_id', '')
+            self._json(gateway.unregister(node_id))
+
+        elif self.path == '/api/gateway/dispatch':
+            from .nodes import gateway
+            node_id = body.get('node_id', '')
+            tool = body.get('tool', '')
+            args = body.get('args', {})
+            if node_id:
+                result = gateway.dispatch(node_id, tool, args)
+            else:
+                result = gateway.dispatch_auto(tool, args)
+                if result is None:
+                    result = {'error': 'No available node for this tool'}
+            self._json(result)
+
+        elif self.path == '/api/node/execute':
+            # Node endpoint: execute a tool locally (called by gateway)
+            from .tool_handlers import execute_tool
+            tool = body.get('tool', '')
+            args = body.get('args', {})
+            if not tool:
+                self._json({'error': 'tool name required'}, 400)
+                return
+            try:
+                result = execute_tool(tool, args)
+                self._json({'ok': True, 'result': result[:50000]})
+            except Exception as e:
+                self._json({'error': str(e)[:500]}, 500)
 
         else:
             self._json({'error': 'Not found'}, 404)

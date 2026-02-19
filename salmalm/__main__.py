@@ -29,6 +29,67 @@ def _ensure_windows_shortcut():
         print(f"⚠️  Could not create desktop shortcut: {e}")
 
 
+def _run_node_mode():
+    """Run as a lightweight node that registers with a gateway."""
+    import http.server, json, threading
+
+    # Parse args: --node --gateway http://host:18800 --port 18810 --name mynode --token secret
+    args = sys.argv[1:]
+    gateway_url = 'http://127.0.0.1:18800'
+    port = 18810
+    name = os.environ.get('HOSTNAME', 'node-1')
+    token = ''
+
+    i = 0
+    while i < len(args):
+        if args[i] == '--gateway' and i + 1 < len(args):
+            gateway_url = args[i + 1]; i += 2
+        elif args[i] == '--port' and i + 1 < len(args):
+            port = int(args[i + 1]); i += 2
+        elif args[i] == '--name' and i + 1 < len(args):
+            name = args[i + 1]; i += 2
+        elif args[i] == '--token' and i + 1 < len(args):
+            token = args[i + 1]; i += 2
+        else:
+            i += 1
+
+    from salmalm.constants import VERSION
+    from salmalm.web import WebHandler
+    from salmalm.nodes import NodeAgent
+
+    # Ensure working dirs
+    for d in ('memory', 'workspace', 'uploads', 'plugins'):
+        os.makedirs(d, exist_ok=True)
+
+    node_id = f'{name}-{port}'
+    agent = NodeAgent(gateway_url, node_id, token=token, name=name)
+
+    # Register with gateway
+    result = agent.register()
+    if 'error' in result:
+        print(f"⚠️  Gateway registration failed: {result['error']}")
+        print(f"   Starting standalone anyway on :{port}")
+
+    # Start heartbeat
+    agent.start_heartbeat(interval=30)
+
+    # Start HTTP server for tool execution
+    server = http.server.ThreadingHTTPServer(('0.0.0.0', port), WebHandler)
+    print(f"╔══════════════════════════════════════════════╗")
+    print(f"║  📡 SalmAlm Node v{VERSION:<27s}║")
+    print(f"║  Name: {name:<37s}║")
+    print(f"║  Port: {port:<37s}║")
+    print(f"║  Gateway: {gateway_url:<34s}║")
+    print(f"╚══════════════════════════════════════════════╝")
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        agent.stop()
+        server.shutdown()
+        print("\n📡 Node stopped.")
+
+
 def main() -> None:
     """CLI entry point — start the salmalm server."""
     # Set working directory to a fixed location (not cwd)
@@ -55,6 +116,11 @@ def main() -> None:
     # Windows: create desktop shortcut on first run
     if sys.platform == 'win32' and not getattr(sys, 'frozen', False):
         _ensure_windows_shortcut()
+
+    # Node mode: lightweight tool executor that registers with a gateway
+    if '--node' in sys.argv:
+        _run_node_mode()
+        return
 
     # Ensure working directory has required folders
     for d in ('memory', 'workspace', 'uploads', 'plugins'):

@@ -75,8 +75,18 @@ def _is_subpath(path: Path, parent: Path) -> bool:
 
 
 def execute_tool(name: str, args: dict) -> str:
-    """Execute a tool and return result string."""
+    """Execute a tool and return result string. Auto-dispatches to remote node if available."""
     audit_log('tool_exec', f'{name}: {json.dumps(args, ensure_ascii=False)[:200]}')
+
+    # Try remote node dispatch first (if gateway has registered nodes)
+    try:
+        from .nodes import gateway
+        if gateway._nodes:
+            result = gateway.dispatch_auto(name, args)
+            if result and 'error' not in result:
+                return result.get('result', str(result))
+    except Exception:
+        pass  # Fall through to local execution
     try:
         if name == 'exec':
             cmd = args.get('command', '')

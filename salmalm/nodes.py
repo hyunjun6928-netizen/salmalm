@@ -355,5 +355,199 @@ class NodeManager:
             return {"error": str(e)}
 
 
-# Module-level instance
+# ============================================================
+# Gateway-Node Protocol
+# ============================================================
+# Nodes register with the gateway. Gateway can dispatch tool calls to nodes.
+# Node runs in --node mode: lightweight SalmAlm that only executes tools.
+# Gateway keeps a registry and routes tool calls based on node capabilities.
+
+class GatewayRegistry:
+    """Gateway side: manages registered nodes that can execute tools remotely."""
+
+    def __init__(self):
+        self._nodes: Dict[str, dict] = {}  # node_id → {url, token, capabilities, last_heartbeat, status}
+
+    def register(self, node_id: str, url: str, token: str = '',
+                 capabilities: list = None, name: str = '') -> dict:
+        """Register a node with the gateway."""
+        self._nodes[node_id] = {
+            'id': node_id,
+            'name': name or node_id,
+            'url': url.rstrip('/'),
+            'token': token,
+            'capabilities': capabilities or ['exec', 'read_file', 'write_file', 'edit_file', 'web_search', 'web_fetch'],
+            'last_heartbeat': time.time(),
+            'status': 'online',
+            'tool_calls': 0,
+            'errors': 0,
+        }
+        log.info(f"📡 Node registered: {node_id} ({url})")
+        return {'ok': True, 'node_id': node_id}
+
+    def heartbeat(self, node_id: str) -> dict:
+        """Update node heartbeat timestamp."""
+        node = self._nodes.get(node_id)
+        if not node:
+            return {'error': 'Node not registered'}
+        node['last_heartbeat'] = time.time()
+        node['status'] = 'online'
+        return {'ok': True}
+
+    def unregister(self, node_id: str) -> dict:
+        """Remove a node."""
+        if node_id in self._nodes:
+            del self._nodes[node_id]
+            log.info(f"📡 Node unregistered: {node_id}")
+            return {'ok': True}
+        return {'error': 'Node not found'}
+
+    def list_nodes(self) -> list:
+        """List all registered nodes with status."""
+        now = time.time()
+        result = []
+        for nid, node in self._nodes.items():
+            age = now - node['last_heartbeat']
+            if age > 120:
+                node['status'] = 'offline'
+            elif age > 60:
+                node['status'] = 'stale'
+            result.append({
+                'id': nid,
+                'name': node['name'],
+                'url': node['url'],
+                'status': node['status'],
+                'capabilities': node['capabilities'],
+                'tool_calls': node['tool_calls'],
+                'errors': node['errors'],
+                'last_seen': int(age),
+            })
+        return result
+
+    def find_node(self, tool_name: str) -> Optional[dict]:
+        """Find an online node that supports the given tool."""
+        now = time.time()
+        for nid, node in self._nodes.items():
+            if (node['status'] == 'online'
+                    and (now - node['last_heartbeat']) < 120
+                    and tool_name in node['capabilities']):
+                return node
+        return None
+
+    def dispatch(self, node_id: str, tool_name: str, tool_args: dict,
+                 timeout: int = 60) -> dict:
+        """Dispatch a tool call to a specific node."""
+        node = self._nodes.get(node_id)
+        if not node:
+            return {'error': f'Node {node_id} not found'}
+
+        url = f"{node['url']}/api/node/execute"
+        headers = {'Content-Type': 'application/json'}
+        if node['token']:
+            headers['Authorization'] = f'Bearer {node["token"]}'
+
+        payload = json.dumps({
+            'tool': tool_name,
+            'args': tool_args,
+        }).encode()
+
+        req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                result = json.loads(resp.read())
+                node['tool_calls'] += 1
+                return result
+        except Exception as e:
+            node['errors'] += 1
+            return {'error': f'Node dispatch failed: {str(e)[:200]}'}
+
+    def dispatch_auto(self, tool_name: str, tool_args: dict,
+                      timeout: int = 60) -> Optional[dict]:
+        """Auto-find a node for this tool and dispatch. Returns None if no node available."""
+        node = self.find_node(tool_name)
+        if not node:
+            return None
+        return self.dispatch(node['id'], tool_name, tool_args, timeout)
+
+
+class NodeAgent:
+    """Node side: lightweight agent that receives and executes tool calls from gateway."""
+
+    def __init__(self, gateway_url: str, node_id: str, token: str = '',
+                 capabilities: list = None, name: str = ''):
+        self.gateway_url = gateway_url.rstrip('/')
+        self.node_id = node_id
+        self.token = token
+        self.capabilities = capabilities or ['exec', 'read_file', 'write_file', 'edit_file', 'web_search', 'web_fetch']
+        self.name = name or node_id
+        self._heartbeat_thread = None
+        self._running = False
+
+    def register(self) -> dict:
+        """Register this node with the gateway."""
+        payload = json.dumps({
+            'node_id': self.node_id,
+            'url': f'http://{self._get_local_ip()}:18810',
+            'token': self.token,
+            'capabilities': self.capabilities,
+            'name': self.name,
+        }).encode()
+
+        headers = {'Content-Type': 'application/json'}
+        if self.token:
+            headers['Authorization'] = f'Bearer {self.token}'
+
+        req = urllib.request.Request(
+            f'{self.gateway_url}/api/gateway/register',
+            data=payload, headers=headers, method='POST')
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read())
+                log.info(f"📡 Registered with gateway: {self.gateway_url}")
+                return result
+        except Exception as e:
+            log.error(f"📡 Gateway registration failed: {e}")
+            return {'error': str(e)}
+
+    def _get_local_ip(self) -> str:
+        """Get local IP for advertising to gateway."""
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return '127.0.0.1'
+
+    def start_heartbeat(self, interval: int = 30):
+        """Start background heartbeat to gateway."""
+        self._running = True
+        import threading
+
+        def _beat():
+            while self._running:
+                try:
+                    payload = json.dumps({'node_id': self.node_id}).encode()
+                    headers = {'Content-Type': 'application/json'}
+                    if self.token:
+                        headers['Authorization'] = f'Bearer {self.token}'
+                    req = urllib.request.Request(
+                        f'{self.gateway_url}/api/gateway/heartbeat',
+                        data=payload, headers=headers, method='POST')
+                    urllib.request.urlopen(req, timeout=10)
+                except Exception:
+                    pass
+                time.sleep(interval)
+
+        self._heartbeat_thread = threading.Thread(target=_beat, daemon=True)
+        self._heartbeat_thread.start()
+
+    def stop(self):
+        self._running = False
+
+
+# Module-level instances
 node_manager = NodeManager()
+gateway = GatewayRegistry()
