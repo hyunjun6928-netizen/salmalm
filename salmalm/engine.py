@@ -240,9 +240,18 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         # PHASE 1: PLANNING — inject plan prompt for complex tasks
         if classification['intent'] in ('code', 'analysis') and classification['score'] >= 2:
-            # Inject planning instruction into the last user message context
+            # Inject planning instruction before the last user message
             plan_msg = {'role': 'system', 'content': self.PLAN_PROMPT, '_plan_injected': True}
-            session.messages.insert(-1, plan_msg)  # Before the user message
+            # Find the last user message index to insert before it
+            last_user_idx = None
+            for i in range(len(session.messages) - 1, -1, -1):
+                if session.messages[i].get('role') == 'user':
+                    last_user_idx = i
+                    break
+            if last_user_idx is not None:
+                session.messages.insert(last_user_idx, plan_msg)
+            else:
+                session.messages.insert(-1, plan_msg)
 
         # PHASE 2: EXECUTE — tool loop
         try:

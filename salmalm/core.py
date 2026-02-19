@@ -19,7 +19,7 @@ def _get_db() -> sqlite3.Connection:
     """Get thread-local SQLite connection (reused across calls, WAL mode)."""
     conn = getattr(_thread_local, 'audit_conn', None)
     if conn is None:
-        conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=False)
+        conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=True)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
@@ -92,7 +92,8 @@ class ResponseCache:
         self._ttl = ttl
 
     def _key(self, model: str, messages: list, session_id: str = '') -> str:
-        content = json.dumps({'s': session_id, 'm': model, 'msgs': messages[-3:]}, sort_keys=True)
+        # Include last 5 messages for better session isolation even without explicit session_id
+        content = json.dumps({'s': session_id, 'm': model, 'msgs': messages[-5:]}, sort_keys=True)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
     def get(self, model: str, messages: list, session_id: str = '') -> Optional[str]:
@@ -702,6 +703,7 @@ class Session:
 
 _tg_bot = None  # Set during startup by telegram module
 _sessions = {}  # type: ignore[var-annotated]
+_session_lock = threading.Lock()  # Protects _sessions dict
 _session_cleanup_ts = 0.0
 _SESSION_TTL = 3600 * 8  # 8 hours
 _SESSION_MAX = 200
@@ -714,46 +716,48 @@ def _cleanup_sessions():
     if now - _session_cleanup_ts < 600:  # Check every 10 min
         return
     _session_cleanup_ts = now
-    stale = [sid for sid, s in _sessions.items()
-             if now - s.last_active > _SESSION_TTL]
-    for sid in stale:
-        try:
-            _sessions[sid]._persist()
-        except Exception:
-            pass
-        del _sessions[sid]
-    if stale:
-        log.info(f"[CLEAN] Session cleanup: removed {len(stale)} inactive sessions")
-    # Hard cap
-    if len(_sessions) > _SESSION_MAX:
-        by_age = sorted(_sessions.items(), key=lambda x: x[1].last_active)
-        for sid, _ in by_age[:len(_sessions) - _SESSION_MAX]:
+    with _session_lock:
+        stale = [sid for sid, s in _sessions.items()
+                 if now - s.last_active > _SESSION_TTL]
+        for sid in stale:
+            try:
+                _sessions[sid]._persist()
+            except Exception:
+                pass
             del _sessions[sid]
+        if stale:
+            log.info(f"[CLEAN] Session cleanup: removed {len(stale)} inactive sessions")
+        # Hard cap
+        if len(_sessions) > _SESSION_MAX:
+            by_age = sorted(_sessions.items(), key=lambda x: x[1].last_active)
+            for sid, _ in by_age[:len(_sessions) - _SESSION_MAX]:
+                del _sessions[sid]
 
 
 def get_session(session_id: str) -> Session:
     """Get or create a chat session by ID."""
     _cleanup_sessions()
-    if session_id not in _sessions:
-        _sessions[session_id] = Session(session_id)
-        # Try to restore from SQLite
-        try:
-            conn = _get_db()
-            row = conn.execute('SELECT messages FROM session_store WHERE session_id=?', (session_id,)).fetchone()
-            if row:
-                restored = json.loads(row[0])
-                _sessions[session_id].messages = restored
-                log.info(f"[NOTE] Session restored: {session_id} ({len(restored)} msgs)")
-                # Refresh system prompt
-                from .prompt import build_system_prompt
-                _sessions[session_id].add_system(build_system_prompt(full=False))
-                return _sessions[session_id]
-        except Exception as e:
-            log.warning(f"Session restore error: {e}")
-        from .prompt import build_system_prompt
-        _sessions[session_id].add_system(build_system_prompt(full=True))
-        log.info(f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
-    return _sessions[session_id]
+    with _session_lock:
+        if session_id not in _sessions:
+            _sessions[session_id] = Session(session_id)
+            # Try to restore from SQLite
+            try:
+                conn = _get_db()
+                row = conn.execute('SELECT messages FROM session_store WHERE session_id=?', (session_id,)).fetchone()
+                if row:
+                    restored = json.loads(row[0])
+                    _sessions[session_id].messages = restored
+                    log.info(f"[NOTE] Session restored: {session_id} ({len(restored)} msgs)")
+                    # Refresh system prompt
+                    from .prompt import build_system_prompt
+                    _sessions[session_id].add_system(build_system_prompt(full=False))
+                    return _sessions[session_id]
+            except Exception as e:
+                log.warning(f"Session restore error: {e}")
+            from .prompt import build_system_prompt
+            _sessions[session_id].add_system(build_system_prompt(full=True))
+            log.info(f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
+        return _sessions[session_id]
 
 
 

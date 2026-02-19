@@ -180,8 +180,10 @@ class Vault:
         """Change vault master password. Returns True on success."""
         if not self.is_unlocked:
             return False
-        # Verify old password matches current
-        if self._password != old_password:
+        # Verify old password matches current (timing-safe comparison)
+        if not hmac.compare_digest(
+                (self._password or '').encode('utf-8'),
+                old_password.encode('utf-8')):
             return False
         # Re-encrypt with new password
         self._password = new_password

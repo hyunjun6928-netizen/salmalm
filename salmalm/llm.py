@@ -56,7 +56,7 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
                           if m['role'] == 'user'), '')
         model = router.route(last_user, has_tools=bool(tools))
 
-    # Check cache (only for tool-free queries)
+    # Check cache (only for tool-free queries, scoped by last few messages)
     if not tools:
         cached = response_cache.get(model, messages)
         if cached:
@@ -116,10 +116,10 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
                     fb_tools = None
                 elif fb_provider == 'anthropic':
                     fb_tools = [{'name': t['name'], 'description': t['description'],
-                                 'input_schema': t['input_schema']} for t in tools]
+                                 'input_schema': t.get('input_schema', t.get('parameters', {}))} for t in tools]
                 elif fb_provider in ('openai', 'xai', 'google'):
                     fb_tools = [{'name': t['name'], 'description': t['description'],
-                                 'parameters': t.get('input_schema', t.get('parameters', {}))} for t in tools]
+                                 'parameters': t.get('parameters', t.get('input_schema', {}))} for t in tools]
                 else:
                     fb_tools = None
                 result = _call_provider(fb_provider, fb_key, fb_model_id, messages,

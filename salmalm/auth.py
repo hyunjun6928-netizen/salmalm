@@ -27,7 +27,7 @@ import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
-from .constants import BASE_DIR, KST
+from .constants import BASE_DIR, KST, PBKDF2_ITER
 from .crypto import log
 
 AUTH_DB = BASE_DIR / "auth.db"
@@ -38,11 +38,11 @@ def _hash_password(password: str, salt: Optional[bytes] = None) -> Tuple[bytes, 
     """Hash password with PBKDF2. Returns (hash, salt)."""
     if salt is None:
         salt = os.urandom(32)
-    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100_000)
+    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, PBKDF2_ITER)
     return dk, salt
 
 def _verify_password(password: str, stored_hash: bytes, salt: bytes) -> bool:
-    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100_000)
+    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, PBKDF2_ITER)
     return hmac.compare_digest(dk, stored_hash)
 
 
@@ -62,7 +62,20 @@ class TokenManager:
             self._secret = os.urandom(32)
             try:
                 self._SECRET_FILE.write_bytes(self._secret)
-                self._SECRET_FILE.chmod(0o600)
+                try:
+                    self._SECRET_FILE.chmod(0o600)
+                except (OSError, NotImplementedError):
+                    pass  # chmod not supported on Windows
+                # Windows: use icacls to restrict access
+                import sys
+                if sys.platform == 'win32':
+                    try:
+                        import subprocess
+                        subprocess.run(['icacls', str(self._SECRET_FILE), '/inheritance:r',
+                                        '/grant:r', f'{os.environ.get("USERNAME", "SYSTEM")}:(R,W)'],
+                                       capture_output=True, timeout=5)
+                    except Exception:
+                        pass
             except Exception:
                 pass  # In-memory only if write fails
 

@@ -372,10 +372,22 @@ class GatewayRegistry:
 
     def __init__(self):
         self._nodes: Dict[str, dict] = {}  # node_id → {url, token, capabilities, last_heartbeat, status}
+        self._gateway_token: str = ''  # Set via config to require auth for registration
+
+    def set_gateway_token(self, token: str):
+        """Set the gateway authentication token. Nodes must provide this to register."""
+        self._gateway_token = token
 
     def register(self, node_id: str, url: str, token: str = '',
-                 capabilities: Optional[list] = None, name: str = '') -> dict:
-        """Register a node with the gateway."""
+                 capabilities: Optional[list] = None, name: str = '',
+                 auth_token: str = '') -> dict:
+        """Register a node with the gateway. Requires auth_token if gateway_token is set."""
+        # Verify registration auth
+        if self._gateway_token:
+            import hmac as _hmac
+            if not auth_token or not _hmac.compare_digest(auth_token, self._gateway_token):
+                log.warning(f"[NET] Node registration rejected (bad auth): {node_id} ({url})")
+                return {'error': 'Authentication required for node registration'}
         self._nodes[node_id] = {
             'id': node_id,
             'name': name or node_id,

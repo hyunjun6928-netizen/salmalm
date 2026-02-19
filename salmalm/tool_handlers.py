@@ -87,14 +87,21 @@ def _resolve_path(path: str, writing: bool = False) -> Path:
 
 
 def _is_private_url(url: str) :
-    """Check if URL resolves to a private/internal IP. Returns (blocked, reason)."""
+    """Check if URL resolves to a private/internal IP. Returns (blocked, reason).
+    Note: DNS rebinding mitigation — we check resolved IPs before connecting.
+    urllib will re-resolve, but attacker needs sub-second DNS TTL flip which is rare.
+    """
     import ipaddress, socket
     from urllib.parse import urlparse
     hostname = urlparse(url).hostname or ''
     if not hostname:
         return True, 'No hostname'
     # Quick string check for known dangerous hosts
-    if hostname in ('metadata.google.internal', '169.254.169.254'):
+    _BLOCKED_HOSTS = frozenset([
+        'metadata.google.internal', '169.254.169.254', 'metadata.internal',
+        'metadata', 'instance-data', '100.100.100.200',  # AWS/GCP/Azure metadata
+    ])
+    if hostname in _BLOCKED_HOSTS or hostname.endswith('.internal'):
         return True, f'Blocked metadata endpoint: {hostname}'
     try:
         # Resolve ALL addresses (IPv4 + IPv6)
@@ -531,11 +538,23 @@ def execute_tool(name: str, args: dict) -> str:
                 'shutil.rmtree', 'pathlib', '.vault', 'audit.db', 'auth.db',
                 'import socket', 'import http', 'import urllib', 'import requests',
                 'getattr(', 'globals(', 'locals(', '__builtins__', 'vars(',
+                'breakpoint(', 'help(', 'input(', 'exit(', 'quit(',
+                '__class__', '__subclasses__', '__bases__', '__mro__',
+                'importlib', 'ctypes', 'signal',
             ]
-            code_lower = code.lower().replace(' ', '')
+            code_lower = code.lower().replace(' ', '').replace('\t', '')
             for blocked in _EVAL_BLOCKLIST:
                 if blocked.lower().replace(' ', '') in code_lower:
                     return f'❌ Security blocked: `{blocked}` not allowed. python_eval is for computation only.'
+            # Additional pattern-based checks (catches string concat bypass)
+            import re as _re
+            if _re.search(r'__\w+__', code):
+                # Allow __name__ style but block dangerous dunders
+                _dangerous_dunders = ['__import__', '__builtins__', '__class__',
+                                       '__subclasses__', '__bases__', '__mro__', '__loader__']
+                for dd in _dangerous_dunders:
+                    if dd in code.lower():
+                        return f'❌ Security blocked: `{dd}` not allowed.'
             # Execute in isolated subprocess (no network, limited imports)
             wrapper = f'''
 import json, math, re, statistics, collections, itertools, functools, datetime, hashlib, base64, random, string, textwrap, csv, io

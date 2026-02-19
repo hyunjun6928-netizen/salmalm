@@ -60,11 +60,15 @@ EXEC_BLOCKLIST = {
 }
 EXEC_BLOCKLIST_PATTERNS = [
     r'[;&|`]\s*(rm|dd|mkfs|shutdown|reboot|halt|sudo|su)\b',  # chained dangerous cmds
-    r'\$\(.*\)',       # command substitution
-    r'`[^`]+`',        # backtick substitution
+    r'\$\(',           # command substitution (any)
+    r'`[^`]*`',        # backtick substitution (any, including empty)
     r'>\s*/dev/sd',    # write to raw device
     r'>\s*/etc/',      # overwrite system config
     r'/proc/sysrq',    # sysrq trigger
+    r'<\(',            # process substitution
+    r'\beval\b',       # eval bypass
+    r'\bsource\b',     # source bypass
+    r'\b(python3?|node|deno|bun)\s+.*(-c|--eval)\b',  # elevated inline code execution
 ]
 PROTECTED_FILES = {'.vault.enc', 'audit.db', 'auth.db', 'server.py', '.clipboard.json'}
 
