@@ -725,20 +725,45 @@ class TelegramBot:
         elif cmd == '/help':
             self.send_message(chat_id, textwrap.dedent(f"""
                 😈 {APP_NAME} v{VERSION}
+
+                📋 **Assistant**
+                /briefing — Daily briefing (날씨+일정+메일)
+                /routine [morning|evening] — 루틴 실행
+                /remind list — 리마인더 목록
+                /remind delete <id> — 리마인더 삭제
+                /tr <lang> <text> — 빠른 번역
+
+                📝 **Notes & Knowledge**
+                /note <content> — 메모 저장
+                /note search <query> — 메모 검색
+                /note list — 최근 메모
+                /note tag <tag> <content> — 태그 메모
+
+                💰 **Expenses**
+                /expense add <desc> <amount> [cat] — 지출 기록
+                /expense today — 오늘 지출
+                /expense month [YYYY-MM] — 월별 요약
+
+                🔖 **Links**
+                /save <url> — 링크 저장
+                /saved list — 저장 목록
+                /saved search <query> — 검색
+
+                🍅 **Pomodoro**
+                /pomodoro start [min] — 집중 시작
+                /pomodoro break [min] — 휴식
+                /pomodoro stop — 중지
+
+                📅 **Calendar & Email**
+                /cal [today|week|month] — Calendar
+                /mail [inbox|read|send|search] — Email
+
+                ⚙️ **System**
                 /usage — Token usage/cost
-                /model [auto|opus|sonnet|haiku] — Model
+                /model [auto|...] — Model
                 /compact — Compact conversation
                 /clear — Clear conversation
-                /tts [on|off] — Voice replies
-                /voice [name] — TTS voice
-                /cal [today|week|month] — Calendar
-                /cal add YYYY-MM-DD HH:MM title — Add event
-                /cal delete <event_id> — Delete event
-                /mail [inbox] — Recent emails
-                /mail read <id> — Read email
-                /mail send to subject body — Send email
-                /mail search <query> — Search emails
-                /telegram [webhook <url>|polling] — Bot mode
+                /tts [on|off] — Voice
                 /help — This help
             """).strip())
         elif cmd == '/telegram':
@@ -835,6 +860,139 @@ class TelegramBot:
                 result = _exec_tool('email_search', {'query': query})
             else:
                 result = _exec_tool('email_inbox', {})
+            self.send_message(chat_id, result)
+
+        elif cmd == '/briefing':
+            from .tool_registry import execute_tool as _exec_tool
+            sections = text.split(maxsplit=1)[1] if len(text.split(maxsplit=1)) > 1 else None
+            args = {'sections': sections} if sections else {}
+            result = _exec_tool('briefing', args)
+            self.send_message(chat_id, result)
+
+        elif cmd == '/note':
+            from .tool_registry import execute_tool as _exec_tool
+            parts = text.split(maxsplit=2)
+            sub = parts[1] if len(parts) > 1 else ''
+            if sub == 'search':
+                query = parts[2] if len(parts) > 2 else ''
+                result = _exec_tool('note', {'action': 'search', 'query': query}) if query else '❌ Usage: /note search <keyword>'
+            elif sub == 'list':
+                result = _exec_tool('note', {'action': 'list'})
+            elif sub == 'tag':
+                # /note tag work "content..."
+                rest = text.split(maxsplit=3)
+                tag = rest[2] if len(rest) > 2 else ''
+                content = rest[3] if len(rest) > 3 else ''
+                result = _exec_tool('note', {'action': 'save', 'content': content, 'tags': tag}) if content else '❌ Usage: /note tag <tag> <content>'
+            elif sub == 'delete':
+                nid = parts[2] if len(parts) > 2 else ''
+                result = _exec_tool('note', {'action': 'delete', 'note_id': nid}) if nid else '❌ Usage: /note delete <id>'
+            else:
+                # /note <content> → save directly
+                content = text[len('/note'):].strip()
+                result = _exec_tool('note', {'action': 'save', 'content': content}) if content else '❌ Usage: /note <content> or /note search/list/tag/delete'
+            self.send_message(chat_id, result)
+
+        elif cmd == '/expense':
+            from .tool_registry import execute_tool as _exec_tool
+            parts = text.split(maxsplit=3)
+            sub = parts[1] if len(parts) > 1 else 'today'
+            if sub == 'add':
+                # /expense add 점심 12000 식비
+                rest = text.split(maxsplit=1)[1][4:].strip() if len(text) > 12 else ''
+                eparts = rest.split()
+                if len(eparts) >= 2:
+                    desc = eparts[0]
+                    amount = eparts[1]
+                    cat = eparts[2] if len(eparts) > 2 else ''
+                    result = _exec_tool('expense', {'action': 'add', 'description': desc, 'amount': amount, 'category': cat})
+                else:
+                    result = '❌ Usage: /expense add <description> <amount> [category]'
+            elif sub == 'today':
+                result = _exec_tool('expense', {'action': 'today'})
+            elif sub == 'month':
+                month = parts[2] if len(parts) > 2 else ''
+                args = {'action': 'month'}
+                if month:
+                    args['month'] = month
+                result = _exec_tool('expense', args)
+            elif sub == 'delete':
+                eid = parts[2] if len(parts) > 2 else ''
+                result = _exec_tool('expense', {'action': 'delete', 'expense_id': eid}) if eid else '❌ Usage: /expense delete <id>'
+            else:
+                result = _exec_tool('expense', {'action': 'today'})
+            self.send_message(chat_id, result)
+
+        elif cmd == '/save':
+            from .tool_registry import execute_tool as _exec_tool
+            url = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ''
+            if url:
+                result = _exec_tool('save_link', {'action': 'save', 'url': url})
+            else:
+                result = '❌ Usage: /save <url>'
+            self.send_message(chat_id, result)
+
+        elif cmd == '/saved':
+            from .tool_registry import execute_tool as _exec_tool
+            parts = text.split(maxsplit=2)
+            sub = parts[1] if len(parts) > 1 else 'list'
+            if sub == 'list':
+                result = _exec_tool('save_link', {'action': 'list'})
+            elif sub == 'search':
+                query = parts[2] if len(parts) > 2 else ''
+                result = _exec_tool('save_link', {'action': 'search', 'query': query}) if query else '❌ Usage: /saved search <keyword>'
+            elif sub == 'delete':
+                lid = parts[2] if len(parts) > 2 else ''
+                result = _exec_tool('save_link', {'action': 'delete', 'link_id': lid}) if lid else '❌ Usage: /saved delete <id>'
+            else:
+                result = _exec_tool('save_link', {'action': 'list'})
+            self.send_message(chat_id, result)
+
+        elif cmd == '/pomodoro':
+            from .tool_registry import execute_tool as _exec_tool
+            parts = text.split(maxsplit=2)
+            sub = parts[1] if len(parts) > 1 else 'status'
+            if sub == 'start':
+                duration = parts[2] if len(parts) > 2 else '25'
+                result = _exec_tool('pomodoro', {'action': 'start', 'duration': duration})
+            elif sub == 'break':
+                duration = parts[2] if len(parts) > 2 else '5'
+                result = _exec_tool('pomodoro', {'action': 'break', 'duration': duration})
+            elif sub == 'stop':
+                result = _exec_tool('pomodoro', {'action': 'stop'})
+            else:
+                result = _exec_tool('pomodoro', {'action': 'status'})
+            self.send_message(chat_id, result)
+
+        elif cmd == '/routine':
+            from .tool_registry import execute_tool as _exec_tool
+            parts = text.split(maxsplit=1)
+            sub = parts[1].strip() if len(parts) > 1 else 'list'
+            result = _exec_tool('routine', {'action': sub})
+            self.send_message(chat_id, result)
+
+        elif cmd == '/remind':
+            from .tool_registry import execute_tool as _exec_tool
+            parts = text.split(maxsplit=2)
+            sub = parts[1] if len(parts) > 1 else 'list'
+            if sub == 'list':
+                result = _exec_tool('reminder', {'action': 'list'})
+            elif sub == 'delete':
+                rid = parts[2] if len(parts) > 2 else ''
+                result = _exec_tool('reminder', {'action': 'delete', 'reminder_id': rid}) if rid else '❌ Usage: /remind delete <id>'
+            else:
+                result = _exec_tool('reminder', {'action': 'list'})
+            self.send_message(chat_id, result)
+
+        elif cmd == '/tr':
+            from .tool_registry import execute_tool as _exec_tool
+            parts = text.split(maxsplit=2)
+            if len(parts) >= 3:
+                target_lang = parts[1]
+                tr_text = parts[2]
+                result = _exec_tool('translate', {'text': tr_text, 'target': target_lang})
+            else:
+                result = '❌ Usage: /tr <lang> <text>\nExample: /tr en 안녕하세요'
             self.send_message(chat_id, result)
 
         else:
