@@ -116,7 +116,20 @@ class SubAgent:
 
 
 class SkillLoader:
-    """Load skills from skills/ directory. Each skill = folder with SKILL.md."""
+    """OpenClaw-style skill loader.
+
+    Skills are self-contained folders with SKILL.md + optional scripts.
+    SKILL.md uses YAML-like frontmatter:
+        ---
+        name: my-skill
+        description: What this skill does
+        metadata: {"openclaw": {"requires": {"bins": ["ffmpeg"]}}}
+        ---
+        Instructions for the agent...
+
+    Pattern: scan descriptions at startup, read full content on demand.
+    Auto-discovery from skills/ directory with gating support.
+    """
 
     _cache: dict = {}
     _last_scan = 0
@@ -139,11 +152,83 @@ class SkillLoader:
                 dest = skills_dir / src.name
                 if not dest.exists():
                     shutil.copytree(str(src), str(dest))
-                    log.info(f"[LOAD] Default skill installed: {src.name}")
+                    log.info(f"[SKILL] Default skill installed: {src.name}")
+
+    @classmethod
+    def _parse_frontmatter(cls, content: str) -> dict:
+        """Parse YAML-like frontmatter from SKILL.md (OpenClaw-compatible).
+
+        Supports:
+            ---
+            name: value
+            description: value
+            metadata: {"json": "object"}
+            ---
+        """
+        meta = {}
+        lines = content.splitlines()
+        if not lines or lines[0].strip() != '---':
+            # No frontmatter — fall back to heading/paragraph parsing
+            return meta
+
+        in_fm = True
+        for i, line in enumerate(lines[1:], 1):
+            if line.strip() == '---':
+                break
+            if ':' in line:
+                key, _, val = line.partition(':')
+                key = key.strip()
+                val = val.strip()
+                if key == 'metadata':
+                    try:
+                        meta['metadata'] = json.loads(val)
+                    except (json.JSONDecodeError, ValueError):
+                        meta['metadata'] = val
+                else:
+                    meta[key] = val
+        return meta
+
+    @classmethod
+    def _check_gates(cls, metadata: dict) -> bool:
+        """Check if a skill's requirements are met (OpenClaw-style gating).
+
+        Checks: required binaries on PATH, required env vars.
+        """
+        oc = metadata.get('openclaw', {}) if isinstance(metadata, dict) else {}
+        if not oc:
+            return True  # No gates = always eligible
+
+        if oc.get('always'):
+            return True
+
+        requires = oc.get('requires', {})
+
+        # Check required binaries
+        bins = requires.get('bins', [])
+        for b in bins:
+            if not shutil.which(b):
+                return False
+
+        # Check anyBins (at least one must exist)
+        any_bins = requires.get('anyBins', [])
+        if any_bins and not any(shutil.which(b) for b in any_bins):
+            return False
+
+        # Check required env vars
+        env_vars = requires.get('env', [])
+        for e in env_vars:
+            if not os.environ.get(e):
+                return False
+
+        return True
 
     @classmethod
     def scan(cls) -> list:
-        """Scan skills directory, return list of available skills."""
+        """Scan skills directory, return list of available skills.
+
+        OpenClaw pattern: only reads frontmatter (name + description).
+        Full SKILL.md content loaded on demand via load().
+        """
         cls._install_defaults()
         now = time.time()
         if cls._cache and now - cls._last_scan < 120:
@@ -163,26 +248,39 @@ class SkillLoader:
                 continue
             try:
                 content = skill_md.read_text(encoding='utf-8', errors='replace')
-                # Extract metadata from first few lines
-                lines = content.splitlines()
-                name = skill_dir.name
-                description = ''
-                for line in lines[:10]:
-                    if line.startswith('# '):
-                        name = line[2:].strip()
-                    elif line.startswith('> ') or (line.strip() and not line.startswith('#')):
-                        description = line.lstrip('> ').strip()
-                        break
+                fm = cls._parse_frontmatter(content)
+
+                name = fm.get('name', skill_dir.name)
+                description = fm.get('description', '')
+
+                # Fall back to heading/paragraph parsing if no frontmatter
+                if not description:
+                    for line in content.splitlines()[:10]:
+                        if line.startswith('# '):
+                            name = line[2:].strip()
+                        elif line.startswith('> ') or (line.strip() and not line.startswith('#')
+                                                        and not line.startswith('---')):
+                            description = line.lstrip('> ').strip()
+                            break
+
+                # Gating: check if skill requirements are met
+                metadata = fm.get('metadata', {})
+                if isinstance(metadata, dict) and not cls._check_gates(metadata):
+                    log.info(f"[SKILL] Gated out: {skill_dir.name} (missing requirements)")
+                    continue
+
                 cls._cache[skill_dir.name] = {
                     'name': name, 'dir_name': skill_dir.name,
                     'description': description,
-                    'path': str(skill_md), 'size': len(content)
+                    'path': str(skill_md), 'size': len(content),
+                    'metadata': metadata,
+                    'has_scripts': any(skill_dir.glob('*.py')) or any(skill_dir.glob('*.sh')),
                 }
             except Exception:
                 continue
 
         cls._last_scan = now  # type: ignore[assignment]
-        log.info(f"[LOAD] Skills scanned: {len(cls._cache)} found")
+        log.info(f"[SKILL] Skills scanned: {len(cls._cache)} found")
         return list(cls._cache.values())
 
     @classmethod
