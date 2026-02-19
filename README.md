@@ -9,6 +9,8 @@
 
 > [🇺🇸 English](README_EN.md)
 
+![SalmAlm Demo](demo.gif)
+
 개인 AI 게이트웨이. 순수 Python stdlib 기반, 외부 런타임 의존성 없이 구축.
 암호화(`cryptography`)만 선택적 의존성으로, 설치 시 AES-256-GCM을 사용하고 없으면 HMAC-CTR 폴백.
 
