@@ -359,7 +359,6 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             llm_error = None
             try:
                 from .llm import _http_post
-                from .core import router
                 model = router.force_model or router._pick_available(1)
                 provider = model.split('/')[0] if '/' in model else 'anthropic'
                 from .crypto import vault as _vault
