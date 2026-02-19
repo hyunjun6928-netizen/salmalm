@@ -412,7 +412,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
         elif self.path == '/api/metrics':
-            from .core import _metrics, get_usage_report
+            from .core import _metrics
             usage = get_usage_report()
             _metrics['total_cost'] = usage.get('total_cost', 0.0)
             merged = {**request_logger.get_metrics(), **_metrics}
