@@ -26,6 +26,55 @@ from urllib.parse import urlparse
 from .constants import BASE_DIR, VERSION, KST
 
 
+# ── Sensitive Data Redaction ─────────────────────────────────
+
+REDACT_PATTERNS = [
+    r'sk-[a-zA-Z0-9]{20,}',                       # OpenAI/Anthropic API 키
+    r'ghp_[a-zA-Z0-9]{36}',                        # GitHub 토큰
+    r'xoxb-[a-zA-Z0-9-]+',                         # Slack 봇 토큰
+    r'[0-9]+:AA[a-zA-Z0-9_-]{33}',                 # Telegram 봇 토큰
+    r'(?i)password\s*[:=]\s*\S+',                   # 비밀번호
+    r'(?i)secret\s*[:=]\s*\S+',                     # 시크릿
+    r'(?i)token\s*[:=]\s*\S+',                      # 토큰
+    r'eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+',      # JWT
+]
+
+_COMPILED_PATTERNS = [re.compile(p) for p in REDACT_PATTERNS]
+
+
+def _load_redact_config() -> dict:
+    """Load redaction config from ~/.salmalm/security.json."""
+    config_path = Path.home() / '.salmalm' / 'security.json'
+    defaults = {'redactEnabled': True, 'customPatterns': []}
+    try:
+        if config_path.exists():
+            import json as _json
+            cfg = _json.loads(config_path.read_text(encoding='utf-8'))
+            defaults.update(cfg)
+    except Exception:
+        pass
+    return defaults
+
+
+def redact_sensitive(text: str) -> str:
+    """민감 정보를 [REDACTED]로 치환."""
+    if not text or not isinstance(text, str):
+        return text
+    cfg = _load_redact_config()
+    if not cfg.get('redactEnabled', True):
+        return text
+    result = text
+    for pat in _COMPILED_PATTERNS:
+        result = pat.sub('[REDACTED]', result)
+    # Custom patterns
+    for custom in cfg.get('customPatterns', []):
+        try:
+            result = re.sub(custom, '[REDACTED]', result)
+        except re.error:
+            pass
+    return result
+
+
 # ── Login Rate Limiter (Exponential Backoff) ────────────────
 
 class LoginRateLimiter:

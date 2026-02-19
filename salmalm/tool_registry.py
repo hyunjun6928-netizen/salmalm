@@ -18,6 +18,10 @@ def _ensure_modules():
                    tools_misc, tools_system, tools_util, tools_agent,
                    tools_browser, tools_google, tools_media,
                    tools_calendar, tools_email, tools_personal)  # noqa: F401
+    # Register apply_patch tool
+    from .tools_patch import apply_patch as _apply_patch_fn
+    _HANDLERS['apply_patch'] = lambda args: _apply_patch_fn(
+        args.get('patch_text', ''), args.get('base_dir', '.'))
 
 
 def register(name):
@@ -82,7 +86,7 @@ def execute_tool(name: str, args: dict) -> str:
         # Try directory-based plugins (new plugin architecture)
         try:
             from .plugin_manager import plugin_manager
-            result = plugin_manager.execute_tool(name, args)
+            result = plugin_manager._execute_plugin_tool(name, args)
             if result is not None:
                 return result
         except Exception:

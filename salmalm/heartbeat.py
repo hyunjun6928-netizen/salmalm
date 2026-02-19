@@ -161,5 +161,82 @@ class CacheWarmer:
         }
 
 
-# Singleton
+class HeartbeatManager:
+    """Heartbeat manager with active hours support.
+
+    하트비트 관리자 — 활성 시간대 지원.
+    """
+
+    _CONFIG_FILE = Path.home() / '.salmalm' / 'heartbeat.json'
+    _DEFAULT_CONFIG = {
+        'enabled': True,
+        'interval_minutes': 30,
+        'active_hours': {'start': '08:00', 'end': '24:00'},
+        'timezone': 'Asia/Seoul',
+    }
+
+    def __init__(self):
+        self._config = self._load_config()
+
+    def _load_config(self) -> dict:
+        cfg = dict(self._DEFAULT_CONFIG)
+        try:
+            if self._CONFIG_FILE.exists():
+                data = json.loads(self._CONFIG_FILE.read_text(encoding='utf-8'))
+                cfg.update(data)
+        except Exception:
+            pass
+        return cfg
+
+    def reload(self):
+        self._config = self._load_config()
+
+    @property
+    def config(self) -> dict:
+        return dict(self._config)
+
+    def is_active_hours(self) -> bool:
+        """Check if current time is within active hours."""
+        from datetime import datetime, timezone, timedelta
+        tz_name = self._config.get('timezone', 'Asia/Seoul')
+        # Simple timezone mapping for common cases
+        tz_offsets = {
+            'Asia/Seoul': 9, 'Asia/Tokyo': 9, 'UTC': 0,
+            'US/Eastern': -5, 'US/Pacific': -8, 'Europe/London': 0,
+        }
+        offset_hours = tz_offsets.get(tz_name, 9)
+        tz = timezone(timedelta(hours=offset_hours))
+        now = datetime.now(tz)
+
+        active = self._config.get('active_hours', {})
+        start_str = active.get('start', '08:00')
+        end_str = active.get('end', '24:00')
+
+        try:
+            start_h, start_m = map(int, start_str.split(':'))
+            end_h, end_m = map(int, end_str.split(':'))
+        except (ValueError, AttributeError):
+            return True  # Default to active if config is invalid
+
+        current_minutes = now.hour * 60 + now.minute
+        start_minutes = start_h * 60 + start_m
+        end_minutes = end_h * 60 + end_m
+
+        if end_minutes <= start_minutes:
+            # Wraps midnight
+            return current_minutes >= start_minutes or current_minutes < end_minutes
+        return start_minutes <= current_minutes < end_minutes
+
+    def should_heartbeat(self) -> bool:
+        """Check if heartbeat should run now."""
+        if not self._config.get('enabled', True):
+            return False
+        if not self.is_active_hours():
+            log.info("[HEARTBEAT] Outside active hours, skipping")
+            return False
+        return True
+
+
+# Singletons
 cache_warmer = CacheWarmer()
+heartbeat_manager = HeartbeatManager()

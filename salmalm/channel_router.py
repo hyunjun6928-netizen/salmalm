@@ -20,19 +20,16 @@ CONFIG_DIR = Path.home() / '.salmalm'
 CONFIG_FILE = CONFIG_DIR / 'channels.json'
 
 
+from .config_manager import ConfigManager
+
+
 def _load_config() -> Dict[str, Any]:
     """Load channel configuration from ~/.salmalm/channels.json."""
-    if CONFIG_FILE.exists():
-        try:
-            return json.loads(CONFIG_FILE.read_text('utf-8'))
-        except Exception as e:
-            log.warning(f'Failed to load channels.json: {e}')
-    return {}
+    return ConfigManager.load('channels')
 
 
 def _save_config(cfg: Dict[str, Any]) -> None:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    CONFIG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), 'utf-8')
+    ConfigManager.save('channels', cfg)
 
 
 def format_for_channel(text: str, channel: str) -> str:
@@ -116,7 +113,20 @@ class ChannelRouter:
         ch = self._channels.get(name)
         return ch['enabled'] if ch else False
 
-    def route_outbound(self, channel: str, **kwargs) -> bool:
+    def _get_response_prefix(self, channel: str, is_group: bool = False) -> str:
+        """Get response prefix for channel. Only applied in group chats."""
+        if not is_group:
+            return ''
+        cfg = self._config
+        # Per-channel override
+        by_ch = cfg.get('byChannel', {})
+        if channel in by_ch:
+            prefix = by_ch[channel].get('responsePrefix')
+            if prefix is not None:
+                return prefix
+        return cfg.get('responsePrefix', '')
+
+    def route_outbound(self, channel: str, is_group: bool = False, **kwargs) -> bool:
         """Send a message through the specified channel."""
         ch = self._channels.get(channel)
         if not ch or not ch['enabled']:
@@ -125,6 +135,9 @@ class ChannelRouter:
         try:
             text = kwargs.get('text', '')
             if text:
+                prefix = self._get_response_prefix(channel, is_group)
+                if prefix:
+                    text = prefix + text
                 kwargs['text'] = format_for_channel(text, channel)
             ch['send_fn'](**kwargs)
             return True

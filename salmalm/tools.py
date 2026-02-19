@@ -761,6 +761,18 @@ TOOL_DEFINITIONS = [
             },
         }
     },
+    {
+        'name': 'apply_patch',
+        'description': 'Apply a multi-file patch (Add/Update/Delete files). 멀티 파일 패치 적용.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'patch_text': {'type': 'string', 'description': 'Patch text in *** Begin Patch / *** End Patch format'},
+                'base_dir': {'type': 'string', 'description': 'Base directory for patch operations (default: cwd)'},
+            },
+            'required': ['patch_text'],
+        }
+    },
 ]
 
 
