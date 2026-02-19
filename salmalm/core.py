@@ -766,6 +766,7 @@ def set_telegram_bot(bot):
     """Set the Telegram bot instance (called during startup)."""
     global _tg_bot
     _tg_bot = bot
+_llm_cron = None  # Set during startup by __main__ (LLMCron instance)
 _sessions = {}  # type: ignore[var-annotated]
 _session_lock = threading.Lock()  # Protects _sessions dict
 _session_cleanup_ts = 0.0
