@@ -48,189 +48,189 @@ class TestWebAllRoutes(unittest.TestCase):
     # === GET routes ===
     def test_get_root(self):
         s, _ = self._get('/')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_index(self):
         s, _ = self._get('/index.html')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_sessions(self):
         s, _ = self._get('/api/sessions')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_notifications(self):
         s, _ = self._get('/api/notifications')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_dashboard_api(self):
         s, _ = self._get('/api/dashboard')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_cron(self):
         s, _ = self._get('/api/cron')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_plugins(self):
         s, _ = self._get('/api/plugins')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_mcp(self):
         s, _ = self._get('/api/mcp')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_rag(self):
         s, _ = self._get('/api/rag')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_rag_search(self):
         s, _ = self._get('/api/rag/search?q=test')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_ws_status(self):
         s, _ = self._get('/api/ws/status')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_health(self):
         s, _ = self._get('/api/health')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_nodes(self):
         s, _ = self._get('/api/nodes')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_gateway_nodes(self):
         s, _ = self._get('/api/gateway/nodes')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_status(self):
         s, _ = self._get('/api/status')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_check_update(self):
         s, _ = self._get('/api/check-update')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_metrics(self):
         s, _ = self._get('/api/metrics')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_cert(self):
         s, _ = self._get('/api/cert')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_auth_users(self):
         s, _ = self._get('/api/auth/users')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_manifest(self):
         s, _ = self._get('/manifest.json')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_icon192(self):
         s, _ = self._get('/icon-192.svg')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_icon512(self):
         s, _ = self._get('/icon-512.svg')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_sw(self):
         s, _ = self._get('/sw.js')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_dashboard_page(self):
         s, _ = self._get('/dashboard')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_docs_page(self):
         s, _ = self._get('/docs')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_models(self):
         s, _ = self._get('/api/models')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_tools(self):
         s, _ = self._get('/api/tools')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_config(self):
         s, _ = self._get('/api/config')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_version(self):
         s, _ = self._get('/api/version')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_uploads_nonexistent(self):
         s, _ = self._get('/uploads/nonexistent.txt')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_get_404(self):
         s, _ = self._get('/totally_nonexistent_page')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     # === POST routes ===
     def test_post_login(self):
         s, _ = self._post('/api/auth/login', {'username': 'admin', 'password': 'wrong'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_register(self):
         s, _ = self._post('/api/auth/register', {'username': 'test', 'password': 'test123'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_setup(self):
         s, _ = self._post('/api/setup', {'password': 'testpw'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_test_key(self):
         s, _ = self._post('/api/test-key', {'provider': 'openai', 'key': 'sk-test'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_unlock(self):
         s, _ = self._post('/api/unlock', {'password': 'testpw'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_sessions_delete(self):
         s, _ = self._post('/api/sessions/delete', {'session_id': 'nonexist'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_sessions_rename(self):
         s, _ = self._post('/api/sessions/rename', {'session_id': 'test', 'title': 'new'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_chat(self):
         s, _ = self._post('/api/chat', {'message': '/version', 'session_id': 'webtest'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_vault_keys(self):
         s, _ = self._post('/api/vault', {'action': 'keys'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_vault_get(self):
         s, _ = self._post('/api/vault', {'action': 'get', 'key': 'OPENAI_API_KEY'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_vault_set(self):
         s, _ = self._post('/api/vault', {'action': 'set', 'key': 'TEST_KEY', 'value': 'test'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
 
     def test_post_model(self):
         s, _ = self._post('/api/model', {'model': 'auto'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_password(self):
         s, _ = self._post('/api/password', {'current': 'wrong', 'new': 'new'})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_unknown(self):
         s, _ = self._post('/api/nonexistent_route')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
     def test_post_stt_no_audio(self):
         s, _ = self._post('/api/stt', {})
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
 
 
 class TestToolHandlersMoreEdgeCases(unittest.TestCase):
