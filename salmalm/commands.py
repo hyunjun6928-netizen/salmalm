@@ -225,9 +225,11 @@ class CommandRouter:
         """
         directives: Dict[str, str] = {}
         remaining = text
-        for d in DIRECTIVE_COMMANDS:
+        # Sort longest-first so /think matches before /t
+        sorted_directives = sorted(DIRECTIVE_COMMANDS, key=len, reverse=True)
+        for d in sorted_directives:
             pattern = re.compile(
-                rf'{re.escape(d)}:?\s*(off|low|medium|high|on|full|stream|[\w/.-]+)',
+                rf'(?<!\w){re.escape(d)}(?!\w):?\s*(off|low|medium|high|on|full|stream|[\w/.-]+)',
                 re.IGNORECASE,
             )
             m = pattern.search(remaining)
