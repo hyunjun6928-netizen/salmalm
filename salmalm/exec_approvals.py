@@ -159,7 +159,7 @@ class BackgroundSession:
                 result = subprocess.run(
                     **run_args, capture_output=True, text=True,
                     timeout=self.timeout, env=run_env,
-                    cwd=str(Path.home() / '.salmalm' / 'workspace')
+                    cwd=str(Path(__file__).parent.parent.resolve())
                 )
                 self.stdout_data = result.stdout[-100_000:]  # Keep last 100KB
                 self.stderr_data = result.stderr[-10_000:]

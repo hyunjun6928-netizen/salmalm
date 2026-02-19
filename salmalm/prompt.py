@@ -151,7 +151,7 @@ def build_system_prompt(full: bool = True, mode: str = 'full') -> str:
     # ── Minimal mode for subagents: Tooling + Workspace + Runtime only ──
     if mode == 'minimal':
         parts.append(f"[SalmAlm SubAgent — v{VERSION}]")
-        parts.append(f"Workspace: {WORKSPACE_DIR}")
+        parts.append(f"Workspace: {BASE_DIR}")
         now = datetime.now(KST)
         parts.append(f"Current: {now.strftime('%Y-%m-%d %H:%M')} KST")
         parts.append("You are a sub-agent. Complete your assigned task. "
