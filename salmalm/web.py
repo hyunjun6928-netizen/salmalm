@@ -101,7 +101,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         """Check auth for protected endpoints. Returns user dict or sends 401 and returns None.
         If vault is locked, also rejects (403)."""
         path = self.path.split('?')[0]
-        if path in self._PUBLIC_PATHS or path.startswith('/uploads/'):
+        if path in self._PUBLIC_PATHS:
             return {'username': 'public', 'role': 'public', 'id': 0}  # skip auth for public endpoints
 
         # Try token/api-key auth first
@@ -210,6 +210,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self._html(WEB_HTML)
         elif self.path == '/api/notifications':
+            if not self._require_auth('user'): return
             from .core import _sessions
             web_session = _sessions.get('web')
             notifications = []
@@ -218,6 +219,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 web_session._notifications = []  # clear after read
             self._json({'notifications': notifications})
         elif self.path == '/api/dashboard':
+            if not self._require_auth('user'): return
             # Dashboard data: sessions, costs, tools, cron jobs
             from .core import _sessions, _llm_cron, PluginLoader, SubAgent
             sessions_info = [
@@ -252,23 +254,28 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 'cost_timeline': cost_timeline
             })
         elif self.path == '/api/cron':
+            if not self._require_auth('user'): return
             from .core import _llm_cron
             self._json({'jobs': _llm_cron.list_jobs() if _llm_cron else []})
         elif self.path == '/api/plugins':
+            if not self._require_auth('user'): return
             from .core import PluginLoader
             tools = PluginLoader.get_all_tools()
             plugins = [{'name': n, 'tools': len(p['tools']), 'path': p['path']}
                        for n, p in PluginLoader._plugins.items()]
             self._json({'plugins': plugins, 'total_tools': len(tools)})
         elif self.path == '/api/mcp':
+            if not self._require_auth('user'): return
             from .mcp import mcp_manager
             servers = mcp_manager.list_servers()
             all_tools = mcp_manager.get_all_tools()
             self._json({'servers': servers, 'total_tools': len(all_tools)})
         elif self.path == '/api/rag':
+            if not self._require_auth('user'): return
             from .rag import rag_engine
             self._json(rag_engine.get_stats())
         elif self.path.startswith('/api/rag/search'):
+            if not self._require_auth('user'): return
             from .rag import rag_engine
             import urllib.parse
             parsed = urllib.parse.urlparse(self.path)
@@ -328,10 +335,13 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             from .docs import generate_api_docs_html
             self._html(generate_api_docs_html())
         elif self.path.startswith('/uploads/'):
-            # Serve uploaded files (images, audio)
-            fname = self.path.split('/uploads/')[-1]
-            fpath = WORKSPACE_DIR / 'uploads' / fname
-            if not fpath.exists():
+            # Serve uploaded files (images, audio) — basename-only to prevent traversal
+            fname = Path(self.path.split('/uploads/', 1)[-1]).name
+            if not fname:
+                self.send_error(400); return
+            upload_dir = (WORKSPACE_DIR / 'uploads').resolve()
+            fpath = (upload_dir / fname).resolve()
+            if not str(fpath).startswith(str(upload_dir)) or not fpath.exists():
                 self.send_error(404)
                 return
             mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
@@ -431,6 +441,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path == '/api/do-update':
+            if not self._require_auth('admin'): return
+            if self._get_client_ip() not in ('127.0.0.1', '::1', 'localhost'):
+                self._json({'error': 'Update only allowed from localhost'}, 403); return
             try:
                 import subprocess, sys
                 result = subprocess.run(
@@ -451,6 +464,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path == '/api/restart':
+            if not self._require_auth('admin'): return
+            if self._get_client_ip() not in ('127.0.0.1', '::1', 'localhost'):
+                self._json({'error': 'Restart only allowed from localhost'}, 403); return
             import sys, subprocess
             audit_log('restart', 'user-initiated restart')
             self._json({'ok': True, 'message': 'Restarting...'})
