@@ -178,6 +178,16 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                      'input_schema': t['input_schema']} for t in all_tools]
         return all_tools
 
+    # Max chars per tool result sent to LLM context
+    MAX_TOOL_RESULT_CHARS = 50_000
+
+    def _truncate_tool_result(self, result: str) -> str:
+        """Truncate tool result to prevent context explosion."""
+        if len(result) > self.MAX_TOOL_RESULT_CHARS:
+            return result[:self.MAX_TOOL_RESULT_CHARS] + \
+                f'\n\n... [truncated: {len(result)} chars total, showing first {self.MAX_TOOL_RESULT_CHARS}]'
+        return result
+
     def _execute_tools_parallel(self, tool_calls: list, on_tool=None) -> dict:
         """Execute multiple tools in parallel, return {id: result}."""
         for tc in tool_calls:
@@ -196,7 +206,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         if len(tool_calls) == 1:
             tc = tool_calls[0]
-            return {tc['id']: execute_tool(tc['name'], tc['arguments'])}
+            return {tc['id']: self._truncate_tool_result(execute_tool(tc['name'], tc['arguments']))}
 
         futures = {}
         for tc in tool_calls:
@@ -205,7 +215,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         outputs = {}
         for tc_id, f in futures.items():
             try:
-                outputs[tc_id] = f.result(timeout=60)
+                outputs[tc_id] = self._truncate_tool_result(f.result(timeout=60))
             except Exception as e:
                 outputs[tc_id] = f'❌ Tool execution error: {e}'
         log.info(f"[FAST] Parallel: {len(tool_calls)} tools completed")

@@ -14,7 +14,7 @@ import urllib.request
 
 from .constants import DEFAULT_MAX_TOKENS, FALLBACK_MODELS
 from .crypto import vault, log
-from .core import response_cache, router, track_usage
+from .core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded
 
 _UA: str = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
@@ -65,6 +65,13 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
         if cached:
             return {'content': cached, 'tool_calls': [], 'usage': {'input': 0, 'output': 0},
                     'model': model, 'cached': True}
+
+    # Hard cost cap check before every LLM call
+    try:
+        check_cost_cap()
+    except CostCapExceeded as e:
+        return {'content': f'⚠️ {e}', 'tool_calls': [],
+                'usage': {'input': 0, 'output': 0}, 'model': model}
 
     provider, model_id = model.split('/', 1) if '/' in model else ('anthropic', model)
     # OpenRouter-routed providers use openrouter key
@@ -348,6 +355,13 @@ def stream_anthropic(messages: List[Dict[str, Any]], model: Optional[str] = None
         last_user = next((m['content'] for m in reversed(messages)
                           if m['role'] == 'user'), '')
         model = router.route(last_user, has_tools=bool(tools))
+
+    # Hard cost cap check before streaming
+    try:
+        check_cost_cap()
+    except CostCapExceeded as e:
+        yield {'type': 'error', 'error': str(e)}
+        return
 
     provider, model_id = model.split('/', 1) if '/' in model else ('anthropic', model)
 

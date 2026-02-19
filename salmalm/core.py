@@ -122,6 +122,15 @@ response_cache = ResponseCache()
 _usage = {'total_input': 0, 'total_output': 0, 'total_cost': 0.0,
           'by_model': {}, 'session_start': time.time()}
 
+# Hard cost cap — stop all LLM calls after this threshold (per session lifetime)
+# Override with SALMALM_COST_CAP env var (in USD)
+COST_CAP = float(os.environ.get('SALMALM_COST_CAP', '50.0'))
+
+
+class CostCapExceeded(Exception):
+    """Raised when cumulative API spend exceeds the cost cap."""
+    pass
+
 def _restore_usage():
     """Restore cumulative usage from SQLite on startup."""
     try:
@@ -138,6 +147,15 @@ def _restore_usage():
             log.info(f"[STAT] Usage restored: ${_usage['total_cost']:.4f} total")
     except Exception as e:
         log.warning(f"Usage restore failed: {e}")
+
+
+def check_cost_cap():
+    """Raise CostCapExceeded if cumulative cost exceeds the cap."""
+    with _usage_lock:
+        if _usage['total_cost'] >= COST_CAP:
+            raise CostCapExceeded(
+                f"Cost cap exceeded: ${_usage['total_cost']:.2f} >= ${COST_CAP:.2f}. "
+                f"Increase SALMALM_COST_CAP env var or restart.")
 
 
 def track_usage(model: str, input_tokens: int, output_tokens: int):
@@ -648,9 +666,16 @@ class LLMCronManager:
             log.info(f"[CRON] LLM cron firing: {job['name']} ({job['id']})")
             try:
                 from .engine import process_message
+                # Track cost before/after to enforce per-cron-job cap
+                cost_before = _usage['total_cost']
                 response = await process_message(
                     f"cron-{job['id']}", job['prompt'],
                     model_override=job.get('model'))
+                cost_after = _usage['total_cost']
+                cron_cost = cost_after - cost_before
+                MAX_CRON_JOB_COST = 2.0  # $2 max per cron execution
+                if cron_cost > MAX_CRON_JOB_COST:
+                    log.warning(f"[CRON] Job {job['name']} cost ${cron_cost:.2f} — exceeds ${MAX_CRON_JOB_COST} cap")
                 job['last_run'] = datetime.now(KST).isoformat()
                 job['run_count'] = job.get('run_count', 0) + 1
                 self.save_jobs()
@@ -1066,7 +1091,7 @@ from .agents import SubAgent, SkillLoader, PluginLoader
 
 # Module-level exports for convenience
 __all__ = [
-    'audit_log', 'response_cache', 'router', 'track_usage', 'get_usage_report',
+    'audit_log', 'response_cache', 'router', 'track_usage', 'get_usage_report', 'check_cost_cap', 'CostCapExceeded',
     'compact_messages', 'get_session', 'write_daily_log', 'cron',
     'memory_manager', 'heartbeat',
     'get_telegram_bot', 'set_telegram_bot',

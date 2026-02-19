@@ -21,10 +21,18 @@ class SubAgent:
     _agents: dict = {}  # id -> {task, status, result, thread, started, completed}
     _counter = 0
     _lock = threading.Lock()
+    MAX_CONCURRENT = 5  # Max concurrent sub-agents
+    MAX_DEPTH = 2       # Max nesting depth (sub-agent spawning sub-agents)
 
     @classmethod
-    def spawn(cls, task: str, model: Optional[str] = None, notify_telegram: bool = True) -> str:
+    def spawn(cls, task: str, model: Optional[str] = None, notify_telegram: bool = True,
+              _depth: int = 0) -> str:
         """Spawn a background sub-agent. Returns agent ID."""
+        if _depth >= cls.MAX_DEPTH:
+            raise ValueError(f'Sub-agent nesting depth limit ({cls.MAX_DEPTH}) reached')
+        running = sum(1 for a in cls._agents.values() if a['status'] == 'running')
+        if running >= cls.MAX_CONCURRENT:
+            raise ValueError(f'Max concurrent sub-agents ({cls.MAX_CONCURRENT}) reached')
         with cls._lock:
             cls._counter += 1
             agent_id = f'sub-{cls._counter}'

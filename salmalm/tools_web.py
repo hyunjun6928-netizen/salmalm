@@ -33,7 +33,8 @@ def handle_web_fetch(args: dict) -> str:
         return f'{reason}'
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (SalmAlm/0.1)'})
     with urllib.request.urlopen(req, timeout=15) as resp:
-        raw = resp.read().decode('utf-8', errors='replace')
+        # Limit download to 2MB to prevent memory explosion
+        raw = resp.read(2 * 1024 * 1024).decode('utf-8', errors='replace')
     from html.parser import HTMLParser
 
     class _TextExtractor(HTMLParser):
