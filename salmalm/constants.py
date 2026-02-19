@@ -141,10 +141,14 @@ MODELS = {
 }
 
 # Tier-based model routing pools (cheapest → most capable)
+# Ollama models included for users running local LLMs
 MODEL_TIERS = {
-    1: [MODELS['gemini3flash'], MODELS['gpt4.1nano'], MODELS['gpt4.1mini'], MODELS['grok3mini']],
-    2: [MODELS['sonnet'], MODELS['gpt5.3'], MODELS['grok4'], MODELS['gemini3pro'], MODELS['gpt4.1'], MODELS['gpt5.1']],
-    3: [MODELS['opus'], MODELS['o3'], MODELS['sonnet'], MODELS['gpt5.1'], MODELS['grok4']],
+    1: [MODELS['gemini3flash'], MODELS['gpt4.1nano'], MODELS['gpt4.1mini'], MODELS['grok3mini'],
+        'ollama/llama3.2', 'ollama/qwen3'],
+    2: [MODELS['sonnet'], MODELS['gpt5.3'], MODELS['grok4'], MODELS['gemini3pro'], MODELS['gpt4.1'], MODELS['gpt5.1'],
+        'ollama/llama3.3', 'ollama/qwen3'],
+    3: [MODELS['opus'], MODELS['o3'], MODELS['sonnet'], MODELS['gpt5.1'], MODELS['grok4'],
+        'ollama/llama3.3'],
 }
 
 # Fallback models per provider (cheapest reliable model)
@@ -174,6 +178,8 @@ MODEL_ALIASES = {
     'grok3': MODELS['grok3'], 'grok3mini': MODELS['grok3mini'],
     'gemini': MODELS['gemini3pro'], 'flash': MODELS['gemini3flash'],
     'deepseek': MODELS['deepseek-r1'], 'maverick': MODELS['maverick'], 'scout': MODELS['scout'],
+    'llama': 'ollama/llama3.3', 'llama3.2': 'ollama/llama3.2', 'llama3.3': 'ollama/llama3.3',
+    'qwen': 'ollama/qwen3', 'qwen3': 'ollama/qwen3',
 }
 
 # Model for /commands processing (cheap + capable)
