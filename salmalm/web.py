@@ -612,6 +612,18 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             elif action == 'delete':
                 vault.delete(body['key'])
                 self._json({'ok': True})
+            elif action == 'change_password':
+                old_pw = body.get('old_password', '')
+                new_pw = body.get('new_password', '')
+                if not old_pw or not new_pw:
+                    self._json({'error': 'old_password and new_password required'}, 400)
+                elif len(new_pw) < 4:
+                    self._json({'error': 'Password must be at least 4 characters'}, 400)
+                elif vault.change_password(old_pw, new_pw):
+                    audit_log('vault', 'master password changed')
+                    self._json({'ok': True})
+                else:
+                    self._json({'error': 'Current password is incorrect'}, 403)
             else:
                 self._json({'error': 'Unknown action'}, 400)
 

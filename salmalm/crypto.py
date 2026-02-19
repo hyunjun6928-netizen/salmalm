@@ -175,6 +175,19 @@ class Vault:
         self._data.pop(key, None)
         self._save()
 
+    def change_password(self, old_password: str, new_password: str) -> bool:
+        """Change vault master password. Returns True on success."""
+        if not self.is_unlocked:
+            return False
+        # Verify old password matches current
+        if self._password != old_password:
+            return False
+        # Re-encrypt with new password
+        self._password = new_password
+        self._salt = secrets.token_bytes(16)
+        self._save()
+        return True
+
     def keys(self) -> List[str]:
         """List all stored key names."""
         return list(self._data.keys())

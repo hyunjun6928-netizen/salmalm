@@ -260,6 +260,17 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="usage-detail"></div>
   </div>
   <div class="settings-card">
+    <h3>🔒 비밀번호 변경</h3>
+    <label>현재 비밀번호</label>
+    <input type="password" id="pw-old" placeholder="현재 비밀번호">
+    <label>새 비밀번호</label>
+    <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상)">
+    <label>새 비밀번호 확인</label>
+    <input type="password" id="pw-confirm" placeholder="새 비밀번호 다시 입력">
+    <button class="btn" onclick="changePw()">변경</button>
+    <div id="pw-result" style="margin-top:8px;font-size:12px"></div>
+  </div>
+  <div class="settings-card">
     <h3 data-i18n="h-update">🔄 Update</h3>
     <div style="display:flex;gap:8px;align-items:center">
       <span id="update-ver" style="font-size:13px;color:var(--text2)">Current: v<span id="cur-ver"></span></span>
@@ -646,6 +657,16 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       document.getElementById('usage-detail').innerHTML=h});
   };
   window.showUsage=window.showSettings;
+  window.changePw=function(){
+    var o=document.getElementById('pw-old').value,n=document.getElementById('pw-new').value,c=document.getElementById('pw-confirm').value;
+    var re=document.getElementById('pw-result');
+    if(!o||!n){re.innerHTML='<span style="color:#f87171">모든 항목을 입력하세요</span>';return}
+    if(n!==c){re.innerHTML='<span style="color:#f87171">새 비밀번호가 일치하지 않습니다</span>';return}
+    if(n.length<4){re.innerHTML='<span style="color:#f87171">비밀번호는 4자 이상이어야 합니다</span>';return}
+    fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'change_password',old_password:o,new_password:n})}).then(function(r){return r.json()}).then(function(d){
+      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ 비밀번호가 변경되었습니다</span>';document.getElementById('pw-old').value='';document.getElementById('pw-new').value='';document.getElementById('pw-confirm').value=''}
+      else{re.innerHTML='<span style="color:#f87171">❌ '+(d.error||'변경 실패')+'</span>'}
+    }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})};
   window.checkUpdate=function(){
     var re=document.getElementById('update-result');
     re.innerHTML='<span style="color:var(--text2)">⏳ Checking PyPI...</span>';
