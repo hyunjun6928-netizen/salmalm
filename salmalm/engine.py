@@ -264,12 +264,17 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             session.add_assistant(error_msg)
             return error_msg
 
+    # ── OpenClaw-style limits ──
+    MAX_TOOL_ITERATIONS = 15
+    MAX_CONSECUTIVE_ERRORS = 3
+
     async def _execute_loop(self, session, user_message, model_override,
                              on_tool, classification, tier):
         use_thinking = classification['thinking']
         thinking_budget = classification['thinking_budget']
         iteration = 0
-        while True:
+        consecutive_errors = 0
+        while iteration < self.MAX_TOOL_ITERATIONS:
             model = model_override or router.route(
                 user_message, has_tools=True, iteration=iteration)
 
@@ -280,7 +285,13 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 model = router._pick_available(2)
 
             provider = model.split('/')[0] if '/' in model else 'anthropic'
-            tools = self._get_tools_for_provider(provider)
+
+            # OpenClaw-style: intent별 도구 선별 주입 — chat/memory/creative엔 도구 불필요
+            _TOOL_INTENTS = {'code', 'analysis', 'search', 'system'}
+            if classification['intent'] in _TOOL_INTENTS:
+                tools = self._get_tools_for_provider(provider)
+            else:
+                tools = None
 
             # Use thinking for first call on complex tasks
             think_this_call = (use_thinking and iteration == 0
@@ -327,9 +338,30 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 tool_outputs = await asyncio.to_thread(
                     self._execute_tools_parallel,
                     result['tool_calls'], on_tool)
+
+                # Circuit breaker: 연속 에러 감지
+                errors = sum(1 for v in tool_outputs.values()
+                             if '❌' in str(v) or 'error' in str(v).lower())
+                if errors > 0:
+                    consecutive_errors += errors
+                    if consecutive_errors >= self.MAX_CONSECUTIVE_ERRORS:
+                        log.warning(f"[BREAK] {consecutive_errors} consecutive tool errors — stopping loop")
+                        err_summary = '\n'.join(f"• {v}" for v in tool_outputs.values() if '❌' in str(v))
+                        response = f"⚠️ Tool errors detected, stopping:\n{err_summary}"
+                        session.add_assistant(response)
+                        return response
+                else:
+                    consecutive_errors = 0
+
                 self._append_tool_results(
                     session, provider, result,
                     result['tool_calls'], tool_outputs)
+
+                # Mid-loop compaction: 메시지 40개 넘으면 즉시 압축
+                if len(session.messages) > 40:
+                    session.messages = compact_messages(session.messages)
+                    log.info(f"[CUT] Mid-loop compaction: -> {len(session.messages)} msgs")
+
                 iteration += 1
                 continue
 
@@ -366,7 +398,14 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                                 if not m.get('_plan_injected')]
             return response
 
-        # Unreachable (while True exits via return)
+        # Loop exhausted — MAX_TOOL_ITERATIONS reached
+        log.warning(f"[BREAK] Max iterations ({self.MAX_TOOL_ITERATIONS}) reached")
+        response = result.get('content', 'Reached maximum tool iterations. Please try a simpler request.')  # noqa: F821
+        if not response:
+            response = 'Reached maximum tool iterations. Please try a simpler request.'
+        session.add_assistant(response)
+        session.messages = [m for m in session.messages if not m.get('_plan_injected')]
+        return response
 
 
 # Singleton
