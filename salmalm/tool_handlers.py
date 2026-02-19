@@ -1,4 +1,4 @@
-"""SalmAlm tool handlers — execution logic for all 30 tools."""
+"""SalmAlm tool handlers — execution logic for all 32 tools."""
 import subprocess, sys, os, re, time, json, traceback, uuid, secrets
 import urllib.request, base64, mimetypes, difflib, threading
 from datetime import datetime

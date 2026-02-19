@@ -158,7 +158,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="session-list" style="max-height:240px;overflow-y:auto;padding:0 8px 4px"></div>
     <div class="nav-section" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px">📡 Channels</div>
     <div class="nav-item" id="tg-status">📡 Telegram <span class="badge">ON</span></div>
-    <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ Tools (31) ▾</div>
+    <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ Tools (32) ▾</div>
     <div id="tools-list" style="display:none">
     <div class="nav-item" onclick="quickCmd('/help')">🔧 exec · file · search</div>
     <div class="nav-item" onclick="quickCmd('Check system status')">🖥️ System Monitor</div>

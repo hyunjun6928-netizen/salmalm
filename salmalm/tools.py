@@ -1,4 +1,4 @@
-"""SalmAlm tool definitions — schema for all 31 tools."""
+"""SalmAlm tool definitions — schema for all 32 tools."""
 
 TOOL_DEFINITIONS = [
     {

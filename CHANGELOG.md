@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.1 (2026-02-19)
+
+### ✨ Features
+- **Multi-session UI** — sidebar conversation list with create/switch/delete + auto-title from first message
+- **Dashboard** (`/dashboard`) — Chart.js bar chart (tool calls 24h) + doughnut (cost by model) + model stats table + cron/plugin status + 60s auto-refresh
+- **STT (Speech-to-Text)** — `stt` tool using OpenAI Whisper API; 🎤 mic button in web UI records audio → transcribes → inserts text
+- **PWA** — `manifest.json`, SVG app icons, service worker (standalone mode only), installable from mobile
+- **32 tools** (added `stt`)
+- **FAQ + use-cases English versions** (`docs/FAQ_EN.md`, `docs/use-cases_EN.md`)
+
 ## v0.11.0 (2026-02-19)
 
 ### ✨ Features

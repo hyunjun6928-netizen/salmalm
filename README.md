@@ -1,4 +1,4 @@
-# 😈 삶앎 (SalmAlm) v0.11.0
+# 😈 삶앎 (SalmAlm) v0.11.1
 
 [![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
@@ -51,7 +51,7 @@ salmalm/
 ├── core.py             — audit, cache, router, cron, sessions
 ├── agents.py           — SubAgent, SkillLoader, PluginLoader
 ├── llm.py              — LLM API calls (6 providers + auto-fallback)
-├── tools.py            — 30 tool definitions
+├── tools.py            — 32 tool definitions
 ├── tool_handlers.py    — tool execution + gateway dispatch
 ├── prompt.py           — system prompt builder
 ├── engine.py           — Intelligence Engine (Classify→Plan→Execute→Reflect)
@@ -177,14 +177,21 @@ Store in `.env` file or encrypted vault via Web UI:
 - [Changelog](CHANGELOG.md)
 - [API Docs](http://localhost:18800/docs) (서버 실행 후)
 
-## 📝 v0.11.0 Changelog
+## 📝 v0.11.1 Changelog
 
+- **💬 멀티세션 UI**: 사이드바 대화 목록 — 생성/전환/삭제, 자동 제목 생성
+- **📈 대시보드**: `/dashboard` — Chart.js 도구 사용량 차트 + 모델별 비용 도넛 + 테이블
+- **🎤 STT (음성→텍스트)**: Whisper API 연동 + 마이크 버튼 — 녹음→변환→입력창 삽입
+- **📱 PWA**: manifest.json + 서비스워커 + 앱 아이콘 — 폰에서 홈화면 앱으로 설치
+- **32개 도구** (stt 추가)
+
+### v0.11.0
 - **👁️ image_analyze 비전 도구**: 이미지 분석 (URL/base64/파일 경로)
 - **🧠 프롬프트 v0.5.0**: 의도 분류 + 도구 선택 정확도 향상
 - **📡 SSE 청크 스트리밍**: 실시간 응답 스트리밍 지원
 - **📋 CI/CD**: GitHub Actions 매트릭스 (Ubuntu/macOS/Windows × Python 3.10-3.13)
 - **📛 배지**: PyPI + CI + License + Python 버전 배지
-- **📖 CONTRIBUTING + CHANGELOG + FAQ + use-cases + issue templates**
+- **📖 CONTRIBUTING + CHANGELOG + FAQ(한/영) + use-cases(한/영) + issue templates**
 
 ### v0.10.9
 - **🔒 P0 보안 패치**: `/api/do-update`, `/api/restart`에 admin 인증 + loopback 강제

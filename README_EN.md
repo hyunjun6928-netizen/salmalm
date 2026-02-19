@@ -1,4 +1,4 @@
-# 😈 SalmAlm v0.11.0
+# 😈 SalmAlm v0.11.1
 
 [![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
@@ -9,7 +9,7 @@
 
 > [🇰🇷 한국어](README.md)
 
-A self-hosted AI gateway built entirely on Python's standard library. No npm, no dependency hell, no Docker required. One command and you're running your own AI assistant with 30 tools.
+A self-hosted AI gateway built entirely on Python's standard library. No npm, no dependency hell, no Docker required. One command and you're running your own AI assistant with 32 tools.
 
 The only optional dependency is `cryptography` for AES-256-GCM vault encryption. Without it, the vault falls back to HMAC-CTR (still secure, just not AEAD).
 
@@ -101,7 +101,7 @@ salmalm/
 ├── core.py             — audit, cache, sessions, cron, routing
 ├── agents.py           — SubAgent, SkillLoader, PluginLoader
 ├── llm.py              — multi-provider LLM calls (6 providers + auto-fallback)
-├── tools.py            — 30 tool definitions
+├── tools.py            — 32 tool definitions
 ├── tool_handlers.py    — tool execution + gateway dispatch
 ├── prompt.py           — system prompt builder
 ├── engine.py           — Intelligence Engine (classify → plan → execute → reflect)
@@ -185,8 +185,15 @@ Not just a chat proxy. Every message goes through:
 - 21/21 self-test on startup
 - 8-component health monitoring
 
-## 📝 v0.11.0 Changelog
+## 📝 v0.11.1 Changelog
 
+- **💬 Multi-session UI**: sidebar chat list — create/switch/delete conversations, auto-titling
+- **📈 Dashboard**: `/dashboard` — Chart.js tool usage bar chart + model cost doughnut + stats table
+- **🎤 STT (Speech-to-Text)**: Whisper API + mic button — record → transcribe → insert into input
+- **📱 PWA**: manifest.json + service worker + app icon — install as home screen app
+- **32 tools** (added `stt`)
+
+### v0.11.0
 - **👁️ `image_analyze` vision tool**: image analysis (URL/base64/local file/OCR)
 - **🧠 Prompt v0.5.0**: improved intent classification + tool selection accuracy
 - **📡 SSE chunk streaming**: real-time response streaming with tool counters
