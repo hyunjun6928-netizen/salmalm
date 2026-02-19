@@ -81,7 +81,7 @@ def execute_tool(name: str, args: dict) -> str:
 
         # Try directory-based plugins (new plugin architecture)
         try:
-            from .plugins import plugin_manager
+            from .plugin_manager import plugin_manager
             result = plugin_manager.execute_tool(name, args)
             if result is not None:
                 return result

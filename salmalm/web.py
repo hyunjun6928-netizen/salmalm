@@ -380,10 +380,30 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/api/plugins':
             if not self._require_auth('user'): return
             from .core import PluginLoader
-            tools = PluginLoader.get_all_tools()
-            plugins = [{'name': n, 'tools': len(p['tools']), 'path': p['path']}
+            legacy_tools = PluginLoader.get_all_tools()
+            legacy = [{'name': n, 'tools': len(p['tools']), 'path': p['path']}
                        for n, p in PluginLoader._plugins.items()]
-            self._json({'plugins': plugins, 'total_tools': len(tools)})
+            from .plugin_manager import plugin_manager
+            new_plugins = plugin_manager.list_plugins()
+            self._json({
+                'plugins': legacy, 'total_tools': len(legacy_tools),
+                'directory_plugins': new_plugins,
+                'directory_total_tools': len(plugin_manager.get_all_tools()),
+            })
+        elif self.path == '/api/agents':
+            if not self._require_auth('user'): return
+            from .agents import agent_manager
+            self._json({
+                'agents': agent_manager.list_agents(),
+                'bindings': agent_manager.list_bindings(),
+            })
+        elif self.path == '/api/hooks':
+            if not self._require_auth('user'): return
+            from .hooks import hook_manager, VALID_EVENTS
+            self._json({
+                'hooks': hook_manager.list_hooks(),
+                'valid_events': list(VALID_EVENTS),
+            })
         elif self.path == '/api/mcp':
             if not self._require_auth('user'): return
             from .mcp import mcp_manager
@@ -804,14 +824,32 @@ self.addEventListener('fetch',e=>{{
                                         ip=self._get_client_ip(),
                                         duration_ms=duration)
 
+    # Max POST body size: 10MB
+    _MAX_POST_SIZE = 10 * 1024 * 1024
+
     def _do_post_inner(self):
         from .engine import process_message
         length = int(self.headers.get('Content-Length', 0))
+
+        # Request size limit
+        if length > self._MAX_POST_SIZE:
+            self._json({'error': f'Request too large ({length} bytes). Max: {self._MAX_POST_SIZE} bytes.'}, 413)
+            return
+
         # Don't parse multipart as JSON
         if self.path == '/api/upload':
             body = {}  # type: ignore[var-annotated]
         else:
-            body = json.loads(self.rfile.read(length)) if length else {}
+            # Content-Type validation for JSON endpoints
+            ct = self.headers.get('Content-Type', '')
+            if length > 0 and self.path.startswith('/api/') and 'json' not in ct and 'form' not in ct:
+                self._json({'error': 'Expected Content-Type: application/json'}, 400)
+                return
+            try:
+                body = json.loads(self.rfile.read(length)) if length else {}
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                self._json({'error': f'Invalid JSON body: {e}'}, 400)
+                return
 
         if self.path == '/api/auth/login':
             username = body.get('username', '')
@@ -1146,6 +1184,60 @@ self.addEventListener('fetch',e=>{{
             from .core import branch_session
             result = branch_session(sid, int(message_index))
             self._json(result)
+
+        elif self.path == '/api/agents':
+            if not self._require_auth('user'): return
+            from .agents import agent_manager
+            action = body.get('action', '')
+            if action == 'create':
+                result = agent_manager.create(body.get('id', ''), body.get('display_name', ''))
+                self._json({'ok': '✅' in result, 'message': result})
+            elif action == 'delete':
+                result = agent_manager.delete(body.get('id', ''))
+                self._json({'ok': True, 'message': result})
+            elif action == 'bind':
+                result = agent_manager.bind(body.get('chat_key', ''), body.get('agent_id', ''))
+                self._json({'ok': True, 'message': result})
+            elif action == 'switch':
+                result = agent_manager.switch(body.get('chat_key', ''), body.get('agent_id', ''))
+                self._json({'ok': True, 'message': result})
+            else:
+                self._json({'error': 'Unknown action. Use: create, delete, bind, switch'}, 400)
+
+        elif self.path == '/api/hooks':
+            if not self._require_auth('user'): return
+            from .hooks import hook_manager
+            action = body.get('action', '')
+            if action == 'add':
+                result = hook_manager.add_hook(body.get('event', ''), body.get('command', ''))
+                self._json({'ok': True, 'message': result})
+            elif action == 'remove':
+                result = hook_manager.remove_hook(body.get('event', ''), body.get('index', 0))
+                self._json({'ok': True, 'message': result})
+            elif action == 'test':
+                result = hook_manager.test_hook(body.get('event', ''))
+                self._json({'ok': True, 'message': result})
+            elif action == 'reload':
+                hook_manager.reload()
+                self._json({'ok': True, 'message': '🔄 Hooks reloaded'})
+            else:
+                self._json({'error': 'Unknown action'}, 400)
+
+        elif self.path == '/api/plugins/manage':
+            if not self._require_auth('user'): return
+            from .plugin_manager import plugin_manager
+            action = body.get('action', '')
+            if action == 'reload':
+                result = plugin_manager.reload_all()
+                self._json({'ok': True, 'message': result})
+            elif action == 'enable':
+                result = plugin_manager.enable(body.get('name', ''))
+                self._json({'ok': True, 'message': result})
+            elif action == 'disable':
+                result = plugin_manager.disable(body.get('name', ''))
+                self._json({'ok': True, 'message': result})
+            else:
+                self._json({'error': 'Unknown action'}, 400)
 
         elif self.path in ('/api/chat', '/api/chat/stream'):
             self._auto_unlock_localhost()

@@ -438,6 +438,10 @@ def compact_messages(messages: list, model: Optional[str] = None,
     """Multi-stage compaction: trim tool results → drop old tools → summarize.
     Hard limit: max 100 messages, max 500K chars (≈125K tokens).
     OpenClaw-style: flush memory before compaction."""
+    # Empty conversation guard
+    if not messages:
+        return messages
+
     MAX_MESSAGES = 100
     MAX_CHARS = 500_000
 
@@ -918,7 +922,10 @@ class Session:
         self.messages.insert(0, {'role': 'system', 'content': content})
 
     def _persist(self):
-        """Save session to SQLite (only text messages, skip image data)."""
+        """Save session to SQLite (only text messages, skip image data).
+
+        Handles: disk full (OSError), DB lock (sqlite3.OperationalError).
+        """
         try:
             # Filter out large binary data from messages
             saveable = []
@@ -938,9 +945,18 @@ class Session:
             log.warning(f"Session persist error: {e}")
 
     def add_user(self, content: str):
-        """Add a user message to the session."""
+        """Add a user message to the session.
+
+        Auto-compaction: if session exceeds 1000 messages, trim old ones.
+        """
         self.messages.append({'role': 'user', 'content': content})
         self.last_active = time.time()
+        # Session size explosion prevention
+        if len(self.messages) > 1000:
+            system_msgs = [m for m in self.messages if m['role'] == 'system'][:1]
+            recent = [m for m in self.messages if m['role'] != 'system'][-50:]
+            self.messages = system_msgs + recent
+            log.warning(f"[SESSION] Auto-trimmed session {self.id}: >1000 msgs → {len(self.messages)}")
 
     def add_assistant(self, content: str):
         """Add an assistant response to the session."""
@@ -1018,9 +1034,16 @@ def get_session(session_id: str) -> Session:
                 conn = _get_db()
                 row = conn.execute('SELECT messages FROM session_store WHERE session_id=?', (session_id,)).fetchone()
                 if row:
-                    restored = json.loads(row[0])
-                    _sessions[session_id].messages = restored
-                    log.info(f"[NOTE] Session restored: {session_id} ({len(restored)} msgs)")
+                    try:
+                        restored = json.loads(row[0])
+                        if not isinstance(restored, list):
+                            raise ValueError("Session data is not a list")
+                        _sessions[session_id].messages = restored
+                        log.info(f"[NOTE] Session restored: {session_id} ({len(restored)} msgs)")
+                    except (json.JSONDecodeError, ValueError, TypeError) as je:
+                        # Corrupted session JSON — start fresh
+                        log.warning(f"[SESSION] Corrupt session JSON for {session_id}: {je}")
+                        _sessions[session_id].messages = []
                     # Refresh system prompt
                     from .prompt import build_system_prompt
                     _sessions[session_id].add_system(build_system_prompt(full=False))
@@ -1472,10 +1495,22 @@ def compact_session(session_id: str, force: bool = False) -> str:
         {'role': 'system', 'content': 'You are a conversation summarizer. Summarize the following conversation concisely but thoroughly. Preserve key decisions, facts, code context, task progress, and user preferences. Write in the same language as the conversation. Output 5-15 sentences.'},
         {'role': 'user', 'content': summary_text}
     ]
-    result = call_llm(summ_msgs, model=summary_model, max_tokens=1000)
+    try:
+        result = call_llm(summ_msgs, model=summary_model, max_tokens=1000)
+    except Exception as e:
+        # Compaction error: preserve original messages, skip compaction
+        log.error(f"[COMPACT] LLM call failed during compaction: {e}")
+        return f'❌ Compaction skipped — LLM error: {e}. Original messages preserved.'
+
     summary = result.get('content', '')
     if not summary:
-        return '❌ Compaction failed — could not generate summary.'
+        return '❌ Compaction failed — could not generate summary. Original preserved.'
+
+    # Guard: if summary is longer than original, don't use it
+    original_chars = sum(len(_msg_content_str(m)) for m in old_msgs)
+    if len(summary) > original_chars:
+        log.warning(f"[COMPACT] Summary ({len(summary)} chars) longer than original ({original_chars} chars) — skipping")
+        return '⚠️ Compaction result was longer than original — skipped.'
 
     # Rebuild session messages
     compacted = system_msgs + [

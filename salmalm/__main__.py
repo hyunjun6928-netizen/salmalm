@@ -225,6 +225,23 @@ def main() -> None:
             audit_log('startup', f'{APP_NAME} v{VERSION}')
             MEMORY_DIR.mkdir(exist_ok=True)
 
+            # Initialize hooks, plugins, agents (훅/플러그인/에이전트 초기화)
+            try:
+                from .hooks import hook_manager
+                hook_manager.fire('on_startup', {'message': f'{APP_NAME} v{VERSION} starting'})
+            except Exception:
+                pass
+            try:
+                from .plugin_manager import plugin_manager
+                plugin_manager.scan_and_load()
+            except Exception as e:
+                log.warning(f"Plugin scan error: {e}")
+            try:
+                from .agents import agent_manager
+                agent_manager.scan()
+            except Exception as e:
+                log.warning(f"Agent scan error: {e}")
+
             port = int(os.environ.get('SALMALM_PORT', 18800))
             bind_addr = os.environ.get('SALMALM_BIND', '127.0.0.1')
             server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
@@ -393,6 +410,13 @@ def main() -> None:
 
             log.info("[SHUTDOWN] Phase 6: Stop HTTP server")
             server.shutdown()
+
+            # Fire on_shutdown hook (종료 훅)
+            try:
+                from .hooks import hook_manager
+                hook_manager.fire('on_shutdown', {'message': 'Server shutting down'})
+            except Exception:
+                pass
 
             audit_log('shutdown', f'{APP_NAME} v{VERSION} graceful shutdown')
             log.info("[SHUTDOWN] Complete. Goodbye! 😈")

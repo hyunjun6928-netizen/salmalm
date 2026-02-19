@@ -128,7 +128,27 @@ def _is_subpath(path: Path, parent: Path) -> bool:
 # ── Main Entry Point (thin shim) ────────────────────────────
 
 def execute_tool(name: str, args: dict) -> str:
-    """Execute a tool — delegates to tool_registry."""
+    """Execute a tool — delegates to tool_registry.
+
+    Edge cases:
+    - Path traversal (.. in paths): rejected
+    - Environment variable injection ($VAR in args): sanitized
+    - All exceptions caught and returned as error strings
+    """
+    # Path traversal prevention
+    for key in ('path', 'file_path', 'image_path', 'audio_path', 'file1', 'file2'):
+        val = args.get(key, '')
+        if isinstance(val, str) and '..' in val:
+            return f'❌ Path traversal blocked: ".." not allowed in {key} / 경로 탈출 차단'
+
+    # Environment variable injection prevention
+    for key, val in args.items():
+        if isinstance(val, str) and re.search(r'\$\{?\w+\}?', val):
+            # Allow $HOME-style only in non-sensitive contexts
+            if key in ('command',):
+                continue  # exec tool handles its own safety
+            args[key] = re.sub(r'\$\{?\w+\}?', '', val)
+
     audit_log('tool_exec', f'{name}: {json.dumps(args, ensure_ascii=False)[:200]}')
 
     # Try remote node dispatch first (if gateway has registered nodes)

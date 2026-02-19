@@ -23,25 +23,26 @@ _UA: str = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Geck
 
 
 def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120) -> dict:
-    data = json.dumps(body).encode('utf-8')
-    headers.setdefault('User-Agent', _UA)
-    req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode('utf-8'))  # type: ignore[no-any-return]
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode('utf-8', errors='replace')
-        log.error(f"HTTP {e.code}: {err_body[:300]}")
-        # Friendly error messages
-        if e.code == 401:
-            raise ValueError(f'Invalid API key (401). Please check your key.') from e
-        elif e.code == 429:
-            raise ValueError(f'Rate limit exceeded (429). Please try again later.') from e
-        elif e.code == 402:
-            raise ValueError(f'Insufficient API credits (402). Check billing info.') from e
-        elif e.code == 529:
-            raise ValueError(f'Server overloaded (529). Please try again later.') from e
-        raise
+    """HTTP POST with retry for transient errors (5xx, timeout, 429, 529)."""
+    from .retry import retry_call
+
+    def _do_post():
+        data = json.dumps(body).encode('utf-8')
+        headers.setdefault('User-Agent', _UA)
+        req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode('utf-8', errors='replace')
+            log.error(f"HTTP {e.code}: {err_body[:300]}")
+            if e.code == 401:
+                raise ValueError(f'Invalid API key (401). Please check your key.') from e
+            elif e.code == 402:
+                raise ValueError(f'Insufficient API credits (402). Check billing info.') from e
+            raise  # Let retry logic handle 429, 5xx, 529
+
+    return retry_call(_do_post, max_attempts=3)
 
 
 def _http_get(url: str, headers: Optional[Dict[str, str]] = None, timeout: int = 30) -> dict:
@@ -99,12 +100,16 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
         result = _call_provider(provider, api_key, model_id, messages, tools, max_tokens,
                                 thinking=thinking)
         result['model'] = model
-        usage = result.get('usage', {})
-        inp_tok = usage.get('input', 0)
-        out_tok = usage.get('output', 0)
-        track_usage(model, inp_tok, out_tok)
-        _metrics['total_tokens_in'] += inp_tok
-        _metrics['total_tokens_out'] += out_tok
+        # Cost tracking — best-effort (never fail the request)
+        try:
+            usage = result.get('usage', {})
+            inp_tok = usage.get('input', 0)
+            out_tok = usage.get('output', 0)
+            track_usage(model, inp_tok, out_tok)
+            _metrics['total_tokens_in'] += inp_tok
+            _metrics['total_tokens_out'] += out_tok
+        except Exception as e:
+            log.warning(f"[COST] Usage tracking failed (ignored): {e}")
         if not result.get('tool_calls') and result.get('content'):
             response_cache.put(model, messages, result['content'])
         return result

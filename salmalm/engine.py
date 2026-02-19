@@ -1191,7 +1191,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
 
     # --- Plugins commands (플러그인 명령) ---
     if cmd.startswith('/plugins'):
-        from .plugins import plugin_manager
+        from .plugin_manager import plugin_manager
         parts = cmd.split(maxsplit=2)
         sub = parts[1] if len(parts) > 1 else 'list'
         if sub == 'list':

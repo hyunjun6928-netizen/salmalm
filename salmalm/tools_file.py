@@ -9,7 +9,25 @@ def handle_read_file(args: dict) -> str:
     p = _resolve_path(args['path'])
     if not p.exists():
         return f'File not found: {p}'
-    text = p.read_text(encoding='utf-8', errors='replace')
+    # Symlink loop detection
+    try:
+        p.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return f'❌ Cannot resolve path (symlink loop?): {p}'
+    # Size limit: 5MB max for reading
+    try:
+        size = p.stat().st_size
+        if size > 5 * 1024 * 1024:
+            return f'❌ File too large ({size // 1024}KB). Max 5MB for read_file.'
+    except OSError as e:
+        return f'❌ Cannot stat file: {e}'
+    # Read with encoding fallback
+    try:
+        text = p.read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        text = p.read_text(encoding='latin-1')
+    except OSError as e:
+        return f'❌ Read error: {e}'
     lines = text.splitlines()
     offset = args.get('offset', 1) - 1
     limit = args.get('limit', len(lines))
@@ -20,8 +38,13 @@ def handle_read_file(args: dict) -> str:
 @register('write_file')
 def handle_write_file(args: dict) -> str:
     p = _resolve_path(args['path'], writing=True)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(args['content'], encoding='utf-8')
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(args['content'], encoding='utf-8')
+    except OSError as e:
+        if 'No space left' in str(e) or e.errno == 28:
+            return f'❌ Disk full — cannot write: {e}'
+        return f'❌ Write error: {e}'
     return f'{p} ({len(args["content"])} chars)'
 
 

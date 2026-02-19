@@ -48,14 +48,24 @@ class WSClient:
         self.created_at = time.time()
         self.last_ping = time.time()
         self._id = id(self)
+        self._send_lock = asyncio.Lock()  # Serialize concurrent sends
+        self._buffer: list = []  # Buffer messages during disconnect
 
     async def send_json(self, data: dict):
-        """Send a JSON message as a WebSocket text frame."""
+        """Send a JSON message as a WebSocket text frame.
+
+        Serializes concurrent sends to prevent frame interleaving.
+        Buffers messages if disconnected.
+        """
         if not self.connected:
+            # Buffer for potential reconnection (max 50)
+            if len(self._buffer) < 50:
+                self._buffer.append(data)
             return
         try:
-            payload = json.dumps(data, ensure_ascii=False).encode('utf-8')
-            await self._send_frame(OP_TEXT, payload)
+            async with self._send_lock:
+                payload = json.dumps(data, ensure_ascii=False).encode('utf-8')
+                await self._send_frame(OP_TEXT, payload)
         except Exception:
             self.connected = False
 
@@ -96,7 +106,8 @@ class WSClient:
                 data = await self.reader.readexactly(8)
                 length = struct.unpack('!Q', data)[0]
 
-            if length > 16 * 1024 * 1024:  # 16MB limit
+            if length > 1 * 1024 * 1024:  # 1MB limit (reject oversized frames)
+                log.warning(f"[WS] Rejecting oversized frame: {length} bytes")
                 return None
 
             mask_key = None
@@ -288,7 +299,13 @@ class WebSocketServer:
                     try:
                         data = json.loads(text)
                     except json.JSONDecodeError:
-                        data = {"type": "message", "text": text}
+                        # Invalid JSON — send error but keep connection alive
+                        log.warning(f"[WS] Invalid JSON from client {client._id}")
+                        await client.send_json({
+                            "type": "error",
+                            "error": "Invalid JSON format / 잘못된 JSON 형식"
+                        })
+                        continue
 
                     if self._on_message:
                         try:
@@ -335,7 +352,7 @@ class WebSocketServer:
             now = time.time()
             dead = []
             for cid, client in list(self.clients.items()):
-                if now - client.last_ping > 90:
+                if now - client.last_ping > 60:  # 60s ping timeout
                     dead.append(cid)
                 else:
                     try:

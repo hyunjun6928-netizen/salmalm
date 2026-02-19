@@ -11,7 +11,7 @@ def handle_exec(args: dict) -> str:
     safe, reason = _is_safe_command(cmd)
     if not safe:
         return f'{reason}'
-    timeout = min(args.get('timeout', 30), 120)
+    timeout = min(args.get('timeout', 30), 120)  # Max 120s, default 30s
     try:
         import shlex
         needs_shell = any(c in cmd for c in ['|', '>', '<', '&&', '||', ';', '`', '$('])
@@ -26,7 +26,11 @@ def handle_exec(args: dict) -> str:
             **run_args, capture_output=True, text=True,
             timeout=timeout, cwd=str(WORKSPACE_DIR)
         )
-        output = result.stdout[-5000:] if result.stdout else ''
+        # Output truncation: 50KB max
+        MAX_OUTPUT = 50 * 1024
+        output = result.stdout[-MAX_OUTPUT:] if result.stdout else ''
+        if len(result.stdout or '') > MAX_OUTPUT:
+            output = f'[truncated: {len(result.stdout)} chars total, showing last {MAX_OUTPUT}]\n' + output
         if result.stderr:
             output += f'\n[stderr]: {result.stderr[-2000:]}'
         if result.returncode != 0:
