@@ -265,6 +265,34 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="key-test-result" style="margin-top:8px;font-size:12px"></div>
     <div id="vault-keys" style="margin-top:12px"></div>
   </div>
+  <div class="settings-card" id="google-oauth-card">
+    <h3>🔗 Google 연동 (Calendar & Gmail)</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+      Google Calendar, Gmail 기능을 사용하려면 OAuth2 연동이 필요합니다.<br>
+      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--accent2)">Google Cloud Console</a>에서 OAuth 2.0 Client ID를 생성하세요.
+    </p>
+    <label>Google Client ID</label>
+    <div style="display:flex;gap:6px"><input id="sk-google-client-id" type="password" placeholder="xxxx.apps.googleusercontent.com"><button class="btn" data-action="save-google-client-id">Save</button></div>
+    <label>Google Client Secret</label>
+    <div style="display:flex;gap:6px"><input id="sk-google-client-secret" type="password" placeholder="GOCSPX-..."><button class="btn" data-action="save-google-client-secret">Save</button></div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+      <button class="btn" data-action="googleConnect" id="google-connect-btn">🔗 Google 계정 연결</button>
+      <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="googleDisconnect">연결 해제</button>
+      <span id="google-status" style="font-size:12px;color:var(--text2)"></span>
+    </div>
+    <div id="google-result" style="margin-top:8px;font-size:12px"></div>
+    <details style="margin-top:12px">
+      <summary style="font-size:12px;color:var(--text2);cursor:pointer">📋 설정 가이드</summary>
+      <ol style="font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2">
+        <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--accent2)">Google Cloud Console</a> → 프로젝트 생성/선택</li>
+        <li>API 및 서비스 → 사용자 인증 정보 → OAuth 2.0 클라이언트 ID 만들기</li>
+        <li>애플리케이션 유형: <b>웹 애플리케이션</b></li>
+        <li>승인된 리디렉션 URI: <code style="background:var(--bg);padding:2px 6px;border-radius:4px">http://localhost:PORT/api/google/callback</code></li>
+        <li>Client ID와 Client Secret을 위에 입력</li>
+        <li><b>🔗 Google 계정 연결</b> 클릭</li>
+      </ol>
+    </details>
+  </div>
   <div class="settings-card" id="usage-card">
     <h3data-i18n="h-usage">📊 Token Usage</h3>
     <div id="usage-detail"></div>
@@ -793,6 +821,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'keys'})})
       .then(function(r){return r.json()}).then(function(d){
         document.getElementById('vault-keys').innerHTML=d.keys.map(function(k){return '<div style="padding:4px 0;font-size:13px;color:var(--text2)">🔑 '+k+'</div>'}).join('')});
+    if(window.checkGoogleStatus)window.checkGoogleStatus();
     fetch('/api/status').then(function(r){return r.json()}).then(function(d){
       var u=d.usage,h='<div style="font-size:13px;line-height:2">📥 Input: '+u.total_input.toLocaleString()+' tokens<br>📤 Output: '+u.total_output.toLocaleString()+' tokens<br>💰 Cost: $'+u.total_cost.toFixed(4)+'<br>⏱️ Uptime: '+u.elapsed_hours+'h</div>';
       if(u.by_model){h+='<div style="margin-top:12px;font-size:12px">';for(var m in u.by_model){var v=u.by_model[m];h+='<div style="padding:4px 0;color:var(--text2)">'+m+': '+v.calls+'calls · $'+v.cost.toFixed(4)+'</div>'}h+='</div>'}
@@ -888,6 +917,38 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     .then(function(r){return r.json()}).then(function(d){
       re.innerHTML=d.ok?'<span style="color:#4ade80">'+d.result+'</span>':'<span style="color:#f87171">'+d.result+'</span>'})
     .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ Error: '+e.message+'</span>'})
+  };
+  window.googleConnect=function(){
+    var re=document.getElementById('google-result');
+    re.innerHTML='<span style="color:var(--text2)">⏳ Checking credentials...</span>';
+    fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'get',key:'google_client_id'})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(!d.value){re.innerHTML='<span style="color:#f87171">❌ Client ID를 먼저 저장하세요</span>';return}
+      re.innerHTML='<span style="color:#4ade80">🔗 Google 로그인 페이지로 이동합니다...</span>';
+      window.open('/api/google/auth','_blank','width=500,height=600')})
+    .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})
+  };
+  window.googleDisconnect=function(){
+    var re=document.getElementById('google-result');
+    if(!confirm('Google 연동을 해제하시겠습니까?'))return;
+    Promise.all([
+      fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',key:'google_refresh_token'})}),
+      fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',key:'google_access_token'})})
+    ]).then(function(){
+      re.innerHTML='<span style="color:#4ade80">✅ Google 연동이 해제되었습니다</span>';
+      document.getElementById('google-status').innerHTML='<span style="color:var(--text2)">⚪ 연결 안됨</span>';
+    }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})
+  };
+  window.checkGoogleStatus=function(){
+    var st=document.getElementById('google-status');
+    if(!st)return;
+    fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'get',key:'google_refresh_token'})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.value){st.innerHTML='<span style="color:#4ade80">🟢 연결됨</span>'}
+      else{st.innerHTML='<span style="color:var(--text2)">⚪ 연결 안됨</span>'}
+    }).catch(function(){st.innerHTML=''})
   };
   window.setModel=function(m){modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
     fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'/model '+(m==='auto'?'auto':m),session:_currentSession})})};
@@ -987,6 +1048,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='save-google')window.saveKey('google_api_key','sk-google');
     else if(a==='test-google')window.testKey('google');
     else if(a==='save-brave')window.saveKey('brave_api_key','sk-brave');
+    else if(a==='save-google-client-id')window.saveKey('google_client_id','sk-google-client-id');
+    else if(a==='save-google-client-secret')window.saveKey('google_client_secret','sk-google-client-secret');
+    else if(a==='googleConnect')window.googleConnect();
+    else if(a==='googleDisconnect')window.googleDisconnect();
     else if(a==='changePw')window.changePw();
     else if(a==='removePw')window.removePw();
     else if(a==='setPw')window.setPw();
