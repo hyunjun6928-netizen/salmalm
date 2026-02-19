@@ -332,6 +332,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 <div id="input-area">
   <div class="input-box">
     <textarea id="input" rows="1" placeholder="Type a message..." data-i18n="input-ph"></textarea>
+    <button id="thinking-btn" data-action="toggleThinking" title="Extended Thinking" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🧠</button>
     <button id="mic-btn" data-action="toggleMic" title="Voice input" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🎤</button>
     <button id="send-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
@@ -762,6 +763,35 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   async function doSend(){
     var t=input.value.trim();
     if(!t&&!pendingFile)return;
+    /* Client-side /rollback N command */
+    var rollMatch=t.match(/^\/rollback\s+(\d+)$/);
+    if(rollMatch){
+      input.value='';
+      var cnt=parseInt(rollMatch[1]);
+      fetch('/api/sessions/rollback',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+        body:JSON.stringify({session_id:_currentSession,count:cnt})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.ok){
+          addMsg('assistant','⏪ Rolled back '+d.removed+' message pair(s).');
+          /* Reload session */
+          switchSession(_currentSession);
+        }else{addMsg('assistant','❌ Rollback failed: '+(d.error||''));}
+      });
+      return;
+    }
+    /* Client-side /branch command */
+    if(t==='/branch'){
+      input.value='';
+      var allMsgs=chat.querySelectorAll('.msg-row');
+      var idx=allMsgs.length-1;
+      fetch('/api/sessions/branch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+        body:JSON.stringify({session_id:_currentSession,message_index:idx})})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.ok){switchSession(d.new_session_id);loadSessionList();}
+        else{addMsg('assistant','❌ Branch failed: '+(d.error||''));}
+      });
+      return;
+    }
     input.value='';input.style.height='auto';btn.disabled=true;
 
     var fileMsg='';var imgData=null;var imgMime=null;
@@ -1116,6 +1146,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='toggleTheme')window.toggleTheme();
     else if(a==='openDashboard')window.showDashboard();
     else if(a==='exportChat')window.exportChat('md');
+    else if(a==='toggleThinking')window.toggleThinking();
     else if(a==='toggleMic')window.toggleMic();
     else if(a==='clearFile')window.clearFile();
     else if(a==='toggleTools'){var nx=el.nextElementSibling;nx.style.display=nx.style.display==='none'?'block':'none'}
@@ -1165,6 +1196,24 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   });
 
   /* STT — Voice Input */
+  /* --- Extended Thinking Toggle --- */
+  var _thinkingOn=false;
+  window.toggleThinking=function(){
+    _thinkingOn=!_thinkingOn;
+    var btn=document.getElementById('thinking-btn');
+    if(_thinkingOn){
+      btn.style.background='var(--accent)';btn.style.color='#fff';
+      fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+        body:JSON.stringify({message:'/thinking on',session:_currentSession})}).catch(function(){});
+      addMsg('system','🧠 Extended Thinking: ON');
+    }else{
+      btn.style.background='var(--bg3)';btn.style.color='var(--text2)';
+      fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+        body:JSON.stringify({message:'/thinking off',session:_currentSession})}).catch(function(){});
+      addMsg('system','Extended Thinking: OFF');
+    }
+  };
+
   var _mediaRec=null,_audioChunks=[];
   window.toggleMic=function(){
     var btn=document.getElementById('mic-btn');

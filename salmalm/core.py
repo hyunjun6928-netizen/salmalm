@@ -738,6 +738,7 @@ class Session:
         self.last_active = time.time()
         self.metadata: dict = {}  # Arbitrary session metadata
         self._memory_flushed = False  # Track if pre-compaction memory flush happened
+        self.thinking_enabled = False  # Extended thinking toggle (default OFF)
 
     def add_system(self, content: str):
         # Replace existing system message
@@ -1151,6 +1152,89 @@ heartbeat = HeartbeatManager()
 
 
 # ============================================================
+# CONTEXT COMPACTION — Auto-compress old messages when token count exceeds threshold
+# ============================================================
+AUTO_COMPACT_TOKEN_THRESHOLD = 80_000  # ~80K tokens (chars/4 approximation = 320K chars)
+COMPACT_PRESERVE_RECENT = 10  # Keep last N messages intact
+
+
+def _estimate_tokens(messages: list) -> int:
+    """Estimate token count using chars/4 approximation (stdlib only)."""
+    total_chars = sum(len(_msg_content_str(m)) for m in messages)
+    return total_chars // 4
+
+
+def compact_session(session_id: str, force: bool = False) -> str:
+    """Compact a session's conversation by summarizing old messages.
+
+    If force=True, compact regardless of token count.
+    Returns a status message.
+    """
+    session = get_session(session_id)
+    est_tokens = _estimate_tokens(session.messages)
+
+    if not force and est_tokens < AUTO_COMPACT_TOKEN_THRESHOLD:
+        return f'Context size ~{est_tokens:,} tokens — no compaction needed (threshold: {AUTO_COMPACT_TOKEN_THRESHOLD:,}).'
+
+    # Separate system messages and conversation
+    system_msgs = [m for m in session.messages if m['role'] == 'system'][:1]
+    non_system = [m for m in session.messages if m['role'] != 'system']
+
+    if len(non_system) <= COMPACT_PRESERVE_RECENT:
+        return f'Only {len(non_system)} messages — too few to compact.'
+
+    # Split: old messages to summarize, recent to preserve
+    old_msgs = non_system[:-COMPACT_PRESERVE_RECENT]
+    recent_msgs = non_system[-COMPACT_PRESERVE_RECENT:]
+
+    # Build summary request from old messages
+    summary_parts = []
+    for m in old_msgs[-30:]:  # Summarize last 30 old messages max
+        role = m.get('role', '?')
+        text = _msg_content_str(m)[:500]
+        if text.strip():
+            summary_parts.append(f'[{role}]: {text}')
+
+    if not summary_parts:
+        return 'No substantial messages to compact.'
+
+    summary_text = '\n'.join(summary_parts)
+
+    from .llm import call_llm
+    summary_model = router._pick_available(1)
+    summ_msgs = [
+        {'role': 'system', 'content': 'You are a conversation summarizer. Summarize the following conversation concisely but thoroughly. Preserve key decisions, facts, code context, task progress, and user preferences. Write in the same language as the conversation. Output 5-15 sentences.'},
+        {'role': 'user', 'content': summary_text}
+    ]
+    result = call_llm(summ_msgs, model=summary_model, max_tokens=1000)
+    summary = result.get('content', '')
+    if not summary:
+        return '❌ Compaction failed — could not generate summary.'
+
+    # Rebuild session messages
+    compacted = system_msgs + [
+        {'role': 'system', 'content': f'[Conversation Summary — {len(old_msgs)} messages compacted]\n{summary}'}
+    ] + recent_msgs
+
+    old_tokens = est_tokens
+    session.messages = compacted
+    new_tokens = _estimate_tokens(session.messages)
+
+    log.info(f"[COMPACT] Session {session_id}: {old_tokens:,} → {new_tokens:,} tokens, "
+             f"{len(old_msgs)} messages summarized")
+    return f'✅ Compacted: ~{old_tokens:,} → ~{new_tokens:,} tokens ({len(old_msgs)} messages summarized).'
+
+
+def auto_compact_if_needed(session_id: str):
+    """Check and auto-compact session if over token threshold."""
+    session = get_session(session_id)
+    est_tokens = _estimate_tokens(session.messages)
+    if est_tokens >= AUTO_COMPACT_TOKEN_THRESHOLD:
+        log.info(f"[COMPACT] Auto-compacting session {session_id} (~{est_tokens:,} tokens)")
+        compact_session(session_id, force=True)
+
+
+# ============================================================
 # DAILY MEMORY LOG
 # ============================================================
 def write_daily_log(entry: str):
@@ -1170,6 +1254,7 @@ from .agents import SubAgent, SkillLoader, PluginLoader
 __all__ = [
     'audit_log', 'response_cache', 'router', 'track_usage', 'get_usage_report', 'check_cost_cap', 'CostCapExceeded',
     '_metrics', 'compact_messages', 'get_session', 'write_daily_log', 'cron',
+    'compact_session', 'auto_compact_if_needed', '_estimate_tokens',
     'save_session_to_disk', 'restore_session', 'restore_all_sessions_from_disk',
     'memory_manager', 'heartbeat',
     'get_telegram_bot', 'set_telegram_bot',

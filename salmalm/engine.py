@@ -12,7 +12,7 @@ from .constants import (VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG,
                         MODEL_ALIASES as _CONST_ALIASES, COMMAND_MODEL)
 import re as _re
 from .crypto import log
-from .core import router, compact_messages, get_session, _sessions, _metrics
+from .core import router, compact_messages, get_session, _sessions, _metrics, compact_session, auto_compact_if_needed
 from .prompt import build_system_prompt
 from .tool_handlers import execute_tool
 from .llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic
@@ -317,8 +317,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
     async def _execute_loop(self, session, user_message, model_override,
                              on_tool, classification, tier, on_token=None):
-        use_thinking = classification['thinking']
-        thinking_budget = classification['thinking_budget']
+        use_thinking = classification['thinking'] or getattr(session, 'thinking_enabled', False)
+        thinking_budget = classification['thinking_budget'] or (10000 if use_thinking else 0)
         iteration = 0
         consecutive_errors = 0
         while iteration < self.MAX_TOOL_ITERATIONS:
@@ -597,6 +597,13 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
 
     # Classify and run through Intelligence Engine
     classification = TaskClassifier.classify(user_message, len(session.messages))
+
+    # Override thinking based on session-level toggle
+    if session.thinking_enabled:
+        classification['thinking'] = True
+        if classification['thinking_budget'] == 0:
+            classification['thinking_budget'] = 10000
+
     response = await _engine.run(session, user_message,
                               model_override=model_override,
                               on_tool=on_tool,
