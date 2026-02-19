@@ -180,6 +180,8 @@ class TestRAG(unittest.TestCase):
     def test_search_empty(self):
         from salmalm.rag import RAGEngine
         engine = RAGEngine(db_path=self.db_path)
+        engine._get_indexable_files = lambda: []
+        engine._get_session_files = lambda: []
         results = engine.search("test query")
         self.assertEqual(results, [])
         engine.close()
@@ -187,6 +189,9 @@ class TestRAG(unittest.TestCase):
     def test_build_context(self):
         from salmalm.rag import RAGEngine
         engine = RAGEngine(db_path=self.db_path)
+        # Patch to avoid indexing real workspace files
+        engine._get_indexable_files = lambda: []
+        engine._get_session_files = lambda: []
         ctx = engine.build_context("nonexistent query")
         self.assertEqual(ctx, "")
         engine.close()

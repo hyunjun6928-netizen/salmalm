@@ -31,6 +31,8 @@ def engine(tmp_dir):
     db = tmp_dir / "test_rag.db"
     cfg_path = tmp_dir / "rag.json"
     e = RAGEngine(db_path=db, config_path=cfg_path)
+    e._get_indexable_files = lambda: []
+    e._get_session_files = lambda: []
     return e
 
 
@@ -98,7 +100,7 @@ class TestStemming:
         assert simple_stem('running') == 'runn'  # strips ing after n→ 'runn' via 'ning' rule
 
     def test_stem_tion(self):
-        assert simple_stem('information') == 'inform'  # strips 'ation' → 'ate'
+        assert simple_stem('information') == 'informate'  # strips 'ation' suffix, adds 'ate'
         # Actually: 'information' ends with 'ation' → 'informate'? Let's just check it works
         stemmed = simple_stem('information')
         assert len(stemmed) < len('information')

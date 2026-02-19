@@ -102,6 +102,20 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 .settings-card label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
 .settings-card input,.settings-card select{width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;margin-bottom:12px}
 .settings-card .btn{padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px}
+.settings-tab.active{color:var(--accent2)!important;border-bottom-color:var(--accent)!important}
+.feat-cat{margin-bottom:12px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--bg2)}
+.feat-cat-header{display:flex;align-items:center;gap:8px;padding:14px 16px;cursor:pointer;font-weight:600;font-size:14px;user-select:none}
+.feat-cat-header:hover{background:var(--bg3)}
+.feat-cat-header .arrow{transition:transform .2s;font-size:10px}
+.feat-cat.open .arrow{transform:rotate(90deg)}
+.feat-cat-body{display:none;padding:8px 16px 16px}
+.feat-cat.open .feat-cat-body{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.feat-card{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px}
+.feat-card .feat-name{font-weight:600;margin-bottom:4px}
+.feat-card .feat-desc{color:var(--text2);font-size:12px;margin-bottom:6px}
+.feat-card .feat-cmd{display:inline-block;background:var(--accent-dim,rgba(59,130,246,0.15));color:var(--accent2);padding:2px 8px;border-radius:6px;font-size:11px;font-family:monospace;cursor:pointer;border:none}
+.feat-card .feat-cmd:hover{background:var(--accent);color:#fff}
+@media(max-width:600px){.feat-cat.open .feat-cat-body{grid-template-columns:1fr}}
 
 /* TOOL CALL DISPLAY */
 .tool-call{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin:6px 0;font-size:12px;font-family:'SF Mono',monospace}
@@ -264,6 +278,11 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 <div id="chat"></div>
 
 <div id="settings">
+  <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;position:sticky;top:0;background:var(--bg);z-index:10;padding-top:8px">
+    <button class="settings-tab active" data-settings-tab="general" style="padding:10px 20px;border:none;background:none;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-general">⚙️ General</button>
+    <button class="settings-tab" data-settings-tab="features" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-features">📖 Features</button>
+  </div>
+  <div id="settings-general">
   <div class="settings-card">
     <h3 data-i18n="h-lang">🌐 Language</h3>
     <select id="s-lang" data-action="setLang" style="width:200px">
@@ -473,6 +492,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       <button class="btn" id="do-update-btn" style="display:none" data-action="doUpdate">⬆️ Update</button>
     </div>
     <div id="update-result" style="margin-top:8px;font-size:12px"></div>
+  </div>
+  </div><!-- end settings-general -->
+  <div id="settings-features" style="display:none">
+    <div style="margin-bottom:16px"><input id="features-search" type="text" placeholder="Search features..." data-i18n="features-search-ph" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:14px"></div>
+    <div id="features-list"></div>
+    <div id="features-empty" style="display:none;text-align:center;padding:40px;color:var(--text2);font-size:14px" data-i18n="features-empty">No features found.</div>
   </div>
 </div>
 
@@ -1166,6 +1191,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var _i18n={
     en:{
       'nav-chat':'💬 Chat','nav-settings':'⚙️ Settings',
+      'tab-general':'⚙️ General','tab-features':'📖 Features',
+      'features-search-ph':'Search features...','features-empty':'No features found.',
       'h-model':'🤖 Model Settings','h-keys':'🔑 API Key Management','h-update':'🔄 Update','h-lang':'🌐 Language',
       'lbl-model':'Default Model','lbl-ollama':'Ollama URL',
       'btn-save':'Save','btn-test':'Test','btn-check':'Check for Updates','btn-update':'⬆️ Update',
@@ -1266,6 +1293,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     },
     ko:{
       'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정',
+      'tab-general':'⚙️ 일반','tab-features':'📖 기능 가이드',
+      'features-search-ph':'기능 검색...','features-empty':'검색 결과가 없습니다.',
       'h-model':'🤖 모델 설정','h-keys':'🔑 API 키 관리','h-update':'🔄 업데이트','h-lang':'🌐 언어',
       'lbl-model':'기본 모델','lbl-ollama':'Ollama URL',
       'btn-save':'저장','btn-test':'테스트','btn-check':'업데이트 확인','btn-update':'⬆️ 업데이트',
@@ -1421,6 +1450,123 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       document.getElementById('usage-detail').innerHTML=h});
   };
   window.showUsage=window.showSettings;
+
+  /* --- Settings Tabs --- */
+  document.querySelectorAll('.settings-tab').forEach(function(tab){
+    tab.addEventListener('click',function(){
+      document.querySelectorAll('.settings-tab').forEach(function(t){t.classList.remove('active')});
+      tab.classList.add('active');
+      var which=tab.getAttribute('data-settings-tab');
+      document.getElementById('settings-general').style.display=which==='general'?'block':'none';
+      document.getElementById('settings-features').style.display=which==='features'?'block':'none';
+      if(which==='features'&&!window._featuresLoaded){window._featuresLoaded=true;loadFeatures()}
+    });
+  });
+
+  /* --- Features Guide --- */
+  var FEATURE_CATEGORIES=[
+    {id:'core',icon:'🤖',title:'Core AI',title_kr:'핵심 AI',features:[
+      {name:'Multi-model Routing',name_kr:'멀티 모델 라우팅',desc:'Auto-routes to haiku/sonnet/opus based on complexity',desc_kr:'복잡도에 따라 haiku/sonnet/opus 자동 선택',command:'/model'},
+      {name:'Extended Thinking',name_kr:'확장 사고',desc:'Deep reasoning for complex tasks',desc_kr:'복잡한 작업을 위한 심층 추론',command:'/thinking on'},
+      {name:'Context Compaction',name_kr:'컨텍스트 압축',desc:'Auto-summarize long sessions',desc_kr:'긴 세션 자동 요약',command:'/compact'},
+      {name:'Prompt Caching',name_kr:'프롬프트 캐싱',desc:'Anthropic cache for cost savings',desc_kr:'Anthropic 캐시로 비용 절감',command:'/context'},
+      {name:'Self-Evolving Prompt',name_kr:'자가 진화 프롬프트',desc:'AI learns your preferences over time',desc_kr:'대화할수록 선호도 자동 학습',command:'/evolve status'},
+      {name:'Mood-Aware Response',name_kr:'기분 감지 응답',desc:'Adjusts tone based on your emotion',desc_kr:'감정에 따라 톤 자동 조절',command:'/mood on'},
+      {name:'A/B Split Response',name_kr:'A/B 분할 응답',desc:'Two perspectives on one question',desc_kr:'하나의 질문에 두 관점 동시 응답',command:'/split'}
+    ]},
+    {id:'tools',icon:'🔧',title:'Tools',title_kr:'도구',features:[
+      {name:'Web Search',name_kr:'웹 검색',desc:'Search the internet',desc_kr:'인터넷 검색'},
+      {name:'Code Execution',name_kr:'코드 실행',desc:'Run code with sandbox protection',desc_kr:'샌드박스 보호 하에 코드 실행',command:'/bash'},
+      {name:'File Operations',name_kr:'파일 작업',desc:'Read, write, edit files',desc_kr:'파일 읽기/쓰기/편집'},
+      {name:'Browser Automation',name_kr:'브라우저 자동화',desc:'Control Chrome via CDP',desc_kr:'Chrome DevTools Protocol 제어',command:'/screen'},
+      {name:'Image Vision',name_kr:'이미지 분석',desc:'Analyze images with AI',desc_kr:'AI로 이미지 분석'},
+      {name:'TTS / STT',name_kr:'음성 입출력',desc:'Text-to-speech and speech-to-text',desc_kr:'텍스트↔음성 변환'},
+      {name:'PDF Extraction',name_kr:'PDF 추출',desc:'Extract text from PDFs',desc_kr:'PDF에서 텍스트 추출'}
+    ]},
+    {id:'personal',icon:'👤',title:'Personal Assistant',title_kr:'개인 비서',features:[
+      {name:'Daily Briefing',name_kr:'데일리 브리핑',desc:'Morning/evening digest',desc_kr:'아침/저녁 종합 브리핑',command:'/life'},
+      {name:'Smart Reminders',name_kr:'스마트 리마인더',desc:'Natural language time parsing',desc_kr:'자연어 시간 파싱'},
+      {name:'Expense Tracker',name_kr:'가계부',desc:'Track spending by category',desc_kr:'카테고리별 지출 추적'},
+      {name:'Pomodoro Timer',name_kr:'포모도로 타이머',desc:'25min focus sessions',desc_kr:'25분 집중 세션'},
+      {name:'Notes & Links',name_kr:'메모 & 링크',desc:'Save and search notes/links',desc_kr:'메모와 링크 저장/검색'},
+      {name:'Routines',name_kr:'루틴',desc:'Daily habit tracking',desc_kr:'일일 습관 추적'},
+      {name:'Google Calendar',name_kr:'구글 캘린더',desc:'View, add, delete events',desc_kr:'일정 보기/추가/삭제'},
+      {name:'Gmail',name_kr:'지메일',desc:'Read, send, search emails',desc_kr:'이메일 읽기/보내기/검색'},
+      {name:'Life Dashboard',name_kr:'인생 대시보드',desc:'All-in-one life overview',desc_kr:'원페이지 인생 현황판',command:'/life'}
+    ]},
+    {id:'unique',icon:'✨',title:'Unique Features',title_kr:'독자 기능',features:[
+      {name:'Thought Stream',name_kr:'생각 스트림',desc:'Quick thought timeline with tags',desc_kr:'해시태그 기반 생각 타임라인',command:'/think'},
+      {name:'Time Capsule',name_kr:'타임캡슐',desc:'Messages to your future self',desc_kr:'미래의 나에게 보내는 메시지',command:'/capsule'},
+      {name:"Dead Man's Switch",name_kr:'데드맨 스위치',desc:'Emergency actions on inactivity',desc_kr:'비활동 시 긴급 조치',command:'/deadman'},
+      {name:'Shadow Mode',name_kr:'분신술',desc:'AI replies in your style when away',desc_kr:'부재 시 내 말투로 대리 응답',command:'/shadow on'},
+      {name:'Encrypted Vault',name_kr:'비밀 금고',desc:'Double-encrypted private chat',desc_kr:'이중 암호화 비밀 대화',command:'/vault open'},
+      {name:'Agent-to-Agent',name_kr:'AI간 통신',desc:'Negotiate with other SalmAlm instances',desc_kr:'다른 SalmAlm과 자동 협상',command:'/a2a'}
+    ]},
+    {id:'infra',icon:'⚙️',title:'Infrastructure',title_kr:'인프라',features:[
+      {name:'Workflow Engine',name_kr:'워크플로우 엔진',desc:'Multi-step automation pipelines',desc_kr:'다단계 자동화 파이프라인',command:'/workflow'},
+      {name:'MCP Marketplace',name_kr:'MCP 마켓',desc:'One-click MCP server install',desc_kr:'MCP 서버 원클릭 설치',command:'/mcp catalog'},
+      {name:'Plugin System',name_kr:'플러그인',desc:'Extend with custom plugins',desc_kr:'커스텀 플러그인으로 확장'},
+      {name:'Multi-Agent',name_kr:'다중 에이전트',desc:'Isolated sub-agents for parallel work',desc_kr:'병렬 작업용 격리 서브에이전트',command:'/subagents'},
+      {name:'Sandboxing',name_kr:'샌드박싱',desc:'Docker/subprocess isolation',desc_kr:'Docker/subprocess 격리 실행'},
+      {name:'OAuth Auth',name_kr:'OAuth 인증',desc:'Anthropic/OpenAI subscription auth',desc_kr:'API 키 없이 구독 인증',command:'/oauth'},
+      {name:'Prompt Caching',name_kr:'프롬프트 캐싱',desc:'Reduce API costs with caching',desc_kr:'캐싱으로 API 비용 절감',command:'/context'}
+    ]},
+    {id:'channels',icon:'📱',title:'Channels',title_kr:'채널',features:[
+      {name:'Web UI',name_kr:'웹 UI',desc:'Full-featured web interface',desc_kr:'풀기능 웹 인터페이스'},
+      {name:'Telegram',name_kr:'텔레그램',desc:'Bot with topics, reactions, groups',desc_kr:'토픽/반응/그룹 지원 봇'},
+      {name:'Discord',name_kr:'디스코드',desc:'Bot with threads and reactions',desc_kr:'스레드/반응 지원 봇'},
+      {name:'Slack',name_kr:'슬랙',desc:'Event API + Web API',desc_kr:'Event API + Web API'},
+      {name:'PWA',name_kr:'PWA',desc:'Install as desktop/mobile app',desc_kr:'데스크톱/모바일 앱 설치'}
+    ]},
+    {id:'commands',icon:'⌨️',title:'Commands',title_kr:'명령어',features:[
+      {name:'/help',desc:'Show help',desc_kr:'도움말'},{name:'/status',desc:'Session status',desc_kr:'세션 상태'},
+      {name:'/model',desc:'Switch model',desc_kr:'모델 전환'},{name:'/compact',desc:'Compress context',desc_kr:'컨텍스트 압축'},
+      {name:'/context',desc:'Token breakdown',desc_kr:'토큰 분석'},{name:'/usage',desc:'Token/cost tracking',desc_kr:'토큰/비용 추적'},
+      {name:'/think',desc:'Record a thought / set thinking level',desc_kr:'생각 기록 / 사고 레벨'},
+      {name:'/persona',desc:'Switch persona',desc_kr:'페르소나 전환'},{name:'/branch',desc:'Branch conversation',desc_kr:'대화 분기'},
+      {name:'/rollback',desc:'Rollback messages',desc_kr:'메시지 롤백'},{name:'/life',desc:'Life dashboard',desc_kr:'인생 대시보드'},
+      {name:'/remind',desc:'Set reminder',desc_kr:'리마인더 설정'},{name:'/expense',desc:'Track expense',desc_kr:'지출 기록'},
+      {name:'/pomodoro',desc:'Start pomodoro',desc_kr:'포모도로 시작'},{name:'/note',desc:'Save note',desc_kr:'메모 저장'},
+      {name:'/link',desc:'Save link',desc_kr:'링크 저장'},{name:'/routine',desc:'Manage routines',desc_kr:'루틴 관리'},
+      {name:'/shadow',desc:'Shadow mode',desc_kr:'분신술'},{name:'/vault',desc:'Encrypted vault',desc_kr:'비밀 금고'},
+      {name:'/capsule',desc:'Time capsule',desc_kr:'타임캡슐'},{name:'/deadman',desc:"Dead man's switch",desc_kr:'데드맨 스위치'},
+      {name:'/a2a',desc:'Agent-to-agent',desc_kr:'AI간 통신'},{name:'/workflow',desc:'Workflow engine',desc_kr:'워크플로우'},
+      {name:'/mcp',desc:'MCP management',desc_kr:'MCP 관리'},{name:'/subagents',desc:'Sub-agents',desc_kr:'서브에이전트'},
+      {name:'/oauth',desc:'OAuth setup',desc_kr:'OAuth 설정'},{name:'/bash',desc:'Run shell command',desc_kr:'셸 명령 실행'},
+      {name:'/screen',desc:'Browser control',desc_kr:'브라우저 제어'},{name:'/evolve',desc:'Evolving prompt',desc_kr:'진화 프롬프트'},
+      {name:'/mood',desc:'Mood detection',desc_kr:'감정 감지'},{name:'/split',desc:'A/B split',desc_kr:'A/B 분할'}
+    ]}
+  ];
+
+  function loadFeatures(){renderFeatures('')}
+  function renderFeatures(q){
+    var el=document.getElementById('features-list');
+    var empty=document.getElementById('features-empty');
+    var kr=_lang==='ko';
+    var ql=q.toLowerCase();
+    var html='';var total=0;
+    FEATURE_CATEGORIES.forEach(function(cat){
+      var items=cat.features.filter(function(f){
+        if(!ql)return true;
+        return (f.name+(f.name_kr||'')+(f.desc||'')+(f.desc_kr||'')+(f.command||'')).toLowerCase().indexOf(ql)>=0;
+      });
+      if(!items.length)return;
+      total+=items.length;
+      var open=ql?'open':'';
+      html+='<div class="feat-cat '+open+'"><div class="feat-cat-header" onclick="this.parentElement.classList.toggle(\'open\')"><span class="arrow">▶</span><span>'+cat.icon+' '+(kr&&cat.title_kr?cat.title_kr:cat.title)+'</span><span style="margin-left:auto;font-size:12px;color:var(--text2)">'+items.length+'</span></div><div class="feat-cat-body">';
+      items.forEach(function(f){
+        var nm=kr&&f.name_kr?f.name_kr:f.name;
+        var ds=kr&&f.desc_kr?f.desc_kr:(f.desc||'');
+        html+='<div class="feat-card"><div class="feat-name">'+nm+'</div><div class="feat-desc">'+ds+'</div>';
+        if(f.command)html+='<button class="feat-cmd" onclick="document.getElementById(\'input\').value=\''+f.command.replace(/'/g,"\\'")+'\';document.getElementById(\'input\').focus()">'+f.command+'</button>';
+        html+='</div>';
+      });
+      html+='</div></div>';
+    });
+    el.innerHTML=html;
+    empty.style.display=total?'none':'block';
+  }
+  document.getElementById('features-search').addEventListener('input',function(){renderFeatures(this.value)});
 
   /* ── Users Panel (Multi-tenant) ── */
   window.loadUsers=function(){
