@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import secrets
 from typing import Any, Dict, List, Optional
 
@@ -138,9 +139,31 @@ class Vault:
 
     _ctr_decrypt = _ctr_encrypt  # CTR is symmetric
 
+    # Map vault keys → env var names
+    _ENV_MAP = {
+        'anthropic_api_key': 'ANTHROPIC_API_KEY',
+        'openai_api_key': 'OPENAI_API_KEY',
+        'xai_api_key': 'XAI_API_KEY',
+        'google_api_key': 'GOOGLE_API_KEY',
+        'brave_api_key': 'BRAVE_SEARCH_API_KEY',
+        'openrouter_api_key': 'OPENROUTER_API_KEY',
+        'ollama_url': 'OLLAMA_URL',
+        'telegram_token': 'TELEGRAM_TOKEN',
+        'telegram_owner_id': 'TELEGRAM_OWNER_ID',
+        'discord_token': 'DISCORD_TOKEN',
+    }
+
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a stored value."""
-        return self._data.get(key, default)
+        """Get a stored value. Falls back to environment variable if not in vault."""
+        val = self._data.get(key)
+        if val:
+            return val
+        # Fallback: check env var
+        env_name = self._ENV_MAP.get(key, key.upper())
+        env_val = os.environ.get(env_name)
+        if env_val:
+            return env_val
+        return default
 
     def set(self, key: str, value: Any) -> None:
         """Store a value (triggers re-encryption)."""

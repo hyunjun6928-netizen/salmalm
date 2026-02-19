@@ -38,6 +38,20 @@ def main() -> None:
         os.makedirs(work_dir, exist_ok=True)
         os.chdir(work_dir)
 
+    # Load .env file if present (simple key=value parser, no dependency)
+    env_file = os.path.join(os.getcwd(), '.env')
+    if os.path.isfile(env_file):
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                k, _, v = line.partition('=')
+                k, v = k.strip(), v.strip().strip('"').strip("'")
+                if k and v:
+                    os.environ.setdefault(k, v)
+        print(f"📄 Loaded .env file")
+
     # Windows: create desktop shortcut on first run
     if sys.platform == 'win32' and not getattr(sys, 'frozen', False):
         _ensure_windows_shortcut()
