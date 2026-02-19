@@ -152,7 +152,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   </div>
   <div class="side-nav">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px 4px">
-      <div class="nav-section" style="margin:0;padding:0" data-i18n="sec-chats">💬 Chats</div>
+      <div class="nav-section" style="margin:0;padding:0;cursor:pointer" data-action="showChat" data-i18n="sec-chats">💬 Chats</div>
       <button data-action="newSession" title="New Chat" style="background:var(--accent);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
     </div>
     <div id="session-list" style="max-height:240px;overflow-y:auto;padding:0 8px 4px"></div>
@@ -380,6 +380,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       if(hist.length){window._restoring=true;hist.forEach(function(m){addMsg(m.role,m.text,m.model)});window._restoring=false}
     }
     loadSessionList();
+    /* Return to chat view if on settings/usage/dashboard */
+    showChat();
     /* Close sidebar on mobile */
     var sb=document.getElementById('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();
   };
@@ -911,6 +913,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     var el=e.target.closest('[data-action]');if(!el)return;
     var a=el.getAttribute('data-action');
     if(a==='newSession')window.newSession();
+    else if(a==='showChat')window.showChat();
     else if(a==='showSettings')window.showSettings();
     else if(a==='showUsage')window.showSettings();
     else if(a==='toggleSidebar')window.toggleSidebar();
