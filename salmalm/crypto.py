@@ -90,6 +90,7 @@ class Vault:
 
     def _unlock_hmac_ctr(self, password: str, ciphertext: bytes) -> bytes:
         """Decrypt HMAC-CTR vault (new format with IV, legacy without)."""
+        assert self._salt is not None, "Salt must be set before unlock"
         tag, rest = ciphertext[:32], ciphertext[32:]
         hmac_key = _derive_key(password, self._salt + b'hmac', 32)
         if len(rest) >= 16:

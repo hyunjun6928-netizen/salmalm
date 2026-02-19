@@ -73,52 +73,52 @@ class Container:
     # ── Typed properties for IDE autocomplete ────────────────
 
     @property
-    def vault(self) -> 'Vault':
+    def vault(self) -> Any:
         """Get the Vault service instance."""
         return self.get('vault')
 
     @property
-    def router(self) -> 'ModelRouter':
+    def router(self) -> Any:
         """Get the ModelRouter service instance."""
         return self.get('router')
 
     @property
-    def auth_manager(self) -> 'AuthManager':
+    def auth_manager(self) -> Any:
         """Get the AuthManager service instance."""
         return self.get('auth_manager')
 
     @property
-    def rate_limiter(self) -> 'RateLimiter':
+    def rate_limiter(self) -> Any:
         """Get the RateLimiter service instance."""
         return self.get('rate_limiter')
 
     @property
-    def rag_engine(self) -> 'RAGEngine':
+    def rag_engine(self) -> Any:
         """Get the RAGEngine service instance."""
         return self.get('rag_engine')
 
     @property
-    def mcp_manager(self) -> 'MCPManager':
+    def mcp_manager(self) -> Any:
         """Get the MCPManager service instance."""
         return self.get('mcp_manager')
 
     @property
-    def node_manager(self) -> 'NodeManager':
+    def node_manager(self) -> Any:
         """Get the NodeManager service instance."""
         return self.get('node_manager')
 
     @property
-    def health_monitor(self) -> 'HealthMonitor':
+    def health_monitor(self) -> Any:
         """Get the HealthMonitor service instance."""
         return self.get('health_monitor')
 
     @property
-    def telegram_bot(self) -> 'TelegramBot':
+    def telegram_bot(self) -> Any:
         """Get the TelegramBot service instance."""
         return self.get('telegram_bot')
 
     @property
-    def ws_server(self) -> 'WebSocketServer':
+    def ws_server(self) -> Any:
         """Get the WebSocketServer service instance."""
         return self.get('ws_server')
 

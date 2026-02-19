@@ -56,7 +56,7 @@ _STOP_WORDS = frozenset([
 class RAGEngine:
     """BM25-based retrieval engine with persistent SQLite index."""
 
-    def __init__(self, db_path: Path = None):
+    def __init__(self, db_path: Optional[Path] = None):
         self._db_path = db_path or (BASE_DIR / "rag.db")
         self._conn: Optional[sqlite3.Connection] = None
         self._mtimes: Dict[str, float] = {}  # path -> mtime

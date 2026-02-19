@@ -83,7 +83,7 @@ def create_ssl_context() -> Optional[ssl.SSLContext]:
 
 
 def create_https_server(address: tuple, handler_class,
-                        ssl_context: ssl.SSLContext = None):
+                        ssl_context: Optional[ssl.SSLContext] = None):
     """Create a ThreadingHTTPServer with optional TLS."""
     server = http.server.ThreadingHTTPServer(address, handler_class)
 
