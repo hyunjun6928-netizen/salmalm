@@ -894,6 +894,7 @@ button:hover{background:#4338ca}
 <input type="password" id="pw" placeholder="Master password" onkeydown="if(event.key==='Enter')unlock()">
 <button onclick="unlock()">Unlock</button>
 <div class="error" id="err"></div>
+<p style="margin-top:20px;font-size:12px;color:#888;line-height:1.5">비밀번호를 잊으셨나요?<br>vault 파일을 삭제하면 초기화됩니다:<br><code style="background:#252838;padding:2px 6px;border-radius:3px;font-size:11px;color:#aaa">rm ~/.salmalm/vault.enc</code> (Linux/Mac)<br><code style="background:#252838;padding:2px 6px;border-radius:3px;font-size:11px;color:#aaa">del %USERPROFILE%\\.salmalm\\vault.enc</code> (Windows)</p>
 </div>
 <script>
 async function unlock(){
