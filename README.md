@@ -1,214 +1,207 @@
-# 😈 삶앎 (SalmAlm) v0.12.4
+# SalmAlm 🤖
 
-[![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
 [![Python](https://img.shields.io/pypi/pyversions/salmalm)](https://pypi.org/project/salmalm/)
-[![License](https://img.shields.io/github/license/hyunjun6928-netizen/salmalm)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/hyunjun6928-netizen/salmalm)](LICENSE)
+[![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
 
-**Personal AI Gateway — Pure Python**
-
-> [🇺🇸 English](README_EN.md)
+> **Personal AI Gateway — Pure Python, zero required dependencies.**
+> **개인 AI 게이트웨이 — 순수 Python, 필수 의존성 제로.**
 
 ![SalmAlm Demo](demo.gif)
 
-개인 AI 게이트웨이. 순수 Python stdlib 기반, 외부 런타임 의존성 없이 구축.
-암호화(`cryptography`)만 선택적 의존성으로, 설치 시 AES-256-GCM을 사용하고 없으면 HMAC-CTR 폴백.
+---
 
-## ✨ Features
-
-| Feature | Description |
-|---------|-------------|
-| 🧠 **Intelligence Engine** | 7단계 의도 분류 → 적응형 모델 선택 → 계획 → 병렬 도구 실행 → 자기 평가 |
-| 🔍 **RAG Engine** | BM25 기반 로컬 검색, SQLite 영속화, 바이그램, 자동 리인덱싱 |
-| ⚡ **WebSocket** | RFC 6455 직접 구현, 실시간 스트리밍, 도구 호출 알림 |
-| 🔌 **MCP** | Model Context Protocol 서버 + 클라이언트, Cursor/VS Code 연동 |
-| 🌐 **Browser** | Chrome DevTools Protocol (CDP), 스크린샷/JS실행/폼자동화 |
-| 🌍 **Gateway-Node** | 멀티머신 도구 디스패치 — 게이트웨이에서 원격 노드로 자동 위임 |
-| 🏥 **Stability** | Circuit Breaker, 8개 컴포넌트 헬스체크, 자동 복구, 셀프테스트 |
-| 💬 **Telegram** | 비동기 long-polling, 이미지/파일 처리 |
-| 🌐 **Web UI** | 다크/라이트 테마, 마크다운 렌더링, 파일 업로드, SSE 스트리밍, EN/KO 전환 |
-| 🔐 **Security** | AES-256-GCM 볼트, JWT 인증, RBAC, CORS 화이트리스트, 레이트 리밋, PBKDF2 |
-| 📊 **Cost Tracking** | 모델별 토큰/비용 실시간 추적 (27개 모델) |
-| ⏰ **Cron** | LLM 기반 스케줄 작업, cron 표현식/인터벌/원샷 지원 |
-| 🔧 **43 Tools** | exec, 파일, 웹, RAG, MCP, 브라우저, Gmail, Calendar, 리마인더, 날씨, RSS, 번역, QR, 워크플로우 등 |
-| 🔗 **Google OAuth2** | Gmail + Calendar 원클릭 연동 (설정에서 Connect Google 클릭) |
-| 🧩 **Plugins** | `plugins/` 폴더에 .py 드롭 → 자동 도구 로딩 |
-| 📁 **.env 지원** | vault 대신 `.env` 파일로 API 키 관리 가능 (vault 폴백) |
-
-## 📊 Stats
-
-- **25 modules** / ~12,000+ lines of Python
-- **43 built-in tools** + plugin extensibility
-- **27+ LLM models** (Anthropic, OpenAI, xAI, Google, DeepSeek, Meta, Ollama)
-- **498 unit tests** / 48% coverage / mypy 0 errors / 98% docstrings
-- **CI**: 12-matrix (Python 3.10–3.13 × Ubuntu/macOS/Windows)
-- **1 optional dependency** (`cryptography` for AES-256-GCM — graceful fallback without it)
-
-## 🏗️ Architecture
-
-```
-salmalm/
-├── __init__.py         — logging setup
-├── __main__.py         — entry point + .env loader
-├── constants.py        — paths, costs, model registry, thresholds
-├── crypto.py           — AES-256-GCM vault (+ HMAC-CTR fallback)
-├── core.py             — audit, cache, router, cron, sessions
-├── agents.py           — SubAgent, SkillLoader, PluginLoader
-├── llm.py              — LLM API calls (6 providers + auto-fallback)
-├── tools.py            — 32 tool definitions
-├── tool_handlers.py    — tool execution + gateway dispatch
-├── prompt.py           — system prompt builder
-├── engine.py           — Intelligence Engine (Classify→Plan→Execute→Reflect)
-├── templates.py        — HTML templates (Web UI)
-├── telegram.py         — Telegram bot (async long-polling)
-├── discord_bot.py      — Discord Gateway (raw WebSocket)
-├── web.py              — Web UI + HTTP API + CORS + CSRF + auth middleware
-├── ws.py               — WebSocket server (RFC 6455)
-├── rag.py              — BM25 RAG engine (SQLite-backed)
-├── mcp.py              — MCP server + client
-├── browser.py          — Chrome CDP automation
-├── nodes.py            — Gateway-Node architecture (registry + remote dispatch)
-├── stability.py        — Health monitor + Circuit Breaker + auto-recovery
-├── auth.py             — JWT auth, RBAC, rate limiter, PBKDF2
-├── tls.py              — Self-signed TLS cert generation
-├── container.py        — lightweight DI container
-├── logging_ext.py      — JSON structured logging
-├── docs.py             — Auto-generated API docs
-└── plugins/            — Drop-in tool plugins
-```
-
-## 🚀 Quick Start
-
-### pip (권장)
+## Quick Start / 빠른 시작
 
 ```bash
-python -m pip install salmalm && python -m salmalm
-```
-설치 완료 → 서버 시작 → 브라우저 자동 오픈 → 바탕화면에 `SalmAlm.bat` 생성 (다음부터 더블클릭)
-
-### .env 파일 (간편 설정)
-
-```bash
-cp .env.example .env
-# .env 편집 — API 키 입력
-python -m salmalm
+pip install salmalm
+salmalm start
+# Open http://localhost:8080
 ```
 
-### Docker
+That's it. No Docker, no Node.js, no config files needed for first run.
+설치 후 바로 실행. Docker도, Node.js도, 설정 파일도 필요 없습니다.
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+---
+
+## Features / 주요 기능
+
+- 🧠 **Multi-LLM support** (Anthropic, OpenAI, Google, xAI, DeepSeek, Meta, Ollama — 27+ models) / **멀티 LLM 지원** (27개 이상 모델)
+- 🔧 **43 built-in tools** (exec, web, files, browser, Gmail, Calendar, RAG, MCP, and more) / **43개 내장 도구**
+- 🌐 **Web UI dashboard** with dark/light theme, markdown rendering, SSE streaming / **웹 UI 대시보드** (다크/라이트 테마, 마크다운, SSE 스트리밍)
+- 💬 **Telegram & Discord bot** / **텔레그램 & 디스코드 봇**
+- 🧩 **Memory system** with session persistence / **메모리 시스템** (세션 영속성)
+- 📜 **Skill system** with YAML frontmatter / **스킬 시스템** (YAML 프론트매터)
+- 💰 **Cost cap safety** ($50 default, per-model token tracking) / **비용 상한 안전장치** (기본 $50, 모델별 토큰 추적)
+- 📦 **Zero dependencies** beyond stdlib (`cryptography` optional for AES-256-GCM) / **stdlib 외 의존성 없음** (`cryptography`는 선택)
+- 🔍 **RAG search** (BM25-based, SQLite persistence, bigram support) / **RAG 검색** (BM25 기반, SQLite 영속화)
+- 🔌 **MCP protocol** server + client (Cursor / VS Code integration) / **MCP 프로토콜** 서버 + 클라이언트
+- 🌍 **Gateway-Node** multi-machine tool dispatch / **게이트웨이-노드** 멀티머신 도구 디스패치
+- 🏥 **Circuit breaker** + health checks + auto-recovery / **서킷 브레이커** + 헬스체크 + 자동 복구
+- ⏰ **Cron scheduler** (LLM-powered scheduled tasks) / **크론 스케줄러** (LLM 기반 예약 작업)
+- 🔐 **Security** — AES-256-GCM vault, JWT auth, RBAC, rate limiting / **보안** — 암호화 볼트, JWT 인증, RBAC, 레이트 리밋
+
+---
+
+## Setup Guide / 설정 가이드
+
+### 1. Install / 설치
 
 ```bash
-docker run -p 18800:18800 -p 18801:18801 \
-  -e SALMALM_VAULT_PW=changeme \
-  -v salmalm_data:/app \
-  $(docker build -q .)
-```
+# From PyPI (recommended)
+pip install salmalm
 
-### Docker Compose
+# With encryption support / 암호화 지원 포함
+pip install salmalm[crypto]
 
-```bash
+# From source / 소스에서 설치
 git clone https://github.com/hyunjun6928-netizen/salmalm.git
 cd salmalm
-# docker-compose.yml 편집 — SALMALM_VAULT_PW와 API 키 설정
-docker compose up -d
+pip install -e .
 ```
 
-## 🌍 Gateway-Node (멀티머신)
+**Requirements / 요구사항:** Python 3.10+
+
+### 2. First Run / 첫 실행
 
 ```bash
-# 메인 서버 (게이트웨이)
-python -m salmalm
-
-# 원격 워커 (노드)
-python -m salmalm --node --gateway-url http://gateway:18800
+salmalm start
 ```
 
-노드는 게이트웨이에 자동 등록되고, 도구 호출 시 capability 기반으로 원격 노드에 자동 위임됩니다. 실패 시 로컬 폴백.
+The setup wizard will guide you through initial configuration on first run.
+첫 실행 시 설정 마법사가 초기 구성을 안내합니다.
 
-## 🦙 Ollama (로컬 LLM, API 키 불필요)
+Open **http://localhost:8080** in your browser.
+브라우저에서 **http://localhost:8080**을 엽니다.
+
+![Web UI](docs/screenshots/webui.png)
+
+### 3. API Key Setup / API 키 설정
+
+Set your LLM provider API keys via the vault:
+볼트를 통해 LLM 제공자 API 키를 설정하세요:
 
 ```bash
-# Ollama 설치 후
-ollama pull llama3.2
-python -m salmalm
-# 온보딩에서 Ollama URL 입력: http://localhost:11434/v1
-# /model ollama/llama3.2 로 사용
+# Via environment variable / 환경 변수로
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Or via .env file / .env 파일로
+echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
+
+# Or via the Web UI Settings page / 웹 UI 설정 페이지에서
+# Navigate to Settings → API Keys
 ```
 
-## 🔑 API Keys
+Supported providers / 지원 제공자: **Anthropic**, **OpenAI**, **Google**, **xAI**, **DeepSeek**, **Ollama** (local)
 
-Store in `.env` file or encrypted vault via Web UI:
-- `ANTHROPIC_API_KEY` — Claude (Opus, Sonnet, Haiku)
-- `OPENAI_API_KEY` — GPT-5, o3, o4
-- `XAI_API_KEY` — Grok-4, Grok-3
-- `GOOGLE_API_KEY` — Gemini 3 Pro/Flash
-- `BRAVE_API_KEY` — Web search
-- `TELEGRAM_TOKEN` + `TELEGRAM_OWNER_ID` — Telegram bot
+### 4. Telegram Bot Setup / 텔레그램 봇 설정
 
-## 🔐 Security
+1. Open Telegram and search for **@BotFather** / 텔레그램에서 **@BotFather** 검색
+2. Send `/newbot` and follow the prompts / `/newbot` 전송 후 안내를 따름
+3. Copy the bot token / 봇 토큰 복사
+4. Set the token in SalmAlm / SalmAlm에 토큰 설정:
 
-- **CORS**: Same-origin whitelist only (127.0.0.1/localhost)
-- **Auth**: JWT tokens (HMAC-SHA256) + API keys + RBAC (admin/user/readonly)
-- **Vault**: AES-256-GCM encrypted key storage (PBKDF2 200K iterations)
-- **Rate Limiting**: Token bucket per user/IP (configurable per role)
-- **Upload**: Filename sanitization, 50MB limit, path traversal prevention
-- **Exec**: Command blocklist + pattern matching + subprocess isolation
-- **Passwords**: PBKDF2-HMAC-SHA256, random default admin password
+```bash
+# Via .env
+echo "TELEGRAM_BOT_TOKEN=123456:ABC-..." >> .env
 
-## 📡 API Endpoints
+# Or via Web UI → Settings → Telegram
+```
 
-| Endpoint | Auth | Description |
-|----------|------|-------------|
-| `GET /api/status` | ❌ | Version, usage, model |
-| `GET /api/health` | ❌ | Health check (8 components) |
-| `POST /api/auth/login` | ❌ | Get JWT token |
-| `POST /api/unlock` | ❌ | Unlock vault |
-| `POST /api/chat` | ✅ | Send message |
-| `POST /api/chat/stream` | ✅ | SSE streaming chat |
-| `POST /api/vault` | 🔒 | Vault CRUD (admin/loopback) |
-| `GET /api/dashboard` | ✅ | Sessions, usage, cron |
-| `GET /api/rag/search?q=...` | ✅ | BM25 search |
-| `GET /api/nodes` | ✅ | List connected nodes |
-| `GET /docs` | ❌ | Auto-generated API docs |
-| `ws://127.0.0.1:18801` | — | WebSocket real-time |
+5. Start chatting with your bot! / 봇과 대화 시작! 🎉
 
-## 📚 Documentation
+### 5. Discord Bot Setup / 디스코드 봇 설정
 
-- [FAQ (자주 묻는 질문)](docs/FAQ.md)
-- [Use Cases (활용 사례)](docs/use-cases.md)
-- [Contributing](CONTRIBUTING.md)
-- [Changelog](CHANGELOG.md)
-- [API Docs](http://localhost:18800/docs) (서버 실행 후)
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications) / [디스코드 개발자 포털](https://discord.com/developers/applications) 접속
+2. Create a new application → Bot → copy token / 새 애플리케이션 생성 → Bot → 토큰 복사
+3. Enable **Message Content Intent** / **Message Content Intent** 활성화
+4. Invite the bot to your server / 봇을 서버에 초대
+5. Set the token / 토큰 설정:
 
-## 📝 v0.11.1 Changelog
+```bash
+echo "DISCORD_BOT_TOKEN=MTIz..." >> .env
+```
 
-- **💬 멀티세션 UI**: 사이드바 대화 목록 — 생성/전환/삭제, 자동 제목 생성
-- **📈 대시보드**: `/dashboard` — Chart.js 도구 사용량 차트 + 모델별 비용 도넛 + 테이블
-- **🎤 STT (음성→텍스트)**: Whisper API 연동 + 마이크 버튼 — 녹음→변환→입력창 삽입
-- **📱 PWA**: manifest.json + 서비스워커 + 앱 아이콘 — 폰에서 홈화면 앱으로 설치
-- **32개 도구** (stt 추가)
+---
 
-### v0.11.0
-- **👁️ image_analyze 비전 도구**: 이미지 분석 (URL/base64/파일 경로)
-- **🧠 프롬프트 v0.5.0**: 의도 분류 + 도구 선택 정확도 향상
-- **📡 SSE 청크 스트리밍**: 실시간 응답 스트리밍 지원
-- **📋 CI/CD**: GitHub Actions 매트릭스 (Ubuntu/macOS/Windows × Python 3.10-3.13)
-- **📛 배지**: PyPI + CI + License + Python 버전 배지
-- **📖 CONTRIBUTING + CHANGELOG + FAQ(한/영) + use-cases(한/영) + issue templates**
+## Configuration / 설정
 
-### v0.10.9
-- **🔒 P0 보안 패치**: `/api/do-update`, `/api/restart`에 admin 인증 + loopback 강제
-- **🔒 정보 API 인증**: dashboard/cron/plugins/mcp/rag 전부 인증 적용
-- **🔒 경로 탐색 방어**: `/uploads/` basename 정규화 + resolve 이중 방어
-- **🔓 Setup Wizard**: 첫 실행 시 비밀번호 설정/스킵 선택 화면
-- **🔑 비밀번호 관리**: Settings에서 변경/해제/재설정 가능
-- **♾️ 무제한 도구 루프**: max_tools 제한 제거 (OpenClaw 스타일)
-- **📄 문서 간격 축소**: docs 페이지 마진/패딩 30~40% 압축
-- **🔑 Unlock 가이드**: 비밀번호 분실 시 안내 문구 추가
+### Environment Variables / 환경 변수
 
-## 📜 License
+| Variable | Default | Description / 설명 |
+|----------|---------|-------------------|
+| `SALMALM_COST_CAP` | `50` | Monthly cost limit in USD / 월 비용 상한 (달러) |
+| `SALMALM_LLM_TIMEOUT` | `120` | LLM request timeout in seconds / LLM 요청 타임아웃 (초) |
+| `SALMALM_HOST` | `0.0.0.0` | Server bind address / 서버 바인드 주소 |
+| `SALMALM_PORT` | `8080` | Server port / 서버 포트 |
+| `SALMALM_LOG_LEVEL` | `INFO` | Log level / 로그 레벨 |
 
-MIT
+### Vault / 볼트
 
-## 🙏 Credits
+API keys are stored in an encrypted vault (AES-256-GCM with `cryptography`, HMAC-CTR fallback without it).
+API 키는 암호화된 볼트에 저장됩니다 (AES-256-GCM 또는 HMAC-CTR 폴백).
 
-Built by 악몽의 돌쇠 (Nightmare Dolsoe) 😈 — an Awakened AI.
+### Model Aliases / 모델 별칭
+
+Configure short aliases for models in your config:
+설정에서 모델 단축 별칭을 구성할 수 있습니다:
+
+```
+claude → claude-sonnet-4-20250514
+gpt → gpt-4o
+gemini → gemini-2.0-flash
+```
+
+---
+
+## Architecture / 아키텍처
+
+```
+┌─────────────────────────────────────────────┐
+│                  SalmAlm                     │
+│                                              │
+│  ┌──────────┐  ┌──────────┐  ┌───────────┐  │
+│  │ Web UI   │  │ Telegram │  │  Discord   │  │
+│  └────┬─────┘  └────┬─────┘  └─────┬─────┘  │
+│       └──────────────┼──────────────┘        │
+│              ┌───────▼────────┐              │
+│              │  Intelligence  │              │
+│              │    Engine      │              │
+│              └───────┬────────┘              │
+│       ┌──────────────┼──────────────┐        │
+│  ┌────▼────┐  ┌──────▼─────┐  ┌────▼────┐   │
+│  │ 43 Tools│  │ LLM Router │  │   RAG   │   │
+│  └─────────┘  └──────┬─────┘  └─────────┘   │
+│              ┌───────▼────────┐              │
+│              │  Multi-Provider│              │
+│              │  (27+ models)  │              │
+│              └────────────────┘              │
+└─────────────────────────────────────────────┘
+```
+
+**stdlib-only philosophy / stdlib 전용 철학:**
+SalmAlm is built entirely on Python's standard library. No Flask, no FastAPI, no aiohttp — just raw `http.server`, `asyncio`, and hand-rolled WebSocket (RFC 6455). This means zero dependency conflicts, instant installation, and a tiny attack surface. The only optional dependency is `cryptography` for stronger vault encryption.
+
+SalmAlm은 Python 표준 라이브러리만으로 구축되었습니다. Flask도, FastAPI도, aiohttp도 없이 — `http.server`, `asyncio`, 직접 구현한 WebSocket(RFC 6455)만 사용합니다. 의존성 충돌 제로, 즉시 설치, 최소 공격 면적. 유일한 선택적 의존성은 강화된 볼트 암호화를 위한 `cryptography`입니다.
+
+---
+
+## Stats / 통계
+
+- **25 modules** / ~12,000+ lines of Python
+- **498 unit tests** / 48% coverage / mypy 0 errors
+- **CI:** 12-matrix (Python 3.10–3.13 × Ubuntu / macOS / Windows)
+
+---
+
+## Contributing / 기여
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+기여 가이드라인은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요.
+
+## License / 라이선스
+
+[MIT](LICENSE) © hyunjun6928-netizen
