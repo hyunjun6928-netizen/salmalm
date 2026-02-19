@@ -217,13 +217,24 @@ def _call_anthropic(api_key: str, model_id: str, messages: List[Dict[str, Any]],
         body['max_tokens'] = max_tokens  # type: ignore[assignment]
 
     if system_msgs:
-        body['system'] = '\n'.join(system_msgs)
+        # Prompt caching: mark system prompt for Anthropic cache
+        sys_text = '\n'.join(system_msgs)
+        body['system'] = [
+            {'type': 'text', 'text': sys_text,
+             'cache_control': {'type': 'ephemeral'}}
+        ]
     if tools:
-        body['tools'] = tools
+        # Mark last tool with cache_control for tool schema caching
+        cached_tools = list(tools)
+        if cached_tools:
+            cached_tools[-1] = {**cached_tools[-1],
+                                'cache_control': {'type': 'ephemeral'}}
+        body['tools'] = cached_tools
     resp = _http_post(
         'https://api.anthropic.com/v1/messages',
         {'x-api-key': api_key, 'content-type': 'application/json',
-         'anthropic-version': '2023-06-01'},
+         'anthropic-version': '2023-06-01',
+         'anthropic-beta': 'prompt-caching-2024-07-31'},
         body, timeout=timeout or _LLM_TIMEOUT
     )
     content = ''
@@ -243,7 +254,9 @@ def _call_anthropic(api_key: str, model_id: str, messages: List[Dict[str, Any]],
     result = {
         'content': content, 'tool_calls': tool_calls,
         'usage': {'input': usage.get('input_tokens', 0),
-                  'output': usage.get('output_tokens', 0)}
+                  'output': usage.get('output_tokens', 0),
+                  'cache_creation_input_tokens': usage.get('cache_creation_input_tokens', 0),
+                  'cache_read_input_tokens': usage.get('cache_read_input_tokens', 0)}
     }
     if thinking_text:
         result['thinking'] = thinking_text

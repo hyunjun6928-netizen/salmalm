@@ -116,76 +116,96 @@ def reset_user_soul():
         pass
 
 
+
+# ── Token optimization constants ──
+MAX_FILE_CHARS = 15_000       # Per-file truncation limit
+MAX_MEMORY_CHARS = 5_000      # MEMORY.md cap (even in full mode)
+MAX_SESSION_MEMORY_CHARS = 3_000  # Session memory cap (today only)
+MAX_AGENTS_CHARS = 2_000      # AGENTS.md cap after first load
+
+# Track whether AGENTS.md was loaded in full already (per-process)
+_agents_loaded_full = False
+
+
+def _truncate_file(text: str, limit: int = MAX_FILE_CHARS) -> str:
+    """Truncate text to *limit* chars, keeping the tail (most recent)."""
+    if len(text) <= limit:
+        return text
+    return '… [truncated]\n' + text[-limit:]
+
+
 def build_system_prompt(full: bool = True) -> str:
     """Build system prompt from SOUL.md + context files.
     full=True: load everything (first message / refresh)
     full=False: minimal reload (mid-conversation refresh)
 
+    Token-optimized: per-file truncation, memory caps, selective loading.
     User SOUL.md (~/.salmalm/SOUL.md) is prepended if it exists.
     """
+    global _agents_loaded_full
     parts = []
 
     # User SOUL.md (custom persona — prepended before everything)
     user_soul = get_user_soul()
     if user_soul:
-        parts.append(user_soul)
+        parts.append(_truncate_file(user_soul))
 
     # SOUL.md (persona — FULL load, this IS who we are)
     if SOUL_FILE.exists():
         soul = SOUL_FILE.read_text(encoding='utf-8')
         if full:
-            parts.append(soul)
+            parts.append(_truncate_file(soul))
         else:
             parts.append(soul[:3000])
 
     # IDENTITY.md
     id_file = BASE_DIR / 'IDENTITY.md'
     if id_file.exists():
-        parts.append(id_file.read_text(encoding='utf-8'))
+        parts.append(_truncate_file(id_file.read_text(encoding='utf-8')))
 
     # USER.md
     if USER_FILE.exists():
-        parts.append(USER_FILE.read_text(encoding='utf-8'))
+        parts.append(_truncate_file(USER_FILE.read_text(encoding='utf-8')))
 
-    # MEMORY.md (full on first load, recent on refresh)
+    # MEMORY.md — capped to MAX_MEMORY_CHARS (tail)
     if MEMORY_FILE.exists():
         mem = MEMORY_FILE.read_text(encoding='utf-8')
         if full:
-            parts.append(f"# Long-term Memory\n{mem}")
+            parts.append(f"# Long-term Memory\n{_truncate_file(mem, MAX_MEMORY_CHARS)}")
         else:
             parts.append(f"# Long-term Memory (recent)\n{mem[-2000:]}")
 
-    # Session memory context (today + yesterday)
+    # Session memory context — today only, capped
     try:
         from .memory import memory_manager
         session_ctx = memory_manager.load_session_context()
         if session_ctx:
-            parts.append(session_ctx)
+            parts.append(_truncate_file(session_ctx, MAX_SESSION_MEMORY_CHARS))
     except Exception:
-        # Fallback: just load today's log
         today = datetime.now(KST).strftime('%Y-%m-%d')
         today_log = MEMORY_DIR / f'{today}.md'
         if today_log.exists():
             tlog = today_log.read_text(encoding='utf-8')
-            parts.append(f"# Today's Log\n{tlog[-2000:]}")
+            parts.append(f"# Today's Log\n{tlog[-MAX_SESSION_MEMORY_CHARS:]}")
 
-    # AGENTS.md (behavior rules)
+    # AGENTS.md — full on first load, abbreviated after
     if AGENTS_FILE.exists():
         agents = AGENTS_FILE.read_text(encoding='utf-8')
-        if full:
-            parts.append(agents)
+        if full and not _agents_loaded_full:
+            parts.append(_truncate_file(agents))
+            _agents_loaded_full = True
         else:
-            parts.append(agents[:2000])
+            parts.append(_truncate_file(agents, MAX_AGENTS_CHARS))
 
     # TOOLS.md
     tools_file = BASE_DIR / 'TOOLS.md'
     if tools_file.exists():
-        parts.append(tools_file.read_text(encoding='utf-8'))
+        parts.append(_truncate_file(tools_file.read_text(encoding='utf-8')))
 
     # HEARTBEAT.md
     hb_file = BASE_DIR / 'HEARTBEAT.md'
     if hb_file.exists():
-        parts.append(hb_file.read_text(encoding='utf-8'))
+        parts.append(_truncate_file(hb_file.read_text(encoding='utf-8')))
 
     # Context
     now = datetime.now(KST)

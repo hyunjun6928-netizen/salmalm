@@ -416,6 +416,82 @@ class TaskClassifier:
         }
 
 
+# ── Intent-based tool selection (token optimization) ──
+INTENT_TOOLS = {
+    'chat': [],
+    'memory': [],
+    'creative': [],
+    'code': ['exec', 'read_file', 'write_file', 'edit_file', 'diff_files',
+             'python_eval', 'sub_agent', 'system_monitor', 'skill_manage'],
+    'analysis': ['web_search', 'web_fetch', 'read_file', 'rag_search',
+                 'python_eval', 'exec', 'http_request'],
+    'search': ['web_search', 'web_fetch', 'rag_search', 'http_request'],
+    'system': ['exec', 'read_file', 'write_file', 'edit_file',
+               'system_monitor', 'cron_manage', 'health_check', 'plugin_manage'],
+}
+
+# Extra tools injected by keyword detection in the user message
+_KEYWORD_TOOLS = {
+    'calendar': ['google_calendar', 'calendar_list', 'calendar_add', 'calendar_delete'],
+    '일정': ['google_calendar', 'calendar_list', 'calendar_add', 'calendar_delete'],
+    'email': ['gmail', 'email_inbox', 'email_read', 'email_send', 'email_search'],
+    '메일': ['gmail', 'email_inbox', 'email_read', 'email_send', 'email_search'],
+    'remind': ['reminder', 'notification'],
+    '알림': ['reminder', 'notification'],
+    '알려줘': ['reminder', 'notification'],
+    'image': ['image_generate', 'image_analyze', 'screenshot'],
+    '이미지': ['image_generate', 'image_analyze', 'screenshot'],
+    '사진': ['image_generate', 'image_analyze', 'screenshot'],
+    'tts': ['tts', 'tts_generate'],
+    '음성': ['tts', 'tts_generate', 'stt'],
+    'weather': ['weather'],
+    '날씨': ['weather'],
+    'rss': ['rss_reader'],
+    'translate': ['translate'],
+    '번역': ['translate'],
+    'qr': ['qr_code'],
+    'expense': ['expense'],
+    '지출': ['expense'],
+    'note': ['note'],
+    '메모': ['note', 'memory_read', 'memory_write', 'memory_search'],
+    'bookmark': ['save_link'],
+    '북마크': ['save_link'],
+    'pomodoro': ['pomodoro'],
+    'routine': ['routine'],
+    'briefing': ['briefing'],
+    'browser': ['browser'],
+    'node': ['node_manage'],
+    'mcp': ['mcp_manage'],
+    'workflow': ['workflow'],
+    'file_index': ['file_index'],
+    'clipboard': ['clipboard'],
+}
+
+# Dynamic max_tokens per intent
+INTENT_MAX_TOKENS = {
+    'chat': 1024,
+    'memory': 1024,
+    'creative': 1024,
+    'search': 2048,
+    'analysis': 2048,
+    'code': 4096,
+    'system': 2048,
+}
+
+# Keywords that trigger higher max_tokens
+_DETAIL_KEYWORDS = {'자세히', '상세', 'detail', 'detailed', 'verbose', 'explain',
+                    '설명', 'thorough', '구체적'}
+
+
+def _get_dynamic_max_tokens(intent: str, user_message: str) -> int:
+    """Return max_tokens based on intent + user request."""
+    base = INTENT_MAX_TOKENS.get(intent, 2048)
+    msg_lower = user_message.lower()
+    if any(kw in msg_lower for kw in _DETAIL_KEYWORDS):
+        return max(base, 4096)
+    return base
+
+
 class IntelligenceEngine:
     """Core AI reasoning engine — surpasses OpenClaw's capabilities.
 
@@ -445,7 +521,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     def __init__(self):
         self._tool_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='tool')
 
-    def _get_tools_for_provider(self, provider: str) -> list:
+    def _get_tools_for_provider(self, provider: str, intent: str = None,
+                                user_message: str = '') -> list:
         from .tools import TOOL_DEFINITIONS
         from .core import PluginLoader
         from .mcp import mcp_manager
@@ -456,9 +533,24 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             if t['name'] not in seen:
                 all_tools.append(t)
                 seen.add(t['name'])
-        
+
+        # ── Selective tool injection based on intent ──
+        if intent:
+            allowed = set(INTENT_TOOLS.get(intent, []))
+            # Add keyword-triggered tools
+            msg_lower = user_message.lower()
+            for kw, tools in _KEYWORD_TOOLS.items():
+                if kw in msg_lower:
+                    allowed.update(tools)
+            # Always include memory tools for memory intent
+            if intent == 'memory':
+                allowed.update(['memory_read', 'memory_write', 'memory_search'])
+            if allowed:
+                all_tools = [t for t in all_tools if t['name'] in allowed]
+            else:
+                return []
+
         if provider == 'google':
-            # Google Gemini: use OpenAI-compatible tool format
             return [{'name': t['name'], 'description': t['description'],
                      'parameters': t['input_schema']} for t in all_tools]
         elif provider in ('openai', 'xai', 'deepseek', 'meta-llama'):
@@ -747,10 +839,15 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             provider = model.split('/')[0] if '/' in model else 'anthropic'
 
-            # OpenClaw-style: intent별 도구 선별 주입 — chat/memory/creative엔 도구 불필요
-            _TOOL_INTENTS = {'code', 'analysis', 'search', 'system'}
-            if classification['intent'] in _TOOL_INTENTS:
-                tools = self._get_tools_for_provider(provider)
+            # OpenClaw-style: intent별 도구 선별 주입
+            cur_intent = classification['intent']
+            intent_tool_names = INTENT_TOOLS.get(cur_intent, [])
+            # Also check keyword-triggered tools
+            _msg_lower = user_message.lower() if user_message else ''
+            _has_kw_tools = any(kw in _msg_lower for kw in _KEYWORD_TOOLS)
+            if intent_tool_names or _has_kw_tools:
+                tools = self._get_tools_for_provider(provider, intent=cur_intent,
+                                                     user_message=user_message or '')
             else:
                 tools = None
 
@@ -771,11 +868,15 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 else:
                     on_status(STATUS_TYPING, 'typing')
 
+            # Dynamic max_tokens based on intent
+            _dynamic_max_tokens = _get_dynamic_max_tokens(
+                classification['intent'], user_message or '')
+
             # LLM call with failover
             _failover_warn = None
             result, _failover_warn = await self._call_with_failover(
                 pruned_messages, model=model, tools=tools,
-                max_tokens=4096, thinking=think_this_call,
+                max_tokens=_dynamic_max_tokens, thinking=think_this_call,
                 on_token=on_token, on_status=on_status)
             # Clean internal flag
             result.pop('_failed', None)
@@ -1035,6 +1136,7 @@ def _cmd_help(cmd, session, **_):
 /think <question> — 🧠 Deep reasoning (Opus)
 /plan <question> — 📋 Plan → Execute
 /status — Usage + Cost
+/context — Context window token usage
 /tools — Tool list
 /uptime — Uptime stats (업타임)
 /latency — Latency stats (레이턴시)
@@ -1220,6 +1322,64 @@ def _cmd_security(cmd, session, **_):
     from .security import security_auditor
     return security_auditor.format_report()
 
+def _cmd_context(cmd, session, **_):
+    """Show context window token usage breakdown."""
+    from .prompt import build_system_prompt
+
+    def _estimate_tokens(text: str) -> int:
+        """Estimate tokens: mix of Korean/English → len/3 as heuristic."""
+        if not text:
+            return 0
+        # Count Korean chars
+        kr_chars = sum(1 for c in text if '\uac00' <= c <= '\ud7a3' or '\u3131' <= c <= '\u318e')
+        kr_ratio = kr_chars / max(len(text), 1)
+        # Korean-heavy → /2, English-heavy → /4, mixed → /3
+        if kr_ratio > 0.3:
+            return int(len(text) / 2)
+        elif kr_ratio < 0.05:
+            return int(len(text) / 4)
+        return int(len(text) / 3)
+
+    sys_prompt = build_system_prompt(full=False)
+    sys_tokens = _estimate_tokens(sys_prompt)
+
+    # Tool schemas
+    tool_tokens = 0
+    try:
+        from .tools import TOOL_DEFINITIONS
+        tool_text = json.dumps([{'name': t['name'], 'description': t['description'],
+                                 'input_schema': t['input_schema']} for t in TOOL_DEFINITIONS])
+        tool_tokens = _estimate_tokens(tool_text)
+    except Exception:
+        pass
+
+    # Conversation history
+    history_text = ''
+    for m in session.messages:
+        c = m.get('content', '')
+        if isinstance(c, str):
+            history_text += c
+        elif isinstance(c, list):
+            for block in c:
+                if isinstance(block, dict):
+                    history_text += block.get('content', '') or block.get('text', '') or ''
+    history_tokens = _estimate_tokens(history_text)
+
+    total = sys_tokens + tool_tokens + history_tokens
+
+    return f"""📊 **Context Window Usage**
+
+| Component | Chars | ~Tokens |
+|-----------|------:|--------:|
+| System Prompt | {len(sys_prompt):,} | {sys_tokens:,} |
+| Tool Schemas (all {len(TOOL_DEFINITIONS)}) | {len(tool_text):,} | {tool_tokens:,} |
+| Conversation ({len(session.messages)} msgs) | {len(history_text):,} | {history_tokens:,} |
+| **Total** | | **{total:,}** |
+
+💡 Intent-based injection reduces tools to ≤15 per call.
+Dynamic max_tokens: chat=1024, search=2048, code=4096."""
+
+
 def _cmd_soul(cmd, session, **_):
     from .prompt import get_user_soul, USER_SOUL_FILE
     content = get_user_soul()
@@ -1373,6 +1533,7 @@ _SLASH_COMMANDS = {
     '/security': _cmd_security,
     '/soul': _cmd_soul,
     '/soul reset': _cmd_soul_reset,
+    '/context': _cmd_context,
 }
 
 # Prefix-match slash commands (checked with startswith)
