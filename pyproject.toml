@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "salmalm"
-version = "0.12.1"
+version = "0.12.2"
 description = "Personal AI Gateway — Pure Python, minimal dependencies"
 readme = "README.md"
 license = "MIT"

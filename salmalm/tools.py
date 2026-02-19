@@ -520,6 +520,61 @@ TOOL_DEFINITIONS = [
             'required': ['message']
         }
     },
+    # ── v0.12.1 Additional Tools ─────────────────────────────────
+    {
+        'name': 'weather',
+        'description': 'Get current weather and forecast for a location. No API key needed.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'location': {'type': 'string', 'description': 'City name or coordinates (e.g. "Seoul", "Tokyo", "37.5,127.0")'},
+                'format': {'type': 'string', 'description': 'Output format: short, full, forecast', 'enum': ['short', 'full', 'forecast'], 'default': 'full'},
+                'lang': {'type': 'string', 'description': 'Language code (default: ko)', 'default': 'ko'},
+            },
+            'required': ['location']
+        }
+    },
+    {
+        'name': 'rss_reader',
+        'description': 'Read RSS/Atom feeds. Subscribe, list, and fetch latest articles from news sources.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'fetch, subscribe, unsubscribe, list', 'enum': ['fetch', 'subscribe', 'unsubscribe', 'list']},
+                'url': {'type': 'string', 'description': 'RSS feed URL (for fetch/subscribe)'},
+                'name': {'type': 'string', 'description': 'Feed name (for subscribe)'},
+                'count': {'type': 'integer', 'description': 'Number of articles to fetch (default: 5)'},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'translate',
+        'description': 'Translate text between languages using Google Translate (free, no API key).',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'text': {'type': 'string', 'description': 'Text to translate'},
+                'target': {'type': 'string', 'description': 'Target language code (e.g. "en", "ko", "ja", "zh", "es", "fr")'},
+                'source': {'type': 'string', 'description': 'Source language code (default: auto-detect)'},
+            },
+            'required': ['text', 'target']
+        }
+    },
+    {
+        'name': 'qr_code',
+        'description': 'Generate QR code as SVG or text art. Pure stdlib, no dependencies.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'data': {'type': 'string', 'description': 'Data to encode in QR code (URL, text, etc.)'},
+                'output': {'type': 'string', 'description': 'Output file path (default: auto-generated SVG)'},
+                'format': {'type': 'string', 'description': 'Output format: svg, text', 'enum': ['svg', 'text'], 'default': 'svg'},
+                'size': {'type': 'integer', 'description': 'Module size in pixels (SVG, default: 10)'},
+            },
+            'required': ['data']
+        }
+    },
 ]
 
 

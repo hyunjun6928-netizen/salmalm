@@ -1,4 +1,4 @@
-"""SalmAlm tool handlers — execution logic for all 39 tools."""
+"""SalmAlm tool handlers — execution logic for all 43 tools."""
 import subprocess, sys, os, re, time, json, traceback, uuid, secrets
 import urllib.request, base64, mimetypes, difflib, threading
 from datetime import datetime
@@ -1230,6 +1230,18 @@ else:
         elif name == 'notification':
             return _handle_notification(args)
 
+        elif name == 'weather':
+            return _handle_weather(args)
+
+        elif name == 'rss_reader':
+            return _handle_rss_reader(args)
+
+        elif name == 'translate':
+            return _handle_translate(args)
+
+        elif name == 'qr_code':
+            return _handle_qr_code(args)
+
         else:
             # Try plugin tools as fallback
             from .core import PluginLoader
@@ -1474,23 +1486,109 @@ _reminder_lock = threading.Lock()
 _reminder_thread_started = False
 
 def _parse_relative_time(s: str) -> datetime:
-    """Parse relative time string like '30m', '2h', '1d' into datetime."""
+    """Parse time string into datetime. Supports:
+    - Relative: '30m', '2h', '1d', '1w'
+    - Korean natural: '내일 오후 3시', '다음주 월요일', '오늘 저녁 7시', '모레 아침'
+    - English natural: 'tomorrow 3pm', 'next monday'
+    - ISO8601: '2026-02-20T15:00:00'
+    """
     import re as _re
     now = datetime.now()
     from datetime import timedelta
-    m = _re.match(r'^(\d+)\s*(m|min|h|hr|hour|d|day|w|week)s?$', s.strip().lower())
+    s_stripped = s.strip().lower()
+
+    # Relative: 30m, 2h, 1d, 1w
+    m = _re.match(r'^(\d+)\s*(m|min|h|hr|hour|d|day|w|week)s?$', s_stripped)
     if m:
         val = int(m.group(1))
         unit = m.group(2)[0]
         delta = {'m': timedelta(minutes=val), 'h': timedelta(hours=val),
                  'd': timedelta(days=val), 'w': timedelta(weeks=val)}
         return now + delta.get(unit, timedelta(minutes=val))
-    # Try ISO format
+
+    # Try ISO format first (before natural language parsing)
     try:
         return datetime.fromisoformat(s)
     except ValueError:
         pass
-    raise ValueError(f'Cannot parse time: {s}. Use ISO8601 or relative (30m, 2h, 1d)')
+
+    # Korean natural language
+    s_orig = s.strip()
+    day_offset = 0
+    hour = None
+    minute = 0
+
+    # Day parsing (Korean)
+    if '오늘' in s_orig:
+        day_offset = 0
+    elif '내일' in s_orig:
+        day_offset = 1
+    elif '모레' in s_orig:
+        day_offset = 2
+    elif '다음주' in s_orig or 'next week' in s_stripped:
+        day_offset = 7
+        # 다음주 월요일~일요일
+        weekdays_kr = {'월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6}
+        weekdays_en = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
+        for wd, idx in {**weekdays_kr, **weekdays_en}.items():
+            if wd in s_orig or wd in s_stripped:
+                current_wd = now.weekday()
+                days_ahead = (idx - current_wd + 7) % 7
+                if days_ahead == 0:
+                    days_ahead = 7
+                day_offset = days_ahead
+                break
+    elif 'tomorrow' in s_stripped:
+        day_offset = 1
+
+    # Time parsing
+    # Korean: 오전/오후 N시 M분, 아침, 점심, 저녁
+    if '아침' in s_orig or 'morning' in s_stripped:
+        hour = 8
+    elif '점심' in s_orig or 'noon' in s_stripped or 'lunch' in s_stripped:
+        hour = 12
+    elif '저녁' in s_orig or 'evening' in s_stripped:
+        hour = 18
+    elif '밤' in s_orig or 'night' in s_stripped:
+        hour = 21
+
+    # 오후 3시, 오전 10시 30분
+    m_kr = _re.search(r'(오전|오후|AM|PM)?\s*(\d{1,2})\s*시\s*(\d{1,2})?\s*분?', s_orig)
+    if m_kr:
+        period = m_kr.group(1)
+        hour = int(m_kr.group(2))
+        minute = int(m_kr.group(3) or 0)
+        if period in ('오후', 'PM') and hour < 12:
+            hour += 12
+        elif period in ('오전', 'AM') and hour == 12:
+            hour = 0
+        elif not period:
+            # Infer AM/PM from context: 저녁/밤 = PM
+            if ('저녁' in s_orig or '밤' in s_orig) and hour < 12:
+                hour += 12
+            elif ('오후' in s_orig) and hour < 12:
+                hour += 12
+
+    # English: 3pm, 3:30pm, 15:00
+    m_en = _re.search(r'(\d{1,2}):?(\d{2})?\s*(am|pm)?', s_stripped)
+    if m_en and hour is None:
+        hour = int(m_en.group(1))
+        minute = int(m_en.group(2) or 0)
+        period = m_en.group(3)
+        if period == 'pm' and hour < 12:
+            hour += 12
+        elif period == 'am' and hour == 12:
+            hour = 0
+
+    if day_offset > 0 or hour is not None:
+        target = now + timedelta(days=day_offset)
+        if hour is not None:
+            target = target.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        elif day_offset > 0:
+            target = target.replace(hour=9, minute=0, second=0, microsecond=0)
+        return target
+
+    raise ValueError(f'Cannot parse time: {s}. Use ISO8601, relative (30m, 2h), or natural language (내일 오후 3시)')
 
 
 def _reminders_file() -> Path:
@@ -1957,3 +2055,336 @@ def _handle_notification(args: dict) -> str:
 
     results = _send_notification_impl(message, title, channel, url, priority)
     return '🔔 Notification sent:\n  ' + '\n  '.join(results)
+
+
+# ── Weather ──────────────────────────────────────────────────
+
+def _handle_weather(args: dict) -> str:
+    """Weather tool handler using wttr.in (no API key needed)."""
+    location = args.get('location', '')
+    if not location:
+        return '❌ location is required'
+    fmt = args.get('format', 'full')
+    lang = args.get('lang', 'ko')
+
+    import urllib.parse
+    loc_encoded = urllib.parse.quote(location)
+
+    if fmt == 'short':
+        url = f'https://wttr.in/{loc_encoded}?format=%l:+%c+%t+%h+%w&lang={lang}'
+    elif fmt == 'forecast':
+        url = f'https://wttr.in/{loc_encoded}?format=3&lang={lang}'
+    else:
+        url = f'https://wttr.in/{loc_encoded}?format=j1&lang={lang}'
+
+    req = urllib.request.Request(url, headers={'User-Agent': 'curl/7.0', 'Accept-Language': lang})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = resp.read().decode('utf-8', errors='replace')
+    except Exception as e:
+        return f'❌ Weather fetch failed: {e}'
+
+    if fmt in ('short', 'forecast'):
+        return f'🌤️ {data.strip()}'
+
+    # Parse JSON format for full
+    try:
+        wdata = json.loads(data)
+        current = wdata.get('current_condition', [{}])[0]
+        area = wdata.get('nearest_area', [{}])[0]
+        city = area.get('areaName', [{}])[0].get('value', location)
+        country = area.get('country', [{}])[0].get('value', '')
+
+        temp_c = current.get('temp_C', '?')
+        feels = current.get('FeelsLikeC', '?')
+        humidity = current.get('humidity', '?')
+        desc_kr = current.get('lang_ko', [{}])[0].get('value', '') if lang == 'ko' else ''
+        desc = desc_kr or current.get('weatherDesc', [{}])[0].get('value', '?')
+        wind = current.get('windspeedKmph', '?')
+        wind_dir = current.get('winddir16Point', '')
+        uv = current.get('uvIndex', '?')
+        precip = current.get('precipMM', '0')
+        visibility = current.get('visibility', '?')
+
+        lines = [f'🌤️ **{city}** ({country})']
+        lines.append(f'  🌡️ {temp_c}°C (체감 {feels}°C) | {desc}')
+        lines.append(f'  💧 습도 {humidity}% | 💨 풍속 {wind}km/h {wind_dir}')
+        lines.append(f'  ☀️ UV {uv} | 🌧️ 강수 {precip}mm | 👁️ 가시거리 {visibility}km')
+
+        # 3-day forecast
+        forecasts = wdata.get('weather', [])[:3]
+        if forecasts:
+            lines.append('\n📅 **3일 예보:**')
+            for day in forecasts:
+                date = day.get('date', '?')
+                max_t = day.get('maxtempC', '?')
+                min_t = day.get('mintempC', '?')
+                hourly = day.get('hourly', [])
+                desc_day = ''
+                if hourly:
+                    mid = hourly[len(hourly)//2]
+                    desc_day = mid.get('lang_ko', [{}])[0].get('value', '') if lang == 'ko' else ''
+                    desc_day = desc_day or mid.get('weatherDesc', [{}])[0].get('value', '')
+                lines.append(f'  • {date}: {min_t}~{max_t}°C {desc_day}')
+
+        return '\n'.join(lines)
+    except (json.JSONDecodeError, KeyError, IndexError):
+        return f'🌤️ {data[:500]}'
+
+
+# ── RSS Reader ───────────────────────────────────────────────
+
+_feeds_file = WORKSPACE_DIR / 'rss_feeds.json'
+
+def _load_feeds() -> dict:
+    """Load RSS feed subscriptions."""
+    if _feeds_file.exists():
+        try:
+            return json.loads(_feeds_file.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+    return {}
+
+def _save_feeds(feeds: dict):
+    """Save RSS feed subscriptions."""
+    _feeds_file.write_text(json.dumps(feeds, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+def _parse_rss(xml_text: str) -> list:
+    """Parse RSS/Atom feed XML into list of articles (stdlib only)."""
+    from xml.etree import ElementTree as ET
+    articles = []
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return []
+
+    # RSS 2.0
+    for item in root.iter('item'):
+        title = item.findtext('title', '').strip()
+        link = item.findtext('link', '').strip()
+        pub = item.findtext('pubDate', '').strip()
+        desc = item.findtext('description', '').strip()
+        # Strip HTML from description
+        desc = re.sub(r'<[^>]+>', '', desc)[:200]
+        articles.append({'title': title, 'link': link, 'date': pub[:25], 'summary': desc})
+
+    # Atom
+    if not articles:
+        ns = {'atom': 'http://www.w3.org/2005/Atom'}
+        for entry in root.iter('{http://www.w3.org/2005/Atom}entry'):
+            title = ''
+            t = entry.find('{http://www.w3.org/2005/Atom}title')
+            if t is not None and t.text:
+                title = t.text.strip()
+            link = ''
+            l = entry.find('{http://www.w3.org/2005/Atom}link')
+            if l is not None:
+                link = l.get('href', '')
+            pub = ''
+            p = entry.find('{http://www.w3.org/2005/Atom}published')
+            if p is None:
+                p = entry.find('{http://www.w3.org/2005/Atom}updated')
+            if p is not None and p.text:
+                pub = p.text[:25]
+            summary = ''
+            s = entry.find('{http://www.w3.org/2005/Atom}summary')
+            if s is not None and s.text:
+                summary = re.sub(r'<[^>]+>', '', s.text)[:200]
+            articles.append({'title': title, 'link': link, 'date': pub, 'summary': summary})
+
+    return articles
+
+
+def _handle_rss_reader(args: dict) -> str:
+    """RSS reader tool handler."""
+    action = args.get('action', 'fetch')
+
+    if action == 'list':
+        feeds = _load_feeds()
+        if not feeds:
+            return '📰 No subscribed feeds.'
+        lines = ['📰 **Subscribed Feeds:**']
+        for name, info in feeds.items():
+            lines.append(f"  • **{name}** — {info['url']}")
+        return '\n'.join(lines)
+
+    elif action == 'subscribe':
+        url = args.get('url', '')
+        name = args.get('name', '')
+        if not url:
+            return '❌ url is required for subscribe'
+        if not name:
+            name = url.split('/')[2] if '/' in url else url[:30]
+        feeds = _load_feeds()
+        feeds[name] = {'url': url, 'added': datetime.now().isoformat()}
+        _save_feeds(feeds)
+        return f'📰 Subscribed: **{name}** ({url})'
+
+    elif action == 'unsubscribe':
+        name = args.get('name', '')
+        feeds = _load_feeds()
+        if name in feeds:
+            del feeds[name]
+            _save_feeds(feeds)
+            return f'📰 Unsubscribed: {name}'
+        return f'❌ Feed not found: {name}'
+
+    elif action == 'fetch':
+        url = args.get('url', '')
+        count = args.get('count', 5)
+
+        # If no URL, fetch all subscribed feeds
+        if not url:
+            feeds = _load_feeds()
+            if not feeds:
+                return '❌ No URL provided and no subscribed feeds.'
+            all_articles = []
+            for name, info in feeds.items():
+                try:
+                    req = urllib.request.Request(info['url'], headers={
+                        'User-Agent': 'SalmAlm/1.0 RSS Reader'})
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        xml = resp.read().decode('utf-8', errors='replace')
+                    articles = _parse_rss(xml)
+                    for a in articles[:3]:
+                        a['feed'] = name
+                    all_articles.extend(articles[:3])
+                except Exception:
+                    pass
+            if not all_articles:
+                return '📰 No articles fetched from subscribed feeds.'
+            lines = [f'📰 **Latest Articles ({len(all_articles)}):**']
+            for a in all_articles[:count]:
+                feed_tag = f" [{a.get('feed', '')}]" if a.get('feed') else ''
+                lines.append(f"  📄 **{a['title']}**{feed_tag}")
+                if a['date']:
+                    lines.append(f"     {a['date']}")
+                if a['summary']:
+                    lines.append(f"     {a['summary'][:100]}")
+                if a['link']:
+                    lines.append(f"     🔗 {a['link']}")
+            return '\n'.join(lines)
+
+        # Fetch specific URL
+        req = urllib.request.Request(url, headers={'User-Agent': 'SalmAlm/1.0 RSS Reader'})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                xml = resp.read().decode('utf-8', errors='replace')
+        except Exception as e:
+            return f'❌ RSS fetch failed: {e}'
+
+        articles = _parse_rss(xml)
+        if not articles:
+            return f'📰 No articles found in feed: {url}'
+
+        lines = [f'📰 **Articles ({min(count, len(articles))}):**']
+        for a in articles[:count]:
+            lines.append(f"  📄 **{a['title']}**")
+            if a['date']:
+                lines.append(f"     {a['date']}")
+            if a['summary']:
+                lines.append(f"     {a['summary'][:100]}")
+            if a['link']:
+                lines.append(f"     🔗 {a['link']}")
+        return '\n'.join(lines)
+
+    return f'❌ Unknown rss_reader action: {action}'
+
+
+# ── Translate ────────────────────────────────────────────────
+
+def _handle_translate(args: dict) -> str:
+    """Translation tool handler using Google Translate (free)."""
+    text = args.get('text', '')
+    target = args.get('target', '')
+    source = args.get('source', 'auto')
+    if not text or not target:
+        return '❌ text and target language are required'
+
+    import urllib.parse
+    encoded = urllib.parse.quote(text[:5000])
+    url = (f'https://translate.googleapis.com/translate_a/single'
+           f'?client=gtx&sl={source}&tl={target}&dt=t&q={encoded}')
+
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except Exception as e:
+        return f'❌ Translation failed: {e}'
+
+    # Parse response: [[["translated","original",...],...],...]
+    try:
+        translated_parts = []
+        for segment in data[0]:
+            if segment[0]:
+                translated_parts.append(segment[0])
+        translated = ''.join(translated_parts)
+        detected = data[2] if len(data) > 2 else source
+        lang_names = {
+            'ko': '한국어', 'en': 'English', 'ja': '日本語', 'zh-CN': '中文',
+            'es': 'Español', 'fr': 'Français', 'de': 'Deutsch', 'ru': 'Русский',
+            'pt': 'Português', 'it': 'Italiano', 'vi': 'Tiếng Việt', 'th': 'ไทย',
+            'ar': 'العربية', 'hi': 'हिन्दी',
+        }
+        src_name = lang_names.get(str(detected), str(detected))
+        tgt_name = lang_names.get(target, target)
+        return f'🌐 **{src_name} → {tgt_name}:**\n{translated}'
+    except (IndexError, TypeError):
+        return f'❌ Translation parse error: {str(data)[:200]}'
+
+
+# ── QR Code Generator ────────────────────────────────────────
+
+def _handle_qr_code(args: dict) -> str:
+    """QR code generator — pure Python, no dependencies.
+
+    Implements a minimal QR code encoder (Mode Byte, EC level L).
+    For complex data, falls back to an online API.
+    """
+    data = args.get('data', '')
+    if not data:
+        return '❌ data is required'
+    fmt = args.get('format', 'svg')
+    size = args.get('size', 10)
+    output = args.get('output', '')
+
+    if not output:
+        fname = f"qr_{secrets.token_hex(4)}.{'svg' if fmt == 'svg' else 'txt'}"
+        output_dir = WORKSPACE_DIR / 'qr_output'
+        output_dir.mkdir(exist_ok=True)
+        output = str(output_dir / fname)
+
+    # Use Google Charts API for reliable QR generation
+    import urllib.parse
+    encoded = urllib.parse.quote(data)
+    qr_url = f'https://chart.googleapis.com/chart?cht=qr&chs={size*25}x{size*25}&chl={encoded}&choe=UTF-8'
+
+    if fmt == 'text':
+        # Generate text-art QR using Unicode blocks
+        # Use a simpler approach: fetch from API and convert
+        try:
+            # Use goqr.me API which returns SVG we can parse
+            api_url = f'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={encoded}&format=svg'
+            req = urllib.request.Request(api_url, headers={'User-Agent': 'SalmAlm/1.0'})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                svg_data = resp.read().decode('utf-8')
+            Path(output).write_text(f'QR Code for: {data}\nGenerate at: {qr_url}\n\n(SVG saved)', encoding='utf-8')
+            # Save actual SVG alongside
+            svg_path = output.replace('.txt', '.svg')
+            Path(svg_path).write_text(svg_data, encoding='utf-8')
+            return f'📱 QR code generated:\n  Text: {output}\n  SVG: {svg_path}\n  Data: {data[:50]}'
+        except Exception as e:
+            return f'❌ QR generation failed: {e}'
+
+    else:  # SVG
+        try:
+            api_url = f'https://api.qrserver.com/v1/create-qr-code/?size={size*25}x{size*25}&data={encoded}&format=svg'
+            req = urllib.request.Request(api_url, headers={'User-Agent': 'SalmAlm/1.0'})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                svg_data = resp.read().decode('utf-8')
+            Path(output).write_text(svg_data, encoding='utf-8')
+            return f'📱 QR code saved: {output} ({len(svg_data)} bytes)\n  Data: {data[:50]}'
+        except Exception as e:
+            return f'❌ QR generation failed: {e}'

@@ -238,9 +238,9 @@ class TestGmailTool(unittest.TestCase):
 class TestToolCount(unittest.TestCase):
     """Verify tool count is updated."""
 
-    def test_tool_count_39(self):
+    def test_tool_count_43(self):
         from salmalm.tools import TOOL_DEFINITIONS
-        self.assertEqual(len(TOOL_DEFINITIONS), 39)
+        self.assertEqual(len(TOOL_DEFINITIONS), 43)
 
     def test_all_tools_have_names(self):
         from salmalm.tools import TOOL_DEFINITIONS

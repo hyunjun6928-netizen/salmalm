@@ -57,3 +57,5 @@ certs/
 reminders.json
 workflows.json
 tts_output/
+rss_feeds.json
+qr_output/
