@@ -562,11 +562,14 @@ else:
                     pass  # Windows or unsupported
 
             try:
-                result = subprocess.run(  # type: ignore[assignment]
-                    [sys.executable, '-c', wrapper],
+                _kwargs: dict = dict(
                     capture_output=True, text=True,
                     timeout=timeout_sec, cwd=str(WORKSPACE_DIR),
-                    preexec_fn=_set_limits
+                )
+                if sys.platform != 'win32':
+                    _kwargs['preexec_fn'] = _set_limits
+                result = subprocess.run(  # type: ignore[assignment]
+                    [sys.executable, '-c', wrapper], **_kwargs
                 )
                 if result.returncode == 0 and result.stdout.strip():  # type: ignore[union-attr]
                     try:
@@ -587,35 +590,52 @@ else:
             lines = []
             try:
                 if detail in ('overview', 'cpu'):
-                    load = os.getloadavg()
                     cpu_count = os.cpu_count() or 1
-                    lines.append(f'🖥️ CPU: {cpu_count}cores, load: {load[0]:.2f} / {load[1]:.2f} / {load[2]:.2f} (1/5/15min)')
+                    try:
+                        load = os.getloadavg()
+                        lines.append(f'🖥️ CPU: {cpu_count}cores, load: {load[0]:.2f} / {load[1]:.2f} / {load[2]:.2f} (1/5/15min)')
+                    except (OSError, AttributeError):
+                        lines.append(f'🖥️ CPU: {cpu_count}cores')
                 if detail in ('overview', 'memory'):
-                    mem = subprocess.run(['free', '-h'], capture_output=True, text=True, timeout=5)
-                    if mem.stdout:
-                        for l in mem.stdout.strip().split('\n'):
-                            lines.append(f'💾 {l}')
+                    try:
+                        mem = subprocess.run(['free', '-h'], capture_output=True, text=True, timeout=5)
+                        if mem.stdout:
+                            for l in mem.stdout.strip().split('\n'):
+                                lines.append(f'💾 {l}')
+                    except (FileNotFoundError, OSError):
+                        pass
                 if detail in ('overview', 'disk'):
-                    disk = subprocess.run(['df', '-h', '/'], capture_output=True, text=True, timeout=5)
-                    if disk.stdout:
-                        for l in disk.stdout.strip().split('\n'):
-                            lines.append(f'💿 {l}')
+                    try:
+                        disk = subprocess.run(['df', '-h', '/'], capture_output=True, text=True, timeout=5)
+                        if disk.stdout:
+                            for l in disk.stdout.strip().split('\n'):
+                                lines.append(f'💿 {l}')
+                    except (FileNotFoundError, OSError):
+                        pass
                 if detail in ('overview', 'network'):
-                    # Quick network check
-                    net = subprocess.run(['ss', '-s'], capture_output=True, text=True, timeout=5)
-                    if net.stdout:
-                        lines.append(f'🌐 Network:')
-                        for l in net.stdout.strip().split('\n')[:5]:
-                            lines.append(f'   {l}')
+                    try:
+                        net = subprocess.run(['ss', '-s'], capture_output=True, text=True, timeout=5)
+                        if net.stdout:
+                            lines.append(f'🌐 Network:')
+                            for l in net.stdout.strip().split('\n')[:5]:
+                                lines.append(f'   {l}')
+                    except (FileNotFoundError, OSError):
+                        pass
                 if detail == 'processes':
-                    ps = subprocess.run(['ps', 'aux', '--sort=-rss'], capture_output=True, text=True, timeout=5)
-                    if ps.stdout:
+                    try:
+                        ps = subprocess.run(['ps', 'aux', '--sort=-rss'], capture_output=True, text=True, timeout=5)
+                    except (FileNotFoundError, OSError):
+                        ps = None
+                    if ps and ps.stdout:
                         for l in ps.stdout.strip().split('\n')[:20]:
                             lines.append(l)
                 if detail in ('overview',):
-                    uptime = subprocess.run(['uptime', '-p'], capture_output=True, text=True, timeout=5)
-                    if uptime.stdout:
-                        lines.append(f'⏱️ Uptime: {uptime.stdout.strip()}')
+                    try:
+                        uptime = subprocess.run(['uptime', '-p'], capture_output=True, text=True, timeout=5)
+                        if uptime.stdout:
+                            lines.append(f'⏱️ Uptime: {uptime.stdout.strip()}')
+                    except (FileNotFoundError, OSError):
+                        pass
                     # Python process info
                     mem_mb = 0
                     if _resource_mod:

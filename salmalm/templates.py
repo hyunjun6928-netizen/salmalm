@@ -172,7 +172,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div class="nav-section" data-i18n="sec-admin">Admin</div>
     <div class="nav-item" data-action="showSettings"data-i18n="nav-settings">⚙️ Settings</div>
     <div class="nav-item" data-action="showUsage">📊 Usage</div>
-    <div class="nav-item" data-action="openDashboard">📈 Dashboard</div>
+    <div class="nav-item" data-action="showDashboard">📈 Dashboard</div>
   </div>
   <div class="side-footer">
     <div class="status"><span class="dot"></span> Running</div>
@@ -322,6 +322,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <img id="img-preview" style="display:none;max-height:120px;border-radius:8px;margin-top:8px">
   </div>
   <div class="input-hint">Enter to send · Shift+Enter newline · Ctrl+V paste · Drag&Drop files</div>
+</div>
+
+<div id="dashboard-view" style="display:none;padding:20px;max-width:1200px;margin:0 auto">
+  <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px">← Back to Chat</a></div>
+  <h2 style="margin-bottom:16px">📈 Dashboard</h2>
+  <div id="dashboard-content" style="color:var(--text2)">Loading...</div>
 </div>
 
 <script>
@@ -774,8 +780,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   }
   window.setLang=function(v){_lang=v;localStorage.setItem('salmalm-lang',v);applyLang()};
   /* --- Settings --- */
-  window.showChat=function(){settingsEl.style.display='none';chat.style.display='flex';inputArea.style.display='block'};
-  window.showSettings=function(){chat.style.display='none';inputArea.style.display='none';settingsEl.style.display='block';
+  var dashView=document.getElementById('dashboard-view');
+  window.showChat=function(){settingsEl.style.display='none';dashView.style.display='none';chat.style.display='flex';inputArea.style.display='block'};
+  window.showSettings=function(){chat.style.display='none';inputArea.style.display='none';dashView.style.display='none';settingsEl.style.display='block';
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'keys'})})
       .then(function(r){return r.json()}).then(function(d){
         document.getElementById('vault-keys').innerHTML=d.keys.map(function(k){return '<div style="padding:4px 0;font-size:13px;color:var(--text2)">🔑 '+k+'</div>'}).join('')});
@@ -785,6 +792,26 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       document.getElementById('usage-detail').innerHTML=h});
   };
   window.showUsage=window.showSettings;
+  window.showDashboard=function(){
+    chat.style.display='none';inputArea.style.display='none';settingsEl.style.display='none';dashView.style.display='block';
+    var dc=document.getElementById('dashboard-content');dc.innerHTML='<p style="color:var(--text2)">Loading...</p>';
+    var hdr={'Authorization':'Bearer '+localStorage.getItem('salm_token')};
+    fetch('/api/dashboard',{headers:hdr}).then(function(r){return r.json()}).then(function(d){
+      var h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:20px">';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:12px;color:var(--text2)">TOTAL COST</div><div style="font-size:28px;font-weight:700;color:var(--accent)">$'+(d.total_cost||0).toFixed(4)+'</div></div>';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:12px;color:var(--text2)">TOTAL CALLS</div><div style="font-size:28px;font-weight:700;color:var(--accent)">'+(d.total_calls||0)+'</div></div>';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:12px;color:var(--text2)">UPTIME</div><div style="font-size:28px;font-weight:700;color:var(--accent)">'+(d.uptime_hours||'?')+'h</div></div>';
+      h+='</div>';
+      if(d.by_model&&Object.keys(d.by_model).length){
+        h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px"><h3 style="font-size:13px;color:var(--text2);margin-bottom:12px">MODEL BREAKDOWN</h3><table style="width:100%;font-size:13px;border-collapse:collapse">';
+        h+='<tr style="color:var(--text2)"><th style="text-align:left;padding:4px 8px">Model</th><th style="text-align:right;padding:4px 8px">Calls</th><th style="text-align:right;padding:4px 8px">Cost</th></tr>';
+        for(var m in d.by_model){var v=d.by_model[m];h+='<tr style="border-top:1px solid var(--border)"><td style="padding:4px 8px">'+m+'</td><td style="text-align:right;padding:4px 8px">'+v.calls+'</td><td style="text-align:right;padding:4px 8px">$'+v.cost.toFixed(4)+'</td></tr>'}
+        h+='</table></div>';
+      }
+      dc.innerHTML=h;
+    }).catch(function(e){dc.innerHTML='<p style="color:var(--red)">Failed to load: '+e.message+'</p>'});
+    var sb=document.getElementById('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();
+  };
   window.changePw=function(){
     var o=document.getElementById('pw-old').value,n=document.getElementById('pw-new').value,c=document.getElementById('pw-confirm').value;
     var re=document.getElementById('pw-result');
@@ -935,9 +962,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='showChat')window.showChat();
     else if(a==='showSettings')window.showSettings();
     else if(a==='showUsage')window.showSettings();
+    else if(a==='showDashboard')window.showDashboard();
     else if(a==='toggleSidebar')window.toggleSidebar();
     else if(a==='toggleTheme')window.toggleTheme();
-    else if(a==='openDashboard')window.open('/dashboard','_blank');
+    else if(a==='openDashboard')window.showDashboard();
     else if(a==='exportChat')window.exportChat('md');
     else if(a==='toggleMic')window.toggleMic();
     else if(a==='clearFile')window.clearFile();
