@@ -78,11 +78,9 @@ salmalm/
 ### pip (권장)
 
 ```bash
-python -m pip install salmalm
-python -m salmalm
-# → http://localhost:18800
-# Settings에서 API 키 입력
+python -m pip install salmalm && python -m salmalm
 ```
+설치 완료 → 서버 시작 → 브라우저 자동 오픈 → 바탕화면에 `SalmAlm.bat` 생성 (다음부터 더블클릭)
 
 ### .env 파일 (간편 설정)
 
