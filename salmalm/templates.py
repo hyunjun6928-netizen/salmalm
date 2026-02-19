@@ -505,9 +505,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     t=t.replace(/^# (.+)$/gm,'<h2 style="margin:12px 0 8px;font-size:16px;color:var(--accent2)">$1</h2>');
     t=t.replace(/^[•\\-] (.+)$/gm,'<div style="padding-left:16px;position:relative"><span style="position:absolute;left:4px">•</span>$1</div>');
     t=t.replace(/^(\\d+)\\. (.+)$/gm,'<div style="padding-left:16px">$1. $2</div>');
-    t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1</a>');
-    t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" data-action="openImage">');
-    t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
+    t=t.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g,'<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1</a>');
+    t=t.replace(/uploads[/]([\\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" data-action="openImage">');
+    t=t.replace(/uploads[/]([\\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
     t=t.replace(/\\n/g,'<br>');
     return t;
   }
@@ -859,9 +859,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     document.querySelectorAll('.bubble pre code').forEach(function(el){
       if(el.dataset.hl)return;el.dataset.hl='1';
       var h=el.innerHTML;
-      h=h.replace(/(\/\/.*$|#.*$|\/\*[\s\S]*?\*\/)/gm,'<span class="cmt">$1</span>');
+      h=h.replace(/(\\/\\/.*$|#.*$|\\/\\*[\\s\\S]*?\\*\\/)/gm,'<span class="cmt">$1</span>');
       h=h.replace(/(&quot;[^&]*?&quot;|"[^"]*?"|'[^']*?')/g,'<span class="str">$1</span>');
-      h=h.replace(/\b(\d+\.?\d*)\b/g,'<span class="num">$1</span>');
+      h=h.replace(/\b(\\d+\\.?\\d*)\b/g,'<span class="num">$1</span>');
       h=h.replace(/\b(function|const|let|var|if|else|for|while|return|import|from|class|def|try|except|async|await|yield|with|raise)\b/g,'<span class="kw">$1</span>');
       el.innerHTML=h;
     });

@@ -72,7 +72,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Security-Policy',
             f"default-src 'self'; "
             f"script-src {script_src}; "
-            f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "
             f"img-src 'self' data: blob:; "
             f"connect-src 'self' ws://127.0.0.1:* wss://127.0.0.1:*; "
             f"font-src 'self' data: https://fonts.gstatic.com; "
