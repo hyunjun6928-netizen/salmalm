@@ -23,6 +23,23 @@ def _get_db() -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
+        # Auto-create tables on first connection per thread
+        conn.execute('''CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT NOT NULL, event TEXT NOT NULL,
+            detail TEXT, prev_hash TEXT, hash TEXT NOT NULL
+        )''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS usage_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT NOT NULL, model TEXT NOT NULL,
+            input_tokens INTEGER, output_tokens INTEGER, cost REAL
+        )''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS session_store (
+            session_id TEXT PRIMARY KEY,
+            messages TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )''')
+        conn.commit()
         _thread_local.audit_conn = conn
     return conn
 
