@@ -284,6 +284,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             from .engine import get_routing_config
             from .constants import MODELS
             self._json({'config': get_routing_config(), 'available_models': MODELS})
+        elif self.path == '/api/failover':
+            if not self._require_auth('user'): return
+            from .engine import get_failover_config, _load_cooldowns
+            self._json({'config': get_failover_config(), 'cooldowns': _load_cooldowns()})
         elif self.path == '/api/sessions':
             if not self._require_auth('user'): return
             from .core import _get_db
@@ -1070,6 +1074,13 @@ self.addEventListener('fetch',e=>{{
                     cfg[k] = body[k]
             _save_routing_config(cfg)
             self._json({'ok': True, 'config': cfg})
+            return
+
+        elif self.path == '/api/failover':
+            if not self._require_auth('user'): return
+            from .engine import save_failover_config, get_failover_config
+            save_failover_config(body)
+            self._json({'ok': True, 'config': get_failover_config()})
             return
 
         elif self.path == '/api/sessions/rename':

@@ -71,6 +71,21 @@ class DiscordBot:
         """Send typing indicator."""
         self._api('POST', f'/channels/{channel_id}/typing')
 
+    def start_typing_loop(self, channel_id: str) -> 'asyncio.Task':
+        """Start a continuous typing indicator loop (refreshes every 8s).
+
+        Discord typing expires after ~10s, so we refresh every 8s.
+        Returns a cancellable asyncio Task.
+        """
+        async def _loop():
+            try:
+                while True:
+                    await asyncio.to_thread(self.send_typing, channel_id)
+                    await asyncio.sleep(8)
+            except asyncio.CancelledError:
+                pass
+        return asyncio.create_task(_loop())
+
     def add_reaction(self, channel_id: str, message_id: str, emoji: str):
         """Add an emoji reaction to a Discord message."""
         encoded = urllib.parse.quote(emoji)
@@ -259,7 +274,8 @@ class DiscordBot:
                     return
 
                 if self._on_message:
-                    self.send_typing(channel_id)
+                    # Start continuous typing indicator
+                    typing_task = self.start_typing_loop(channel_id)
                     try:
                         response = await self._on_message(content, d)
                         if response:
@@ -271,6 +287,12 @@ class DiscordBot:
                     except Exception as e:
                         log.error(f'Discord message handler error: {e}')
                         self.send_message(channel_id, f'❌ Error: {str(e)[:200]}', reply_to=message_id)
+                    finally:
+                        typing_task.cancel()
+                        try:
+                            await typing_task
+                        except asyncio.CancelledError:
+                            pass
 
     async def poll(self):
         """Main gateway loop."""

@@ -261,12 +261,18 @@ def main() -> None:
                         await client.send_json({'type': 'error', 'error': 'Empty message'})
                         return
                     stream = StreamingResponse(client)
+                    # Send typing indicator immediately
+                    await client.send_json({'type': 'typing', 'status': 'typing'})
                     async def on_tool(name, args):
                         await stream.send_tool_call(name, args)
+                    async def on_status(status_type, detail):
+                        """Forward engine status to WS client as typing events."""
+                        await client.send_json({'type': 'typing', 'status': status_type, 'detail': detail})
                     try:
                         from salmalm.engine import process_message
                         image_data = (image_b64, image_mime) if image_b64 else None
-                        response = await process_message(session_id, text or '', image_data=image_data, on_tool=on_tool)
+                        response = await process_message(session_id, text or '', image_data=image_data,
+                                                         on_tool=on_tool, on_status=on_status)
                         await stream.send_done(response)
                     except Exception as e:
                         await stream.send_error(str(e)[:200])

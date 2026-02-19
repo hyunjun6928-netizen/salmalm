@@ -495,6 +495,16 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     except RuntimeError:
                         pass  # No running event loop
 
+        # Fire on_tool_call hook for each tool (도구 호출 훅)
+        try:
+            from .hooks import hook_manager
+            for tc in tool_calls:
+                hook_manager.fire('on_tool_call', {
+                    'session_id': '', 'message': f"{tc['name']}: {str(tc.get('arguments', ''))[:200]}"
+                })
+        except Exception:
+            pass
+
         if len(tool_calls) == 1:
             tc = tool_calls[0]
             _metrics['tool_calls'] += 1
@@ -696,6 +706,12 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             import traceback; traceback.print_exc()
             error_msg = f'❌ Processing error: {type(e).__name__}: {e}'
             session.add_assistant(error_msg)
+            # Fire on_error hook (에러 발생 훅)
+            try:
+                from .hooks import hook_manager
+                hook_manager.fire('on_error', {'session_id': getattr(session, 'id', ''), 'message': error_msg})
+            except Exception:
+                pass
             return error_msg
 
     # ── OpenClaw-style limits ──
@@ -805,9 +821,24 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     tool_names = ', '.join(tc['name'] for tc in result['tool_calls'][:3])
                     on_status(STATUS_TOOL_RUNNING, f'🔧 Running {tool_names}...')
 
-                tool_outputs = await asyncio.to_thread(
-                    self._execute_tools_parallel,
-                    result['tool_calls'], on_tool)
+                # Validate tool calls
+                valid_tools = []
+                tool_outputs = {}
+                for tc in result['tool_calls']:
+                    # Invalid arguments (not a dict) — try JSON parse
+                    if not isinstance(tc.get('arguments'), dict):
+                        try:
+                            tc['arguments'] = json.loads(tc['arguments']) if isinstance(tc['arguments'], str) else {}
+                        except (json.JSONDecodeError, TypeError):
+                            tool_outputs[tc['id']] = f"❌ Invalid tool arguments for {tc['name']} / 잘못된 도구 인자"
+                            continue
+                    valid_tools.append(tc)
+
+                if valid_tools:
+                    exec_outputs = await asyncio.to_thread(
+                        self._execute_tools_parallel,
+                        valid_tools, on_tool)
+                    tool_outputs.update(exec_outputs)
 
                 # Circuit breaker: 연속 에러 감지
                 errors = sum(1 for v in tool_outputs.values()
@@ -836,7 +867,28 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 continue
 
             # Final response
-            response = result.get('content', 'Could not generate a response.')
+            response = result.get('content', '')
+
+            # ── LLM edge cases ──
+
+            # Empty response: retry once
+            if not response or not response.strip():
+                log.warning("[LLM] Empty response, retrying once")
+                retry_result, _ = await self._call_with_failover(
+                    pruned_messages, model=model, tools=tools,
+                    max_tokens=4096, thinking=False)
+                response = retry_result.get('content', '')
+                if not response or not response.strip():
+                    response = '⚠️ 응답을 생성할 수 없습니다. / Could not generate a response.'
+
+            # Truncated response (max_tokens reached)
+            stop_reason = result.get('stop_reason', '')
+            if stop_reason == 'max_tokens' or result.get('usage', {}).get('output', 0) >= 4090:
+                response += '\n\n⚠️ [응답이 잘렸습니다 / Response was truncated]'
+
+            # Content filter / safety block
+            if stop_reason in ('content_filter', 'safety'):
+                response = '⚠️ 안전 필터에 의해 응답이 차단되었습니다. / Response blocked by content filter.'
 
             # PHASE 3: REFLECT — self-evaluation for complex tasks
             if self._should_reflect(classification, response, iteration):
@@ -901,10 +953,15 @@ async def process_message(session_id: str, user_message: str,
                           on_tool: Optional[Callable[[str, Any], None]] = None,
                           on_token: Optional[Callable] = None,
                           on_status: Optional[Callable] = None) -> str:
-    """Process a user message through the Intelligence Engine pipeline."""
+    """Process a user message through the Intelligence Engine pipeline.
+
+    Edge cases:
+    - Shutdown rejection
+    - Unhandled exceptions → graceful error message
+    """
     # Reject new requests during shutdown
     if _shutting_down:
-        return '⚠️ Server is shutting down. Please try again later.'
+        return '⚠️ Server is shutting down. Please try again later. / 서버가 종료 중입니다.'
 
     with _active_requests_lock:
         global _active_requests
@@ -918,6 +975,10 @@ async def process_message(session_id: str, user_message: str,
                                              on_tool=on_tool,
                                              on_token=on_token,
                                              on_status=on_status)
+    except Exception as e:
+        log.error(f"[ENGINE] Unhandled error: {type(e).__name__}: {e}")
+        import traceback; traceback.print_exc()
+        return f'❌ Internal error / 내부 오류: {type(e).__name__}. Please try again.'
     finally:
         with _active_requests_lock:
             _active_requests -= 1
@@ -940,6 +1001,13 @@ async def _process_message_inner(session_id: str, user_message: str,
     user_message = _sanitize_input(user_message)
 
     session = get_session(session_id)
+
+    # Fire on_message hook (메시지 수신 훅)
+    try:
+        from .hooks import hook_manager
+        hook_manager.fire('on_message', {'session_id': session_id, 'message': user_message})
+    except Exception:
+        pass
 
     # --- Slash commands (fast path, no LLM) ---
     cmd = user_message.strip()
@@ -1061,6 +1129,91 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
             return f'🎙️ Voice: **{arg}** — saved ✅'
         return f'Available voices: {", ".join(valid_voices)}'
 
+    # --- Agent commands (에이전트 명령) ---
+    if cmd.startswith('/agent'):
+        from .agents import agent_manager
+        parts = cmd.split(maxsplit=2)
+        sub = parts[1] if len(parts) > 1 else 'list'
+        if sub == 'list':
+            agents = agent_manager.list_agents()
+            lines = ['🤖 **Agents** (에이전트 목록)\n']
+            for a in agents:
+                lines.append(f"• **{a['id']}** — {a['display_name']}")
+            bindings = agent_manager.list_bindings()
+            if bindings:
+                lines.append('\n📌 **Bindings** (바인딩)')
+                for k, v in bindings.items():
+                    lines.append(f"• {k} → {v}")
+            return '\n'.join(lines)
+        elif sub == 'create' and len(parts) > 2:
+            return agent_manager.create(parts[2])
+        elif sub == 'switch' and len(parts) > 2:
+            chat_key = f'session:{session_id}'
+            return agent_manager.switch(chat_key, parts[2])
+        elif sub == 'delete' and len(parts) > 2:
+            return agent_manager.delete(parts[2])
+        elif sub == 'bind' and len(parts) > 2:
+            # /agent bind telegram:12345 work
+            bind_parts = parts[2].split()
+            if len(bind_parts) == 2:
+                return agent_manager.bind(bind_parts[0], bind_parts[1])
+            return '❌ Usage: /agent bind <chat_key> <agent_id>'
+        return '❌ Usage: /agent list|create|switch|delete|bind <args>'
+
+    # --- Hooks commands (훅 명령) ---
+    if cmd.startswith('/hooks'):
+        from .hooks import hook_manager
+        parts = cmd.split(maxsplit=2)
+        sub = parts[1] if len(parts) > 1 else 'list'
+        if sub == 'list':
+            hooks = hook_manager.list_hooks()
+            if not hooks:
+                return '📋 No hooks configured. Edit ~/.salmalm/hooks.json'
+            lines = ['🪝 **Hooks** (이벤트 훅)\n']
+            for event, info in hooks.items():
+                cmds_list = info['commands']
+                pc = info['plugin_callbacks']
+                lines.append(f"• **{event}**: {len(cmds_list)} commands, {pc} plugin callbacks")
+                for i, c in enumerate(cmds_list):
+                    lines.append(f"  [{i}] `{c[:60]}`")
+            return '\n'.join(lines)
+        elif sub == 'test' and len(parts) > 2:
+            return hook_manager.test_hook(parts[2].strip())
+        elif sub == 'add' and len(parts) > 2:
+            add_parts = parts[2].split(maxsplit=1)
+            if len(add_parts) == 2:
+                return hook_manager.add_hook(add_parts[0], add_parts[1])
+            return '❌ Usage: /hooks add <event> <command>'
+        elif sub == 'reload':
+            hook_manager.reload()
+            return '🔄 Hooks reloaded'
+        return '❌ Usage: /hooks list|test|add|reload'
+
+    # --- Plugins commands (플러그인 명령) ---
+    if cmd.startswith('/plugins'):
+        from .plugins import plugin_manager
+        parts = cmd.split(maxsplit=2)
+        sub = parts[1] if len(parts) > 1 else 'list'
+        if sub == 'list':
+            plugins = plugin_manager.list_plugins()
+            if not plugins:
+                return '🔌 No plugins found. Add to ~/.salmalm/plugins/'
+            lines = ['🔌 **Plugins** (플러그인)\n']
+            for p in plugins:
+                status = '✅' if p['enabled'] else '❌'
+                err = f" ⚠️ {p['error']}" if p.get('error') else ''
+                lines.append(f"• {status} **{p['name']}** v{p['version']} — {p['description'][:40]}{err}")
+                if p['tools']:
+                    lines.append(f"  Tools: {', '.join(p['tools'])}")
+            return '\n'.join(lines)
+        elif sub == 'reload':
+            return plugin_manager.reload_all()
+        elif sub == 'enable' and len(parts) > 2:
+            return plugin_manager.enable(parts[2].strip())
+        elif sub == 'disable' and len(parts) > 2:
+            return plugin_manager.disable(parts[2].strip())
+        return '❌ Usage: /plugins list|reload|enable|disable <name>'
+
     # --- Normal message processing ---
     if not user_message.strip() and not image_data:
         return "Please enter a message."
@@ -1136,6 +1289,15 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         _notify_completion(session_id, user_message, response, classification)
     except Exception as e:
         log.error(f"Notification hook error: {e}")
+
+    # Fire on_response hook (응답 완료 훅)
+    try:
+        from .hooks import hook_manager
+        hook_manager.fire('on_response', {
+            'session_id': session_id, 'message': response,
+        })
+    except Exception:
+        pass
 
     return response
 

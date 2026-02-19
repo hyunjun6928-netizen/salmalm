@@ -51,14 +51,36 @@ class TelegramBot:
 
     def send_message(self, chat_id, text: str, parse_mode: Optional[str] = None,
                      reply_markup: Optional[dict] = None):
-        """Send a text message to a Telegram chat, with optional inline keyboard."""
+        """Send a text message to a Telegram chat, with optional inline keyboard.
+
+        Edge cases handled:
+        - Empty messages: skip
+        - Length > 4096: smart split on paragraph/code block boundaries
+        - MarkdownV2 parse error: fallback to plain text
+        - Flood wait (429): respect retry_after
+        - Chat not found (400): log warning, skip
+        - Bot kicked (403): cleanup session
+        - MessageNotModified: ignore
+        """
+        # Empty message guard
+        if not text or not text.strip():
+            return
+
         text, btn_labels = self._extract_buttons(text)
+        if not text.strip():
+            return
+
         if btn_labels and not reply_markup:
             reply_markup = {'inline_keyboard': [
                 [{'text': label, 'callback_data': f'btn:{label}'[:64]} for label in btn_labels]
             ]}
-        chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
+
+        # Smart split: respect paragraph boundaries and code blocks
+        chunks = self._smart_split(text, max_len=4096)
+
         for idx, chunk in enumerate(chunks):
+            if not chunk.strip():
+                continue
             data = {'chat_id': chat_id, 'text': chunk}
             if parse_mode:
                 data['parse_mode'] = parse_mode
@@ -67,11 +89,105 @@ class TelegramBot:
             try:
                 self._api('sendMessage', data)
             except Exception as e:
+                err_str = str(e).lower()
+                # Flood wait — respect retry_after
+                if '429' in str(e) or 'flood' in err_str or 'retry_after' in err_str:
+                    wait = self._extract_retry_after(e)
+                    log.warning(f"[TG] Flood wait: {wait}s for chat {chat_id}")
+                    time.sleep(wait)
+                    try:
+                        self._api('sendMessage', data)
+                    except Exception:
+                        pass
+                    continue
+                # Chat not found
+                if 'chat not found' in err_str or '400' in str(e):
+                    log.warning(f"[TG] Chat not found: {chat_id}")
+                    return
+                # Bot kicked from group
+                if '403' in str(e) or 'forbidden' in err_str or 'kicked' in err_str:
+                    log.warning(f"[TG] Bot kicked/blocked: {chat_id}")
+                    self._cleanup_session(chat_id)
+                    return
+                # MessageNotModified — ignore
+                if 'not modified' in err_str:
+                    return
+                # MarkdownV2 parse error → retry without parse_mode
                 if parse_mode:
                     data2 = {'chat_id': chat_id, 'text': chunk}
                     if reply_markup and idx == len(chunks) - 1:
                         data2['reply_markup'] = reply_markup
-                    self._api('sendMessage', data2)
+                    try:
+                        self._api('sendMessage', data2)
+                    except Exception as e2:
+                        log.error(f"[TG] Send failed even without parse_mode: {e2}")
+                else:
+                    log.error(f"[TG] Send failed: {e}")
+
+    def _smart_split(self, text: str, max_len: int = 4096) -> list:
+        """Split text respecting paragraph boundaries and code blocks.
+
+        Preserves code block integrity (```...```) when possible.
+        Falls back to hard split if a single block exceeds max_len.
+        """
+        if len(text) <= max_len:
+            return [text]
+
+        chunks = []
+        remaining = text
+
+        while remaining:
+            if len(remaining) <= max_len:
+                chunks.append(remaining)
+                break
+
+            # Try to split at paragraph boundary
+            split_pos = remaining.rfind('\n\n', 0, max_len)
+            if split_pos < max_len // 4:
+                # No good paragraph break, try single newline
+                split_pos = remaining.rfind('\n', 0, max_len)
+            if split_pos < max_len // 4:
+                # Hard split
+                split_pos = max_len
+
+            chunk = remaining[:split_pos]
+            remaining = remaining[split_pos:].lstrip('\n')
+
+            # Check for unclosed code blocks
+            code_blocks = chunk.count('```')
+            if code_blocks % 2 != 0:
+                # Unclosed code block — close it in this chunk, reopen in next
+                chunk += '\n```'
+                remaining = '```\n' + remaining
+
+            chunks.append(chunk)
+
+        return chunks
+
+    @staticmethod
+    def _extract_retry_after(error) -> float:
+        """Extract retry_after seconds from Telegram error."""
+        try:
+            err_str = str(error)
+            import re as _re
+            m = _re.search(r'retry.after[:\s]+(\d+)', err_str, _re.IGNORECASE)
+            if m:
+                return float(m.group(1))
+        except Exception:
+            pass
+        return 5.0  # Default wait
+
+    def _cleanup_session(self, chat_id):
+        """Clean up session when bot is kicked from chat."""
+        session_id = f'telegram_{chat_id}'
+        try:
+            from .core import _sessions, _session_lock
+            with _session_lock:
+                if session_id in _sessions:
+                    del _sessions[session_id]
+            log.info(f"[TG] Session cleaned up: {session_id}")
+        except Exception as e:
+            log.error(f"[TG] Session cleanup error: {e}")
 
     def _send_photo(self, chat_id, path: Path, caption: str = ''):
         """Send a photo file to Telegram."""
@@ -96,7 +212,8 @@ class TelegramBot:
             urllib.request.urlopen(req, timeout=30)
         except Exception as e:
             log.error(f"Send photo error: {e}")
-            self.send_message(chat_id, f'📷 Image send failed: {e}')
+            # Fallback: send as text link if file was from URL
+            self.send_message(chat_id, f'📷 Image send failed: {e}\n{caption}')
 
     def _send_audio(self, chat_id, path: Path, caption: str = ''):
         """Send an audio file to Telegram."""
@@ -462,16 +579,56 @@ class TelegramBot:
             await self._handle_command(chat_id, text)
             return
 
-        # Process message
-        self.send_typing(chat_id)
+        # Process message with typing loop + block streaming
         session_id = f'telegram_{chat_id}'
+
+        # Start continuous typing indicator
+        typing_task = None
+        if self.typing_mode != 'never':
+            self.send_typing(chat_id)
+            typing_task = self._start_typing_loop(chat_id)
+
+        # Block streaming: accumulate streamed text and periodically edit
+        _stream_buf = []
+        _draft_sent = [False]
+        _BLOCK_STREAM_THRESHOLD = 500  # chars before first draft send
+
+        def _on_stream_token(event):
+            """Handle streaming tokens for block streaming in Telegram."""
+            etype = event.get('type', '')
+            if etype == 'content_delta':
+                text_delta = event.get('text', '')
+                if text_delta:
+                    _stream_buf.append(text_delta)
+                    full = ''.join(_stream_buf)
+                    if not _draft_sent[0] and len(full) >= _BLOCK_STREAM_THRESHOLD:
+                        self._send_draft(chat_id, full + ' ▍')
+                        _draft_sent[0] = True
+                    elif _draft_sent[0]:
+                        self._update_draft(chat_id, full + ' ▍')
+
+        def _on_status(status_type, detail):
+            """Handle status callbacks for typing indicator updates."""
+            # We could update the draft with status, but typing action is already running
+            pass
+
         _start = time.time()
         from .engine import process_message
-        response = await process_message(session_id, text, image_data=_image_data)
+        response = await process_message(
+            session_id, text, image_data=_image_data,
+            on_token=_on_stream_token,
+            on_status=_on_status)
         _elapsed = time.time() - _start
 
+        # Cancel typing loop
+        if typing_task:
+            typing_task.cancel()
+            try:
+                await typing_task
+            except asyncio.CancelledError:
+                pass
+
         # Model badge for response
-        _model_name = getattr(session_obj, 'last_model', 'auto') if 'session_obj' in dir() else 'auto'
         session_obj = get_session(session_id)
         _model_short = (getattr(session_obj, 'last_model', '') or 'auto').split('/')[-1][:20]
         _complexity = getattr(session_obj, 'last_complexity', '')
@@ -484,17 +641,33 @@ class TelegramBot:
         if img_match:
             img_path = WORKSPACE_DIR / img_match.group(0)
             if img_path.exists():
+                # Finalize any draft first
+                if _draft_sent[0]:
+                    key = str(chat_id)
+                    self._draft_messages.pop(key, None)
                 self._send_photo(chat_id, img_path, response[:1000])
             else:
-                self.send_message(chat_id, f'{response}{suffix}')
+                if _draft_sent[0]:
+                    self._finalize_draft(chat_id, response, suffix)
+                else:
+                    self.send_message(chat_id, f'{response}{suffix}')
         elif audio_match:
             audio_path = WORKSPACE_DIR / audio_match.group(0)
             if audio_path.exists():
+                if _draft_sent[0]:
+                    key = str(chat_id)
+                    self._draft_messages.pop(key, None)
                 self._send_audio(chat_id, audio_path, response[:1000])
             else:
-                self.send_message(chat_id, f'{response}{suffix}')
+                if _draft_sent[0]:
+                    self._finalize_draft(chat_id, response, suffix)
+                else:
+                    self.send_message(chat_id, f'{response}{suffix}')
         else:
-            self.send_message(chat_id, f'{response}{suffix}')
+            if _draft_sent[0]:
+                self._finalize_draft(chat_id, response, suffix)
+            else:
+                self.send_message(chat_id, f'{response}{suffix}')
 
         # TTS: send voice message if enabled
         if getattr(session_obj, 'tts_enabled', False):

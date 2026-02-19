@@ -480,6 +480,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   function _storageKey(sid){return 'salm_chat_'+sid}
 
   function loadSessionList(){
+    /* Load agents for sidebar dropdown (에이전트 로드) */
+    fetch('/api/agents',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var sel=document.getElementById('agent-select');if(!sel)return;
+      var agents=d.agents||[];
+      sel.innerHTML=agents.map(function(a){return '<option value="'+a.id+'">🤖 '+a.display_name+'</option>'}).join('');
+    }).catch(function(){});
     fetch('/api/sessions',{headers:{'X-Session-Token':_tok}})
     .then(function(r){return r.json()})
     .then(function(d){
@@ -832,14 +838,26 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       if(role==='user'&&hist.filter(function(m){return m.role==='user'}).length===1)setTimeout(loadSessionList,500);
     }
   }
-  function addTyping(){
+  function addTyping(statusText){
     const row=document.createElement('div');row.className='msg-row assistant';row.id='typing-row';
     const av=document.createElement('div');av.className='avatar';av.textContent='😈';
     const wrap=document.createElement('div');
     const b=document.createElement('div');b.className='bubble';
-    b.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div>';
+    var label=statusText||'';
+    b.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div>'+(label?' '+label:'');
     wrap.appendChild(b);row.appendChild(av);row.appendChild(wrap);
     chat.appendChild(row);chat.scrollTop=999999;
+  }
+  function updateTypingStatus(status, detail){
+    var el=document.getElementById('typing-row');
+    if(!el)return;
+    var b=el.querySelector('.bubble');
+    if(!b||b._streaming)return;
+    var label='';
+    if(status==='thinking')label='🧠 Thinking...';
+    else if(status==='tool_running')label=detail||'🔧 Running tool...';
+    else label=detail||'';
+    b.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div>'+(label?' '+label:'');
   }
 
   /* --- File handling --- */
@@ -906,6 +924,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       var data;try{data=JSON.parse(ev.data)}catch(e){return}
       if(data.type==='pong')return;
       if(data.type==='welcome')return;
+      if(data.type==='typing'){updateTypingStatus(data.status,data.detail);return;}
       _wsHandleMessage(data);
     };
   }
@@ -1762,6 +1781,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       fetch('/api/soul',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({content:''})}).then(function(r){return r.json()}).then(function(d){
         document.getElementById('soul-result').innerHTML='<span style="color:#4ade80">'+(d.message||'Reset')+'</span>'})
     }
+    else if(a==='reloadPlugins'){fetch('/api/plugins/manage',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({action:'reload'})}).then(function(){window.showSettings()})}
+    else if(a==='reloadHooks'){fetch('/api/hooks',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({action:'reload'})}).then(function(){window.showSettings()})}
     else if(a==='closeShortcutModal'||a==='closeFilterModal'){_closeAllModals()}
     else if(a==='filterSelect'){_closeAllModals();switchSession(el.getAttribute('data-sid'))}
     else if(a==='switchSession'){e.stopPropagation();window.switchSession(el.getAttribute('data-sid'))}
