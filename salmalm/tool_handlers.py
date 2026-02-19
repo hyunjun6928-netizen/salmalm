@@ -20,7 +20,7 @@ from .llm import _http_post, _http_get
 _clipboard_lock = threading.Lock()
 telegram_bot = None
 
-def _is_safe_command(cmd: str) -> tuple[bool, str]:
+def _is_safe_command(cmd: str) :
     """Check if command is safe to execute (allowlist + blocklist double defense)."""
     if not cmd.strip():
         return False, 'Empty command'
@@ -86,7 +86,7 @@ def _resolve_path(path: str, writing: bool = False) -> Path:
     return p
 
 
-def _is_private_url(url: str) -> tuple[bool, str]:
+def _is_private_url(url: str) :
     """Check if URL resolves to a private/internal IP. Returns (blocked, reason)."""
     import ipaddress, socket
     from urllib.parse import urlparse

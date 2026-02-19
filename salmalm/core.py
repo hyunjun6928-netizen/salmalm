@@ -476,7 +476,7 @@ class LLMCronManager:
     _JOBS_FILE = BASE_DIR / '.cron_jobs.json'
 
     def __init__(self):
-        self.jobs: list[dict] = []
+        self.jobs = []
 
     def load_jobs(self):
         """Load persisted cron jobs from file."""
@@ -673,7 +673,7 @@ class Session:
 
 
 _tg_bot = None  # Set during startup by telegram module
-_sessions: dict[str, Session] = {}
+_sessions = {}
 _session_cleanup_ts = 0.0
 _SESSION_TTL = 3600 * 8  # 8 hours
 _SESSION_MAX = 200
@@ -732,7 +732,7 @@ class CronScheduler:
     """Simple cron-like scheduler."""
 
     def __init__(self):
-        self.jobs: list[dict] = []
+        self.jobs = []
         self._running = False
 
     def add_job(self, name: str, interval_seconds: int, callback, **kwargs):
