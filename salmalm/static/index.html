@@ -632,6 +632,132 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   inputArea.addEventListener('drop',function(e){e.preventDefault();e.stopPropagation();inputArea.style.outline='';
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)window.setFile(f)});
 
+  /* --- WebSocket Connection Manager --- */
+  var _ws=null,_wsReady=false,_wsBackoff=500,_wsMaxBackoff=5000,_wsTimer=null,_wsPingTimer=null;
+  var _wsPendingResolve=null,_wsSendStart=0;
+
+  function _wsUrl(){
+    var proto=location.protocol==='https:'?'wss:':'ws:';
+    var host=location.hostname||'localhost';
+    return proto+'//'+host+':18801';
+  }
+
+  function _wsConnect(){
+    if(_ws&&(_ws.readyState===WebSocket.CONNECTING||_ws.readyState===WebSocket.OPEN))return;
+    try{_ws=new WebSocket(_wsUrl())}catch(e){console.warn('WS connect error:',e);_wsScheduleReconnect();return}
+    _ws.onopen=function(){
+      _wsReady=true;_wsBackoff=500;
+      console.log('WS connected');
+      _wsStartPing();
+    };
+    _ws.onclose=function(){
+      _wsReady=false;_wsStopPing();
+      if(_wsPendingResolve){_wsPendingResolve({fallback:true});_wsPendingResolve=null}
+      _wsScheduleReconnect();
+    };
+    _ws.onerror=function(){_wsReady=false};
+    _ws.onmessage=function(ev){
+      var data;try{data=JSON.parse(ev.data)}catch(e){return}
+      if(data.type==='pong')return;
+      if(data.type==='welcome')return;
+      _wsHandleMessage(data);
+    };
+  }
+
+  function _wsScheduleReconnect(){
+    if(_wsTimer)return;
+    _wsTimer=setTimeout(function(){_wsTimer=null;_wsConnect()},_wsBackoff);
+    _wsBackoff=Math.min(_wsBackoff*2,_wsMaxBackoff);
+  }
+
+  function _wsStartPing(){
+    _wsStopPing();
+    _wsPingTimer=setInterval(function(){
+      if(_ws&&_ws.readyState===WebSocket.OPEN)_ws.send(JSON.stringify({type:'ping'}));
+    },30000);
+  }
+  function _wsStopPing(){if(_wsPingTimer){clearInterval(_wsPingTimer);_wsPingTimer=null}}
+
+  function _wsHandleMessage(data){
+    var typingEl=document.getElementById('typing-row');
+    if(data.type==='chunk'){
+      if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb){if(!tb._streaming){tb._streaming=true;tb.innerHTML=''}tb.innerHTML+=data.text.replace(/</g,'&lt;')}}
+    }else if(data.type==='tool'){
+      if(typingEl){var tb2=typingEl.querySelector('.bubble');if(tb2)tb2.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> 🔧 '+data.name+'...'}
+    }else if(data.type==='done'){
+      if(typingEl)typingEl.remove();
+      var _secs=((Date.now()-_wsSendStart)/1000).toFixed(1);
+      addMsg('assistant',data.text||'','⏱️'+_secs+'s');
+      fetch('/api/status').then(function(r){return r.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+      if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
+    }else if(data.type==='error'){
+      if(typingEl)typingEl.remove();
+      addMsg('assistant','❌ '+data.error);
+      if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
+    }
+  }
+
+  /* Connect on load */
+  _wsConnect();
+
+  /* --- Send via WebSocket with SSE fallback --- */
+  function _sendViaWs(msg,session){
+    return new Promise(function(resolve){
+      if(!_wsReady||!_ws||_ws.readyState!==WebSocket.OPEN){resolve({fallback:true});return}
+      _wsPendingResolve=resolve;
+      _ws.send(JSON.stringify({type:'message',text:msg,session:session}));
+    });
+  }
+
+  async function _sendViaSse(chatBody,_sendStart){
+    try{
+      var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+        body:JSON.stringify(chatBody)});
+      if(!r.ok||!r.body){throw new Error('stream unavailable')}
+      var reader=r.body.getReader();var decoder=new TextDecoder();var buf='';var gotDone=false;
+      var typingEl=document.getElementById('typing-row');
+      while(true){
+        var chunk=await reader.read();
+        if(chunk.done)break;
+        buf+=decoder.decode(chunk.value,{stream:true});
+        var evts=buf.split('\n\n');buf=evts.pop();
+        for(var i=0;i<evts.length;i++){
+          var evt=evts[i];
+          var em=evt.match(/^event: (\w+)\ndata: (.+)$/m);
+          if(!em)continue;
+          var etype=em[1],edata=JSON.parse(em[2]);
+          if(etype==='status'){
+            if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb)tb.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> '+edata.text}
+          }else if(etype==='tool'){
+            if(typingEl){var tb2=typingEl.querySelector('.bubble');if(tb2)tb2.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> 🔧 '+edata.name+(edata.count?' ('+edata.count+')':'')+'...'}
+          }else if(etype==='chunk'){
+            if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4.innerHTML=''}tb4.innerHTML+=edata.text.replace(/</g,'&lt;')}}
+          }else if(etype==='done'){
+            gotDone=true;
+            if(typingEl)typingEl.remove();
+            var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
+            addMsg('assistant',edata.response||'',(edata.model||'')+' · ⏱️'+_secs+'s');
+            fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+          }
+        }
+      }
+      if(!gotDone)throw new Error('stream incomplete');
+      if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
+    }catch(streamErr){
+      console.warn('SSE failed, falling back:',streamErr);
+      var typRow=document.getElementById('typing-row');
+      if(typRow){var tb3=typRow.querySelector('.bubble');if(tb3)tb3.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> Processing...'}
+      var r2=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+        body:JSON.stringify(chatBody)});
+      var d=await r2.json();
+      if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
+      var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
+      if(d.response)addMsg('assistant',d.response,(d.model||'')+' · ⏱️'+_secs2+'s');
+      else if(d.error)addMsg('assistant','❌ '+d.error);
+      fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+    }
+  }
+
   /* --- Send --- */
   async function doSend(){
     var t=input.value.trim();
@@ -662,56 +788,14 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
     addTyping();
     var _sendStart=Date.now();
+    _wsSendStart=_sendStart;
     var chatBody={message:msg,session:_currentSession};
     if(imgData){chatBody.image_base64=imgData;chatBody.image_mime=imgMime}
     try{
-      var useStream=true;
-      try{
-        var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
-          body:JSON.stringify(chatBody)});
-        if(!r.ok||!r.body){throw new Error('stream unavailable')}
-        var reader=r.body.getReader();var decoder=new TextDecoder();var buf='';var gotDone=false;
-        var typingEl=document.getElementById('typing-row');
-        while(true){
-          var chunk=await reader.read();
-          if(chunk.done)break;
-          buf+=decoder.decode(chunk.value,{stream:true});
-          var evts=buf.split('\n\n');buf=evts.pop();
-          for(var i=0;i<evts.length;i++){
-            var evt=evts[i];
-            var em=evt.match(/^event: (\w+)\ndata: (.+)$/m);
-            if(!em)continue;
-            var etype=em[1],edata=JSON.parse(em[2]);
-            if(etype==='status'){
-              if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb)tb.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> '+edata.text}
-            }else if(etype==='tool'){
-              if(typingEl){var tb2=typingEl.querySelector('.bubble');if(tb2)tb2.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> 🔧 '+edata.name+(edata.count?' ('+edata.count+')':'')+'...'}
-            }else if(etype==='chunk'){
-              if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4.innerHTML=''}tb4.innerHTML+=edata.text.replace(/</g,'&lt;')}}
-            }else if(etype==='done'){
-              gotDone=true;
-              if(typingEl)typingEl.remove();
-              var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
-              addMsg('assistant',edata.response||'',(edata.model||'')+' · ⏱️'+_secs+'s');
-              fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
-            }
-          }
-        }
-        if(!gotDone)throw new Error('stream incomplete');
-        if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
-      }catch(streamErr){
-        /* Fallback to regular /api/chat */
-        console.warn('Stream failed, falling back:',streamErr);
-        var typRow=document.getElementById('typing-row');
-        if(typRow){var tb3=typRow.querySelector('.bubble');if(tb3)tb3.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> Processing...'}
-        var r2=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
-          body:JSON.stringify(chatBody)});
-        var d=await r2.json();
-        if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
-        var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
-        if(d.response)addMsg('assistant',d.response,(d.model||'')+' · ⏱️'+_secs2+'s');
-        else if(d.error)addMsg('assistant','❌ '+d.error);
-        fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+      /* Try WebSocket first, fall back to SSE */
+      var wsResult=await _sendViaWs(msg,_currentSession);
+      if(wsResult.fallback){
+        await _sendViaSse(chatBody,_sendStart);
       }
     }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ Error: '+se.message)}
     finally{btn.disabled=false;input.focus()}

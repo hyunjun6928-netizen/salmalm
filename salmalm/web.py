@@ -74,7 +74,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             f"script-src {script_src}; "
             f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "
             f"img-src 'self' data: blob:; "
-            f"connect-src 'self' ws://127.0.0.1:* wss://127.0.0.1:*; "
+            f"connect-src 'self' ws://127.0.0.1:* ws://localhost:* wss://127.0.0.1:* wss://localhost:*; "
             f"font-src 'self' data: https://fonts.gstatic.com; "
             f"object-src 'none'; "
             f"base-uri 'self'; "
