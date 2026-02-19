@@ -8,12 +8,48 @@ from .constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, TOOLS_FIL
 from .core import SkillLoader
 from . import log
 
+# User-customizable SOUL.md (takes priority over project SOUL.md)
+USER_SOUL_FILE = Path.home() / '.salmalm' / 'SOUL.md'
+
+
+def get_user_soul() -> str:
+    """Read user SOUL.md from ~/.salmalm/SOUL.md. Returns empty string if not found."""
+    try:
+        if USER_SOUL_FILE.exists():
+            return USER_SOUL_FILE.read_text(encoding='utf-8')
+    except Exception:
+        pass
+    return ''
+
+
+def set_user_soul(content: str):
+    """Write user SOUL.md to ~/.salmalm/SOUL.md."""
+    USER_SOUL_FILE.parent.mkdir(parents=True, exist_ok=True)
+    USER_SOUL_FILE.write_text(content, encoding='utf-8')
+
+
+def reset_user_soul():
+    """Delete user SOUL.md (revert to default)."""
+    try:
+        if USER_SOUL_FILE.exists():
+            USER_SOUL_FILE.unlink()
+    except Exception:
+        pass
+
+
 def build_system_prompt(full: bool = True) -> str:
     """Build system prompt from SOUL.md + context files.
     full=True: load everything (first message / refresh)
     full=False: minimal reload (mid-conversation refresh)
+
+    User SOUL.md (~/.salmalm/SOUL.md) is prepended if it exists.
     """
     parts = []
+
+    # User SOUL.md (custom persona — prepended before everything)
+    user_soul = get_user_soul()
+    if user_soul:
+        parts.append(user_soul)
 
     # SOUL.md (persona — FULL load, this IS who we are)
     if SOUL_FILE.exists():

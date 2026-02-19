@@ -11,8 +11,16 @@ from .constants import (VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG,
                         INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN,
                         MODEL_ALIASES as _CONST_ALIASES, COMMAND_MODEL)
 import re as _re
+import threading as _threading
+import time as _time
 from .crypto import log
-from .core import router, compact_messages, get_session, _sessions, _metrics, compact_session, auto_compact_if_needed
+
+# Graceful shutdown state
+_shutting_down = False
+_active_requests = 0
+_active_requests_lock = _threading.Lock()
+_active_requests_event = _threading.Event()  # signaled when _active_requests == 0
+from .core import router, compact_messages, get_session, _sessions, _metrics, compact_session, auto_compact_if_needed, audit_log
 from .prompt import build_system_prompt
 from .tool_handlers import execute_tool
 from .llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic
@@ -51,6 +59,68 @@ async def _call_llm_streaming(messages, model=None, tools=None,
 # ============================================================
 # Model aliases — sourced from constants.py (single source of truth)
 MODEL_ALIASES = {'auto': None, **_CONST_ALIASES}
+
+# Multi-model routing: cost-optimized model selection
+_SIMPLE_PATTERNS = _re.compile(
+    r'^(안녕|hi|hello|hey|ㅎㅇ|ㅎㅎ|ㄱㅅ|고마워|감사|ㅋㅋ|ㅎㅎ|ok|lol|yes|no|네|아니|응|ㅇㅇ|뭐해|잘자|굿|bye|잘가|좋아|ㅠㅠ|ㅜㅜ|오|와|대박|진짜|뭐|어|음|흠|뭐야|왜|어떻게|언제|어디|누구|얼마)[\?!？！.\s]*$',
+    _re.IGNORECASE)
+_MODERATE_KEYWORDS = ['분석', '리뷰', '요약', '코드', 'code', 'analyze', 'review', 'summarize',
+                       'summary', 'compare', '비교', 'refactor', '리팩', 'debug', '디버그',
+                       'explain', '설명', '번역', 'translate']
+_COMPLEX_KEYWORDS = ['설계', '아키텍처', 'architecture', 'design', 'system design',
+                      'from scratch', '처음부터', '전체', 'migration', '마이그레이션']
+
+from .constants import MODELS as _MODELS
+
+def _select_model(message: str, session) -> tuple:
+    """Select optimal model based on message complexity.
+
+    Returns (model_id, complexity_level) where complexity is 'simple'|'moderate'|'complex'.
+    Respects session-level model_override (from /model command).
+    """
+    # Check session-level override
+    override = getattr(session, 'model_override', None)
+    if override and override != 'auto':
+        if override == 'haiku':
+            return _MODELS['haiku'], 'simple'
+        elif override == 'sonnet':
+            return _MODELS['sonnet'], 'moderate'
+        elif override == 'opus':
+            return _MODELS['opus'], 'complex'
+        else:
+            # Direct model string
+            return override, 'manual'
+
+    msg_lower = message.lower()
+    msg_len = len(message)
+
+    # Check thinking mode
+    if getattr(session, 'thinking_enabled', False):
+        return _MODELS['opus'], 'complex'
+
+    # Complex: long messages, architecture keywords
+    if msg_len > 500:
+        return _MODELS['opus'], 'complex'
+    for kw in _COMPLEX_KEYWORDS:
+        if kw in msg_lower:
+            return _MODELS['opus'], 'complex'
+
+    # Moderate: code blocks, analysis keywords
+    if '```' in message or 'def ' in message or 'class ' in message:
+        return _MODELS['sonnet'], 'moderate'
+    for kw in _MODERATE_KEYWORDS:
+        if kw in msg_lower:
+            return _MODELS['sonnet'], 'moderate'
+
+    # Simple: short + greeting/simple question pattern
+    if msg_len < 50 and _SIMPLE_PATTERNS.match(message.strip()):
+        return _MODELS['haiku'], 'simple'
+    if msg_len < 50:
+        # Short but not a pattern match — still use haiku for cost savings
+        return _MODELS['haiku'], 'simple'
+
+    # Default: moderate
+    return _MODELS['sonnet'], 'moderate'
 
 
 class TaskClassifier:
@@ -208,25 +278,51 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         if len(tool_calls) == 1:
             tc = tool_calls[0]
             _metrics['tool_calls'] += 1
+            t0 = _time.time()
             try:
                 result = self._truncate_tool_result(execute_tool(tc['name'], tc['arguments']))
+                elapsed = _time.time() - t0
+                audit_log('tool_call', f"{tc['name']}: ok ({elapsed:.2f}s)",
+                          detail_dict={'tool': tc['name'],
+                                       'args_summary': str(tc['arguments'])[:200],
+                                       'elapsed_s': round(elapsed, 3),
+                                       'success': True})
             except Exception as e:
+                elapsed = _time.time() - t0
                 _metrics['tool_errors'] += 1
                 result = f'❌ Tool execution error: {e}'
+                audit_log('tool_call', f"{tc['name']}: error ({e})",
+                          detail_dict={'tool': tc['name'],
+                                       'args_summary': str(tc['arguments'])[:200],
+                                       'elapsed_s': round(elapsed, 3),
+                                       'success': False, 'error': str(e)[:200]})
             return {tc['id']: result}
 
         futures = {}
+        start_times = {}
         for tc in tool_calls:
             _metrics['tool_calls'] += 1
+            start_times[tc['id']] = _time.time()
             f = self._tool_executor.submit(execute_tool, tc['name'], tc['arguments'])
-            futures[tc['id']] = f
+            futures[tc['id']] = (f, tc)
         outputs = {}
-        for tc_id, f in futures.items():
+        for tc_id, (f, tc) in futures.items():
             try:
                 outputs[tc_id] = self._truncate_tool_result(f.result(timeout=60))
+                elapsed = _time.time() - start_times[tc_id]
+                audit_log('tool_call', f"{tc['name']}: ok ({elapsed:.2f}s)",
+                          detail_dict={'tool': tc['name'],
+                                       'args_summary': str(tc['arguments'])[:200],
+                                       'elapsed_s': round(elapsed, 3), 'success': True})
             except Exception as e:
+                elapsed = _time.time() - start_times[tc_id]
                 _metrics['tool_errors'] += 1
                 outputs[tc_id] = f'❌ Tool execution error: {e}'
+                audit_log('tool_call', f"{tc['name']}: error",
+                          detail_dict={'tool': tc['name'],
+                                       'args_summary': str(tc['arguments'])[:200],
+                                       'elapsed_s': round(elapsed, 3),
+                                       'success': False, 'error': str(e)[:200]})
         log.info(f"[FAST] Parallel: {len(tool_calls)} tools completed")
         return outputs
 
@@ -384,6 +480,18 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     session.add_assistant("⚠️ Context too large. Use /clear to reset.")
                     return "⚠️ Context too large. Use /clear to reset."
 
+            # Audit API call
+            usage = result.get('usage', {})
+            api_detail = {
+                'model': result.get('model', model),
+                'input_tokens': usage.get('input', 0),
+                'output_tokens': usage.get('output', 0),
+                'iteration': iteration,
+            }
+            if usage.get('input', 0) or usage.get('output', 0):
+                audit_log('api_call', f"{model} in={usage.get('input',0)} out={usage.get('output',0)}",
+                          detail_dict=api_detail)
+
             if result.get('thinking'):
                 log.info(f"[AI] Thinking: {len(result['thinking'])} chars")
 
@@ -480,6 +588,34 @@ async def process_message(session_id: str, user_message: str,
                           on_tool: Optional[Callable[[str, Any], None]] = None,
                           on_token: Optional[Callable] = None) -> str:
     """Process a user message through the Intelligence Engine pipeline."""
+    # Reject new requests during shutdown
+    if _shutting_down:
+        return '⚠️ Server is shutting down. Please try again later.'
+
+    with _active_requests_lock:
+        global _active_requests
+        _active_requests += 1
+        _active_requests_event.clear()
+
+    try:
+        return await _process_message_inner(session_id, user_message,
+                                             model_override=model_override,
+                                             image_data=image_data,
+                                             on_tool=on_tool,
+                                             on_token=on_token)
+    finally:
+        with _active_requests_lock:
+            _active_requests -= 1
+            if _active_requests == 0:
+                _active_requests_event.set()
+
+
+async def _process_message_inner(session_id: str, user_message: str,
+                                  model_override: Optional[str] = None,
+                                  image_data: Optional[Tuple[str, str]] = None,
+                                  on_tool: Optional[Callable[[str, Any], None]] = None,
+                                  on_token: Optional[Callable] = None) -> str:
+    """Inner implementation of process_message."""
     # Input sanitization
     if not _SESSION_ID_RE.match(session_id):
         return '❌ Invalid session ID format (alphanumeric and hyphens only).'
@@ -549,19 +685,57 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
                           'thinking_budget': 10000, 'score': 5}
         return await _engine.run(session, plan_msg, model_override=model_override,
                                   on_tool=on_tool, classification=classification)
+    if cmd == '/soul':
+        from .prompt import get_user_soul, USER_SOUL_FILE
+        content = get_user_soul()
+        if content:
+            return f'📜 **SOUL.md** (`{USER_SOUL_FILE}`)\n\n{content}'
+        return f'📜 SOUL.md is not set. Create `{USER_SOUL_FILE}` or edit via Settings.'
+    if cmd == '/soul reset':
+        from .prompt import reset_user_soul
+        reset_user_soul()
+        # Refresh system prompt
+        session.add_system(build_system_prompt(full=True))
+        return '📜 SOUL.md reset to default.'
     if cmd.startswith('/model '):
         model_name = cmd[7:].strip()
-        if model_name == 'auto':
-            router.set_force_model(None)
-            return 'Model changed: auto (auto-routing) — saved ✅'
+        # Session-level multi-model routing
+        if model_name in ('auto', 'opus', 'sonnet', 'haiku'):
+            session.model_override = model_name if model_name != 'auto' else 'auto'
+            if model_name == 'auto':
+                router.set_force_model(None)
+                return 'Model: **auto** (cost-optimized routing) — saved ✅\n• simple → haiku ⚡ • moderate → sonnet • complex → opus 💎'
+            labels = {'opus': 'claude-opus-4 💎', 'sonnet': 'claude-sonnet-4', 'haiku': 'claude-haiku-3.5 ⚡'}
+            return f'Model: **{model_name}** ({labels[model_name]}) — saved ✅'
         if '/' in model_name:
             router.set_force_model(model_name)
+            session.model_override = model_name
             return f'Model changed: {model_name} — saved ✅'
         if model_name in MODEL_ALIASES:
             resolved = MODEL_ALIASES[model_name]
             router.set_force_model(resolved)
+            session.model_override = resolved
             return f'Model changed: {model_name} → {resolved} — saved ✅'
-        return f'Unknown model: {model_name}\\nAvailable: {", ".join(sorted(MODEL_ALIASES.keys()))}'
+        return f'Unknown model: {model_name}\\nAvailable: auto, opus, sonnet, haiku, {", ".join(sorted(MODEL_ALIASES.keys()))}'
+    if cmd.startswith('/tts'):
+        arg = cmd[4:].strip()
+        if arg == 'on':
+            session.tts_enabled = True
+            return '🔊 TTS: **ON** — 응답을 음성으로 전송합니다.'
+        elif arg == 'off':
+            session.tts_enabled = False
+            return '🔇 TTS: **OFF**'
+        else:
+            status = 'ON' if getattr(session, 'tts_enabled', False) else 'OFF'
+            voice = getattr(session, 'tts_voice', 'alloy')
+            return f'🔊 TTS: **{status}** (voice: {voice})\n`/tts on` · `/tts off` · `/voice alloy|nova|echo|fable|onyx|shimmer`'
+    if cmd.startswith('/voice'):
+        arg = cmd[6:].strip()
+        valid_voices = ('alloy', 'nova', 'echo', 'fable', 'onyx', 'shimmer')
+        if arg in valid_voices:
+            session.tts_voice = arg
+            return f'🎙️ Voice: **{arg}** — saved ✅'
+        return f'Available voices: {", ".join(valid_voices)}'
 
     # --- Normal message processing ---
     if not user_message.strip() and not image_data:
@@ -604,11 +778,32 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         if classification['thinking_budget'] == 0:
             classification['thinking_budget'] = 10000
 
+    # Multi-model routing: select optimal model if no override
+    selected_model = model_override
+    complexity = 'auto'
+    if not model_override:
+        selected_model, complexity = _select_model(user_message, session)
+        log.info(f"[ROUTE] Multi-model: {complexity} → {selected_model}")
+
     response = await _engine.run(session, user_message,
-                              model_override=model_override,
+                              model_override=selected_model,
                               on_tool=on_tool,
                               classification=classification,
                               on_token=on_token)
+
+    # Store model metadata on session for API consumers
+    session.last_model = selected_model or 'auto'
+    session.last_complexity = complexity
+
+    # ── Auto-title session after first assistant response ──
+    try:
+        user_msgs = [m for m in session.messages if m.get('role') == 'user' and isinstance(m.get('content'), str)]
+        assistant_msgs = [m for m in session.messages if m.get('role') == 'assistant']
+        if len(assistant_msgs) == 1 and user_msgs:
+            from .core import auto_title_session
+            auto_title_session(session_id, user_msgs[0]['content'])
+    except Exception as e:
+        log.warning(f"Auto-title hook error: {e}")
 
     # ── Completion Notification Hook ──
     # Notify other channels when a task completes
@@ -660,6 +855,22 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
             })
             # Keep max 20 notifications
             web_session._notifications = web_session._notifications[-20:]  # type: ignore[attr-defined]
+
+
+def begin_shutdown():
+    """Signal the engine to stop accepting new requests."""
+    global _shutting_down
+    _shutting_down = True
+    log.info("[SHUTDOWN] Engine: rejecting new requests")
+
+
+def wait_for_active_requests(timeout: float = 30.0) -> bool:
+    """Wait for active requests to complete. Returns True if all done, False if timed out."""
+    with _active_requests_lock:
+        if _active_requests == 0:
+            return True
+    log.info(f"[SHUTDOWN] Waiting for {_active_requests} active request(s) (timeout={timeout}s)")
+    return _active_requests_event.wait(timeout=timeout)
 
 
 

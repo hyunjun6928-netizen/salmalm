@@ -126,6 +126,26 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 /* MOBILE MENU BUTTON */
 #mobile-menu-btn{display:none;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;padding:4px}
 
+/* SEARCH MODAL */
+#search-modal{display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,0.6);align-items:flex-start;justify-content:center;padding-top:15vh}
+#search-modal.open{display:flex}
+#search-box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:560px;max-width:90vw;max-height:60vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.4)}
+#search-input{padding:16px 20px;border:none;background:transparent;color:var(--text);font-size:15px;outline:none;border-bottom:1px solid var(--border)}
+#search-input::placeholder{color:var(--text2)}
+#search-results{overflow-y:auto;padding:8px;flex:1}
+.search-item{padding:10px 14px;border-radius:8px;cursor:pointer;font-size:13px;line-height:1.5;transition:background 0.1s}
+.search-item:hover{background:var(--accent-dim)}
+.search-item .sr-session{font-size:11px;color:var(--text2)}
+.search-item .sr-snippet{color:var(--text)}
+.search-item mark{background:var(--accent-dim);color:var(--accent2);padding:1px 2px;border-radius:2px}
+#search-hint{padding:12px 16px;font-size:11px;color:var(--text2);text-align:center;border-top:1px solid var(--border)}
+
+/* MODEL BADGE ON BUBBLES */
+.model-tag{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;background:var(--accent-dim);color:var(--accent2);margin-right:4px;font-weight:500}
+/* TTS BUTTON */
+.tts-btn{background:none;border:none;cursor:pointer;font-size:14px;opacity:0.5;transition:opacity 0.15s;padding:2px 4px}
+.tts-btn:hover{opacity:1}
+
 /* MOBILE */
 @media(max-width:768px){
   body{grid-template-columns:1fr;grid-template-areas:"head" "chat" "input"}
@@ -290,6 +310,19 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       </ol>
     </details>
   </div>
+  <div class="settings-card" id="soul-card">
+    <h3>📜 SOUL.md (Custom System Prompt)</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">
+      커스텀 시스템 프롬프트를 설정합니다. 모든 대화의 앞에 삽입됩니다.<br>
+      <code style="font-size:11px">~/.salmalm/SOUL.md</code> · 비우면 기본값 복원
+    </p>
+    <textarea id="soul-editor" style="width:100%;min-height:150px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:'SF Mono',monospace;resize:vertical;line-height:1.6" placeholder="# My Custom Persona\n\nYou are ..."></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn" data-action="saveSoul">💾 Save</button>
+      <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="resetSoul">🔄 Reset</button>
+    </div>
+    <div id="soul-result" style="margin-top:6px;font-size:12px"></div>
+  </div>
   <div class="settings-card" id="usage-card">
     <h3data-i18n="h-usage">📊 Token Usage</h3>
     <div id="usage-detail"></div>
@@ -358,6 +391,14 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div id="dashboard-content" style="color:var(--text2)">Loading...</div>
 </div>
 
+<div id="search-modal">
+  <div id="search-box">
+    <input id="search-input" type="text" placeholder="🔍 Search conversations... (Ctrl+K)">
+    <div id="search-results"></div>
+    <div id="search-hint">Esc to close · Enter to select · Type to search</div>
+  </div>
+</div>
+
 <script>
 (function(){
   const chat=document.getElementById('chat'),input=document.getElementById('input'),
@@ -404,7 +445,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         var pad=indent?'padding-left:'+(10+indent*16)+'px;':'';
         var icon=s.parent_session_id?'↳ ':'';
         var h='<div class="nav-item session-item"'+active+' data-action="switchSession" data-sid="'+s.id+'" style="'+pad+'">'
-          +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+icon+title+'</span>'
+          +'<span class="session-title" data-sid="'+s.id+'" title="Double-click to rename" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+icon+title+'</span>'
           +'<span class="session-del" data-action="deleteSession" data-sid="'+s.id+'" title="Delete" style="opacity:0.4;cursor:pointer;padding:2px 4px;font-size:11px">✕</span>'
           +'</div>';
         if(childMap[s.id]){childMap[s.id].forEach(function(c){h+=renderSession(c,(indent||0)+1);});}
@@ -597,9 +638,38 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     }
     wrap.appendChild(bubble);
     var meta_parts=[];
-    if(model)meta_parts.push(model);
+    if(model){
+      /* Show model as badge */
+      var modelShort=model.replace(/anthropic\//,'').replace(/openai\//,'').replace(/xai\//,'').replace(/google\//,'');
+      meta_parts.push(modelShort);
+    }
     meta_parts.push(new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
-    var mt=document.createElement('div');mt.className='meta';mt.textContent=meta_parts.join(' · ');
+    var mt=document.createElement('div');mt.className='meta';
+    /* Add model badge if present */
+    if(model&&role==='assistant'){
+      var _mShort=(model||'').split('/').pop()||model;
+      if(_mShort.length>30)_mShort=_mShort.slice(0,30);
+      var badge=document.createElement('span');badge.className='model-tag';badge.textContent=_mShort;
+      mt.appendChild(badge);
+    }
+    mt.appendChild(document.createTextNode(meta_parts.filter(function(p){return!p.includes('/')}).join(' · ')));
+    /* TTS button for assistant messages */
+    if(role==='assistant'&&_cleanText&&_cleanText.length>5){
+      var ttsBtn=document.createElement('button');ttsBtn.className='tts-btn';ttsBtn.textContent='🔊';ttsBtn.title='Read aloud';
+      ttsBtn.onclick=function(){
+        if('speechSynthesis' in window){
+          window.speechSynthesis.cancel();
+          var utter=new SpeechSynthesisUtterance(_cleanText.replace(/<[^>]*>/g,'').replace(/```[\s\S]*?```/g,'').slice(0,5000));
+          utter.lang=navigator.language||'ko-KR';
+          utter.rate=1.0;
+          ttsBtn.textContent='🔇';
+          utter.onend=function(){ttsBtn.textContent='🔊'};
+          utter.onerror=function(){ttsBtn.textContent='🔊'};
+          window.speechSynthesis.speak(utter);
+        }
+      };
+      mt.appendChild(ttsBtn);
+    }
     if(role==='assistant'&&text){
       var regenBtn=document.createElement('span');
       regenBtn.textContent=' 🔄';regenBtn.style.cursor='pointer';regenBtn.title='Regenerate';
@@ -751,6 +821,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     }else if(data.type==='error'){
       if(typingEl)typingEl.remove();
       addMsg('assistant','❌ '+data.error);
+      if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
+    }else if(data.type==='shutdown'){
+      if(typingEl)typingEl.remove();
+      addMsg('assistant','⚠️ '+(data.message||'Server is shutting down...'));
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
     }
   }
@@ -988,6 +1062,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var dashView=document.getElementById('dashboard-view');
   window.showChat=function(){settingsEl.style.display='none';dashView.style.display='none';chat.style.display='flex';inputArea.style.display='block'};
   window.showSettings=function(){chat.style.display='none';inputArea.style.display='none';dashView.style.display='none';settingsEl.style.display='block';
+    /* Load SOUL.md */
+    fetch('/api/soul',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var ed=document.getElementById('soul-editor');if(ed)ed.value=d.content||'';
+    }).catch(function(){});
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'keys'})})
       .then(function(r){return r.json()}).then(function(d){
         document.getElementById('vault-keys').innerHTML=d.keys.map(function(k){return '<div style="padding:4px 0;font-size:13px;color:var(--text2)">🔑 '+k+'</div>'}).join('')});
@@ -1140,25 +1218,118 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   });
   scrollBtn.addEventListener('click',function(){chat.scrollTop=chat.scrollHeight});
 
-  /* --- Basic syntax highlight for code blocks --- */
+  /* --- Syntax highlighting (pure JS, no external libs) --- */
+  var _hlKeywords={
+    javascript:'\b(function|const|let|var|if|else|for|while|return|import|from|export|default|class|new|this|typeof|instanceof|try|catch|finally|throw|async|await|yield|switch|case|break|continue|do|in|of|null|undefined|true|false|void|delete)\b',
+    python:'\b(def|class|if|elif|else|for|while|return|import|from|as|try|except|finally|raise|with|yield|async|await|lambda|pass|break|continue|and|or|not|in|is|None|True|False|global|nonlocal|del|assert)\b',
+    bash:'\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|echo|export|source|alias|local|readonly|shift|eval|exec|trap|set|cd|pwd|ls|cat|grep|sed|awk|find|sudo|apt|pip|npm|git|docker|curl|wget)\b',
+    html:'\b(html|head|body|div|span|p|a|img|script|style|link|meta|title|ul|ol|li|table|tr|td|th|form|input|button|select|option|textarea|nav|header|footer|section|article|main|class|id|href|src|type|rel)\b',
+    css:'\b(color|background|margin|padding|border|font|display|flex|grid|position|width|height|top|left|right|bottom|opacity|transition|transform|animation|overflow|none|auto|inherit|solid|relative|absolute|fixed|block|inline|important)\b',
+    json:''
+  };
   function highlightCode(){
     document.querySelectorAll('.bubble pre code').forEach(function(el){
       if(el.dataset.hl)return;el.dataset.hl='1';
       var h=el.innerHTML;
-      h=h.replace(/(\/\/.*$|#.*$|\/\*[\s\S]*?\*\/)/gm,'<span class="cmt">$1</span>');
-      h=h.replace(/(&quot;[^&]*?&quot;|"[^"]*?"|'[^']*?')/g,'<span class="str">$1</span>');
-      h=h.replace(/(\d+\.?\d*)/g,'<span class="num">$1</span>');
-      h=h.replace(/(function|const|let|var|if|else|for|while|return|import|from|class|def|try|except|async|await|yield|with|raise)/g,'<span class="kw">$1</span>');
+      var lang='';
+      var lm=h.match(/^\/\*\s*(\w+)\s*\*\/\n?/);
+      if(lm){lang=lm[1].toLowerCase();h=h.replace(lm[0],'')}
+      var tokens=[];
+      h=h.replace(/(\/\*[\s\S]*?\*\/)/g,function(m){tokens.push('<span class="cmt">'+m+'</span>');return '%%TOK'+(tokens.length-1)+'%%'});
+      h=h.replace(/(\/\/.*$|#(?![\da-f]{3,8}\b).*$)/gm,function(m){tokens.push('<span class="cmt">'+m+'</span>');return '%%TOK'+(tokens.length-1)+'%%'});
+      h=h.replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;|"(?:[^"\\]|\\.)*?"|'(?:[^'\\]|\\.)*?'|`(?:[^`\\]|\\.)*?`)/g,function(m){tokens.push('<span class="str">'+m+'</span>');return '%%TOK'+(tokens.length-1)+'%%'});
+      h=h.replace(/\b(\d+\.?\d*(?:e[+-]?\d+)?)\b/gi,function(m){return '<span class="num">'+m+'</span>'});
+      var kwPattern=_hlKeywords[lang]||_hlKeywords.javascript+'|'+_hlKeywords.python;
+      if(kwPattern){h=h.replace(new RegExp(kwPattern,'g'),function(m){return '<span class="kw">'+m+'</span>'})}
+      for(var i=0;i<tokens.length;i++){h=h.replace('%%TOK'+i+'%%',tokens[i])}
       el.innerHTML=h;
     });
   }
   var _hlObs=new MutationObserver(highlightCode);
   _hlObs.observe(chat,{childList:true,subtree:true});
 
-  /* --- Keyboard shortcuts --- */
+  /* --- Keyboard shortcuts + modals --- */
+  var _shortcutModal=document.createElement('div');_shortcutModal.id='shortcut-modal';
+  _shortcutModal.style.cssText='display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;z-index:10000;min-width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
+  _shortcutModal.innerHTML='<h3 style="margin-bottom:12px;color:var(--accent2)">\u2328\ufe0f Keyboard Shortcuts</h3><div style="font-size:13px;line-height:2.2;color:var(--text)"><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+K</kbd> Search sessions</div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+N</kbd> New chat</div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+S</kbd> Toggle sidebar</div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Escape</kbd> Close modal / settings</div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+/</kbd> This help</div></div><button data-action="closeShortcutModal" style="margin-top:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px">Close</button>';
+  document.body.appendChild(_shortcutModal);
+  var _shortcutOv=document.createElement('div');_shortcutOv.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999';_shortcutOv.setAttribute('data-action','closeShortcutModal');document.body.appendChild(_shortcutOv);
+
+  var _filterModal=document.createElement('div');_filterModal.id='filter-modal';
+  _filterModal.style.cssText='display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:20px;z-index:10000;min-width:400px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
+  _filterModal.innerHTML='<input id="session-filter-input" type="text" placeholder="Search sessions..." style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none" autocomplete="off"><div id="session-filter-results" style="margin-top:8px;max-height:300px;overflow-y:auto"></div>';
+  document.body.appendChild(_filterModal);
+  var _filterOv=document.createElement('div');_filterOv.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999';_filterOv.setAttribute('data-action','closeFilterModal');document.body.appendChild(_filterOv);
+
+  function _showFilterModal(){
+    _filterModal.style.display='block';_filterOv.style.display='block';
+    var fi=document.getElementById('session-filter-input');fi.value='';fi.focus();
+    _filterSessions('');fi.oninput=function(){_filterSessions(fi.value)};
+  }
+  function _filterSessions(q){
+    fetch('/api/sessions',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var el=document.getElementById('session-filter-results');
+      if(!d.sessions){el.innerHTML='';return}
+      var filtered=q?d.sessions.filter(function(s){return(s.title||s.id).toLowerCase().indexOf(q.toLowerCase())>=0}):d.sessions;
+      el.innerHTML=filtered.slice(0,20).map(function(s){
+        return '<div style="padding:8px 12px;cursor:pointer;border-radius:6px;font-size:13px;color:var(--text)" data-action="filterSelect" data-sid="'+s.id+'">'+(s.title||s.id)+'</div>';
+      }).join('')||'<div style="padding:8px;color:var(--text2);font-size:13px">No results</div>';
+    });
+  }
+  function _closeAllModals(){_shortcutModal.style.display='none';_shortcutOv.style.display='none';_filterModal.style.display='none';_filterOv.style.display='none'}
+
   document.addEventListener('keydown',function(e){
-    if(e.ctrlKey&&e.key==='/'){e.preventDefault();input.focus()}
-    if(e.key==='Escape'&&settingsEl.style.display==='block')showChat();
+    var tag=document.activeElement&&document.activeElement.tagName;
+    var isFilterInput=document.activeElement&&document.activeElement.id==='session-filter-input';
+    var isTyping=(tag==='INPUT'||tag==='TEXTAREA')&&!isFilterInput;
+    if(e.key==='Escape'){e.preventDefault();
+      if(_searchModal&&_searchModal.classList.contains('open')){_closeSearchModal();return}
+      if(_shortcutModal.style.display!=='none'||_filterModal.style.display!=='none'){_closeAllModals();return}
+      if(settingsEl.style.display==='block'){showChat();return}return}
+    if(isTyping)return;
+    var mod=e.ctrlKey||e.metaKey;
+    if(mod&&e.key==='k'){e.preventDefault();_openSearchModal();return}
+    if(mod&&e.key==='n'){e.preventDefault();window.newSession();return}
+    if(mod&&e.shiftKey&&(e.key==='S'||e.key==='s')){e.preventDefault();toggleSidebar();return}
+    if(mod&&e.key==='/'){e.preventDefault();_shortcutModal.style.display='block';_shortcutOv.style.display='block';return}
+  });
+  document.addEventListener('keydown',function(e){
+    if(_filterModal.style.display==='none')return;
+    if(e.key==='Enter'){var first=document.querySelector('#session-filter-results [data-sid]');if(first){_closeAllModals();switchSession(first.getAttribute('data-sid'))}}
+  });
+
+  /* --- Search Modal (Ctrl+K) — full message search --- */
+  var _searchModal=document.getElementById('search-modal');
+  var _searchInput=document.getElementById('search-input');
+  var _searchResults=document.getElementById('search-results');
+  var _searchTimer=null;
+  function _openSearchModal(){_searchModal.classList.add('open');_searchInput.value='';_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">Type to search across all conversations</div>';_searchInput.focus()}
+  function _closeSearchModal(){_searchModal.classList.remove('open')}
+  _searchModal.addEventListener('click',function(e){if(e.target===_searchModal)_closeSearchModal()});
+  _searchInput.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){_closeSearchModal();e.preventDefault()}
+    if(e.key==='Enter'){var first=_searchResults.querySelector('.search-item');if(first){var sid=first.getAttribute('data-sid');if(sid){_closeSearchModal();switchSession(sid)}}}
+  });
+  _searchInput.addEventListener('input',function(){
+    clearTimeout(_searchTimer);
+    var q=_searchInput.value.trim();
+    if(q.length<2){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">Type to search...</div>';return}
+    _searchTimer=setTimeout(function(){
+      fetch('/api/search?q='+encodeURIComponent(q)+'&limit=15',{headers:{'X-Session-Token':_tok}})
+      .then(function(r){return r.json()}).then(function(d){
+        if(!d.results||!d.results.length){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">No results for "'+q+'"</div>';return}
+        var html='';
+        var re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+        d.results.forEach(function(r){
+          var snippet=(r.match_snippet||r.content||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(re,'<mark>$1</mark>');
+          var icon=r.role==='user'?'👤':'😈';
+          html+='<div class="search-item" data-action="searchGo" data-sid="'+r.session_id+'">'
+            +'<div class="sr-session">'+icon+' '+r.session_id+' · '+(r.updated_at||'')+'</div>'
+            +'<div class="sr-snippet">'+snippet+'</div></div>';
+        });
+        _searchResults.innerHTML=html;
+      }).catch(function(){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--red)">Search error</div>'});
+    },300);
   });
 
   /* --- Welcome (only if no history) --- */
@@ -1229,9 +1400,22 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='checkUpdate')window.checkUpdate();
     else if(a==='doUpdate')window.doUpdate();
     else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){addMsg('assistant','✅ Saved')})}
+    else if(a==='saveSoul'){
+      var sc=document.getElementById('soul-editor').value;
+      fetch('/api/soul',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({content:sc})}).then(function(r){return r.json()}).then(function(d){
+        document.getElementById('soul-result').innerHTML='<span style="color:#4ade80">'+(d.message||'Saved')+'</span>'})
+    }
+    else if(a==='resetSoul'){
+      document.getElementById('soul-editor').value='';
+      fetch('/api/soul',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({content:''})}).then(function(r){return r.json()}).then(function(d){
+        document.getElementById('soul-result').innerHTML='<span style="color:#4ade80">'+(d.message||'Reset')+'</span>'})
+    }
+    else if(a==='closeShortcutModal'||a==='closeFilterModal'){_closeAllModals()}
+    else if(a==='filterSelect'){_closeAllModals();switchSession(el.getAttribute('data-sid'))}
     else if(a==='switchSession'){e.stopPropagation();window.switchSession(el.getAttribute('data-sid'))}
     else if(a==='deleteSession'){e.stopPropagation();window.deleteSession(el.getAttribute('data-sid'))}
     else if(a==='copyCode'){var cid=el.getAttribute('data-copy-id');window.copyCode(cid)}
+    else if(a==='searchGo'){var sid=el.getAttribute('data-sid');if(sid){_closeSearchModal();switchSession(sid)}}
     else if(a==='openImage')window.open(el.src);
     else if(a==='save'&&typeof save==='function')save();
     else if(a==='reload')location.reload();
@@ -1310,6 +1494,28 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       btn.style.background='var(--red)';btn.style.color='#fff';
     }).catch(function(){addMsg('assistant','Microphone access denied')});
   };
+
+  /* --- Double-click to rename session title --- */
+  document.addEventListener('dblclick',function(e){
+    var el=e.target.closest('.session-title');if(!el)return;
+    e.stopPropagation();
+    var sid=el.getAttribute('data-sid');
+    var oldTitle=el.textContent.replace(/^↳ /,'');
+    var inp=document.createElement('input');
+    inp.type='text';inp.value=oldTitle;
+    inp.style.cssText='width:100%;padding:2px 4px;border:1px solid var(--accent);border-radius:4px;background:var(--bg);color:var(--text);font-size:12px;outline:none';
+    el.textContent='';el.appendChild(inp);inp.focus();inp.select();
+    function save(){
+      var newTitle=inp.value.trim()||oldTitle;
+      el.textContent=newTitle;
+      if(newTitle!==oldTitle){
+        fetch('/api/sessions/rename',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+          body:JSON.stringify({session_id:sid,title:newTitle})}).catch(function(){});
+      }
+    }
+    inp.addEventListener('blur',save);
+    inp.addEventListener('keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();inp.blur()}if(ev.key==='Escape'){inp.value=oldTitle;inp.blur()}});
+  });
 
   /* PWA Service Worker — standalone mode only */
   if(window.matchMedia('(display-mode:standalone)').matches&&'serviceWorker' in navigator){

@@ -155,11 +155,56 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                                          'retry_after': e.retry_after}).encode())
             return False
 
+    def do_PUT(self):
+        """Handle HTTP PUT requests."""
+        _start = time.time()
+        import uuid
+        set_correlation_id(str(uuid.uuid4())[:8])
+        if self.path.startswith('/api/') and not self._check_origin():
+            return
+        if self.path.startswith('/api/') and not self._check_rate_limit():
+            return
+        try:
+            self._do_put_inner()
+        except Exception as e:
+            log.error(f"PUT {self.path} error: {e}")
+            self._json({'error': 'Internal server error'}, 500)
+        finally:
+            duration = (time.time() - _start) * 1000
+            request_logger.log_request('PUT', self.path.split('?')[0],
+                                        ip=self._get_client_ip(),
+                                        duration_ms=duration)
+
+    def _do_put_inner(self):
+        length = int(self.headers.get('Content-Length', 0))
+        body = json.loads(self.rfile.read(length)) if length else {}
+        # PUT /api/sessions/{id}/title
+        m = re.match(r'^/api/sessions/([^/]+)/title$', self.path)
+        if m:
+            if not self._require_auth('user'): return
+            sid = m.group(1)
+            title = body.get('title', '').strip()[:60]
+            if not title:
+                self._json({'ok': False, 'error': 'Missing title'}, 400)
+                return
+            from .core import _get_db
+            conn = _get_db()
+            try:
+                conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
+                conn.commit()
+            except Exception:
+                pass
+            conn.execute('UPDATE session_store SET title=? WHERE session_id=?', (title, sid))
+            conn.commit()
+            self._json({'ok': True})
+            return
+        self._json({'error': 'Not found'}, 404)
+
     def do_OPTIONS(self):
         """Handle CORS preflight requests."""
         self.send_response(204)
         self._cors()
-        self.send_header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS')
         self.end_headers()
 
     def do_GET(self):
@@ -230,6 +275,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._html(ONBOARDING_HTML)
             else:
                 self._html(WEB_HTML)
+        elif self.path == '/api/soul':
+            if not self._require_auth('user'): return
+            from .prompt import get_user_soul, USER_SOUL_FILE
+            self._json({'content': get_user_soul(), 'path': str(USER_SOUL_FILE)})
         elif self.path == '/api/sessions':
             if not self._require_auth('user'): return
             from .core import _get_db
@@ -336,6 +385,20 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not self._require_auth('user'): return
             from .rag import rag_engine
             self._json(rag_engine.get_stats())
+        elif self.path.startswith('/api/search'):
+            if not self._require_auth('user'): return
+            import urllib.parse
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            query = params.get('q', [''])[0]
+            if not query:
+                self._json({'error': 'Missing q parameter'}, 400)
+                return
+            lim = int(params.get('limit', ['20'])[0])
+            from .core import search_messages
+            results = search_messages(query, limit=lim)
+            self._json({'query': query, 'results': results, 'count': len(results)})
+
         elif self.path.startswith('/api/rag/search'):
             if not self._require_auth('user'): return
             from .rag import rag_engine
@@ -348,6 +411,18 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             else:
                 results = rag_engine.search(query, max_results=int(params.get('n', ['5'])[0]))
                 self._json({'query': query, 'results': results})
+        elif self.path.startswith('/api/audit'):
+            if not self._require_auth('user'): return
+            import urllib.parse
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            limit = int(params.get('limit', ['50'])[0])
+            event_type = params.get('type', [None])[0]
+            sid = params.get('session_id', [None])[0]
+            from .core import query_audit_log
+            entries = query_audit_log(limit=limit, event_type=event_type, session_id=sid)
+            self._json({'entries': entries, 'count': len(entries)})
+
         elif self.path == '/api/ws/status':
             from .ws import ws_server
             self._json({
@@ -649,8 +724,12 @@ self.addEventListener('fetch',e=>{{
             user = auth_manager.authenticate(username, password)
             if user:
                 token = auth_manager.create_token(user)
+                audit_log('auth_success', f'user={username}',
+                          detail_dict={'username': username, 'ip': self._get_client_ip()})
                 self._json({'ok': True, 'token': token, 'user': user})
             else:
+                audit_log('auth_failure', f'user={username}',
+                          detail_dict={'username': username, 'ip': self._get_client_ip()})
                 self._json({'error': 'Invalid credentials'}, 401)
             return
 
@@ -806,8 +885,21 @@ self.addEventListener('fetch',e=>{{
             conn = _get_db()
             conn.execute('DELETE FROM session_store WHERE session_id=?', (sid,))
             conn.commit()
-            audit_log('session_delete', sid)
+            audit_log('session_delete', sid, session_id=sid,
+                      detail_dict={'session_id': sid})
             self._json({'ok': True})
+
+        elif self.path == '/api/soul':
+            if not self._require_auth('user'): return
+            content = body.get('content', '')
+            from .prompt import set_user_soul, reset_user_soul
+            if content.strip():
+                set_user_soul(content)
+                self._json({'ok': True, 'message': 'SOUL.md saved'})
+            else:
+                reset_user_soul()
+                self._json({'ok': True, 'message': 'SOUL.md reset to default'})
+            return
 
         elif self.path == '/api/sessions/rename':
             if not self._require_auth('user'): return
@@ -918,7 +1010,11 @@ self.addEventListener('fetch',e=>{{
                 except Exception as e:
                     log.error(f"SSE process_message error: {e}")
                     response = f'❌ Internal error: {type(e).__name__}'
-                send_sse('done', {'response': response, 'model': router.force_model or 'auto'})
+                from .core import get_session as _gs2
+                _sess2 = _gs2(session_id)
+                send_sse('done', {'response': response,
+                                   'model': getattr(_sess2, 'last_model', router.force_model or 'auto'),
+                                   'complexity': getattr(_sess2, 'last_complexity', 'auto')})
                 try:
                     self.wfile.write(b"event: close\ndata: {}\n\n")
                     self.wfile.flush()
@@ -935,7 +1031,10 @@ self.addEventListener('fetch',e=>{{
                 except Exception as e:
                     log.error(f"Chat process_message error: {e}")
                     response = f'❌ Internal error: {type(e).__name__}'
-                self._json({'response': response, 'model': router.force_model or 'auto'})
+                from .core import get_session as _gs
+                _sess = _gs(session_id)
+                self._json({'response': response, 'model': getattr(_sess, 'last_model', router.force_model or 'auto'),
+                             'complexity': getattr(_sess, 'last_complexity', 'auto')})
 
         elif self.path == '/api/vault':
             if not vault.is_unlocked:

@@ -165,15 +165,30 @@ class WebSocketServer:
         log.info(f"[FAST] WebSocket server: ws://{self.host}:{self.port}")
         asyncio.create_task(self._keepalive_loop())
 
-    async def stop(self):
-        """Stop the WebSocket server."""
+    async def shutdown(self):
+        """Graceful shutdown: notify clients with shutdown message, then close."""
         self._running = False
+        # Send shutdown notification to all connected clients
+        for client in list(self.clients.values()):
+            try:
+                await client.send_json({"type": "shutdown",
+                                         "message": "Server is shutting down..."})
+            except Exception:
+                pass
+        # Brief pause so clients can process the message
+        await asyncio.sleep(0.5)
+        # Close all connections
         for client in list(self.clients.values()):
             await client.close(1001, "Server shutdown")
         self.clients.clear()
         if self._server:
             self._server.close()
             await self._server.wait_closed()
+        log.info("[SHUTDOWN] WebSocket server stopped")
+
+    async def stop(self):
+        """Stop the WebSocket server (alias for shutdown)."""
+        await self.shutdown()
 
     async def broadcast(self, data: dict, session_id: Optional[str] = None):
         """Send to all connected clients (or filtered by session)."""

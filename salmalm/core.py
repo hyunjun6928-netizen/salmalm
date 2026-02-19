@@ -15,6 +15,10 @@ _usage_lock = threading.Lock()   # Usage tracking (separate to avoid contention)
 _thread_local = threading.local()  # Thread-local DB connections
 
 
+_all_db_connections: list = []  # Track all connections for shutdown cleanup
+_db_connections_lock = threading.Lock()
+
+
 def _get_db() -> sqlite3.Connection:
     """Get thread-local SQLite connection (reused across calls, WAL mode)."""
     conn = getattr(_thread_local, 'audit_conn', None)
@@ -23,6 +27,9 @@ def _get_db() -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
+        # Track for shutdown cleanup
+        with _db_connections_lock:
+            _all_db_connections.append(conn)
         # Auto-create tables on first connection per thread
         conn.execute('''CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,22 +101,121 @@ def _init_audit_db():
     conn.commit()
 
 
-def audit_log(event: str, detail: str = ''):
-    """Write an audit event to the security log file."""
+def _ensure_audit_v2_table():
+    """Create the v2 audit_log_v2 table with session_id and JSON detail."""
+    conn = _get_db()
+    conn.execute('''CREATE TABLE IF NOT EXISTS audit_log_v2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        session_id TEXT DEFAULT '',
+        detail TEXT DEFAULT '{}'
+    )''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_audit_v2_ts ON audit_log_v2(timestamp)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)')
+    conn.commit()
+
+
+def audit_log(event: str, detail: str = '', session_id: str = '',
+              detail_dict: Optional[dict] = None):
+    """Write an audit event to the security log (v1 chain + v2 structured).
+
+    Args:
+        event: event type string (tool_call, api_call, auth_success, etc.)
+        detail: plain text detail (for v1 compatibility)
+        session_id: associated session ID
+        detail_dict: structured detail as dict (serialized to JSON for v2)
+    """
     with _audit_lock:
         conn = _get_db()
+        ts = datetime.now(KST).isoformat()
+
+        # v1: hash-chain audit log (backwards compat)
         row = conn.execute(
             'SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1'
         ).fetchone()
         prev = row[0] if row else '0' * 64
-        ts = datetime.now(KST).isoformat()
         payload = f"{ts}|{event}|{detail}|{prev}"
         h = hashlib.sha256(payload.encode()).hexdigest()
         conn.execute(
             'INSERT INTO audit_log (ts, event, detail, prev_hash, hash) VALUES (?,?,?,?,?)',
             (ts, event, detail[:500], prev, h)
         )
+
+        # v2: structured audit log
+        _ensure_audit_v2_table()
+        json_detail = json.dumps(detail_dict, ensure_ascii=False) if detail_dict else json.dumps({'text': detail[:500]})
+        conn.execute(
+            'INSERT INTO audit_log_v2 (timestamp, event_type, session_id, detail) VALUES (?,?,?,?)',
+            (ts, event, session_id, json_detail)
+        )
         conn.commit()
+
+
+def audit_log_cleanup(days: int = 30):
+    """Delete audit_log_v2 entries older than `days` days."""
+    from datetime import timedelta
+    cutoff = (datetime.now(KST) - timedelta(days=days)).isoformat()
+    try:
+        conn = _get_db()
+        _ensure_audit_v2_table()
+        deleted = conn.execute('DELETE FROM audit_log_v2 WHERE timestamp < ?', (cutoff,)).rowcount
+        conn.commit()
+        if deleted:
+            log.info(f"[AUDIT] Cleaned up {deleted} audit entries older than {days} days")
+    except Exception as e:
+        log.warning(f"Audit cleanup error: {e}")
+
+
+def query_audit_log(limit: int = 50, event_type: Optional[str] = None,
+                    session_id: Optional[str] = None) -> list:
+    """Query structured audit log entries.
+
+    Returns list of dicts with id, timestamp, event_type, session_id, detail.
+    """
+    try:
+        conn = _get_db()
+        _ensure_audit_v2_table()
+        sql = 'SELECT id, timestamp, event_type, session_id, detail FROM audit_log_v2'
+        params: list = []
+        conditions = []
+        if event_type:
+            conditions.append('event_type = ?')
+            params.append(event_type)
+        if session_id:
+            conditions.append('session_id = ?')
+            params.append(session_id)
+        if conditions:
+            sql += ' WHERE ' + ' AND '.join(conditions)
+        sql += ' ORDER BY id DESC LIMIT ?'
+        params.append(min(limit, 500))
+        rows = conn.execute(sql, params).fetchall()
+        results = []
+        for r in rows:
+            try:
+                detail = json.loads(r[4]) if r[4] else {}
+            except (json.JSONDecodeError, TypeError):
+                detail = {'text': r[4]}
+            results.append({
+                'id': r[0], 'timestamp': r[1], 'event_type': r[2],
+                'session_id': r[3], 'detail': detail
+            })
+        return results
+    except Exception as e:
+        log.warning(f"Audit query error: {e}")
+        return []
+
+
+def close_all_db_connections():
+    """Close all tracked SQLite connections (for graceful shutdown)."""
+    with _db_connections_lock:
+        for conn in _all_db_connections:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        _all_db_connections.clear()
+    log.info("[DB] All database connections closed")
 
 
 
@@ -799,6 +905,11 @@ class Session:
         self.metadata: dict = {}  # Arbitrary session metadata
         self._memory_flushed = False  # Track if pre-compaction memory flush happened
         self.thinking_enabled = False  # Extended thinking toggle (default OFF)
+        self.model_override = 'auto'  # Multi-model routing: 'auto'|'haiku'|'sonnet'|'opus'|full model string
+        self.tts_enabled = False  # TTS toggle
+        self.tts_voice = 'alloy'  # TTS voice selection
+        self.last_model = 'auto'  # Last used model (for UI display)
+        self.last_complexity = 'auto'  # Last complexity level
 
     def add_system(self, content: str):
         # Replace existing system message
@@ -919,6 +1030,8 @@ def get_session(session_id: str) -> Session:
             from .prompt import build_system_prompt
             _sessions[session_id].add_system(build_system_prompt(full=True))
             log.info(f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
+            audit_log('session_create', f'new session: {session_id}', session_id=session_id,
+                       detail_dict={'session_id': session_id})
         return _sessions[session_id]
 
 
@@ -1390,6 +1503,38 @@ def auto_compact_if_needed(session_id: str):
 # ============================================================
 # DAILY MEMORY LOG
 # ============================================================
+def auto_title_session(session_id: str, first_message: str):
+    """Generate a title from the first user message (first 50 chars, cleaned up).
+    No LLM call — just text extraction for cost savings."""
+    if not first_message or not first_message.strip():
+        return
+    # Clean up: strip leading slashes/commands, take first 50 chars
+    title = first_message.strip()
+    # Skip command messages
+    if title.startswith('/'):
+        return
+    # Take first line only, then first 50 chars
+    title = title.split('\n')[0][:50].strip()
+    # Remove trailing incomplete word if cut mid-word
+    if len(first_message.strip().split('\n')[0]) > 50 and ' ' in title:
+        title = title[:title.rfind(' ')]
+    if not title:
+        return
+    try:
+        conn = _get_db()
+        # Ensure title column exists
+        try:
+            conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
+            conn.commit()
+        except Exception:
+            pass
+        conn.execute('UPDATE session_store SET title=? WHERE session_id=? AND (title IS NULL OR title="")',
+                     (title, session_id))
+        conn.commit()
+    except Exception as e:
+        log.warning(f"Auto-title error: {e}")
+
+
 def write_daily_log(entry: str):
     """Append to today's memory log."""
     today = datetime.now(KST).strftime('%Y-%m-%d')
@@ -1400,12 +1545,57 @@ def write_daily_log(entry: str):
         ts = datetime.now(KST).strftime('%H:%M')
         f.write(f'{header}- [{ts}] {entry}\n')
 
+def search_messages(query: str, limit: int = 20) -> list:
+    """Search messages across all sessions using LIKE matching.
+
+    Returns list of {'session_id', 'role', 'content', 'match_snippet', 'updated_at'}.
+    """
+    if not query or len(query.strip()) < 2:
+        return []
+    query = query.strip()
+    results = []
+    try:
+        conn = _get_db()
+        rows = conn.execute(
+            'SELECT session_id, messages, updated_at FROM session_store ORDER BY updated_at DESC'
+        ).fetchall()
+        for sid, msgs_json, updated_at in rows:
+            try:
+                msgs = json.loads(msgs_json)
+            except Exception:
+                continue
+            for msg in msgs:
+                role = msg.get('role', '')
+                if role not in ('user', 'assistant'):
+                    continue
+                content = _msg_content_str(msg)
+                if query.lower() in content.lower():
+                    # Extract snippet around the match
+                    idx = content.lower().index(query.lower())
+                    start = max(0, idx - 40)
+                    end = min(len(content), idx + len(query) + 40)
+                    snippet = ('...' if start > 0 else '') + content[start:end] + ('...' if end < len(content) else '')
+                    results.append({
+                        'session_id': sid,
+                        'role': role,
+                        'content': content[:200],
+                        'match_snippet': snippet,
+                        'updated_at': updated_at,
+                    })
+                    if len(results) >= limit:
+                        return results
+    except Exception as e:
+        log.warning(f"search_messages error: {e}")
+    return results
+
+
 # Re-export from agents.py
 from .agents import SubAgent, SkillLoader, PluginLoader
 
 # Module-level exports for convenience
 __all__ = [
-    'audit_log', 'response_cache', 'router', 'track_usage', 'get_usage_report', 'check_cost_cap', 'CostCapExceeded',
+    'audit_log', 'audit_log_cleanup', 'query_audit_log', 'close_all_db_connections',
+    'response_cache', 'router', 'track_usage', 'get_usage_report', 'check_cost_cap', 'CostCapExceeded',
     '_metrics', 'compact_messages', 'get_session', 'write_daily_log', 'cron',
     'compact_session', 'auto_compact_if_needed', '_estimate_tokens',
     'save_session_to_disk', 'restore_session', 'restore_all_sessions_from_disk',
@@ -1413,4 +1603,5 @@ __all__ = [
     'get_telegram_bot', 'set_telegram_bot',
     'Session', 'MemoryManager', 'HeartbeatManager', 'LLMCronManager',
     'SubAgent', 'SkillLoader', 'PluginLoader',
+    'search_messages',
 ]

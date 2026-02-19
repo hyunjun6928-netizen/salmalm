@@ -55,6 +55,25 @@ a.back{color:var(--accent);text-decoration:none;font-size:13px}
   </table>
 </div>
 
+<div class="card" style="margin-bottom:16px">
+  <h3>📋 Audit Log
+    <select id="audit-filter" style="float:right;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px">
+      <option value="">All</option>
+      <option value="tool_call">tool_call</option>
+      <option value="api_call">api_call</option>
+      <option value="auth_success">auth_success</option>
+      <option value="auth_failure">auth_failure</option>
+      <option value="cost_alert">cost_alert</option>
+      <option value="session_create">session_create</option>
+      <option value="session_delete">session_delete</option>
+    </select>
+  </h3>
+  <table class="model-table" style="margin-top:8px">
+    <thead><tr><th>Time</th><th>Type</th><th>Session</th><th>Detail</th></tr></thead>
+    <tbody id="audit-tbody"><tr><td colspan="4" style="color:var(--text2)">Loading...</td></tr></tbody>
+  </table>
+</div>
+
 <div class="grid">
   <div class="card">
     <h3>⏰ Cron Jobs</h3>
@@ -142,4 +161,28 @@ async function load(){
 }
 load();
 setInterval(load,60000);
+
+/* Audit Log */
+async function loadAudit(){
+  const filter=document.getElementById('audit-filter').value;
+  const url='/api/audit?limit=50'+(filter?'&type='+filter:'');
+  try{
+    const res=await fetch(url,{headers:hdr});
+    const data=await res.json();
+    const tbody=document.getElementById('audit-tbody');
+    if(!data.entries||!data.entries.length){
+      tbody.innerHTML='<tr><td colspan="4" style="color:var(--text2)">No entries</td></tr>';
+      return;
+    }
+    tbody.innerHTML=data.entries.map(e=>{
+      const ts=(e.timestamp||'').replace('T',' ').slice(0,19);
+      const det=typeof e.detail==='object'?JSON.stringify(e.detail).slice(0,120):String(e.detail).slice(0,120);
+      const typeColor={'tool_call':'#6366f1','api_call':'#22c55e','auth_success':'#22c55e','auth_failure':'#ef4444','cost_alert':'#eab308'}[e.event_type]||'var(--text2)';
+      return '<tr><td style="white-space:nowrap">'+ts+'</td><td><span style="color:'+typeColor+'">'+e.event_type+'</span></td><td>'+(e.session_id||'-')+'</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+det+'</td></tr>';
+    }).join('');
+  }catch(e){console.error(e)}
+}
+loadAudit();
+document.getElementById('audit-filter').addEventListener('change',loadAudit);
+setInterval(loadAudit,30000);
 </script></body></html>

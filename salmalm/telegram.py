@@ -114,6 +114,56 @@ class TelegramBot:
             log.error(f"Send audio error: {e}")
             self.send_message(chat_id, f'🔊 Voice send failed: {e}')
 
+    def _send_tts_voice(self, chat_id, text: str, session):
+        """Generate TTS audio via OpenAI API and send as voice message."""
+        api_key = vault.get('openai_api_key')
+        if not api_key:
+            log.warning("[TTS] No openai_api_key in vault")
+            return
+        # Clean text for TTS (remove markdown, code blocks, URLs)
+        import re as _re2
+        clean = _re2.sub(r'```[\s\S]*?```', '', text)
+        clean = _re2.sub(r'`[^`]+`', '', clean)
+        clean = _re2.sub(r'https?://\S+', '', clean)
+        clean = _re2.sub(r'[*_#\[\]()>]', '', clean)
+        clean = clean.strip()
+        if not clean or len(clean) < 3:
+            return
+        # Truncate to 4096 chars (API limit)
+        clean = clean[:4096]
+        voice = getattr(session, 'tts_voice', 'alloy')
+        try:
+            tts_body = json.dumps({
+                'model': 'tts-1',
+                'input': clean,
+                'voice': voice,
+                'response_format': 'opus',
+            }).encode()
+            req = urllib.request.Request(
+                'https://api.openai.com/v1/audio/speech',
+                data=tts_body,
+                headers={
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json',
+                },
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                audio_data = resp.read()
+            # Save to temp file and send
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as f:
+                f.write(audio_data)
+                tmp_path = Path(f.name)
+            self._send_audio(chat_id, tmp_path, '')
+            try:
+                tmp_path.unlink()
+            except Exception:
+                pass
+            log.info(f"[TTS] Voice sent: {len(audio_data)} bytes, voice={voice}")
+        except Exception as e:
+            log.error(f"[TTS] OpenAI TTS API error: {e}")
+
     def send_typing(self, chat_id):
         """Send a typing indicator to a Telegram chat."""
         try:
@@ -292,24 +342,38 @@ class TelegramBot:
         response = await process_message(session_id, text, image_data=_image_data)
         _elapsed = time.time() - _start
 
+        # Model badge for response
+        _model_name = getattr(session_obj, 'last_model', 'auto') if 'session_obj' in dir() else 'auto'
+        session_obj = get_session(session_id)
+        _model_short = (getattr(session_obj, 'last_model', '') or 'auto').split('/')[-1][:20]
+        _complexity = getattr(session_obj, 'last_complexity', '')
+
         # Send response (check for generated files to send)
         import re as _re
         img_match = _re.search(r'uploads/[\w.-]+\.(png|jpg|jpeg|gif|webp)', response)
         audio_match = _re.search(r'uploads/[\w.-]+\.(mp3|wav|ogg)', response)
+        suffix = f'\n\n🤖 {_model_short} · ⏱️ {_elapsed:.1f}s'
         if img_match:
             img_path = WORKSPACE_DIR / img_match.group(0)
             if img_path.exists():
                 self._send_photo(chat_id, img_path, response[:1000])
             else:
-                self.send_message(chat_id, f'{response}\n\n⏱️ {_elapsed:.1f}s')
+                self.send_message(chat_id, f'{response}{suffix}')
         elif audio_match:
             audio_path = WORKSPACE_DIR / audio_match.group(0)
             if audio_path.exists():
                 self._send_audio(chat_id, audio_path, response[:1000])
             else:
-                self.send_message(chat_id, f'{response}\n\n⏱️ {_elapsed:.1f}s')
+                self.send_message(chat_id, f'{response}{suffix}')
         else:
-            self.send_message(chat_id, f'{response}\n\n⏱️ {_elapsed:.1f}s')
+            self.send_message(chat_id, f'{response}{suffix}')
+
+        # TTS: send voice message if enabled
+        if getattr(session_obj, 'tts_enabled', False):
+            try:
+                self._send_tts_voice(chat_id, response, session_obj)
+            except Exception as e:
+                log.error(f"TTS error: {e}")
 
     async def _handle_command(self, chat_id, text: str):
         cmd = text.split()[0].lower()
@@ -337,17 +401,44 @@ class TelegramBot:
             session.messages = []
             session.add_system(build_system_prompt())
             self.send_message(chat_id, '🗑️ Chat cleared')
+        elif cmd == '/tts':
+            parts = text.split(maxsplit=1)
+            session = get_session(f'telegram_{chat_id}')
+            if len(parts) > 1 and parts[1].strip() in ('on', 'off'):
+                session.tts_enabled = (parts[1].strip() == 'on')
+                status = 'ON 🔊' if session.tts_enabled else 'OFF 🔇'
+                self.send_message(chat_id, f'TTS: {status}')
+            else:
+                status = 'ON' if getattr(session, 'tts_enabled', False) else 'OFF'
+                voice = getattr(session, 'tts_voice', 'alloy')
+                self.send_message(chat_id, f'🔊 TTS: {status} (voice: {voice})\n/tts on · /tts off\n/voice alloy|nova|echo|fable|onyx|shimmer')
+        elif cmd == '/voice':
+            parts = text.split(maxsplit=1)
+            session = get_session(f'telegram_{chat_id}')
+            valid_voices = ('alloy', 'nova', 'echo', 'fable', 'onyx', 'shimmer')
+            if len(parts) > 1 and parts[1].strip() in valid_voices:
+                session.tts_voice = parts[1].strip()
+                self.send_message(chat_id, f'🎙️ Voice: {session.tts_voice}')
+            else:
+                self.send_message(chat_id, f'Voices: {", ".join(valid_voices)}')
         elif cmd == '/help':
             self.send_message(chat_id, textwrap.dedent(f"""
                 😈 {APP_NAME} v{VERSION}
                 /usage — Token usage/cost
-                /model [name|auto] — Change model
+                /model [auto|opus|sonnet|haiku] — Model
                 /compact — Compact conversation
                 /clear — Clear conversation
+                /tts [on|off] — Voice replies
+                /voice [name] — TTS voice
                 /help — This help
             """).strip())
         else:
-            self.send_message(chat_id, f'❓ Unknown command: {cmd}\n/help See /help')
+            # Route unknown /commands through engine (handles /model auto/opus/sonnet/haiku etc.)
+            self.send_typing(chat_id)
+            session_id = f'telegram_{chat_id}'
+            from .engine import process_message
+            response = await process_message(session_id, text)
+            self.send_message(chat_id, response)
 
     def stop(self):
         """Stop the Telegram polling loop."""

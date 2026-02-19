@@ -291,6 +291,10 @@ def main() -> None:
             llm_cron.load_jobs()
             _core._llm_cron = llm_cron  # type: ignore[attr-defined]
 
+            # Schedule audit log cleanup (once daily)
+            from salmalm.core import audit_log_cleanup
+            cron.add_job('audit_cleanup', 86400, audit_log_cleanup, days=30)
+
             selftest = health_monitor.startup_selftest()
             node_manager.load_config()
             PluginLoader.scan()
@@ -326,12 +330,54 @@ def main() -> None:
             except Exception:
                 pass
 
-            try:
-                while True:
-                    await asyncio.sleep(1)
-            except (KeyboardInterrupt, SystemExit):
-                log.info("Shutting down...")
-                server.shutdown()
+            # ── Graceful Shutdown ──
+            import signal
+            _shutdown_count = [0]
+
+            def _handle_shutdown(signum, frame):
+                _shutdown_count[0] += 1
+                if _shutdown_count[0] >= 2:
+                    log.warning("[SHUTDOWN] Forced exit (second signal)")
+                    os._exit(1)
+                log.info(f"[SHUTDOWN] Signal received ({signum}), initiating graceful shutdown...")
+                # Schedule shutdown coroutine in the running loop
+                asyncio.get_event_loop().call_soon_threadsafe(_trigger_shutdown.set)
+
+            _trigger_shutdown = asyncio.Event()
+
+            # Register signal handlers
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                try:
+                    signal.signal(sig, _handle_shutdown)
+                except (OSError, ValueError):
+                    pass  # Cannot set signal handler in non-main thread on some platforms
+
+            # Wait for shutdown signal
+            await _trigger_shutdown.wait()
+
+            # === Shutdown Sequence ===
+            log.info("[SHUTDOWN] Phase 1: Stop accepting new requests")
+            from salmalm.engine import begin_shutdown, wait_for_active_requests
+            begin_shutdown()
+
+            log.info("[SHUTDOWN] Phase 2: Wait for active LLM requests (max 30s)")
+            wait_for_active_requests(timeout=30.0)
+
+            log.info("[SHUTDOWN] Phase 3: Notify WebSocket clients")
+            await ws_server.shutdown()
+
+            log.info("[SHUTDOWN] Phase 4: Stop cron scheduler")
+            cron.stop()
+
+            log.info("[SHUTDOWN] Phase 5: Close DB connections")
+            from salmalm.core import close_all_db_connections
+            close_all_db_connections()
+
+            log.info("[SHUTDOWN] Phase 6: Stop HTTP server")
+            server.shutdown()
+
+            audit_log('shutdown', f'{APP_NAME} v{VERSION} graceful shutdown')
+            log.info("[SHUTDOWN] Complete. Goodbye! 😈")
 
         asyncio.run(_main())
 
