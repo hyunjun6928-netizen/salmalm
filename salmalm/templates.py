@@ -13,7 +13,8 @@ def _load(name: str) -> str:
     """Read a static HTML file, return empty string if missing."""
     p = _STATIC / name
     if p.exists():
-        return p.read_text(encoding='utf-8')
+        from . import __version__
+        return p.read_text(encoding='utf-8').replace('{{VERSION}}', f'v{__version__}')
     return ''
 
 
