@@ -7,12 +7,18 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .constants import VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG, INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN
+from .constants import (VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG,
+                        INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN)
 from .crypto import log
 from .core import router, compact_messages, get_session, _sessions
 from .prompt import build_system_prompt
-from .tools import execute_tool
-from .llm import call_llm
+from .tool_handlers import execute_tool
+from .llm import call_llm as _call_llm_sync
+
+
+async def _call_llm_async(*args, **kwargs):
+    """Non-blocking LLM call — runs urllib in a thread to avoid blocking the event loop."""
+    return await asyncio.to_thread(_call_llm_sync, *args, **kwargs)
 
 # ============================================================
 MODEL_ALIASES = {
@@ -283,7 +289,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                                and provider == 'anthropic'
                                and ('opus' in model or 'sonnet' in model))
 
-            result = call_llm(session.messages, model=model, tools=tools,
+            result = await _call_llm_async(session.messages, model=model, tools=tools,
                               thinking=think_this_call)
 
             # ── Token overflow: aggressive truncation + retry once ──
@@ -296,19 +302,19 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     session.messages = system_msgs + recent_msgs
                     log.warning(f"🔪 Force-truncated: {msg_count} → {len(session.messages)} msgs")
                     # Retry with truncated context
-                    result = call_llm(session.messages, model=model, tools=tools,
+                    result = await _call_llm_async(session.messages, model=model, tools=tools,
                                       thinking=think_this_call)
                     if result.get('error') == 'token_overflow':
                         # Still too long — nuclear option: keep only last 4
                         session.messages = (system_msgs or []) + session.messages[-4:]
                         log.warning(f"🔪🔪 Nuclear truncation: → {len(session.messages)} msgs")
-                        result = call_llm(session.messages, model=model, tools=tools)
+                        result = await _call_llm_async(session.messages, model=model, tools=tools)
                         if result.get('error'):
                             session.add_assistant("⚠️ Context too large. Use /clear to reset.")
                             return "⚠️ Context too large. Use /clear to reset."
                 elif msg_count > 4:
                     session.messages = session.messages[:1] + session.messages[-4:]
-                    result = call_llm(session.messages, model=model, tools=tools)
+                    result = await _call_llm_async(session.messages, model=model, tools=tools)
                     if result.get('error'):
                         session.add_assistant("⚠️ Context too large. Use /clear to reset.")
                         return "⚠️ Context too large. Use /clear to reset."
@@ -320,7 +326,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 log.info(f"🧠 Thinking: {len(result['thinking'])} chars")
 
             if result.get('tool_calls'):
-                tool_outputs = self._execute_tools_parallel(
+                tool_outputs = await asyncio.to_thread(
+                    self._execute_tools_parallel,
                     result['tool_calls'], on_tool)
                 self._append_tool_results(
                     session, provider, result,
@@ -339,7 +346,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     {'role': 'assistant', 'content': response},
                     {'role': 'user', 'content': 'Evaluate and improve if needed.'}
                 ]
-                reflect_result = call_llm(reflect_msgs,
+                reflect_result = await _call_llm_async(reflect_msgs,
                                            model=router._pick_available(2),
                                            max_tokens=4000)
                 improved = reflect_result.get('content', '')

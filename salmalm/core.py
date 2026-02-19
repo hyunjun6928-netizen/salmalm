@@ -10,8 +10,8 @@ from .constants import *
 from .crypto import vault, log
 
 # ============================================================
-_db_lock = threading.Lock()  # Single lock for all audit.db access
-_audit_lock = _db_lock
+_audit_lock = threading.Lock()   # Audit log writes
+_usage_lock = threading.Lock()   # Usage tracking (separate to avoid contention)
 
 
 def _init_audit_db():
@@ -86,7 +86,7 @@ class ResponseCache:
 
 response_cache = ResponseCache()
 
-_usage_lock = _db_lock  # Share lock with audit to prevent race conditions
+# _usage_lock already defined at top of file
 _usage = {'total_input': 0, 'total_output': 0, 'total_cost': 0.0,
           'by_model': {}, 'session_start': time.time()}
 
