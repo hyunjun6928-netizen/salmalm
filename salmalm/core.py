@@ -131,7 +131,7 @@ def track_usage(model: str, input_tokens: int, output_tokens: int):
             conn.commit()
             conn.close()
         except Exception:
-            pass
+            log.debug(f"Suppressed: {e}")
 
 
 def get_usage_report() -> dict:
@@ -169,7 +169,7 @@ class ModelRouter:
                     self.force_model = saved
                     log.info(f"🔧 Restored model preference: {saved}")
         except Exception:
-            pass
+            log.debug(f"Suppressed: {e}")
 
     def set_force_model(self, model: Optional[str]):
         """Set and persist model preference."""

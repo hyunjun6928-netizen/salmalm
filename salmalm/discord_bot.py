@@ -304,7 +304,7 @@ class DiscordBot:
             if self._ws_raw:
                 self._ws_raw.close()
         except Exception:
-            pass
+            log.debug(f"Suppressed: {e}")
 
 
 discord_bot = DiscordBot()

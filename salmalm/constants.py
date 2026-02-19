@@ -68,6 +68,12 @@ DEFAULT_MAX_TOKENS = 4096
 COMPACTION_THRESHOLD = 60000
 CACHE_TTL = 3600
 
+# Intent classification thresholds
+INTENT_SHORT_MSG = 500       # messages shorter than this → simpler model
+INTENT_COMPLEX_MSG = 1500    # messages longer than this → complex model
+INTENT_CONTEXT_DEPTH = 40    # conversation turns threshold for complexity bump
+REFLECT_SNIPPET_LEN = 500    # max chars of user message in reflection prompt
+
 # Token cost estimates (per 1M tokens, USD)
 MODEL_COSTS = {
     # Anthropic

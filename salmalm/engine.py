@@ -7,7 +7,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .constants import VERSION
+from .constants import VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG, INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN
 from .crypto import log
 from .core import router, compact_messages, get_session, _sessions
 from .prompt import build_system_prompt
@@ -80,9 +80,9 @@ class TaskClassifier:
         info = cls.INTENTS[best]
         # Escalate tier for long/complex messages
         tier = info['tier']
-        if msg_len > 500:
+        if msg_len > INTENT_SHORT_MSG:
             tier = max(tier, 2)
-        if msg_len > 1500 or context_len > 40:
+        if msg_len > INTENT_COMPLEX_MSG or context_len > INTENT_CONTEXT_DEPTH:
             tier = max(tier, 3)
 
         # Adaptive thinking budget
@@ -335,7 +335,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 log.info(f"🔍 Reflection pass on {classification['intent']} response")
                 reflect_msgs = [
                     {'role': 'system', 'content': self.REFLECT_PROMPT},
-                    {'role': 'user', 'content': f'Original question: {user_message[:500]}'},
+                    {'role': 'user', 'content': f'Original question: {user_message[:REFLECT_SNIPPET_LEN]}'},
                     {'role': 'assistant', 'content': response},
                     {'role': 'user', 'content': 'Evaluate and improve if needed.'}
                 ]

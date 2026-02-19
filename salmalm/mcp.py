@@ -385,7 +385,7 @@ class MCPClientConnection:
                 except json.JSONDecodeError:
                     continue
         except Exception:
-            pass
+            log.debug(f"Suppressed: {e}")
         self._connected = False
 
     def _send_request(self, method: str, params: dict = None,
@@ -422,7 +422,7 @@ class MCPClientConnection:
             self._process.stdin.write(data)
             self._process.stdin.flush()
         except Exception:
-            pass
+            log.debug(f"Suppressed: {e}")
 
     @property
     def tools(self) -> List[dict]:

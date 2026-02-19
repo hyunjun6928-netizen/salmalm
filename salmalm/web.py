@@ -190,7 +190,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         ip = self._get_client_ip()
         if ip not in ('127.0.0.1', '::1', 'localhost'):
             return False
-        pw = os.environ.get('SALMALM_VAULT_PW', 'salmalm_local')
+        pw = os.environ.get('SALMALM_VAULT_PW', '')
+        if not pw:
+            # No vault password set — skip vault, rely on .env for API keys
+            return True
         if VAULT_FILE.exists():
             return vault.unlock(pw)
         else:
