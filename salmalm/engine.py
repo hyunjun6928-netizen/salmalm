@@ -466,7 +466,7 @@ _engine = IntelligenceEngine()
 
 
 _MAX_MESSAGE_LENGTH = 100_000
-_SESSION_ID_RE = _re.compile(r'^[a-zA-Z0-9\-]+$')
+_SESSION_ID_RE = _re.compile(r'^[a-zA-Z0-9_\-\.]+$')
 
 
 def _sanitize_input(text: str) -> str:

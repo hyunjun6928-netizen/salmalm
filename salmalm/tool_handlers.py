@@ -18,6 +18,7 @@ from .llm import _http_post, _http_get
 from .tools_misc import (  # noqa: F401 — re-export for tests and other modules
     _reminders, _reminder_lock, _send_notification_impl,
     _parse_relative_time, _parse_rss,
+    _workflows_file, _feeds_file,
 )
 
 # clipboard lock (used by tools_util.py)
