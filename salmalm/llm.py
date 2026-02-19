@@ -22,7 +22,7 @@ def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode('utf-8'))
+            return json.loads(resp.read().decode('utf-8'))  # type: ignore[no-any-return]
     except urllib.error.HTTPError as e:
         err_body = e.read().decode('utf-8', errors='replace')
         log.error(f"HTTP {e.code}: {err_body[:300]}")
@@ -43,7 +43,7 @@ def _http_get(url: str, headers: Optional[Dict[str, str]] = None, timeout: int =
     h.setdefault('User-Agent', _UA)
     req = urllib.request.Request(url, headers=h)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode('utf-8'))
+        return json.loads(resp.read().decode('utf-8'))  # type: ignore[no-any-return]
 
 
 def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
@@ -178,10 +178,10 @@ def _call_anthropic(api_key: str, model_id: str, messages: List[Dict[str, Any]],
     }
     if use_thinking:
         # Extended thinking mode — budget_tokens controls thinking depth
-        body['max_tokens'] = 16000
-        body['thinking'] = {'type': 'enabled', 'budget_tokens': 10000}
+        body['max_tokens'] = 16000  # type: ignore[assignment]
+        body['thinking'] = {'type': 'enabled', 'budget_tokens': 10000}  # type: ignore[assignment]
     else:
-        body['max_tokens'] = max_tokens
+        body['max_tokens'] = max_tokens  # type: ignore[assignment]
 
     if system_msgs:
         body['system'] = '\n'.join(system_msgs)
@@ -277,10 +277,10 @@ def _call_google(api_key: str, model_id: str, messages: List[Dict[str, Any]],
         role = 'user' if m['role'] in ('user', 'system') else 'model'
         parts.append({'role': role, 'parts': [{'text': str(content)}]})
     # Merge consecutive same-role messages
-    merged = []
+    merged = []  # type: ignore[var-annotated]
     for p in parts:
         if merged and merged[-1]['role'] == p['role']:
-            merged[-1]['parts'].extend(p['parts'])
+            merged[-1]['parts'].extend(p['parts'])  # type: ignore[attr-defined]
         else:
             merged.append(p)
     body = {

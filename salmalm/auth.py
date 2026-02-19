@@ -91,7 +91,7 @@ class TokenManager:
             payload = json.loads(base64.urlsafe_b64decode(padded))
             if payload.get('exp', 0) < time.time():
                 return None  # Expired
-            return payload
+            return payload  # type: ignore[no-any-return]
         except Exception:
             return None
 

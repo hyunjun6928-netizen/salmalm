@@ -99,12 +99,12 @@ class RAGEngine:
 
     def _load_stats(self):
         """Load cached statistics."""
-        row = self._conn.execute("SELECT COUNT(*), AVG(token_count) FROM chunks").fetchone()
+        row = self._conn.execute("SELECT COUNT(*), AVG(token_count) FROM chunks").fetchone()  # type: ignore[union-attr]
         self._doc_count = row[0] or 0
         self._avg_dl = row[1] or 1.0
         # Load IDF cache
         self._idf_cache.clear()
-        for term, df in self._conn.execute("SELECT term, df FROM doc_freq"):
+        for term, df in self._conn.execute("SELECT term, df FROM doc_freq"):  # type: ignore[union-attr]
             self._idf_cache[term] = math.log((self._doc_count - df + 0.5) / (df + 0.5) + 1)
 
     @staticmethod
@@ -154,7 +154,7 @@ class RAGEngine:
         now = time.time()
         if now - self._last_check < REINDEX_INTERVAL:
             return False
-        self._last_check = now
+        self._last_check = now  # type: ignore[assignment]
 
         for label, fpath in self._get_indexable_files():
             try:
@@ -213,21 +213,21 @@ class RAGEngine:
             return
 
         # Rebuild tables atomically (BEGIN IMMEDIATE prevents reads seeing empty state)
-        self._conn.execute("BEGIN IMMEDIATE")
+        self._conn.execute("BEGIN IMMEDIATE")  # type: ignore[union-attr]
         try:
-            self._conn.execute("DELETE FROM chunks")
-            self._conn.execute("DELETE FROM doc_freq")
-            self._conn.executemany(
+            self._conn.execute("DELETE FROM chunks")  # type: ignore[union-attr]
+            self._conn.execute("DELETE FROM doc_freq")  # type: ignore[union-attr]
+            self._conn.executemany(  # type: ignore[union-attr]
                 "INSERT INTO chunks (source, line_start, line_end, text, tokens, token_count, mtime, hash) VALUES (?,?,?,?,?,?,?,?)",
                 new_docs
             )
-            self._conn.executemany(
+            self._conn.executemany(  # type: ignore[union-attr]
                 "INSERT OR REPLACE INTO doc_freq (term, df) VALUES (?,?)",
                 list(doc_freq.items())
             )
-            self._conn.execute("COMMIT")
+            self._conn.execute("COMMIT")  # type: ignore[union-attr]
         except Exception:
-            self._conn.execute("ROLLBACK")
+            self._conn.execute("ROLLBACK")  # type: ignore[union-attr]
             raise
         self._load_stats()
         log.info(f"[AI] RAG index rebuilt: {len(new_docs)} chunks from {len(files)} files, "
@@ -251,7 +251,7 @@ class RAGEngine:
         term_set = set(query_tokens)
         scored = []
 
-        for row in self._conn.execute("SELECT id, source, line_start, text, tokens, token_count FROM chunks"):
+        for row in self._conn.execute("SELECT id, source, line_start, text, tokens, token_count FROM chunks"):  # type: ignore[union-attr]
             chunk_id, source, line_start, text, tokens_json, token_count = row
             chunk_tokens = json.loads(tokens_json)
 

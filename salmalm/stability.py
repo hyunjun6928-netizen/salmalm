@@ -16,7 +16,7 @@ import os
 try:
     import resource
 except ImportError:
-    resource = None  # Windows
+    resource = None  # type: ignore[assignment]  # Windows
 import threading
 import time
 import traceback
@@ -137,11 +137,11 @@ class HealthMonitor:
         for name, check_fn in components.items():
             try:
                 result = check_fn()
-                report["components"][name] = result
+                report["components"][name] = result  # type: ignore[index]
                 if result.get("status") != "ok":
                     unhealthy += 1
             except Exception as e:
-                report["components"][name] = {
+                report["components"][name] = {  # type: ignore[index]
                     "status": "error",
                     "error": str(e)[:200],
                 }

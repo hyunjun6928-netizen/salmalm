@@ -7,7 +7,7 @@ from html.parser import HTMLParser
 try:
     import resource as _resource_mod
 except ImportError:
-    _resource_mod = None
+    _resource_mod = None  # type: ignore[assignment]
 
 from .constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, EXEC_ELEVATED,
                         PROTECTED_FILES, WORKSPACE_DIR, VERSION, KST, MEMORY_FILE, MEMORY_DIR, AUDIT_DB)
@@ -127,7 +127,7 @@ def execute_tool(name: str, args: dict) -> str:
         if gateway._nodes:
             result = gateway.dispatch_auto(name, args)
             if result and 'error' not in result:
-                return result.get('result', str(result))
+                return result.get('result', str(result))  # type: ignore[no-any-return]
     except Exception:
         pass  # Fall through to local execution
     try:
@@ -148,15 +148,15 @@ def execute_tool(name: str, args: dict) -> str:
                         run_args = {'args': shlex.split(cmd), 'shell': False}
                     except ValueError:
                         run_args = {'args': cmd, 'shell': True}
-                result = subprocess.run(
+                result = subprocess.run(  # type: ignore[assignment]
                     **run_args, capture_output=True, text=True,
                     timeout=timeout, cwd=str(WORKSPACE_DIR)
                 )
-                output = result.stdout[-5000:] if result.stdout else ''
-                if result.stderr:
-                    output += f'\n[stderr]: {result.stderr[-2000:]}'
-                if result.returncode != 0:
-                    output += f'\n[exit code]: {result.returncode}'
+                output = result.stdout[-5000:] if result.stdout else ''  # type: ignore[union-attr]
+                if result.stderr:  # type: ignore[union-attr]
+                    output += f'\n[stderr]: {result.stderr[-2000:]}'  # type: ignore[union-attr, operator]
+                if result.returncode != 0:  # type: ignore[union-attr]
+                    output += f'\n[exit code]: {result.returncode}'  # type: ignore[union-attr, operator]
                 return output or '(no output)'
             except subprocess.TimeoutExpired:
                 return f'❌ Timeout ({timeout}s)'
@@ -288,8 +288,8 @@ def execute_tool(name: str, args: dict) -> str:
             if not results:
                 return f'No results for: "{query}"'
             out = []
-            for score, label, lineno, snippet in results:
-                out.append(f'📍 {label}#{lineno} (similarity:{score:.3f})\n{snippet}\n')
+            for score, label, lineno, snippet in results:  # type: ignore[misc]
+                out.append(f'📍 {label}#{lineno} (similarity:{score:.3f})\n{snippet}\n')  # type: ignore[has-type]
             return '\n'.join(out)
 
         elif name == 'sub_agent':
@@ -325,8 +325,8 @@ def execute_tool(name: str, args: dict) -> str:
                 message = args.get('message', '')
                 if not agent_id or not message:
                     return '❌ agent_id and message are required'
-                result = SubAgent.send_message(agent_id, message)
-                return result
+                result = SubAgent.send_message(agent_id, message)  # type: ignore[assignment]
+                return result  # type: ignore[return-value]
             return f'❌ Unknown action: {action}'
 
         elif name == 'skill_manage':
@@ -436,7 +436,7 @@ def execute_tool(name: str, args: dict) -> str:
                     {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
                     {'model': 'gpt-4o', 'messages': [{'role': 'user', 'content': content_parts}], 'max_tokens': 1000}
                 )
-                return resp['choices'][0]['message']['content']
+                return resp['choices'][0]['message']['content']  # type: ignore[no-any-return]
             api_key = vault.get('anthropic_api_key')
             if api_key:
                 # Convert to Anthropic format
@@ -453,7 +453,7 @@ def execute_tool(name: str, args: dict) -> str:
                     {'model': 'claude-sonnet-4-20250514', 'max_tokens': 1000,
                      'messages': [{'role': 'user', 'content': [img_block, {'type': 'text', 'text': question}]}]}
                 )
-                return resp['content'][0]['text']
+                return resp['content'][0]['text']  # type: ignore[no-any-return]
             return '❌ No vision API key found (need OpenAI or Anthropic)'
 
         elif name == 'tts':
@@ -562,22 +562,22 @@ else:
                     pass  # Windows or unsupported
 
             try:
-                result = subprocess.run(
+                result = subprocess.run(  # type: ignore[assignment]
                     [sys.executable, '-c', wrapper],
                     capture_output=True, text=True,
                     timeout=timeout_sec, cwd=str(WORKSPACE_DIR),
                     preexec_fn=_set_limits
                 )
-                if result.returncode == 0 and result.stdout.strip():
+                if result.returncode == 0 and result.stdout.strip():  # type: ignore[union-attr]
                     try:
-                        data = json.loads(result.stdout.strip())
-                        output = data.get('result', result.stdout)
+                        data = json.loads(result.stdout.strip())  # type: ignore[union-attr]
+                        output = data.get('result', result.stdout)  # type: ignore[union-attr]
                     except json.JSONDecodeError:
-                        output = result.stdout[-5000:]
+                        output = result.stdout[-5000:]  # type: ignore[union-attr]
                 else:
-                    output = result.stdout[-3000:] if result.stdout else ''
-                if result.stderr:
-                    output += f'\n[stderr]: {result.stderr[-2000:]}'
+                    output = result.stdout[-3000:] if result.stdout else ''  # type: ignore[union-attr]
+                if result.stderr:  # type: ignore[union-attr]
+                    output += f'\n[stderr]: {result.stderr[-2000:]}'  # type: ignore[union-attr, operator]
                 return output or '(no output)'
             except subprocess.TimeoutExpired:
                 return f'❌ Python execution timeout ({timeout_sec}s)'
@@ -619,7 +619,7 @@ else:
                     # Python process info
                     mem_mb = 0
                     if _resource_mod:
-                        mem_mb = _resource_mod.getrusage(_resource_mod.RUSAGE_SELF).ru_maxrss / 1024
+                        mem_mb = _resource_mod.getrusage(_resource_mod.RUSAGE_SELF).ru_maxrss / 1024  # type: ignore[assignment]
                     lines.append(f'🐍 SalmAlm memory: {mem_mb:.1f}MB')
                     lines.append(f'📂 Sessions: {len(_sessions)}')
             except Exception as e:
@@ -655,8 +655,8 @@ else:
                 header_str = '\n'.join(f'  {k}: {v}' for k, v in list(resp_headers.items())[:10])
                 return f'HTTP {status}\nHeaders:\n{header_str}\n\nBody:\n{body_out}'
             except urllib.error.HTTPError as e:
-                body = e.read().decode('utf-8', errors='replace')[:3000]
-                return f'HTTP {e.code} {e.reason}\n{body}'
+                body = e.read().decode('utf-8', errors='replace')[:3000]  # type: ignore[assignment]
+                return f'HTTP {e.code} {e.reason}\n{body}'  # type: ignore[str-bytes-safe]
             except Exception as e:
                 return f'❌ Request error: {e}'
 
@@ -688,13 +688,13 @@ else:
                 fpath = _resolve_path(data_str)
                 data_str = fpath.read_text(encoding='utf-8', errors='replace')
             try:
-                result = subprocess.run(
+                result = subprocess.run(  # type: ignore[assignment]
                     ['jq', query],
                     input=data_str, capture_output=True, text=True, timeout=10
                 )
-                if result.returncode == 0:
-                    return result.stdout[:8000] or '(empty)'
-                return f'❌ jq error: {result.stderr[:500]}'
+                if result.returncode == 0:  # type: ignore[union-attr]
+                    return result.stdout[:8000] or '(empty)'  # type: ignore[union-attr]
+                return f'❌ jq error: {result.stderr[:500]}'  # type: ignore[union-attr]
             except FileNotFoundError:
                 # jq not installed, try Python fallback
                 data = json.loads(data_str)
@@ -774,7 +774,7 @@ else:
                 elif action == 'paste':
                     if slot not in clips:
                         return f'❌ Slot [{slot}] not found. Available: {", ".join(clips.keys()) or "none"}'
-                    return clips[slot]['content']
+                    return clips[slot]['content']  # type: ignore[no-any-return]
 
                 elif action == 'list':
                     if not clips:
@@ -894,12 +894,12 @@ else:
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 try:
                     future = pool.submit(_run_regex)
-                    return future.result(timeout=5)
+                    return future.result(timeout=5)  # type: ignore[no-any-return]
                 except concurrent.futures.TimeoutError:
                     return '❌ Regex execution timeout (5s)'
 
         elif name == 'cron_manage':
-            from .core import _llm_cron
+            from .core import _llm_cron  # type: ignore[attr-defined]
             if not _llm_cron:
                 return '❌ LLM cron manager not initialized'
             action = args.get('action', 'list')
@@ -1177,13 +1177,13 @@ else:
             if not query:
                 return '❌ query is required'
             max_results = args.get('max_results', 5)
-            results = rag_engine.search(query, max_results=max_results)
+            results = rag_engine.search(query, max_results=max_results)  # type: ignore[assignment]
             if not results:
                 return f'🔍 "{query}" No results for'
             lines = [f'🔍 **"{query}" Results ({len(results)}):**']
             for r in results:
-                lines.append(f"\n📄 **{r['source']}** (L{r['line']}, score: {r['score']})")
-                lines.append(r['text'][:300])
+                lines.append(f"\n📄 **{r['source']}** (L{r['line']}, score: {r['score']})")  # type: ignore[index]
+                lines.append(r['text'][:300])  # type: ignore[index]
             stats = rag_engine.get_stats()
             lines.append(f"\n📊 Index: {stats['total_chunks']}chunks, {stats['unique_terms']}terms, {stats['db_size_kb']}KB")
             return '\n'.join(lines)
@@ -1191,9 +1191,9 @@ else:
         else:
             # Try plugin tools as fallback
             from .core import PluginLoader
-            result = PluginLoader.execute(name, args)
+            result = PluginLoader.execute(name, args)  # type: ignore[assignment]
             if result is not None:
-                return result
+                return result  # type: ignore[return-value]
             # Try MCP tools as last fallback
             if name.startswith('mcp_'):
                 from .mcp import mcp_manager

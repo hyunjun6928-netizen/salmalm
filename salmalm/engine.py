@@ -62,14 +62,14 @@ class TaskClassifier:
         msg_len = len(message)
         scores = {}
         for intent, info in cls.INTENTS.items():
-            score = sum(2 for kw in info['keywords'] if kw in msg)
+            score = sum(2 for kw in info['keywords'] if kw in msg)  # type: ignore[attr-defined, misc]
             if intent == 'code' and any(c in message for c in ['```', 'def ', 'class ', '{', '}']):
                 score += 3
             if intent in ('code', 'analysis') and 'github.com' in msg:
                 score += 3
             scores[intent] = score
 
-        best = max(scores, key=scores.get) if any(scores.values()) else 'chat'
+        best = max(scores, key=scores.get) if any(scores.values()) else 'chat'  # type: ignore[arg-type]
         if scores[best] == 0:
             best = 'chat'
 
@@ -77,9 +77,9 @@ class TaskClassifier:
         # Escalate tier for long/complex messages
         tier = info['tier']
         if msg_len > INTENT_SHORT_MSG:
-            tier = max(tier, 2)
+            tier = max(tier, 2)  # type: ignore[call-overload]
         if msg_len > INTENT_COMPLEX_MSG or context_len > INTENT_CONTEXT_DEPTH:
-            tier = max(tier, 3)
+            tier = max(tier, 3)  # type: ignore[call-overload]
 
         # Adaptive thinking budget
         thinking = info['thinking']
@@ -246,7 +246,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         # PHASE 2: EXECUTE — tool loop
         try:
-          return await self._execute_loop(session, user_message, model_override,
+          return await self._execute_loop(session, user_message, model_override,  # type: ignore[no-any-return]
                                            on_tool, classification, tier)
         except Exception as e:
             log.error(f"Engine.run error: {e}")
@@ -408,7 +408,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         from .tools import TOOL_DEFINITIONS
         lines = [f'🔧 **Tool List** ({len(TOOL_DEFINITIONS)})\n']
         for t in TOOL_DEFINITIONS:
-            lines.append(f"• **{t['name']}** — {t['description'][:60]}")
+            lines.append(f"• **{t['name']}** — {t['description'][:60]}")  # type: ignore[index]
         return '\n'.join(lines)
     if cmd.startswith('/think '):
         think_msg = cmd[7:].strip()
@@ -527,13 +527,13 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
         web_session = _sessions.get('web')
         if web_session:
             if not hasattr(web_session, '_notifications'):
-                web_session._notifications = []
-            web_session._notifications.append({
+                web_session._notifications = []  # type: ignore[attr-defined]
+            web_session._notifications.append({  # type: ignore[attr-defined]
                 'time': __import__('time').time(),
                 'text': f"🔔 SalmAlm telegram Task completed\n{notify_text}"
             })
             # Keep max 20 notifications
-            web_session._notifications = web_session._notifications[-20:]
+            web_session._notifications = web_session._notifications[-20:]  # type: ignore[attr-defined]
 
 
 

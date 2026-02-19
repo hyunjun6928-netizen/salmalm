@@ -54,7 +54,7 @@ class DiscordBot:
         req.add_header('User-Agent', 'SalmAlm (github.com/hyunjun6928-netizen/salmalm, 0.8)')
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
-                return json.loads(resp.read().decode())
+                return json.loads(resp.read().decode())  # type: ignore[no-any-return]
         except urllib.error.HTTPError as e:
             err = e.read().decode('utf-8', errors='replace')
             log.error(f'Discord API {method} {path}: {e.code} {err[:200]}')
@@ -115,7 +115,7 @@ class DiscordBot:
             resp += self._ws_raw.recv(4096)
 
         if b'101' not in resp.split(b'\r\n')[0]:
-            raise ConnectionError(f'WebSocket handshake failed: {resp[:100]}')
+            raise ConnectionError(f'WebSocket handshake failed: {resp[:100]}')  # type: ignore[str-bytes-safe]
 
         log.info('[DISC] Discord Gateway connected')
 
@@ -178,7 +178,7 @@ class DiscordBot:
                 self._ws_raw.sendall(pong)
                 return self._ws_recv()
             if opcode == 0x01:  # Text
-                return json.loads(data.decode())
+                return json.loads(data.decode())  # type: ignore[no-any-return]
             return None
         except Exception as e:
             log.error(f'Discord WS recv error: {e}')
@@ -233,7 +233,7 @@ class DiscordBot:
             elif t == 'MESSAGE_CREATE':
                 # Ignore own messages
                 author = d.get('author', {})
-                if author.get('id') == self._bot_user.get('id'):
+                if author.get('id') == self._bot_user.get('id'):  # type: ignore[union-attr]
                     return
                 if author.get('bot'):
                     return

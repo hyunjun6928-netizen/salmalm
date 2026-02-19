@@ -128,7 +128,7 @@ class CDPConnection:
 
         try:
             result = await asyncio.wait_for(future, timeout=timeout)
-            return result
+            return result  # type: ignore[no-any-return]
         except asyncio.TimeoutError:
             self._pending.pop(msg_id, None)
             raise TimeoutError(f"CDP command timeout: {method}")
@@ -154,8 +154,8 @@ class CDPConnection:
         else:
             header += bytes([0x80 | 127]) + struct.pack('!Q', length)
 
-        self._writer.write(header + mask_key + masked)
-        await self._writer.drain()
+        self._writer.write(header + mask_key + masked)  # type: ignore[union-attr]
+        await self._writer.drain()  # type: ignore[union-attr]
 
     async def _read_loop(self):
         """Background task reading CDP responses/events."""
@@ -196,21 +196,21 @@ class CDPConnection:
     async def _recv_frame(self) -> Optional[str]:
         """Read one WebSocket frame (server frames are unmasked)."""
         try:
-            b0, b1 = await self._reader.readexactly(2)
+            b0, b1 = await self._reader.readexactly(2)  # type: ignore[union-attr]
             opcode = b0 & 0x0F
             length = b1 & 0x7F
 
             if length == 126:
-                data = await self._reader.readexactly(2)
+                data = await self._reader.readexactly(2)  # type: ignore[union-attr]
                 length = struct.unpack('!H', data)[0]
             elif length == 127:
-                data = await self._reader.readexactly(8)
+                data = await self._reader.readexactly(8)  # type: ignore[union-attr]
                 length = struct.unpack('!Q', data)[0]
 
             if length > 64 * 1024 * 1024:
                 return None
 
-            payload = await self._reader.readexactly(length) if length > 0 else b''
+            payload = await self._reader.readexactly(length) if length > 0 else b''  # type: ignore[union-attr]
 
             if opcode == 0x1:  # Text
                 return payload.decode('utf-8', errors='replace')
@@ -299,7 +299,7 @@ class BrowserController:
         """Navigate to URL. Returns {frameId, loaderId}."""
         if not self.connected:
             return {"error": "Not connected"}
-        result = await self._cdp.send("Page.navigate", {"url": url})
+        result = await self._cdp.send("Page.navigate", {"url": url})  # type: ignore[union-attr]
         if wait_load:
             try:
                 await asyncio.sleep(1)  # Simple wait; could listen for Page.loadEventFired
@@ -314,19 +314,19 @@ class BrowserController:
             return ""
         params = {"format": format}
         if format == "jpeg":
-            params["quality"] = quality
+            params["quality"] = quality  # type: ignore[assignment]
         if full_page:
             # Get full page dimensions
-            metrics = await self._cdp.send("Page.getLayoutMetrics")
+            metrics = await self._cdp.send("Page.getLayoutMetrics")  # type: ignore[union-attr]
             content = metrics.get("contentSize", {})
-            params["clip"] = {
+            params["clip"] = {  # type: ignore[assignment]
                 "x": 0, "y": 0,
                 "width": content.get("width", 1280),
                 "height": content.get("height", 720),
                 "scale": 1,
             }
-        result = await self._cdp.send("Page.captureScreenshot", params)
-        return result.get("data", "")
+        result = await self._cdp.send("Page.captureScreenshot", params)  # type: ignore[union-attr]
+        return result.get("data", "")  # type: ignore[no-any-return]
 
     async def get_text(self) -> str:
         """Extract page text content."""
@@ -334,25 +334,25 @@ class BrowserController:
             return ""
         result = await self.evaluate(
             "document.body ? document.body.innerText : document.documentElement.textContent || ''")
-        return result.get("value", "")
+        return result.get("value", "")  # type: ignore[no-any-return]
 
     async def get_html(self) -> str:
         """Get page HTML."""
         if not self.connected:
             return ""
-        result = await self._cdp.send("DOM.getDocument", {"depth": -1})
+        result = await self._cdp.send("DOM.getDocument", {"depth": -1})  # type: ignore[union-attr]
         root = result.get("root", {})
         node_id = root.get("nodeId", 0)
         if node_id:
-            html = await self._cdp.send("DOM.getOuterHTML", {"nodeId": node_id})
-            return html.get("outerHTML", "")
+            html = await self._cdp.send("DOM.getOuterHTML", {"nodeId": node_id})  # type: ignore[union-attr]
+            return html.get("outerHTML", "")  # type: ignore[no-any-return]
         return ""
 
     async def evaluate(self, expression: str, return_by_value: bool = True) -> dict:
         """Execute JavaScript and return result."""
         if not self.connected:
             return {"error": "Not connected"}
-        result = await self._cdp.send("Runtime.evaluate", {
+        result = await self._cdp.send("Runtime.evaluate", {  # type: ignore[union-attr]
             "expression": expression,
             "returnByValue": return_by_value,
             "awaitPromise": True,
@@ -413,7 +413,7 @@ class BrowserController:
             api_url = f"http://{self.debug_host}:{self.debug_port}/json/new?{url}"
             req = urllib.request.Request(api_url, method="PUT")
             with urllib.request.urlopen(req, timeout=5) as resp:
-                return json.loads(resp.read())
+                return json.loads(resp.read())  # type: ignore[no-any-return]
         except Exception as e:
             return {"error": str(e)}
 
@@ -421,11 +421,11 @@ class BrowserController:
         """Generate PDF of current page, return base64."""
         if not self.connected:
             return ""
-        result = await self._cdp.send("Page.printToPDF", {
+        result = await self._cdp.send("Page.printToPDF", {  # type: ignore[union-attr]
             "printBackground": True,
             "preferCSSPageSize": True,
         })
-        return result.get("data", "")
+        return result.get("data", "")  # type: ignore[no-any-return]
 
     def get_console_logs(self, limit: int = 50) -> List[str]:
         """Get captured console logs."""

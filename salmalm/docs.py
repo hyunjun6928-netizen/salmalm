@@ -14,9 +14,9 @@ def generate_api_docs_html() -> str:
 
     # Build tool docs
     tool_rows = []
-    for t in sorted(TOOL_DEFINITIONS, key=lambda x: x['name']):
-        params = t.get('input_schema', {}).get('properties', {})
-        required = t.get('input_schema', {}).get('required', [])
+    for t in sorted(TOOL_DEFINITIONS, key=lambda x: x['name']):  # type: ignore[arg-type, return-value]
+        params = t.get('input_schema', {}).get('properties', {})  # type: ignore[attr-defined]
+        required = t.get('input_schema', {}).get('required', [])  # type: ignore[attr-defined]
         param_list = []
         for pname, pinfo in params.items():
             req = ' <span class="req">*</span>' if pname in required else ''

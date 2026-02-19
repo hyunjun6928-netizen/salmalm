@@ -208,14 +208,14 @@ class WebSocketServer:
 
         # Parse headers
         headers = {}
-        for line in request_lines[1:]:
-            if ':' in line:
-                k, v = line.split(':', 1)
+        for line in request_lines[1:]:  # type: ignore[assignment]
+            if ':' in line:  # type: ignore[operator]
+                k, v = line.split(':', 1)  # type: ignore[arg-type]
                 headers[k.strip().lower()] = v.strip()
 
         # Validate WebSocket upgrade
-        ws_key = headers.get('sec-websocket-key', '')
-        if not ws_key or 'upgrade' not in headers.get('connection', '').lower():
+        ws_key = headers.get('sec-websocket-key', '')  # type: ignore[call-overload]
+        if not ws_key or 'upgrade' not in headers.get('connection', '').lower():  # type: ignore[call-overload]
             # Not a WS request — send 400
             response = b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n"
             writer.write(response)

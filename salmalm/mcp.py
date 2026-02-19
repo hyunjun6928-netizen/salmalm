@@ -43,15 +43,15 @@ def _next_id() -> int:
     _rpc_id += 1
     return _rpc_id
 
-def _rpc_request(method: str, params: Optional[dict] = None, id: int = None) -> dict:
+def _rpc_request(method: str, params: Optional[dict] = None, id: Optional[int] = None) -> dict:
     msg = {"jsonrpc": "2.0", "method": method}
     if params:
-        msg["params"] = params
+        msg["params"] = params  # type: ignore[assignment]
     if id is not None:
-        msg["id"] = id
+        msg["id"] = id  # type: ignore[assignment]
     return msg
 
-def _rpc_response(id: int, result: Optional[Any] = None, error: dict = None) -> dict:
+def _rpc_response(id: int, result: Optional[Any] = None, error: Optional[dict] = None) -> dict:
     msg = {"jsonrpc": "2.0", "id": id}
     if error:
         msg["error"] = error
@@ -105,7 +105,7 @@ class MCPServer:
         # ── Lifecycle ──
         if method == "initialize":
             self._initialized = True
-            return _rpc_response(msg_id, {
+            return _rpc_response(msg_id, {  # type: ignore[arg-type]
                 "protocolVersion": "2025-03-26",
                 "capabilities": self.CAPABILITIES,
                 "serverInfo": self.SERVER_INFO,
@@ -115,29 +115,29 @@ class MCPServer:
             return None  # No response for notifications
 
         if method == "ping":
-            return _rpc_response(msg_id, {})
+            return _rpc_response(msg_id, {})  # type: ignore[arg-type]
 
         # ── Tools ──
         if method == "tools/list":
             tools = [self._convert_tool_to_mcp(t) for t in self._tools]
             cursor = params.get("cursor")
             # Simple pagination: return all (SalmAlm has ~30 tools, no pagination needed)
-            return _rpc_response(msg_id, {"tools": tools})
+            return _rpc_response(msg_id, {"tools": tools})  # type: ignore[arg-type]
 
         if method == "tools/call":
             name = params.get("name", "")
             args = params.get("arguments", {})
             if not self._tool_executor:
-                return _rpc_response(msg_id, error={
+                return _rpc_response(msg_id, error={  # type: ignore[arg-type]
                     "code": -32603, "message": "No tool executor configured"})
             try:
                 result = await self._tool_executor(name, args)
-                return _rpc_response(msg_id, {
+                return _rpc_response(msg_id, {  # type: ignore[arg-type]
                     "content": [{"type": "text", "text": str(result)}],
                     "isError": False,
                 })
             except Exception as e:
-                return _rpc_response(msg_id, {
+                return _rpc_response(msg_id, {  # type: ignore[arg-type]
                     "content": [{"type": "text", "text": f"Error: {e}"}],
                     "isError": True,
                 })
@@ -162,7 +162,7 @@ class MCPServer:
                     "name": "MEMORY.md",
                     "mimeType": "text/markdown",
                 })
-            return _rpc_response(msg_id, {"resources": resources})
+            return _rpc_response(msg_id, {"resources": resources})  # type: ignore[arg-type]
 
         if method == "resources/read":
             uri = params.get("uri", "")
@@ -173,12 +173,12 @@ class MCPServer:
                 try:
                     full_path.relative_to(BASE_DIR.resolve())
                 except ValueError:
-                    return _rpc_response(msg_id, error={
+                    return _rpc_response(msg_id, error={  # type: ignore[arg-type]
                         "code": -32602, "message": "Path traversal denied"})
                 if full_path.exists() and full_path.is_file():
                     try:
                         content = full_path.read_text(encoding='utf-8', errors='replace')[:50000]
-                        return _rpc_response(msg_id, {
+                        return _rpc_response(msg_id, {  # type: ignore[arg-type]
                             "contents": [{
                                 "uri": uri,
                                 "mimeType": "text/markdown",
@@ -186,14 +186,14 @@ class MCPServer:
                             }]
                         })
                     except Exception as e:
-                        return _rpc_response(msg_id, error={
+                        return _rpc_response(msg_id, error={  # type: ignore[arg-type]
                             "code": -32603, "message": str(e)})
-            return _rpc_response(msg_id, error={
+            return _rpc_response(msg_id, error={  # type: ignore[arg-type]
                 "code": -32602, "message": f"Unknown resource: {uri}"})
 
         # ── Prompts ──
         if method == "prompts/list":
-            return _rpc_response(msg_id, {"prompts": [
+            return _rpc_response(msg_id, {"prompts": [  # type: ignore[arg-type]
                 {
                     "name": "analyze",
                     "description": "Analysis request prompt",
@@ -215,7 +215,7 @@ class MCPServer:
             args = params.get("arguments", {})
             if name == "analyze":
                 topic = args.get("topic", "unknown")
-                return _rpc_response(msg_id, {
+                return _rpc_response(msg_id, {  # type: ignore[arg-type]
                     "description": f"'{topic}' Analysis",
                     "messages": [
                         {"role": "user", "content": {
@@ -226,7 +226,7 @@ class MCPServer:
                 })
             if name == "code_review":
                 fp = args.get("file_path", "")
-                return _rpc_response(msg_id, {
+                return _rpc_response(msg_id, {  # type: ignore[arg-type]
                     "description": f"'{fp}' Code review",
                     "messages": [
                         {"role": "user", "content": {
@@ -235,7 +235,7 @@ class MCPServer:
                         }}
                     ],
                 })
-            return _rpc_response(msg_id, error={
+            return _rpc_response(msg_id, error={  # type: ignore[arg-type]
                 "code": -32602, "message": f"Unknown prompt: {name}"})
 
         # ── Unknown method ──
@@ -373,7 +373,7 @@ class MCPClientConnection:
         """Background thread: read JSON-RPC responses from stdout."""
         try:
             while self._process and self._process.poll() is None:
-                line = self._process.stdout.readline()
+                line = self._process.stdout.readline()  # type: ignore[union-attr]
                 if not line:
                     break
                 line = line.strip()
@@ -398,8 +398,8 @@ class MCPClientConnection:
         msg = _rpc_request(method, params, rid)
         try:
             data = (json.dumps(msg, ensure_ascii=False) + '\n').encode('utf-8')
-            self._process.stdin.write(data)
-            self._process.stdin.flush()
+            self._process.stdin.write(data)  # type: ignore[union-attr]
+            self._process.stdin.flush()  # type: ignore[union-attr]
         except Exception as e:
             log.error(f"MCP send error ({self.name}): {e}")
             return None
@@ -420,8 +420,8 @@ class MCPClientConnection:
         msg = _rpc_request(method, params)
         try:
             data = (json.dumps(msg, ensure_ascii=False) + '\n').encode('utf-8')
-            self._process.stdin.write(data)
-            self._process.stdin.flush()
+            self._process.stdin.write(data)  # type: ignore[union-attr]
+            self._process.stdin.flush()  # type: ignore[union-attr]
         except Exception as e:
             log.debug(f"Suppressed: {e}")
 
@@ -474,7 +474,7 @@ class MCPManager:
         return self._server
 
     def add_server(self, name: str, command: List[str],
-                   env: Optional[Dict[str, str]] = None, cwd: str = None,
+                   env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None,
                    auto_connect: bool = True) -> bool:
         """Add and optionally connect to an external MCP server."""
         if name in self._clients:
@@ -519,7 +519,7 @@ class MCPManager:
                 })
         return tools
 
-    def call_tool(self, prefixed_name: str, arguments: dict = None) -> Optional[str]:
+    def call_tool(self, prefixed_name: str, arguments: Optional[dict] = None) -> Optional[str]:
         """Call an MCP tool by its prefixed name (mcp_servername_toolname)."""
         # Parse: mcp_{server}_{tool}
         if not prefixed_name.startswith("mcp_"):

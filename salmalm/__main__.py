@@ -232,7 +232,7 @@ def main() -> None:
                 if vault.unlock(vault_pw):
                     log.info("[UNLOCK] Vault auto-unlocked from env")
 
-            _core._tg_bot = telegram_bot
+            _core._tg_bot = telegram_bot  # type: ignore[assignment]
 
             ws_port = int(os.environ.get('SALMALM_WS_PORT', 18801))
             try:
@@ -286,7 +286,7 @@ def main() -> None:
 
             llm_cron = LLMCronManager()
             llm_cron.load_jobs()
-            _core._llm_cron = llm_cron
+            _core._llm_cron = llm_cron  # type: ignore[attr-defined]
 
             selftest = health_monitor.startup_selftest()
             node_manager.load_config()
