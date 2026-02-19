@@ -1,5 +1,10 @@
 # 😈 삶앎 (SalmAlm) v0.10.9
 
+[![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
+[![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
+[![Python](https://img.shields.io/pypi/pyversions/salmalm)](https://pypi.org/project/salmalm/)
+[![License](https://img.shields.io/github/license/hyunjun6928-netizen/salmalm)](LICENSE)
+
 **Personal AI Gateway — Pure Python**
 
 > [🇺🇸 English](README_EN.md)
@@ -163,6 +168,14 @@ Store in `.env` file or encrypted vault via Web UI:
 | `GET /api/nodes` | ✅ | List connected nodes |
 | `GET /docs` | ❌ | Auto-generated API docs |
 | `ws://127.0.0.1:18801` | — | WebSocket real-time |
+
+## 📚 Documentation
+
+- [FAQ (자주 묻는 질문)](docs/FAQ.md)
+- [Use Cases (활용 사례)](docs/use-cases.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+- [API Docs](http://localhost:18800/docs) (서버 실행 후)
 
 ## 📝 v0.10.9 Changelog
 

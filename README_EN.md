@@ -1,5 +1,10 @@
 # 😈 SalmAlm v0.10.9
 
+[![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
+[![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
+[![Python](https://img.shields.io/pypi/pyversions/salmalm)](https://pypi.org/project/salmalm/)
+[![License](https://img.shields.io/github/license/hyunjun6928-netizen/salmalm)](LICENSE)
+
 **Personal AI Gateway — Pure Python, Zero Dependencies**
 
 > [🇰🇷 한국어](README.md)
