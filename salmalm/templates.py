@@ -260,14 +260,27 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="usage-detail"></div>
   </div>
   <div class="settings-card">
-    <h3>🔒 비밀번호 변경</h3>
-    <label>현재 비밀번호</label>
-    <input type="password" id="pw-old" placeholder="현재 비밀번호">
-    <label>새 비밀번호</label>
-    <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상)">
-    <label>새 비밀번호 확인</label>
-    <input type="password" id="pw-confirm" placeholder="새 비밀번호 다시 입력">
-    <button class="btn" onclick="changePw()">변경</button>
+    <h3>🔒 마스터 비밀번호</h3>
+    <div id="pw-section-change">
+      <label>현재 비밀번호</label>
+      <input type="password" id="pw-old" placeholder="현재 비밀번호">
+      <label>새 비밀번호</label>
+      <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상, 비우면 해제)">
+      <label>새 비밀번호 확인</label>
+      <input type="password" id="pw-confirm" placeholder="새 비밀번호 다시 입력">
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn" onclick="changePw()">변경</button>
+        <button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="removePw()">비밀번호 해제</button>
+      </div>
+    </div>
+    <div id="pw-section-set" style="display:none">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px">현재 비밀번호가 설정되어 있지 않습니다.</p>
+      <label>새 비밀번호</label>
+      <input type="password" id="pw-set-new" placeholder="비밀번호 (4자 이상)">
+      <label>비밀번호 확인</label>
+      <input type="password" id="pw-set-confirm" placeholder="다시 입력">
+      <button class="btn" onclick="setPw()">비밀번호 설정</button>
+    </div>
     <div id="pw-result" style="margin-top:8px;font-size:12px"></div>
   </div>
   <div class="settings-card">
@@ -667,6 +680,20 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ 비밀번호가 변경되었습니다</span>';document.getElementById('pw-old').value='';document.getElementById('pw-new').value='';document.getElementById('pw-confirm').value=''}
       else{re.innerHTML='<span style="color:#f87171">❌ '+(d.error||'변경 실패')+'</span>'}
     }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})};
+  window.removePw=function(){
+    var o=document.getElementById('pw-old').value;var re=document.getElementById('pw-result');
+    if(!o){re.innerHTML='<span style="color:#f87171">현재 비밀번호를 입력하세요</span>';return}
+    fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'change_password',old_password:o,new_password:''})}).then(function(r){return r.json()}).then(function(d){
+      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ 비밀번호가 해제되었습니다</span>';document.getElementById('pw-old').value='';document.getElementById('pw-section-change').style.display='none';document.getElementById('pw-section-set').style.display='block'}
+      else{re.innerHTML='<span style="color:#f87171">❌ '+(d.error||'실패')+'</span>'}}).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})};
+  window.setPw=function(){
+    var n=document.getElementById('pw-set-new').value,c=document.getElementById('pw-set-confirm').value;var re=document.getElementById('pw-result');
+    if(!n){re.innerHTML='<span style="color:#f87171">비밀번호를 입력하세요</span>';return}
+    if(n.length<4){re.innerHTML='<span style="color:#f87171">4자 이상 입력하세요</span>';return}
+    if(n!==c){re.innerHTML='<span style="color:#f87171">비밀번호가 일치하지 않습니다</span>';return}
+    fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'change_password',old_password:'',new_password:n})}).then(function(r){return r.json()}).then(function(d){
+      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ 비밀번호가 설정되었습니다</span>';document.getElementById('pw-set-new').value='';document.getElementById('pw-set-confirm').value='';document.getElementById('pw-section-set').style.display='none';document.getElementById('pw-section-change').style.display='block'}
+      else{re.innerHTML='<span style="color:#f87171">❌ '+(d.error||'실패')+'</span>'}}).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})};
   window.checkUpdate=function(){
     var re=document.getElementById('update-result');
     re.innerHTML='<span style="color:var(--text2)">⏳ Checking PyPI...</span>';
@@ -891,6 +918,80 @@ async function save(){
   }catch(e){show('Network error: '+e,'err');btn.disabled=false;btn.textContent='Save & Test';}
 }
 function show(msg,type){const el=document.getElementById('result');el.textContent=msg;el.className='result '+type;}
+</script></body></html>'''
+
+SETUP_HTML = '''<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SalmAlm — First Run</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.box{background:#1a1d27;padding:40px;border-radius:16px;border:1px solid #2a2d37;max-width:460px;width:100%;text-align:center}
+h1{color:#a78bfa;font-size:26px;margin-bottom:8px}
+.sub{color:#888;font-size:14px;margin-bottom:32px;line-height:1.6}
+.choice{display:flex;gap:12px;margin-bottom:20px}
+.choice button{flex:1;padding:16px;border-radius:12px;border:2px solid #333;background:#0f1117;color:#e0e0e0;font-size:15px;cursor:pointer;transition:all 0.2s}
+.choice button:hover{border-color:#7c5cfc;background:#1e1b2e}
+.choice button.selected{border-color:#7c5cfc;background:#1e1b2e}
+.pw-area{display:none;margin:16px 0;text-align:left}
+.pw-area label{font-size:13px;color:#aaa;display:block;margin-bottom:6px}
+.pw-area input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f1117;color:#e0e0e0;font-size:14px;margin-bottom:12px}
+.pw-area input:focus{border-color:#7c5cfc;outline:none}
+.go{width:100%;padding:14px;border-radius:8px;border:none;background:#4f46e5;color:#fff;font-size:16px;cursor:pointer;font-weight:500;display:none}
+.go:hover{background:#4338ca}
+.hint{font-size:12px;color:#666;margin-top:8px;line-height:1.5}
+.err{color:#f87171;font-size:13px;margin-top:8px;display:none}
+</style></head><body>
+<div class="box">
+<h1>😈 SalmAlm</h1>
+<p class="sub">처음 오신 것을 환영합니다!<br>시작하기 전에 하나만 물어볼게요.</p>
+<p style="font-size:15px;color:#ccc;margin-bottom:20px;font-weight:500">🔒 마스터 비밀번호를 설정하시겠습니까?</p>
+<div class="choice">
+  <button id="btn-yes" onclick="pick(true)">네, 설정할게요</button>
+  <button id="btn-no" onclick="pick(false)">아니요, 바로 시작</button>
+</div>
+<div class="pw-area" id="pw-area">
+  <label>비밀번호 (4자 이상)</label>
+  <input type="password" id="pw1" placeholder="비밀번호 입력">
+  <label>비밀번호 확인</label>
+  <input type="password" id="pw2" placeholder="다시 입력" onkeydown="if(event.key==='Enter')go()">
+</div>
+<button class="go" id="go-btn" onclick="go()">다음 →</button>
+<div class="err" id="err"></div>
+<div class="hint" id="hint-yes" style="display:none">비밀번호를 설정하면 브라우저를 열 때마다 입력해야 합니다.<br>나중에 설정에서 변경하거나 해제할 수 있습니다.</div>
+<div class="hint" id="hint-no" style="display:none">비밀번호 없이 바로 사용합니다.<br>나중에 설정에서 비밀번호를 추가할 수 있습니다.</div>
+</div>
+<script>
+let usePw=null;
+function pick(yes){
+  usePw=yes;
+  document.getElementById('btn-yes').className=yes?'selected':'';
+  document.getElementById('btn-no').className=yes?'':'selected';
+  document.getElementById('pw-area').style.display=yes?'block':'none';
+  document.getElementById('go-btn').style.display='block';
+  document.getElementById('hint-yes').style.display=yes?'block':'none';
+  document.getElementById('hint-no').style.display=yes?'none':'block';
+  document.getElementById('err').style.display='none';
+  if(yes)document.getElementById('pw1').focus();
+}
+async function go(){
+  const err=document.getElementById('err');
+  err.style.display='none';
+  if(usePw){
+    const p1=document.getElementById('pw1').value,p2=document.getElementById('pw2').value;
+    if(!p1){err.textContent='비밀번호를 입력하세요';err.style.display='block';return}
+    if(p1.length<4){err.textContent='4자 이상 입력하세요';err.style.display='block';return}
+    if(p1!==p2){err.textContent='비밀번호가 일치하지 않습니다';err.style.display='block';return}
+  }
+  const body={use_password:usePw,password:usePw?document.getElementById('pw1').value:''};
+  try{
+    const r=await fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d.ok)location.reload();
+    else{err.textContent=d.error||'오류 발생';err.style.display='block'}
+  }catch(e){err.textContent='네트워크 오류';err.style.display='block'}
+}
 </script></body></html>'''
 
 

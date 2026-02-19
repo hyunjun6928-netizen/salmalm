@@ -109,7 +109,7 @@ class Vault:
 
     def _save(self) -> None:
         """Encrypt and write vault to disk."""
-        if not self._password or self._salt is None:
+        if self._password is None or self._salt is None:
             return
         plaintext: bytes = json.dumps(self._data).encode('utf-8')
         key = _derive_key(self._password, self._salt)

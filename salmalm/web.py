@@ -10,7 +10,7 @@ from .crypto import vault, log
 from .core import get_usage_report, router, audit_log
 from .auth import auth_manager, rate_limiter, extract_auth, RateLimitExceeded
 from .logging_ext import request_logger, set_correlation_id
-from .templates import WEB_HTML, ONBOARDING_HTML, UNLOCK_HTML
+from .templates import WEB_HTML, ONBOARDING_HTML, UNLOCK_HTML, SETUP_HTML
 
 # ============================================================
 
@@ -94,7 +94,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     # Public endpoints (no auth required)
     _PUBLIC_PATHS = {
         '/', '/index.html', '/api/status', '/api/health', '/api/unlock',
-        '/api/auth/login', '/api/onboarding', '/docs',
+        '/api/auth/login', '/api/onboarding', '/api/setup', '/docs',
     }
 
     def _require_auth(self, min_role: str = 'user') -> Optional[dict]:
@@ -191,17 +191,30 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         if ip not in ('127.0.0.1', '::1', 'localhost'):
             return False
         pw = os.environ.get('SALMALM_VAULT_PW', '')
-        if not pw:
-            # No vault password set — skip vault, rely on .env for API keys
-            return True
         if VAULT_FILE.exists():
-            return vault.unlock(pw)
-        else:
+            # Try env password first, then empty password (no-password vault)
+            if pw and vault.unlock(pw):
+                return True
+            if vault.unlock(''):
+                return True  # No-password vault
+            if not pw:
+                return False  # Has password but no env var — show unlock screen
+            return False
+        elif pw:
             vault.create(pw)
             return True
+        # No vault file, no env var → first run, handled by _needs_first_run
+        return True
+
+    def _needs_first_run(self) -> bool:
+        """True if vault file doesn't exist and no env password — brand new install."""
+        return not VAULT_FILE.exists() and not os.environ.get('SALMALM_VAULT_PW', '')
 
     def _do_get_inner(self):
         if self.path == '/' or self.path == '/index.html':
+            if self._needs_first_run():
+                self._html(SETUP_HTML)
+                return
             self._auto_unlock_localhost()
             if not vault.is_unlocked:
                 self._html(UNLOCK_HTML)
@@ -440,6 +453,26 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': str(e)}, 400)
             return
 
+        if self.path == '/api/setup':
+            # First-run setup — create vault with or without password
+            if VAULT_FILE.exists():
+                self._json({'error': 'Already set up'}, 400)
+                return
+            use_pw = body.get('use_password', False)
+            pw = body.get('password', '')
+            if use_pw:
+                if len(pw) < 4:
+                    self._json({'error': 'Password must be at least 4 characters'}, 400)
+                    return
+                vault.create(pw)
+                audit_log('setup', 'vault created with password')
+            else:
+                # Create vault with empty password (auto-unlock on localhost)
+                vault.create('')
+                audit_log('setup', 'vault created without password')
+            self._json({'ok': True})
+            return
+
         if self.path == '/api/do-update':
             if not self._require_auth('admin'): return
             if self._get_client_ip() not in ('127.0.0.1', '::1', 'localhost'):
@@ -615,9 +648,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             elif action == 'change_password':
                 old_pw = body.get('old_password', '')
                 new_pw = body.get('new_password', '')
-                if not old_pw or not new_pw:
-                    self._json({'error': 'old_password and new_password required'}, 400)
-                elif len(new_pw) < 4:
+                if new_pw and len(new_pw) < 4:
                     self._json({'error': 'Password must be at least 4 characters'}, 400)
                 elif vault.change_password(old_pw, new_pw):
                     audit_log('vault', 'master password changed')
