@@ -1,0 +1,303 @@
+from __future__ import annotations
+
+import textwrap
+from pathlib import Path
+from datetime import datetime
+
+from salmalm.constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, TOOLS_FILE, MEMORY_DIR, BASE_DIR, VERSION, KST
+from salmalm.core import SkillLoader
+from salmalm import log
+
+# User-customizable SOUL.md (takes priority over project SOUL.md)
+USER_SOUL_FILE = Path.home() / '.salmalm' / 'SOUL.md'
+
+# ── Multi-Persona System ──
+PERSONAS_DIR = Path.home() / '.salmalm' / 'personas'
+
+_BUILTIN_PERSONAS = {
+    'default': "# Default AI Assistant\nYou are a helpful, knowledgeable AI assistant.\nRespond clearly and concisely. Use appropriate formality based on context.\nYou can handle a wide range of tasks: coding, writing, analysis, research, and more.\nBe proactive in suggesting better approaches when you see them.\n",
+    'coding': "# Coding Expert 🧑‍💻\nYou are a senior software engineer and coding expert.\nFocus on: code review, debugging, architecture, and best practices.\n- Always provide working, tested code\n- Explain trade-offs and alternatives\n- Follow language-specific conventions\n- Prioritize readability, performance, and security\n- Use type hints, docstrings, and proper error handling\nRespond concisely. Code speaks louder than words.\n",
+    'casual': "# 캐주얼 친구 😎\n넌 친한 친구처럼 대화해! 반말 쓰고, 이모지 많이 써 ✨\n- 편하게 말해~ 격식 없이!\n- 재밌는 표현, 유머 환영 😂\n- 공감 잘 해주고, 리액션 활발하게!\n- 근데 정보는 정확하게 👍\n- 한국어가 기본, 영어 섞어도 OK\n",
+    'professional': "# Business Professional 💼\nYou are a professional business consultant.\n- Use formal, polished language\n- Structure responses with clear headings and bullet points\n- Provide data-driven insights and recommendations\n- Format reports with executive summaries\n- Maintain objectivity and cite sources when possible\n- Use professional terminology appropriate to the domain\n",
+}
+
+_active_personas: dict = {}
+
+
+def ensure_personas_dir():
+    """Create personas directory and install built-in presets if missing."""
+    PERSONAS_DIR.mkdir(parents=True, exist_ok=True)
+    for name, content in _BUILTIN_PERSONAS.items():
+        path = PERSONAS_DIR / f'{name}.md'
+        if not path.exists():
+            path.write_text(content, encoding='utf-8')
+
+
+def list_personas() -> list:
+    """List all available personas."""
+    ensure_personas_dir()
+    personas = []
+    for f in sorted(PERSONAS_DIR.glob('*.md')):
+        name = f.stem
+        content = f.read_text(encoding='utf-8')
+        title = content.strip().split('\n')[0].lstrip('#').strip() if content.strip() else name
+        personas.append({'name': name, 'title': title, 'builtin': name in _BUILTIN_PERSONAS, 'path': str(f)})
+    return personas
+
+
+def get_persona(name: str):
+    """Get persona content by name."""
+    ensure_personas_dir()
+    path = PERSONAS_DIR / f'{name}.md'
+    if path.exists():
+        return path.read_text(encoding='utf-8')
+    return None
+
+
+def create_persona(name: str, content: str) -> bool:
+    """Create or update a custom persona."""
+    ensure_personas_dir()
+    safe_name = ''.join(c for c in name if c.isalnum() or c in '-_').lower()
+    if not safe_name:
+        return False
+    path = PERSONAS_DIR / f'{safe_name}.md'
+    path.write_text(content, encoding='utf-8')
+    return True
+
+
+def delete_persona(name: str) -> bool:
+    """Delete a custom persona (cannot delete built-in ones)."""
+    if name in _BUILTIN_PERSONAS:
+        return False
+    path = PERSONAS_DIR / f'{name}.md'
+    if path.exists():
+        path.unlink()
+        return True
+    return False
+
+
+def switch_persona(session_id: str, name: str):
+    """Switch active persona for a session. Returns persona content or None."""
+    content = get_persona(name)
+    if content is None:
+        return None
+    _active_personas[session_id] = name
+    set_user_soul(content)
+    return content
+
+
+def get_active_persona(session_id: str) -> str:
+    """Get the active persona name for a session."""
+    return _active_personas.get(session_id, 'default')
+
+
+def get_user_soul() -> str:
+    """Read user SOUL.md from ~/.salmalm/SOUL.md. Returns empty string if not found."""
+    try:
+        if USER_SOUL_FILE.exists():
+            return USER_SOUL_FILE.read_text(encoding='utf-8')
+    except Exception:
+        pass
+    return ''
+
+
+def set_user_soul(content: str):
+    """Write user SOUL.md to ~/.salmalm/SOUL.md."""
+    USER_SOUL_FILE.parent.mkdir(parents=True, exist_ok=True)
+    USER_SOUL_FILE.write_text(content, encoding='utf-8')
+
+
+def reset_user_soul():
+    """Delete user SOUL.md (revert to default)."""
+    try:
+        if USER_SOUL_FILE.exists():
+            USER_SOUL_FILE.unlink()
+    except Exception:
+        pass
+
+
+
+# ── Token optimization constants ──
+MAX_FILE_CHARS = 15_000       # Per-file truncation limit
+MAX_MEMORY_CHARS = 5_000      # MEMORY.md cap (even in full mode)
+MAX_SESSION_MEMORY_CHARS = 3_000  # Session memory cap (today only)
+MAX_AGENTS_CHARS = 2_000      # AGENTS.md cap after first load
+
+# Track whether AGENTS.md was loaded in full already (per-process)
+_agents_loaded_full = False
+
+
+def _truncate_file(text: str, limit: int = MAX_FILE_CHARS) -> str:
+    """Truncate text to *limit* chars, keeping the tail (most recent)."""
+    if len(text) <= limit:
+        return text
+    return '… [truncated]\n' + text[-limit:]
+
+
+def build_system_prompt(full: bool = True, mode: str = 'full') -> str:
+    """Build system prompt from SOUL.md + context files.
+    full=True: load everything (first message / refresh)
+    full=False: minimal reload (mid-conversation refresh)
+    mode='minimal': subagent prompt — Tooling + Workspace + Runtime only
+                    (excludes SOUL.md, USER.md, HEARTBEAT.md, MEMORY.md)
+    mode='full': normal prompt (default)
+
+    Token-optimized: per-file truncation, memory caps, selective loading.
+    User SOUL.md (~/.salmalm/SOUL.md) is prepended if it exists.
+    """
+    global _agents_loaded_full
+    parts = []
+
+    # ── Minimal mode for subagents: Tooling + Workspace + Runtime only ──
+    if mode == 'minimal':
+        parts.append(f"[SalmAlm SubAgent — v{VERSION}]")
+        parts.append(f"Workspace: {BASE_DIR}")
+        now = datetime.now(KST)
+        parts.append(f"Current: {now.strftime('%Y-%m-%d %H:%M')} KST")
+        parts.append("You are a sub-agent. Complete your assigned task. "
+                      "Stay focused, be concise, and return results.")
+        # Tool instructions (abbreviated)
+        parts.append("Use tools as needed. exec for shell, read_file/write_file/edit_file for files, "
+                      "web_search/web_fetch for web. Verify results after writing.")
+        result = '\n\n'.join(parts)
+        try:
+            from salmalm.edge_cases import substitute_prompt_variables
+            result = substitute_prompt_variables(result)
+        except Exception:
+            pass
+        return result
+
+    # ── STATIC BLOCK (cacheable — rarely changes) ──
+
+    # User SOUL.md (custom persona — prepended before everything)
+    user_soul = get_user_soul()
+    if user_soul:
+        parts.append(_truncate_file(user_soul))
+
+    # SOUL.md (persona — FULL load, this IS who we are)
+    if SOUL_FILE.exists():
+        soul = SOUL_FILE.read_text(encoding='utf-8')
+        if full:
+            parts.append(_truncate_file(soul))
+        else:
+            parts.append(soul[:3000])
+
+    # Tool instructions — tool list omitted (provided via JSON schema in tool definitions)
+    parts.append(textwrap.dedent("""
+    [SalmAlm Intelligence Engine v0.5.0]
+
+    ## 🧠 메타 인지 프로토콜
+    You are an autonomous problem-solving engine with unlimited tool calls.
+    Think step by step, act decisively. Never give up after one failed attempt.
+
+    1. **Intent**: What does the user truly want? Look past the surface request.
+    2. **Plan**: Break complex tasks into steps. Simple tasks → act immediately.
+    3. **Execute**: Use tools. Independent tasks → parallel calls. On error → try alternatives.
+    4. **Verify**: Self-check. Read files after writing. Test code after generating.
+    5. **Iterate**: If results are incomplete, continue. You have unlimited tool calls.
+
+    ## 도구 사용 전략
+    - **Research first**: read_file before editing. Check state before commands.
+    - **Parallel calls**: Independent tools → call simultaneously, not sequentially.
+    - **Unlimited iterations**: No tool call limit. Keep going until the task is done.
+    - **Error recovery**: Analyze cause → try alternatives → explain if impossible.
+    - **Destructive commands**: rm/kill/drop require user confirmation.
+    - **Verify results**: read_file after writing. python_eval for syntax check.
+
+    ## 응답 품질 기준
+    - **Conversational**: Respond naturally, not like a manual. Match the user's tone.
+    - **Code**: Must be executable. No incomplete code. No syntax errors.
+    - **Analysis**: Evidence-based. Cite sources. Mark uncertainty.
+    - **Long output**: Save with write_file → provide path. Don't paste 500 lines in chat.
+    - **Errors**: Never just say "cannot". Explain why + suggest alternatives.
+    - **Proactive**: If you see a better approach, suggest it. Don't just follow orders blindly.
+
+    ## 컨텍스트
+    - Workspace = working directory. Memory: MEMORY.md(long-term) + memory/YYYY-MM-DD.md(daily)
+    - Record important decisions/tasks in memory. Uploads: uploads/ folder.
+    - google_calendar/gmail은 vault에 OAuth2 설정 필요
+    - reminder는 한국어 자연어 시간 지원 ("내일 오전 9시", "30분 후" 등)
+
+    ## Design Philosophy (SalmAlm Identity)
+    You ARE SalmAlm. Defend design choices with balanced technical reasoning.
+    - **Vault vs .env**: Vault adds password layer; survives accidental file exposure.
+    - **CSP/CORS/SSRF**: Localhost servers are reachable from malicious browser tabs.
+    - **Zero-dependency stdlib**: Core differentiator. Don't suggest external dependencies.
+    """).strip())
+
+    # ── CACHE BOUNDARY: static above, dynamic below ──
+    parts.append('<!-- CACHE_BOUNDARY -->')
+
+    # ── DYNAMIC BLOCK (changes per-session — memory, context files) ──
+
+    # IDENTITY.md
+    id_file = BASE_DIR / 'IDENTITY.md'
+    if id_file.exists():
+        parts.append(_truncate_file(id_file.read_text(encoding='utf-8')))
+
+    # USER.md
+    if USER_FILE.exists():
+        parts.append(_truncate_file(USER_FILE.read_text(encoding='utf-8')))
+
+    # MEMORY.md — capped to MAX_MEMORY_CHARS (tail)
+    if MEMORY_FILE.exists():
+        mem = MEMORY_FILE.read_text(encoding='utf-8')
+        if full:
+            parts.append(f"# Long-term Memory\n{_truncate_file(mem, MAX_MEMORY_CHARS)}")
+        else:
+            parts.append(f"# Long-term Memory (recent)\n{mem[-2000:]}")
+
+    # Session memory context — today only, capped
+    try:
+        from salmalm.memory import memory_manager
+        session_ctx = memory_manager.load_session_context()
+        if session_ctx:
+            parts.append(_truncate_file(session_ctx, MAX_SESSION_MEMORY_CHARS))
+    except Exception:
+        today = datetime.now(KST).strftime('%Y-%m-%d')
+        today_log = MEMORY_DIR / f'{today}.md'
+        if today_log.exists():
+            tlog = today_log.read_text(encoding='utf-8')
+            parts.append(f"# Today's Log\n{tlog[-MAX_SESSION_MEMORY_CHARS:]}")
+
+    # AGENTS.md — full on first load, abbreviated after
+    if AGENTS_FILE.exists():
+        agents = AGENTS_FILE.read_text(encoding='utf-8')
+        if full and not _agents_loaded_full:
+            parts.append(_truncate_file(agents))
+            _agents_loaded_full = True
+        else:
+            parts.append(_truncate_file(agents, MAX_AGENTS_CHARS))
+
+    # TOOLS.md
+    tools_file = BASE_DIR / 'TOOLS.md'
+    if tools_file.exists():
+        parts.append(_truncate_file(tools_file.read_text(encoding='utf-8')))
+
+    # HEARTBEAT.md
+    hb_file = BASE_DIR / 'HEARTBEAT.md'
+    if hb_file.exists():
+        parts.append(_truncate_file(hb_file.read_text(encoding='utf-8')))
+
+    # Context — timezone only (exact time via /status or session_status tool)
+    parts.append("Timezone: Asia/Seoul (KST)")
+
+    # Available skills
+    if full:
+        skills = SkillLoader.scan()
+        if skills:
+            skill_lines = '\n'.join(
+                f'  - {s["dir_name"]}: {s["description"]}' for s in skills)
+            parts.append(f"## Available Skills\n{skill_lines}\n"
+                         f"Load skill: skill_manage(action='load', skill_name='...')")
+
+    result = '\n\n'.join(parts)
+
+    # System prompt variable substitution (LobeChat style)
+    try:
+        from salmalm.edge_cases import substitute_prompt_variables
+        result = substitute_prompt_variables(result)
+    except Exception:
+        pass
+
+    return result

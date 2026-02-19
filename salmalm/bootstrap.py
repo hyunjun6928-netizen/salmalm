@@ -1,0 +1,277 @@
+"""Server bootstrap — start all SalmAlm services."""
+from __future__ import annotations
+
+import asyncio
+import http.server
+import os
+import signal
+import sys
+import threading
+
+from salmalm.constants import (
+    VERSION, APP_NAME, VAULT_FILE, MEMORY_DIR, BASE_DIR
+)
+from salmalm.crypto import vault, log, HAS_CRYPTO
+from salmalm.core import (
+    _init_audit_db, _restore_usage, audit_log,
+    _sessions, cron, LLMCronManager, PluginLoader
+)
+from salmalm.telegram import telegram_bot
+from salmalm.web import WebHandler
+from salmalm.ws import ws_server, StreamingResponse
+from salmalm.rag import rag_engine
+from salmalm.mcp import mcp_manager
+from salmalm.nodes import node_manager
+from salmalm.stability import health_monitor, watchdog_tick
+import salmalm.core as _core
+
+
+def _check_for_updates() -> str:
+    """Check PyPI for newer version. Returns update message or empty string."""
+    try:
+        import urllib.request, json as _json
+        req = urllib.request.Request(
+            'https://pypi.org/pypi/salmalm/json',
+            headers={'User-Agent': f'SalmAlm/{VERSION}', 'Accept': 'application/json'})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = _json.loads(resp.read())
+        latest = data.get('info', {}).get('version', '')
+        def _ver_tuple(v):
+            return tuple(int(x) for x in v.split('.'))
+        if latest and _ver_tuple(latest) > _ver_tuple(VERSION):
+            if getattr(sys, 'frozen', False):
+                return (f"⬆️  New version {latest} available!\n"
+                        f"   Download: https://github.com/hyunjun6928-netizen/salmalm/releases/latest")
+            return f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
+    except Exception:
+        pass  # silently skip if no network
+    return ""
+
+
+async def run_server():
+    """Main async entry point — boot all services."""
+    # ── Phase 1: Database & Core State ──
+    _init_audit_db()
+    _restore_usage()
+    audit_log('startup', f'{APP_NAME} v{VERSION}')
+    MEMORY_DIR.mkdir(exist_ok=True)
+
+    # ── Phase 2: SLA Monitoring ──
+    try:
+        from .sla import uptime_monitor, watchdog
+        uptime_monitor.on_startup()
+        watchdog.start()
+        log.info("[SLA] Uptime monitor + watchdog initialized")
+    except Exception as e:
+        log.warning(f"[SLA] Init error: {e}")
+
+    # ── Phase 3: Extensions (hooks → plugins → agents) ──
+    try:
+        from .hooks import hook_manager
+        hook_manager.fire('on_startup', {'message': f'{APP_NAME} v{VERSION} starting'})
+    except Exception:
+        pass
+    try:
+        from .plugin_manager import plugin_manager
+        plugin_manager.scan_and_load()
+    except Exception as e:
+        log.warning(f"Plugin scan error: {e}")
+    try:
+        from .agents import agent_manager
+        agent_manager.scan()
+    except Exception as e:
+        log.warning(f"Agent scan error: {e}")
+
+    # ── Phase 4: HTTP Server ──
+    port = int(os.environ.get('SALMALM_PORT', 18800))
+    bind_addr = os.environ.get('SALMALM_BIND', '127.0.0.1')
+    server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
+    web_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    web_thread.start()
+    log.info(f"[WEB] Web UI: http://{bind_addr}:{port}")
+
+    # ── Phase 5: Vault Auto-unlock ──
+    vault_pw = os.environ.get('SALMALM_VAULT_PW')
+    if vault_pw and VAULT_FILE.exists():
+        if vault.unlock(vault_pw):
+            log.info("[UNLOCK] Vault auto-unlocked from env")
+
+    _core.set_telegram_bot(telegram_bot)
+
+    # ── Phase 6: WebSocket Server ──
+    ws_port = int(os.environ.get('SALMALM_WS_PORT', 18801))
+    try:
+        ws_server.port = ws_port
+        await ws_server.start()
+    except Exception as e:
+        log.error(f"WebSocket server failed: {e}")
+
+    @ws_server.on_message
+    async def handle_ws_message(client, data):
+        msg_type = data.get('type', 'message')
+        if msg_type == 'ping':
+            await client.send_json({'type': 'pong'})
+            return
+        if msg_type == 'message':
+            text = data.get('text', '').strip()
+            session_id = client.session_id or 'web'
+            image_b64 = data.get('image')
+            image_mime = data.get('image_mime', 'image/png')
+            if not text and not image_b64:
+                await client.send_json({'type': 'error', 'error': 'Empty message'})
+                return
+            stream = StreamingResponse(client)
+            # Send typing indicator immediately
+            await client.send_json({'type': 'typing', 'status': 'typing'})
+            async def on_tool(name, args):
+                await stream.send_tool_call(name, args)
+            async def on_status(status_type, detail):
+                """Forward engine status to WS client as typing events."""
+                await client.send_json({'type': 'typing', 'status': status_type, 'detail': detail})
+            try:
+                from salmalm.engine import process_message
+                image_data = (image_b64, image_mime) if image_b64 else None
+                response = await process_message(session_id, text or '', image_data=image_data,
+                                                 on_tool=on_tool, on_status=on_status)
+                await stream.send_done(response)
+            except Exception as e:
+                await stream.send_error(str(e)[:200])
+
+    @ws_server.on_connect
+    async def handle_ws_connect(client):
+        await client.send_json({
+            'type': 'welcome', 'version': VERSION,
+            'session': client.session_id,
+        })
+
+    # ── Phase 7: RAG Engine ──
+    try:
+        rag_engine.reindex(force=True)
+    except Exception as e:
+        log.warning(f"RAG init error: {e}")
+
+    # ── Phase 8: MCP (Model Context Protocol) ──
+    try:
+        mcp_manager.load_config()
+        from salmalm.tools import TOOL_DEFINITIONS, execute_tool
+        async def mcp_tool_executor(name, args):
+            return execute_tool(name, args)
+        mcp_manager.server.set_tools(TOOL_DEFINITIONS, mcp_tool_executor)
+    except Exception as e:
+        log.warning(f"MCP init error: {e}")
+
+    # ── Phase 9: Cron Scheduler + Background Tasks ──
+    llm_cron = LLMCronManager()
+    llm_cron.load_jobs()
+    _core._llm_cron = llm_cron  # type: ignore[attr-defined]
+
+    # Schedule audit log cleanup (once daily)
+    from salmalm.core import audit_log_cleanup
+    cron.add_job('audit_cleanup', 86400, audit_log_cleanup, days=30)
+
+    # ── Phase 10: Self-test, Nodes, Plugins, Cron start ──
+    selftest = health_monitor.startup_selftest()
+    node_manager.load_config()
+    PluginLoader.scan()
+    asyncio.create_task(cron.run())
+
+    # ── Phase 11: Telegram Bot ──
+    if vault.is_unlocked:
+        tg_token = vault.get('telegram_token')
+        tg_owner = vault.get('telegram_owner_id')
+        if tg_token and tg_owner:
+            telegram_bot.configure(tg_token, tg_owner)
+            import os as _os2
+            _wh_url = _os2.environ.get('SALMALM_TELEGRAM_WEBHOOK_URL') or vault.get('telegram_webhook_url') or ''
+            if _wh_url:
+                telegram_bot.set_webhook(_wh_url.rstrip('/') + '/webhook/telegram'
+                                         if not _wh_url.endswith('/webhook/telegram')
+                                         else _wh_url)
+            else:
+                asyncio.create_task(telegram_bot.poll())
+
+    rag_stats = rag_engine.get_stats()
+    st = f"{selftest['passed']}/{selftest['total']}"
+    update_msg = _check_for_updates()
+    print(f"""
+╔══════════════════════════════════════════════╗
+║  😈 {APP_NAME} v{VERSION}                   ║
+║  Web UI:    http://127.0.0.1:{port:<5}           ║
+║  WebSocket: ws://127.0.0.1:{ws_port:<5}            ║
+║  Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}         ║
+║  Crypto:    {'AES-256-GCM' if HAS_CRYPTO else 'HMAC-CTR (fallback)'}            ║
+║  Self-test: {st}                               ║
+╚══════════════════════════════════════════════╝
+""")
+    if update_msg:
+        print(f"  {update_msg}\n")
+
+    # Auto-open browser on first start
+    try:
+        import webbrowser
+        webbrowser.open(f'http://127.0.0.1:{port}')
+    except Exception:
+        pass
+
+    # ── Graceful Shutdown ──
+    _shutdown_count = [0]
+
+    def _handle_shutdown(signum, frame):
+        _shutdown_count[0] += 1
+        if _shutdown_count[0] >= 2:
+            log.warning("[SHUTDOWN] Forced exit (second signal)")
+            os._exit(1)
+        log.info(f"[SHUTDOWN] Signal received ({signum}), initiating graceful shutdown...")
+        asyncio.get_event_loop().call_soon_threadsafe(_trigger_shutdown.set)
+
+    _trigger_shutdown = asyncio.Event()
+
+    # Register signal handlers
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(sig, _handle_shutdown)
+        except (OSError, ValueError):
+            pass
+
+    # Wait for shutdown signal
+    await _trigger_shutdown.wait()
+
+    # === Shutdown Sequence ===
+    log.info("[SHUTDOWN] Phase 1: Stop accepting new requests")
+    from salmalm.engine import begin_shutdown, wait_for_active_requests
+    begin_shutdown()
+
+    log.info("[SHUTDOWN] Phase 2: Wait for active LLM requests (max 30s)")
+    wait_for_active_requests(timeout=30.0)
+
+    log.info("[SHUTDOWN] Phase 3: Notify WebSocket clients")
+    await ws_server.shutdown()
+
+    log.info("[SHUTDOWN] Phase 4: Stop cron scheduler")
+    cron.stop()
+
+    log.info("[SHUTDOWN] Phase 5: Close DB connections")
+    from salmalm.core import close_all_db_connections
+    close_all_db_connections()
+
+    log.info("[SHUTDOWN] Phase 6: Stop HTTP server")
+    server.shutdown()
+
+    # Fire on_shutdown hook
+    try:
+        from .hooks import hook_manager
+        hook_manager.fire('on_shutdown', {'message': 'Server shutting down'})
+    except Exception:
+        pass
+
+    # SLA: Graceful shutdown
+    try:
+        from .sla import uptime_monitor, watchdog
+        watchdog.stop()
+        uptime_monitor.on_shutdown()
+        log.info("[SHUTDOWN] SLA cleanup complete")
+    except Exception as e:
+        log.warning(f"[SHUTDOWN] SLA cleanup error: {e}")
+
+    audit_log('shutdown', f'{APP_NAME} v{VERSION} graceful shutdown')
+    log.info("[SHUTDOWN] Complete. Goodbye! 😈")
