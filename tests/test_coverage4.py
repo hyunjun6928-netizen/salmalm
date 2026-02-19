@@ -26,6 +26,7 @@ class TestWebAllRoutes(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls._server.shutdown()
+        cls._server.server_close()
 
     def _get(self, path):
         conn = HTTPConnection('127.0.0.1', self._port, timeout=10)

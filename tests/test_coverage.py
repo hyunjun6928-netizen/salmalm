@@ -35,7 +35,8 @@ class TestToolHandlers(unittest.TestCase):
         path = self._ws_path('write_test.txt')
         result = execute_tool('write_file', {'path': path, 'content': 'test content'})
         self.assertTrue(os.path.exists(path))
-        self.assertIn('test content', open(path).read())
+        with open(path) as _f:
+            self.assertIn('test content', _f.read())
         os.unlink(path)
 
     def test_execute_tool_edit_file(self):
@@ -48,7 +49,8 @@ class TestToolHandlers(unittest.TestCase):
             'old_text': 'old',
             'new_text': 'new'
         })
-        content = open(path).read()
+        with open(path) as _f:
+            content = _f.read()
         self.assertIn('new', content)
         os.unlink(path)
 
@@ -585,6 +587,7 @@ class TestWebAPI(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls._server.shutdown()
+        cls._server.server_close()
         import shutil; shutil.rmtree(cls._tmpdir, ignore_errors=True)
 
     def _req(self, method, path, body=None):
@@ -595,6 +598,7 @@ class TestWebAPI(unittest.TestCase):
         conn.request(method, path, body=data, headers=hdrs)
         resp = conn.getresponse()
         raw = resp.read()
+        conn.close()
         try:
             return resp.status, json.loads(raw)
         except Exception:
@@ -615,6 +619,7 @@ class TestWebAPI(unittest.TestCase):
         conn.request('GET', '/icon-192.svg')
         resp = conn.getresponse()
         resp.read()
+        conn.close()
         self.assertEqual(resp.status, 200)
 
     def test_sw_js(self):
@@ -623,6 +628,7 @@ class TestWebAPI(unittest.TestCase):
         conn.request('GET', '/sw.js')
         resp = conn.getresponse()
         resp.read()
+        conn.close()
         self.assertEqual(resp.status, 200)
 
     def test_docs_page(self):
@@ -631,6 +637,7 @@ class TestWebAPI(unittest.TestCase):
         conn.request('GET', '/docs')
         resp = conn.getresponse()
         body = resp.read().decode(errors='replace')
+        conn.close()
         self.assertEqual(resp.status, 200)
         self.assertIn('html', body.lower())
 
@@ -640,6 +647,7 @@ class TestWebAPI(unittest.TestCase):
         conn.request('GET', '/dashboard')
         resp = conn.getresponse()
         body = resp.read().decode(errors='replace')
+        conn.close()
         self.assertEqual(resp.status, 200)
 
     def test_check_update(self):

@@ -38,6 +38,7 @@ class TestAPIEndpoints(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls._server.shutdown()
+        cls._server.server_close()
         import shutil
         shutil.rmtree(cls._tmpdir, ignore_errors=True)
 
@@ -51,6 +52,7 @@ class TestAPIEndpoints(unittest.TestCase):
         conn.request(method, path, body=data, headers=hdrs)
         resp = conn.getresponse()
         raw = resp.read()
+        conn.close()
         try:
             result = json.loads(raw)
         except Exception:
@@ -64,6 +66,7 @@ class TestAPIEndpoints(unittest.TestCase):
         resp = conn.getresponse()
         body = resp.read().decode(errors='replace')
         self.assertEqual(resp.status, 200)
+        conn.close()
         self.assertIn('<!doctype html>', body.lower())
 
     def test_manifest_json(self):
@@ -78,6 +81,7 @@ class TestAPIEndpoints(unittest.TestCase):
         conn.request('OPTIONS', '/api/chat')
         resp = conn.getresponse()
         resp.read()
+        conn.close()
         self.assertIn(resp.status, (200, 204))
 
     def test_404_unknown_path(self):
@@ -96,6 +100,7 @@ class TestAPIEndpoints(unittest.TestCase):
         conn.request('GET', '/health')
         resp = conn.getresponse()
         resp.read()
+        conn.close()
         # Health endpoint may or may not exist — accept 200 or 404
         self.assertIn(resp.status, (200, 404))
 

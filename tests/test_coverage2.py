@@ -307,6 +307,7 @@ class TestWebHandlerRoutes(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls._server.shutdown()
+        cls._server.server_close()
 
     def _get(self, path):
         from http.client import HTTPConnection
