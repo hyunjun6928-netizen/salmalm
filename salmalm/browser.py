@@ -27,8 +27,11 @@ Usage:
 import asyncio
 import base64
 import json
+import os
 import struct
 import hashlib
+import subprocess
+import tempfile
 import time
 import urllib.request
 from typing import Any, Dict, List, Optional
@@ -440,5 +443,244 @@ class BrowserController:
         }
 
 
-# Module-level instance
+class BrowserManager:
+    """Manages Chrome lifecycle — auto-detect, launch, connect, close.
+
+    Unlike BrowserController which connects to an already-running Chrome,
+    BrowserManager can find and launch Chrome automatically.
+    """
+
+    # Common Chrome/Chromium binary paths
+    _CHROME_NAMES = [
+        "google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
+        "brave-browser", "microsoft-edge",
+    ]
+    _CHROME_PATHS = [
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/snap/bin/chromium",
+        "/usr/bin/brave-browser",
+        "/usr/bin/microsoft-edge",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+    ]
+
+    def __init__(self):
+        self._browser: Optional[BrowserController] = None
+        self._process: Optional[Any] = None  # subprocess.Popen
+        self._chrome_path: Optional[str] = None
+        self._debug_port: int = 0
+        self._tmpdir: Optional[str] = None
+
+    def find_chrome(self) -> Optional[str]:
+        """Auto-detect Chrome/Chromium binary."""
+        if self._chrome_path:
+            return self._chrome_path
+        import shutil as _shutil
+        for name in self._CHROME_NAMES:
+            path = _shutil.which(name)
+            if path:
+                self._chrome_path = path
+                return path
+        for path in self._CHROME_PATHS:
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                self._chrome_path = path
+                return path
+        return None
+
+    async def launch(self, url: str = "about:blank", headless: bool = True) -> bool:
+        """Launch Chrome and connect via CDP."""
+        import os as _os
+        chrome = self.find_chrome()
+        if not chrome:
+            log.error("[BROWSER] No Chrome/Chromium found")
+            return False
+
+        self._tmpdir = tempfile.mkdtemp(prefix="salmalm_browser_")
+        user_data = os.path.join(self._tmpdir, "profile")
+
+        args = [
+            chrome,
+            "--remote-debugging-port=0",  # OS picks a free port
+            f"--user-data-dir={user_data}",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--disable-translate",
+            "--metrics-recording-only",
+            "--safebrowsing-disable-auto-update",
+        ]
+        if headless:
+            args.append("--headless=new")
+        args.append(url)
+
+        try:
+            self._process = subprocess.Popen(
+                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+        except Exception as e:
+            log.error(f"[BROWSER] Failed to launch Chrome: {e}")
+            return False
+
+        # Wait for DevTools port — parse stderr for "DevTools listening on ws://..."
+        port = None
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            line = self._process.stderr.readline()  # type: ignore[union-attr]
+            if not line:
+                await asyncio.sleep(0.1)
+                continue
+            text = line.decode("utf-8", errors="replace")
+            if "DevTools listening on" in text:
+                # Extract port from ws://127.0.0.1:PORT/...
+                import re
+                m = re.search(r"ws://[\w.]+:(\d+)/", text)
+                if m:
+                    port = int(m.group(1))
+                break
+
+        if not port:
+            log.error("[BROWSER] Could not detect DevTools port")
+            self.close_sync()
+            return False
+
+        self._debug_port = port
+        self._browser = BrowserController(debug_port=port)
+
+        # Give Chrome a moment then connect
+        await asyncio.sleep(0.5)
+        ok = await self._browser.connect()
+        if ok:
+            log.info(f"[BROWSER] Launched Chrome on port {port}")
+        return ok
+
+    @property
+    def controller(self) -> Optional[BrowserController]:
+        return self._browser
+
+    @property
+    def connected(self) -> bool:
+        return self._browser is not None and self._browser.connected
+
+    async def close(self) -> None:
+        """Disconnect and kill Chrome."""
+        if self._browser:
+            await self._browser.disconnect()
+            self._browser = None
+        self.close_sync()
+
+    def close_sync(self) -> None:
+        """Kill Chrome process (sync)."""
+        if self._process:
+            try:
+                self._process.terminate()
+                self._process.wait(timeout=5)
+            except Exception:
+                try:
+                    self._process.kill()
+                except Exception:
+                    pass
+            self._process = None
+        if self._tmpdir:
+            import shutil as _shutil
+            _shutil.rmtree(self._tmpdir, ignore_errors=True)
+            self._tmpdir = None
+
+
+# ── Agent tool functions ────────────────────────────────────
+
+# Module-level instances
 browser = BrowserController()
+browser_manager = BrowserManager()
+
+
+async def browser_open(url: str) -> str:
+    """Open a URL. Launches Chrome if not connected."""
+    if not browser_manager.connected:
+        ok = await browser_manager.launch(url)
+        if not ok:
+            return "Error: Could not launch Chrome. Is it installed?"
+        return f"Opened {url}"
+    ctrl = browser_manager.controller
+    if ctrl:
+        await ctrl.navigate(url)
+        return f"Navigated to {url}"
+    return "Error: no browser controller"
+
+
+async def browser_screenshot() -> str:
+    """Take screenshot, return base64 PNG."""
+    ctrl = browser_manager.controller
+    if not ctrl or not ctrl.connected:
+        return "Error: Browser not connected"
+    return await ctrl.screenshot()
+
+
+async def browser_snapshot() -> str:
+    """Extract page text (accessibility tree approximation)."""
+    ctrl = browser_manager.controller
+    if not ctrl or not ctrl.connected:
+        return "Error: Browser not connected"
+    # Get structured text: headings, links, form elements
+    js = """
+    (function() {
+        var out = [];
+        var walk = document.createTreeWalker(document.body || document.documentElement,
+            NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, null, false);
+        var node;
+        while (node = walk.nextNode()) {
+            if (node.nodeType === 3) {
+                var t = node.textContent.trim();
+                if (t) out.push(t);
+            } else if (node.nodeType === 1) {
+                var tag = node.tagName.toLowerCase();
+                if (tag === 'a' && node.href) out.push('[link: ' + node.textContent.trim() + ' -> ' + node.href + ']');
+                else if (tag === 'img' && node.alt) out.push('[img: ' + node.alt + ']');
+                else if (tag === 'input') out.push('[input ' + (node.type||'text') + ': ' + (node.name||node.id||'') + '=' + (node.value||'') + ']');
+                else if (tag === 'button') out.push('[button: ' + node.textContent.trim() + ']');
+                else if (tag === 'select') out.push('[select: ' + (node.name||node.id||'') + ']');
+                else if (/^h[1-6]$/.test(tag)) out.push('[' + tag + ': ' + node.textContent.trim() + ']');
+            }
+        }
+        return out.slice(0, 500).join('\\n');
+    })()
+    """
+    result = await ctrl.evaluate(js)
+    return result.get("value", "")
+
+
+async def browser_click(selector: str) -> str:
+    """Click element by CSS selector."""
+    ctrl = browser_manager.controller
+    if not ctrl or not ctrl.connected:
+        return "Error: Browser not connected"
+    ok = await ctrl.click(selector)
+    return "Clicked" if ok else "Element not found"
+
+
+async def browser_type(selector: str, text: str) -> str:
+    """Type text into element."""
+    ctrl = browser_manager.controller
+    if not ctrl or not ctrl.connected:
+        return "Error: Browser not connected"
+    ok = await ctrl.type_text(selector, text)
+    return "Typed" if ok else "Element not found"
+
+
+async def browser_evaluate(js: str) -> str:
+    """Execute JavaScript and return result."""
+    ctrl = browser_manager.controller
+    if not ctrl or not ctrl.connected:
+        return "Error: Browser not connected"
+    result = await ctrl.evaluate(js)
+    val = result.get("value")
+    return str(val) if val is not None else "(undefined)"
+
+
+async def browser_close() -> str:
+    """Close browser."""
+    await browser_manager.close()
+    return "Browser closed"
