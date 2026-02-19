@@ -124,6 +124,11 @@ def _is_subpath(path: Path, parent: Path) -> bool:
         return False
 
 
+def _legacy_execute(name: str, args: dict) -> str:
+    """Legacy tool execution — used by tools_media.py bridge for not-yet-extracted tools."""
+    return _execute_inner(name, args)
+
+
 def execute_tool(name: str, args: dict) -> str:
     """Execute a tool and return result string. Auto-dispatches to remote node if available."""
     audit_log('tool_exec', f'{name}: {json.dumps(args, ensure_ascii=False)[:200]}')
@@ -137,6 +142,11 @@ def execute_tool(name: str, args: dict) -> str:
                 return result.get('result', str(result))  # type: ignore[no-any-return]
     except Exception:
         pass  # Fall through to local execution
+    return _execute_inner(name, args)
+
+
+def _execute_inner(name: str, args: dict) -> str:
+    """Inner tool dispatch — legacy if-elif chain."""
     try:
         if name == 'exec':
             cmd = args.get('command', '')

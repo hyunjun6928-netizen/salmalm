@@ -4,6 +4,18 @@ from .crypto import log
 from .core import audit_log
 
 _HANDLERS = {}
+_modules_loaded = False
+
+
+def _ensure_modules():
+    """Lazy-load all tools_*.py modules so @register decorators run."""
+    global _modules_loaded
+    if _modules_loaded:
+        return
+    _modules_loaded = True
+    from . import (tools_file, tools_web, tools_exec, tools_memory,
+                   tools_misc, tools_system, tools_util, tools_agent,
+                   tools_browser, tools_google, tools_media)  # noqa: F401
 
 
 def register(name):
@@ -27,6 +39,8 @@ def execute_tool(name: str, args: dict) -> str:
                 return result.get('result', str(result))
     except Exception:
         pass  # Fall through to local execution
+
+    _ensure_modules()
 
     try:
         handler = _HANDLERS.get(name)
