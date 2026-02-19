@@ -1,0 +1,90 @@
+site_name: SalmAlm Documentation
+site_description: "Personal AI Gateway — Your AI Assistant in One Command"
+site_url: https://hyunjun6928-netizen.github.io/salmalm/
+repo_url: https://github.com/hyunjun6928-netizen/salmalm
+repo_name: hyunjun6928-netizen/salmalm
+
+theme:
+  name: material
+  language: en
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - tables
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Commands: commands.md
+  - Tools: tools.md
+  - Architecture: architecture.md
+  - Configuration: configuration.md
+  - API Reference:
+    - Overview: api/index.md
+    - Core: api/core.md
+    - Tools: api/tools.md
+    - Features: api/features.md
+    - Channels: api/channels.md
+    - Security: api/security.md
+    - Utils: api/utils.md
+    - Web: api/web.md
+  - Features:
+    - Overview: features/index.md
+    - Multi-Model Routing: features/multi-model.md
+    - Extended Thinking: features/thinking.md
+    - RAG & Knowledge Base: features/rag.md
+    - MCP Integration: features/mcp.md
+    - Session Management: features/sessions.md
+    - Security & Vault: features/security.md
+    - Personal Assistant: features/personal.md
+    - Telegram & Discord: features/channels.md
+    - Self-Evolution: features/self-evolve.md
+    - SLA & Monitoring: features/sla.md
+  - Deployment: deployment.md
+  - Changelog: changelog.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/hyunjun6928-netizen/salmalm
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/salmalm/

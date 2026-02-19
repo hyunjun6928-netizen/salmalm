@@ -6,8 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .constants import *
-from .crypto import vault, log
+from salmalm.constants import *
+from salmalm.crypto import vault, log
 
 # ============================================================
 _audit_lock = threading.Lock()   # Audit log writes
@@ -345,7 +345,7 @@ def track_usage(model: str, input_tokens: int, output_tokens: int,
         # Record cost against user quota
         if user_id:
             try:
-                from .users import user_manager
+                from salmalm.users import user_manager
                 user_manager.record_cost(user_id, cost)
             except Exception as e:
                 log.debug(f"Quota record error: {e}")
@@ -547,7 +547,7 @@ def compact_messages(messages: list, model: Optional[str] = None,
         f"[{m['role']}]: {_msg_content_str(m)[:300]}" for m in to_summarize[-20:]
     )
 
-    from .llm import call_llm
+    from salmalm.llm import call_llm
     # Pick cheapest available model for summarization (avoid hardcoded google)
     summary_model = router._pick_available(1)
     _summ_msgs = [
@@ -695,7 +695,7 @@ _tfidf = TFIDFSearch()
 # ============================================================
 # MEMORY MANAGER — delegated to salmalm.memory module
 # ============================================================
-from .memory import MemoryManager, memory_manager
+from salmalm.memory import MemoryManager, memory_manager
 
 
 # ============================================================
@@ -838,7 +838,7 @@ class LLMCronManager:
                 continue
             log.info(f"[CRON] LLM cron firing: {job['name']} ({job['id']})")
             try:
-                from .engine import process_message
+                from salmalm.engine import process_message
                 # Track cost before/after to enforce per-cron-job cap
                 cost_before = _usage['total_cost']
                 response = await process_message(
@@ -1077,12 +1077,12 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                         log.warning(f"[SESSION] Corrupt session JSON for {session_id}: {je}")
                         _sessions[session_id].messages = []
                     # Refresh system prompt
-                    from .prompt import build_system_prompt
+                    from salmalm.prompt import build_system_prompt
                     _sessions[session_id].add_system(build_system_prompt(full=False))
                     return _sessions[session_id]
             except Exception as e:
                 log.warning(f"Session restore error: {e}")
-            from .prompt import build_system_prompt
+            from salmalm.prompt import build_system_prompt
             _sessions[session_id].add_system(build_system_prompt(full=True))
             log.info(f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
             audit_log('session_create', f'new session: {session_id}', session_id=session_id,
@@ -1412,7 +1412,7 @@ class HeartbeatManager:
             state_ctx = f"\n\nLast checks:\n" + '\n'.join(checks)
 
         try:
-            from .engine import process_message
+            from salmalm.engine import process_message
             # Run in isolated session (OpenClaw pattern: no cross-contamination)
             result = await process_message(
                 f'heartbeat-{int(time.time())}',
@@ -1521,7 +1521,7 @@ def compact_session(session_id: str, force: bool = False) -> str:
 
     summary_text = '\n'.join(summary_parts)
 
-    from .llm import call_llm
+    from salmalm.llm import call_llm
     summary_model = router._pick_available(1)
     summ_msgs = [
         {'role': 'system', 'content': 'You are a conversation summarizer. Summarize the following conversation concisely but thoroughly. Preserve key decisions, facts, code context, task progress, and user preferences. Write in the same language as the conversation. Output 5-15 sentences.'},
@@ -1728,7 +1728,7 @@ def search_messages(query: str, limit: int = 20) -> list:
 
 
 # Re-export from agents.py
-from .agents import SubAgent, SkillLoader, PluginLoader
+from salmalm.agents import SubAgent, SkillLoader, PluginLoader
 
 # Module-level exports for convenience
 __all__ = [

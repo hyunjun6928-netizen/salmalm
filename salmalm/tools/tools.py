@@ -778,4 +778,4 @@ TOOL_DEFINITIONS = [
 
 
 # Re-export handler for backward compatibility
-from .tool_handlers import execute_tool, _resolve_path, _is_safe_command, _is_subpath
+from salmalm.tool_handlers import execute_tool, _resolve_path, _is_safe_command, _is_subpath

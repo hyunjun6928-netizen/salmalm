@@ -1,13 +1,31 @@
 """Centralized configuration manager for SalmAlm.
 
-중앙집중 설정 관리자 — 각 모듈의 _load_config/_save_config를 통합합니다.
+중앙집중 설정 관리자 — 단일 진실 소스(Single Source of Truth).
+우선순위: CLI args > 환경변수 > config file > constants.py defaults
 """
 import json
+import os
 from pathlib import Path
 
 
+# Runtime CLI overrides (populated by __main__ / entry points)
+_cli_overrides: dict = {}
+
+
+def set_cli_overrides(overrides: dict) -> None:
+    """Set CLI argument overrides (called at startup)."""
+    _cli_overrides.update(overrides)
+
+
 class ConfigManager:
-    """중앙집중 설정 관리자."""
+    """중앙집중 설정 관리자.
+
+    Resolution order for ``resolve()``:
+      1. CLI args (``_cli_overrides``)
+      2. Environment variables (``SALMALM_<NAME>_<KEY>``)
+      3. Config file (``~/.salmalm/<name>.json``)
+      4. Caller-supplied *defaults* (typically from ``constants.py``)
+    """
 
     BASE_DIR = Path.home() / '.salmalm'
 
@@ -36,10 +54,38 @@ class ConfigManager:
             json.dump(config, f, indent=2, ensure_ascii=False)
 
     @classmethod
-    def get(cls, name: str, key: str, default=None):
-        """단일 키 조회."""
+    def resolve(cls, name: str, key: str, default=None):
+        """Resolve a single config value with full priority chain.
+
+        1. CLI args  2. Env var ``SALMALM_<NAME>_<KEY>``  3. Config file  4. *default*
+        """
+        # 1. CLI overrides
+        cli_key = f'{name}.{key}'
+        if cli_key in _cli_overrides:
+            return _cli_overrides[cli_key]
+
+        # 2. Environment variable
+        env_key = f'SALMALM_{name.upper()}_{key.upper()}'
+        env_val = os.environ.get(env_key)
+        if env_val is not None:
+            # Attempt JSON parse for non-string types
+            try:
+                return json.loads(env_val)
+            except (json.JSONDecodeError, ValueError):
+                return env_val
+
+        # 3. Config file
         config = cls.load(name)
-        return config.get(key, default)
+        if key in config:
+            return config[key]
+
+        # 4. Caller-supplied default (constants.py value)
+        return default
+
+    @classmethod
+    def get(cls, name: str, key: str, default=None):
+        """단일 키 조회 (resolve 사용)."""
+        return cls.resolve(name, key, default)
 
     @classmethod
     def set(cls, name: str, key: str, value) -> None:

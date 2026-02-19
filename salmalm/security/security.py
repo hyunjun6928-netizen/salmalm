@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from .constants import BASE_DIR, VERSION, KST
+from salmalm.constants import BASE_DIR, VERSION, KST
 
 
 # ── Sensitive Data Redaction ─────────────────────────────────
@@ -250,7 +250,7 @@ class SecurityAuditor:
         issues = []
         # Check that _require_auth exists and is used
         try:
-            from .web import WebHandler
+            from salmalm.web import WebHandler
             public_paths = WebHandler._PUBLIC_PATHS
             if '/api/vault' in public_paths:
                 issues.append('CRITICAL: /api/vault is public')
@@ -267,7 +267,7 @@ class SecurityAuditor:
 
         # Check CSRF protection
         try:
-            from .web import WebHandler
+            from salmalm.web import WebHandler
             if hasattr(WebHandler, '_check_origin'):
                 pass  # Good
             else:
@@ -285,16 +285,16 @@ class SecurityAuditor:
     def _check_a02_cryptographic_failures(self) -> dict:
         """A02: Cryptographic Failures — 암호화 취약점."""
         issues = []
-        from .crypto import vault, HAS_CRYPTO
+        from salmalm.crypto import vault, HAS_CRYPTO
         if not HAS_CRYPTO:
             issues.append('WARN: AES-256-GCM unavailable (using HMAC-CTR fallback)')
         # Check PBKDF2 iterations
-        from .constants import PBKDF2_ITER
+        from salmalm.constants import PBKDF2_ITER
         if PBKDF2_ITER < 100000:
             issues.append(f'WARN: PBKDF2 iterations low ({PBKDF2_ITER}), recommend ≥100000')
         # Check password hashing in auth
         try:
-            from .auth import _hash_password
+            from salmalm.auth import _hash_password
             h, s = _hash_password('test')
             if len(h) < 32:
                 issues.append('Password hash output too short')
@@ -313,7 +313,7 @@ class SecurityAuditor:
         # Verify parameterized queries are used
         # (Static analysis: grep for string formatting in SQL)
         try:
-            web_src = Path(__file__).parent / 'web.py'
+            web_src = Path(__file__).resolve().parent.parent / 'web.py'
             content = web_src.read_text()
             # Check for f-string SQL (dangerous pattern)
             if re.search(r'execute\(f["\']', content):
@@ -326,7 +326,7 @@ class SecurityAuditor:
 
         # Check XSS protection (CSP headers)
         try:
-            from .web import WebHandler
+            from salmalm.web import WebHandler
             handler = WebHandler
             if hasattr(handler, '_security_headers'):
                 pass  # CSP headers present
@@ -337,7 +337,7 @@ class SecurityAuditor:
 
         # Check path traversal protection
         try:
-            from .tools_common import _resolve_path
+            from salmalm.tools_common import _resolve_path
             pass  # Function exists
         except ImportError:
             issues.append('Missing path traversal protection')
@@ -355,7 +355,7 @@ class SecurityAuditor:
         issues = []
         # Check rate limiting
         try:
-            from .auth import rate_limiter
+            from salmalm.auth import rate_limiter
             if not rate_limiter:
                 issues.append('No rate limiting configured')
         except Exception:
@@ -363,7 +363,7 @@ class SecurityAuditor:
 
         # Check request size limits
         try:
-            from .web import WebHandler
+            from salmalm.web import WebHandler
             if hasattr(WebHandler, '_MAX_POST_SIZE'):
                 if WebHandler._MAX_POST_SIZE > 100 * 1024 * 1024:
                     issues.append('Request size limit too high')
@@ -374,7 +374,7 @@ class SecurityAuditor:
 
         # Check exec sandboxing
         try:
-            from .tools_common import _is_safe_command
+            from salmalm.tools_common import _is_safe_command
         except ImportError:
             issues.append('No command execution sandboxing')
 
@@ -393,19 +393,19 @@ class SecurityAuditor:
             issues.append('WARN: Debug mode enabled (SALMALM_DEBUG)')
         # Check for hardcoded secrets
         try:
-            from .constants import VERSION
+            from salmalm.constants import VERSION
         except Exception:
             pass
         # Check security headers
         try:
-            from .web import WebHandler
+            from salmalm.web import WebHandler
             if not hasattr(WebHandler, '_security_headers'):
                 issues.append('Missing security headers method')
         except Exception:
             pass
         # Check allowed HTTP methods
         try:
-            from .web import WebHandler
+            from salmalm.web import WebHandler
             methods = ['do_GET', 'do_POST', 'do_PUT', 'do_OPTIONS']
             for m in ['do_DELETE', 'do_PATCH', 'do_TRACE']:
                 if hasattr(WebHandler, m):
@@ -437,7 +437,7 @@ class SecurityAuditor:
         """A07: Authentication Failures — 인증 실패."""
         issues = []
         try:
-            from .auth import auth_manager
+            from salmalm.auth import auth_manager
             if auth_manager._lockout_duration < 60:
                 issues.append('Lockout duration too short')
             if auth_manager._max_attempts > 10:
@@ -446,7 +446,7 @@ class SecurityAuditor:
             issues.append('Auth manager not available')
         # Check session timeout
         try:
-            from .auth import TokenManager
+            from salmalm.auth import TokenManager
             # Default token expiry is 24h (86400s)
         except Exception:
             pass
@@ -462,7 +462,7 @@ class SecurityAuditor:
         issues = []
         # Check if update verification exists
         try:
-            web_src = Path(__file__).parent / 'web.py'
+            web_src = Path(__file__).resolve().parent.parent / 'web.py'
             content = web_src.read_text()
             if 'pip install' in content and 'hash' not in content.lower():
                 issues.append('WARN: pip install without hash verification')
@@ -479,11 +479,11 @@ class SecurityAuditor:
         """A09: Logging — 보안 로깅."""
         issues = []
         try:
-            from .core import audit_log
+            from salmalm.core import audit_log
         except ImportError:
             issues.append('audit_log not available')
         # Check if audit DB exists
-        from .constants import AUDIT_DB
+        from salmalm.constants import AUDIT_DB
         if not Path(AUDIT_DB).exists():
             issues.append('WARN: Audit database not yet created')
         status = 'WARN' if issues else 'PASS'
@@ -498,7 +498,7 @@ class SecurityAuditor:
         issues = []
         # Verify SSRF protection exists
         try:
-            from .tools_common import _is_private_url
+            from salmalm.tools_common import _is_private_url
             # Test internal IPs
             blocked, _ = _is_private_url('http://127.0.0.1/')
             if not blocked:

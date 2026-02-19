@@ -5,12 +5,12 @@ import asyncio, gzip, http.server, json, os, re, secrets, sys, time
 from pathlib import Path
 from typing import Optional
 
-from .constants import *
-from .crypto import vault, log
-from .core import get_usage_report, router, audit_log
-from .auth import auth_manager, rate_limiter, extract_auth, RateLimitExceeded
-from .logging_ext import request_logger, set_correlation_id
-from .templates import WEB_HTML, ONBOARDING_HTML, UNLOCK_HTML, SETUP_HTML
+from salmalm.constants import *
+from salmalm.crypto import vault, log
+from salmalm.core import get_usage_report, router, audit_log
+from salmalm.auth import auth_manager, rate_limiter, extract_auth, RateLimitExceeded
+from salmalm.logging_ext import request_logger, set_correlation_id
+from salmalm.templates import WEB_HTML, ONBOARDING_HTML, UNLOCK_HTML, SETUP_HTML
 
 # ============================================================
 
@@ -187,7 +187,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not title:
                 self._json({'ok': False, 'error': 'Missing title'}, 400)
                 return
-            from .core import _get_db
+            from salmalm.core import _get_db
             conn = _get_db()
             try:
                 conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
@@ -266,15 +266,15 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
     # ── Extracted GET handlers ────────────────────────────────
     def _get_uptime(self):
-        from .sla import uptime_monitor
+        from salmalm.sla import uptime_monitor
         self._json(uptime_monitor.get_stats())
 
     def _get_latency(self):
-        from .sla import latency_tracker
+        from salmalm.sla import latency_tracker
         self._json(latency_tracker.get_stats())
 
     def _get_sla(self):
-        from .sla import uptime_monitor, latency_tracker, watchdog, sla_config
+        from salmalm.sla import uptime_monitor, latency_tracker, watchdog, sla_config
         self._json({
             'uptime': uptime_monitor.get_stats(),
             'latency': latency_tracker.get_stats(),
@@ -283,15 +283,15 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         })
 
     def _get_sla_config(self):
-        from .sla import sla_config
+        from salmalm.sla import sla_config
         self._json(sla_config.get_all())
 
     def _get_nodes(self):
-        from .nodes import node_manager
+        from salmalm.nodes import node_manager
         self._json({'nodes': node_manager.list_nodes()})
 
     def _get_gateway_nodes(self):
-        from .nodes import gateway
+        from salmalm.nodes import gateway
         self._json({'nodes': gateway.list_nodes()})
 
     def _get_status(self):
@@ -301,18 +301,18 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     'model': router.force_model or 'auto'})
 
     def _get_metrics(self):
-        from .core import _metrics
+        from salmalm.core import _metrics
         usage = get_usage_report()
         _metrics['total_cost'] = usage.get('total_cost', 0.0)
         merged = {**request_logger.get_metrics(), **_metrics}
         self._json(merged)
 
     def _get_cert(self):
-        from .tls import get_cert_info
+        from salmalm.tls import get_cert_info
         self._json(get_cert_info())
 
     def _get_ws_status(self):
-        from .ws import ws_server
+        from salmalm.ws import ws_server
         self._json({
             'running': ws_server._running,
             'clients': ws_server.client_count,
@@ -321,73 +321,73 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
     def _get_usage_daily(self):
         if not self._require_auth('user'): return
-        from .edge_cases import usage_tracker
+        from salmalm.edge_cases import usage_tracker
         self._json({'report': usage_tracker.daily_report()})
 
     def _get_usage_monthly(self):
         if not self._require_auth('user'): return
-        from .edge_cases import usage_tracker
+        from salmalm.edge_cases import usage_tracker
         self._json({'report': usage_tracker.monthly_report()})
 
     def _get_usage_models(self):
         if not self._require_auth('user'): return
-        from .edge_cases import usage_tracker
+        from salmalm.edge_cases import usage_tracker
         self._json({'breakdown': usage_tracker.model_breakdown()})
 
     def _get_groups(self):
         if not self._require_auth('user'): return
-        from .edge_cases import session_groups
+        from salmalm.edge_cases import session_groups
         self._json({'groups': session_groups.list_groups()})
 
     def _get_models(self):
         if not self._require_auth('user'): return
-        from .edge_cases import model_detector
+        from salmalm.edge_cases import model_detector
         force = '?force' in self.path
         models = model_detector.detect_all(force=force)
         self._json({'models': models, 'count': len(models)})
 
     def _get_soul(self):
         if not self._require_auth('user'): return
-        from .prompt import get_user_soul, USER_SOUL_FILE
+        from salmalm.prompt import get_user_soul, USER_SOUL_FILE
         self._json({'content': get_user_soul(), 'path': str(USER_SOUL_FILE)})
 
     def _get_routing(self):
         if not self._require_auth('user'): return
-        from .engine import get_routing_config
-        from .constants import MODELS
+        from salmalm.engine import get_routing_config
+        from salmalm.constants import MODELS
         self._json({'config': get_routing_config(), 'available_models': MODELS})
 
     def _get_failover(self):
         if not self._require_auth('user'): return
-        from .engine import get_failover_config, _load_cooldowns
+        from salmalm.engine import get_failover_config, _load_cooldowns
         self._json({'config': get_failover_config(), 'cooldowns': _load_cooldowns()})
 
     def _get_cron(self):
         if not self._require_auth('user'): return
-        from .core import _llm_cron
+        from salmalm.core import _llm_cron
         self._json({'jobs': _llm_cron.list_jobs() if _llm_cron else []})
 
     def _get_mcp(self):
         if not self._require_auth('user'): return
-        from .mcp import mcp_manager
+        from salmalm.mcp import mcp_manager
         servers = mcp_manager.list_servers()
         all_tools = mcp_manager.get_all_tools()
         self._json({'servers': servers, 'total_tools': len(all_tools)})
 
     def _get_rag(self):
         if not self._require_auth('user'): return
-        from .rag import rag_engine
+        from salmalm.rag import rag_engine
         self._json(rag_engine.get_stats())
 
     def _get_personas(self):
-        from .prompt import list_personas, get_active_persona
+        from salmalm.prompt import list_personas, get_active_persona
         session_id = self.headers.get('X-Session-Id', 'web')
         personas = list_personas()
         active = get_active_persona(session_id)
         self._json({'personas': personas, 'active': active})
 
     def _get_thoughts(self):
-        from .thoughts import thought_stream
+        from salmalm.thoughts import thought_stream
         import urllib.parse as _up
         qs = _up.parse_qs(_up.urlparse(self.path).query)
         search_q = qs.get('q', [''])[0]
@@ -399,7 +399,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self._json({'thoughts': results})
 
     def _get_thoughts_stats(self):
-        from .thoughts import thought_stream
+        from salmalm.thoughts import thought_stream
         self._json(thought_stream.stats())
 
     def _get_features(self):
@@ -475,7 +475,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     def _get_tools_list(self):
         tools = []
         try:
-            from .core import _build_tools
+            from salmalm.core import _build_tools
             for t in _build_tools():
                 tools.append({"name": t.get("name", ""), "description": t.get("description", "")})
         except Exception:
@@ -561,7 +561,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         elif self.path == '/api/sessions':
             if not self._require_auth('user'): return
-            from .core import _get_db
+            from salmalm.core import _get_db
             conn = _get_db()
             # Ensure title column exists
             try:
@@ -602,7 +602,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         elif self.path == '/api/notifications':
             if not self._require_auth('user'): return
-            from .core import _sessions
+            from salmalm.core import _sessions
             web_session = _sessions.get('web')
             notifications = []
             if web_session and hasattr(web_session, '_notifications'):
@@ -611,7 +611,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self._json({'notifications': notifications})
         elif self.path == '/api/presence':
             if not self._require_auth('user'): return
-            from .presence import presence_manager
+            from salmalm.presence import presence_manager
             self._json({
                 'clients': presence_manager.list_all(),
                 'counts': presence_manager.count_by_state(),
@@ -620,7 +620,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         elif self.path == '/api/channels':
             if not self._require_auth('user'): return
-            from .channel_router import channel_router
+            from salmalm.channel_router import channel_router
             self._json({
                 'channels': channel_router.list_channels(),
             })
@@ -628,7 +628,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/api/dashboard':
             if not self._require_auth('user'): return
             # Dashboard data: sessions, costs, tools, cron jobs
-            from .core import _sessions, _llm_cron, PluginLoader, SubAgent  # type: ignore[attr-defined]
+            from salmalm.core import _sessions, _llm_cron, PluginLoader, SubAgent  # type: ignore[attr-defined]
             sessions_info = [
                 {'id': s.id, 'messages': len(s.messages),
                  'last_active': s.last_active, 'created': s.created}
@@ -663,11 +663,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         elif self.path == '/api/plugins':
             if not self._require_auth('user'): return
-            from .core import PluginLoader
+            from salmalm.core import PluginLoader
             legacy_tools = PluginLoader.get_all_tools()
             legacy = [{'name': n, 'tools': len(p['tools']), 'path': p['path']}
                        for n, p in PluginLoader._plugins.items()]
-            from .plugin_manager import plugin_manager
+            from salmalm.plugin_manager import plugin_manager
             new_plugins = plugin_manager.list_plugins()
             self._json({
                 'plugins': legacy, 'total_tools': len(legacy_tools),
@@ -676,14 +676,14 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             })
         elif self.path == '/api/agents':
             if not self._require_auth('user'): return
-            from .agents import agent_manager
+            from salmalm.agents import agent_manager
             self._json({
                 'agents': agent_manager.list_agents(),
                 'bindings': agent_manager.list_bindings(),
             })
         elif self.path == '/api/hooks':
             if not self._require_auth('user'): return
-            from .hooks import hook_manager, VALID_EVENTS
+            from salmalm.hooks import hook_manager, VALID_EVENTS
             self._json({
                 'hooks': hook_manager.list_hooks(),
                 'valid_events': list(VALID_EVENTS),
@@ -700,7 +700,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': 'Missing q parameter'}, 400)
                 return
             lim = int(params.get('limit', ['20'])[0])
-            from .core import search_messages
+            from salmalm.core import search_messages
             results = search_messages(query, limit=lim)
             self._json({'query': query, 'results': results, 'count': len(results)})
 
@@ -715,7 +715,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
             fmt = params.get('format', ['json'])[0]
-            from .core import _get_db
+            from salmalm.core import _get_db
             conn = _get_db()
             row = conn.execute('SELECT messages, updated_at FROM session_store WHERE session_id=?', (sid,)).fetchone()
             if not row:
@@ -762,7 +762,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         elif self.path.startswith('/api/rag/search'):
             if not self._require_auth('user'): return
-            from .rag import rag_engine
+            from salmalm.rag import rag_engine
             import urllib.parse
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
@@ -780,26 +780,26 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             limit = int(params.get('limit', ['50'])[0])
             event_type = params.get('type', [None])[0]
             sid = params.get('session_id', [None])[0]
-            from .core import query_audit_log
+            from salmalm.core import query_audit_log
             entries = query_audit_log(limit=limit, event_type=event_type, session_id=sid)
             self._json({'entries': entries, 'count': len(entries)})
 
         elif self.path == '/api/security/report':
             if not self._require_auth('admin'): return
-            from .security import security_auditor
+            from salmalm.security import security_auditor
             self._json(security_auditor.audit())
 
         elif self.path == '/api/health/providers':
             # Provider health check — Open WebUI style (프로바이더 상태 확인)
             if not self._require_auth('user'): return
-            from .edge_cases import provider_health
+            from salmalm.edge_cases import provider_health
             force = '?force' in self.path or 'force=1' in self.path
             self._json(provider_health.check_all(force=force))
 
         elif self.path == '/api/bookmarks':
             # Message bookmarks — LobeChat style (메시지 북마크)
             if not self._require_auth('user'): return
-            from .edge_cases import bookmark_manager
+            from salmalm.edge_cases import bookmark_manager
             import urllib.parse
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
@@ -813,7 +813,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not self._require_auth('user'): return
             m = re.match(r'^/api/sessions/([^/]+)/summary', self.path)
             if m:
-                from .edge_cases import get_summary_card
+                from salmalm.edge_cases import get_summary_card
                 card = get_summary_card(m.group(1))
                 self._json({'summary': card})
             else:
@@ -823,7 +823,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not self._require_auth('user'): return
             m = re.match(r'^/api/sessions/([^/]+)/alternatives/(\d+)', self.path)
             if m:
-                from .edge_cases import conversation_fork
+                from salmalm.edge_cases import conversation_fork
                 alts = conversation_fork.get_alternatives(m.group(1), int(m.group(2)))
                 self._json({'alternatives': alts})
             else:
@@ -840,7 +840,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             params = urllib.parse.parse_qs(parsed.query)
             text = params.get('text', [''])[0]
             if text:
-                from .edge_cases import detect_paste_type
+                from salmalm.edge_cases import detect_paste_type
                 self._json(detect_paste_type(text))
             else:
                 self._json({'error': 'Missing text parameter'}, 400)
@@ -848,40 +848,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
 
         elif self.path == '/api/health':
-            from .stability import health_monitor
-            base_health = health_monitor.check_health()
-            # Deep check: verify LLM connectivity
-            llm_ok = False
-            llm_error = None
-            try:
-                from .llm import _http_post
-                model = router.force_model or router._pick_available(1)
-                provider = model.split('/')[0] if '/' in model else 'anthropic'
-                from .crypto import vault as _vault
-                if provider == 'anthropic' and _vault.get('anthropic_api_key'):
-                    _http_post('https://api.anthropic.com/v1/messages',
-                        {'x-api-key': _vault.get('anthropic_api_key'),
-                         'content-type': 'application/json', 'anthropic-version': '2023-06-01'},
-                        {'model': 'claude-3-5-haiku-20241022', 'max_tokens': 5,
-                         'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=10)
-                    llm_ok = True
-                elif provider == 'google' and _vault.get('google_api_key'):
-                    import urllib.request
-                    gk = _vault.get('google_api_key')
-                    req = urllib.request.Request(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gk}",
-                        data=json.dumps({'contents': [{'parts': [{'text': 'ping'}]}]}).encode(),
-                        headers={'Content-Type': 'application/json'})
-                    urllib.request.urlopen(req, timeout=10)
-                    llm_ok = True
-                else:
-                    llm_error = f'No key for {provider}'
-            except Exception as e:
-                llm_error = str(e)[:200]
-            base_health['llm_connected'] = llm_ok
-            if llm_error:
-                base_health['llm_error'] = llm_error
-            self._json(base_health)
+            # K8s readiness/liveness probe compatible: 200=healthy, 503=unhealthy
+            from salmalm.core.health import get_health_report
+            report = get_health_report()
+            status_code = 200 if report.get('status') == 'healthy' else 503
+            self._json(report, status=status_code)
 
 
 
@@ -932,7 +903,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not user or user.get('role') != 'admin':
                 self._json({'error': 'Admin access required'}, 403)
             else:
-                from .users import user_manager
+                from salmalm.users import user_manager
                 self._json({
                     'users': user_manager.get_all_users_with_stats(),
                     'multi_tenant': user_manager.multi_tenant_enabled,
@@ -944,7 +915,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not user:
                 self._json({'error': 'Authentication required'}, 401)
             else:
-                from .users import user_manager
+                from salmalm.users import user_manager
                 uid = user.get('uid') or user.get('id', 0)
                 quota = user_manager.get_quota(uid)
                 self._json({'quota': quota})
@@ -954,7 +925,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not user:
                 self._json({'error': 'Authentication required'}, 401)
             else:
-                from .users import user_manager
+                from salmalm.users import user_manager
                 uid = user.get('uid') or user.get('id', 0)
                 settings = user_manager.get_user_settings(uid)
                 self._json({'settings': settings})
@@ -964,7 +935,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not user or user.get('role') != 'admin':
                 self._json({'error': 'Admin access required'}, 403)
             else:
-                from .users import user_manager
+                from salmalm.users import user_manager
                 self._json({
                     'multi_tenant': user_manager.multi_tenant_enabled,
                     'registration_mode': user_manager.get_registration_mode(),
@@ -1105,11 +1076,11 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/dashboard':
             if not self._require_auth('user'): return
-            from .templates import DASHBOARD_HTML
+            from salmalm.templates import DASHBOARD_HTML
             self._html(DASHBOARD_HTML)
 
         elif self.path == '/docs':
-            from .docs import generate_api_docs_html
+            from salmalm.docs import generate_api_docs_html
             self._html(generate_api_docs_html())
         elif self.path.startswith('/uploads/'):
             # Serve uploaded files (images, audio) — basename-only to prevent traversal
@@ -1188,7 +1159,7 @@ self.addEventListener('fetch',e=>{{
     _MAX_POST_SIZE = 10 * 1024 * 1024
 
     def _do_post_inner(self):
-        from .engine import process_message
+        from salmalm.engine import process_message
         length = int(self.headers.get('Content-Length', 0))
 
         # Request size limit
@@ -1214,7 +1185,7 @@ self.addEventListener('fetch',e=>{{
         # ── Multi-tenant user management endpoints ──────────
         if self.path == '/api/users/register':
             # Register new user (admin or open registration)
-            from .users import user_manager
+            from salmalm.users import user_manager
             requester = extract_auth(dict(self.headers))
             reg_mode = user_manager.get_registration_mode()
             if reg_mode == 'admin_only':
@@ -1241,7 +1212,7 @@ self.addEventListener('fetch',e=>{{
             if username:
                 ok = auth_manager.delete_user(username)
             elif uid:
-                from .users import user_manager
+                from salmalm.users import user_manager
                 u = user_manager.get_user_by_id(uid)
                 ok = auth_manager.delete_user(u['username']) if u else False
             else:
@@ -1256,7 +1227,7 @@ self.addEventListener('fetch',e=>{{
             if not requester or requester.get('role') != 'admin':
                 self._json({'error': 'Admin access required'}, 403)
                 return
-            from .users import user_manager
+            from salmalm.users import user_manager
             uid = body.get('user_id')
             enabled = body.get('enabled', True)
             if not uid:
@@ -1272,7 +1243,7 @@ self.addEventListener('fetch',e=>{{
             if not requester or requester.get('role') != 'admin':
                 self._json({'error': 'Admin access required'}, 403)
                 return
-            from .users import user_manager
+            from salmalm.users import user_manager
             uid = body.get('user_id')
             if not uid:
                 self._json({'error': 'user_id required'}, 400)
@@ -1290,7 +1261,7 @@ self.addEventListener('fetch',e=>{{
             if not user:
                 self._json({'error': 'Authentication required'}, 401)
                 return
-            from .users import user_manager
+            from salmalm.users import user_manager
             uid = user.get('uid') or user.get('id', 0)
             allowed_keys = ('model_preference', 'persona', 'tts_enabled', 'tts_voice')
             updates = {k: v for k, v in body.items() if k in allowed_keys}
@@ -1305,7 +1276,7 @@ self.addEventListener('fetch',e=>{{
             if not requester or requester.get('role') != 'admin':
                 self._json({'error': 'Admin access required'}, 403)
                 return
-            from .users import user_manager
+            from salmalm.users import user_manager
             if 'multi_tenant' in body:
                 user_manager.enable_multi_tenant(body['multi_tenant'])
             if 'registration_mode' in body:
@@ -1407,7 +1378,7 @@ self.addEventListener('fetch',e=>{{
                 import subprocess
                 # Broadcast update start via WebSocket
                 try:
-                    from .ws import ws_server
+                    from salmalm.ws import ws_server
                     import asyncio
                     loop = asyncio.get_event_loop()
                     if loop.is_running():
@@ -1435,7 +1406,7 @@ self.addEventListener('fetch',e=>{{
             name = body.get('name', '')
             if not name:
                 self._json({'error': 'name required'}, 400); return
-            from .prompt import switch_persona
+            from salmalm.prompt import switch_persona
             content = switch_persona(session_id, name)
             if content is None:
                 self._json({'error': f'Persona "{name}" not found'}, 404); return
@@ -1447,7 +1418,7 @@ self.addEventListener('fetch',e=>{{
             content = body.get('content', '')
             if not name or not content:
                 self._json({'error': 'name and content required'}, 400); return
-            from .prompt import create_persona
+            from salmalm.prompt import create_persona
             ok = create_persona(name, content)
             if ok:
                 self._json({'ok': True})
@@ -1459,7 +1430,7 @@ self.addEventListener('fetch',e=>{{
             name = body.get('name', '')
             if not name:
                 self._json({'error': 'name required'}, 400); return
-            from .prompt import delete_persona
+            from salmalm.prompt import delete_persona
             ok = delete_persona(name)
             if ok:
                 self._json({'ok': True})
@@ -1469,7 +1440,7 @@ self.addEventListener('fetch',e=>{{
 
         if self.path == '/api/test-key':
             provider = body.get('provider', '')
-            from .llm import _http_post
+            from salmalm.llm import _http_post
             tests = {
                 'anthropic': lambda: _http_post(
                     'https://api.anthropic.com/v1/messages',
@@ -1532,7 +1503,7 @@ self.addEventListener('fetch',e=>{{
                 self._json({'error': 'No audio data'}, 400)
                 return
             try:
-                from .tool_handlers import execute_tool
+                from salmalm.tool_handlers import execute_tool
                 result = execute_tool('stt', {'audio_base64': audio_b64, 'language': lang})  # type: ignore[assignment]
                 text = result.replace('🎤 Transcription:\n', '') if isinstance(result, str) else ''
                 self._json({'ok': True, 'text': text})
@@ -1545,7 +1516,7 @@ self.addEventListener('fetch',e=>{{
             if not sid:
                 self._json({'ok': False, 'error': 'Missing session_id'}, 400)
                 return
-            from .core import _sessions, _get_db
+            from salmalm.core import _sessions, _get_db
             if sid in _sessions:
                 del _sessions[sid]
             conn = _get_db()
@@ -1558,7 +1529,7 @@ self.addEventListener('fetch',e=>{{
         elif self.path == '/api/soul':
             if not self._require_auth('user'): return
             content = body.get('content', '')
-            from .prompt import set_user_soul, reset_user_soul
+            from salmalm.prompt import set_user_soul, reset_user_soul
             if content.strip():
                 set_user_soul(content)
                 self._json({'ok': True, 'message': 'SOUL.md saved'})
@@ -1569,7 +1540,7 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/routing':
             if not self._require_auth('user'): return
-            from .engine import _save_routing_config, get_routing_config
+            from salmalm.engine import _save_routing_config, get_routing_config
             cfg = get_routing_config()
             for k in ('simple', 'moderate', 'complex'):
                 if k in body and body[k]:
@@ -1580,7 +1551,7 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/failover':
             if not self._require_auth('user'): return
-            from .engine import save_failover_config, get_failover_config
+            from salmalm.engine import save_failover_config, get_failover_config
             save_failover_config(body)
             self._json({'ok': True, 'config': get_failover_config()})
             return
@@ -1592,7 +1563,7 @@ self.addEventListener('fetch',e=>{{
             if not sid or not title:
                 self._json({'ok': False, 'error': 'Missing session_id or title'}, 400)
                 return
-            from .core import _get_db
+            from salmalm.core import _get_db
             conn = _get_db()
             # Store title in a separate column (add if not exists)
             try:
@@ -1611,7 +1582,7 @@ self.addEventListener('fetch',e=>{{
             if not sid:
                 self._json({'ok': False, 'error': 'Missing session_id'}, 400)
                 return
-            from .core import rollback_session
+            from salmalm.core import rollback_session
             result = rollback_session(sid, count)
             self._json(result)
 
@@ -1623,7 +1594,7 @@ self.addEventListener('fetch',e=>{{
             if not sid or idx is None or not content:
                 self._json({'ok': False, 'error': 'Missing session_id, message_index, or content'}, 400)
                 return
-            from .core import edit_message
+            from salmalm.core import edit_message
             result = edit_message(sid, int(idx), content)
             self._json(result)
 
@@ -1634,7 +1605,7 @@ self.addEventListener('fetch',e=>{{
             if not sid or idx is None:
                 self._json({'ok': False, 'error': 'Missing session_id or message_index'}, 400)
                 return
-            from .core import delete_message
+            from salmalm.core import delete_message
             result = delete_message(sid, int(idx))
             self._json(result)
 
@@ -1645,13 +1616,13 @@ self.addEventListener('fetch',e=>{{
             if not sid or message_index is None:
                 self._json({'ok': False, 'error': 'Missing session_id or message_index'}, 400)
                 return
-            from .core import branch_session
+            from salmalm.core import branch_session
             result = branch_session(sid, int(message_index))
             self._json(result)
 
         elif self.path == '/api/agents':
             if not self._require_auth('user'): return
-            from .agents import agent_manager
+            from salmalm.agents import agent_manager
             action = body.get('action', '')
             if action == 'create':
                 result = agent_manager.create(body.get('id', ''), body.get('display_name', ''))
@@ -1670,7 +1641,7 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/hooks':
             if not self._require_auth('user'): return
-            from .hooks import hook_manager
+            from salmalm.hooks import hook_manager
             action = body.get('action', '')
             if action == 'add':
                 result = hook_manager.add_hook(body.get('event', ''), body.get('command', ''))
@@ -1689,7 +1660,7 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/plugins/manage':
             if not self._require_auth('user'): return
-            from .plugin_manager import plugin_manager
+            from salmalm.plugin_manager import plugin_manager
             action = body.get('action', '')
             if action == 'reload':
                 result = plugin_manager.reload_all()
@@ -1707,7 +1678,7 @@ self.addEventListener('fetch',e=>{{
             # Abort generation — LibreChat style (생성 중지)
             if not self._require_auth('user'): return
             session_id = body.get('session', body.get('session_id', 'web'))
-            from .edge_cases import abort_controller
+            from salmalm.edge_cases import abort_controller
             abort_controller.set_abort(session_id)
             self._json({'ok': True, 'message': 'Abort signal sent / 중단 신호 전송됨'})
             return
@@ -1720,7 +1691,7 @@ self.addEventListener('fetch',e=>{{
             if message_index is None:
                 self._json({'error': 'Missing message_index'}, 400)
                 return
-            from .edge_cases import conversation_fork
+            from salmalm.edge_cases import conversation_fork
             try:
                 loop = asyncio.new_event_loop()
                 response = loop.run_until_complete(
@@ -1743,7 +1714,7 @@ self.addEventListener('fetch',e=>{{
             if not message:
                 self._json({'error': 'Missing message'}, 400)
                 return
-            from .edge_cases import compare_models
+            from salmalm.edge_cases import compare_models
             try:
                 loop = asyncio.new_event_loop()
                 results = loop.run_until_complete(
@@ -1763,11 +1734,11 @@ self.addEventListener('fetch',e=>{{
             if not all([session_id, message_index is not None, alt_id]):
                 self._json({'error': 'Missing parameters'}, 400)
                 return
-            from .edge_cases import conversation_fork
+            from salmalm.edge_cases import conversation_fork
             content = conversation_fork.switch_alternative(session_id, int(message_index), int(alt_id))
             if content:
                 # Update session messages
-                from .core import get_session
+                from salmalm.core import get_session
                 session = get_session(session_id)
                 ua = [(i, m) for i, m in enumerate(session.messages)
                       if m.get('role') in ('user', 'assistant')]
@@ -1789,7 +1760,7 @@ self.addEventListener('fetch',e=>{{
             if not session_id or message_index is None:
                 self._json({'error': 'Missing session_id or message_index'}, 400)
                 return
-            from .edge_cases import bookmark_manager
+            from salmalm.edge_cases import bookmark_manager
             if action == 'add':
                 ok = bookmark_manager.add(session_id, int(message_index),
                                           content_preview=body.get('preview', ''),
@@ -1807,7 +1778,7 @@ self.addEventListener('fetch',e=>{{
             # Session group CRUD — LobeChat style (그룹 관리)
             if not self._require_auth('user'): return
             action = body.get('action', 'create')
-            from .edge_cases import session_groups
+            from salmalm.edge_cases import session_groups
             if action == 'create':
                 name = body.get('name', '').strip()
                 if not name:
@@ -1846,7 +1817,7 @@ self.addEventListener('fetch',e=>{{
             if not text:
                 self._json({'error': 'Missing text'}, 400)
                 return
-            from .edge_cases import detect_paste_type
+            from salmalm.edge_cases import detect_paste_type
             self._json(detect_paste_type(text))
             return
 
@@ -1918,7 +1889,7 @@ self.addEventListener('fetch',e=>{{
                 except Exception as e:
                     log.error(f"SSE process_message error: {e}")
                     response = f'❌ Internal error: {type(e).__name__}'
-                from .core import get_session as _gs2
+                from salmalm.core import get_session as _gs2
                 _sess2 = _gs2(session_id)
                 send_sse('done', {'response': response,
                                    'model': getattr(_sess2, 'last_model', router.force_model or 'auto'),
@@ -1939,7 +1910,7 @@ self.addEventListener('fetch',e=>{{
                 except Exception as e:
                     log.error(f"Chat process_message error: {e}")
                     response = f'❌ Internal error: {type(e).__name__}'
-                from .core import get_session as _gs
+                from salmalm.core import get_session as _gs
                 _sess = _gs(session_id)
                 self._json({'response': response, 'model': getattr(_sess, 'last_model', router.force_model or 'auto'),
                              'complexity': getattr(_sess, 'last_complexity', 'auto')})
@@ -2004,7 +1975,7 @@ self.addEventListener('fetch',e=>{{
                         self._json({'error': 'Invalid filename'}, 400)
                         return
                     # Validate file type (Open WebUI style)
-                    from .edge_cases import validate_upload
+                    from salmalm.edge_cases import validate_upload
                     ok, err = validate_upload(fname, len(part.get_payload(decode=True) or b''))
                     if not ok:
                         self._json({'error': err}, 400)
@@ -2029,13 +2000,13 @@ self.addEventListener('fetch',e=>{{
                     if is_pdf:
                         # PDF text extraction (Open WebUI style)
                         try:
-                            from .edge_cases import process_uploaded_file
+                            from salmalm.edge_cases import process_uploaded_file
                             info = process_uploaded_file(fname, file_data)
                         except Exception:
                             info += '\n[PDF text extraction failed]'
                     elif is_text:
                         try:
-                            from .edge_cases import process_uploaded_file
+                            from salmalm.edge_cases import process_uploaded_file
                             info = process_uploaded_file(fname, file_data)
                         except Exception:
                             preview = file_data.decode('utf-8', errors='replace')[:3000]  # type: ignore[union-attr]
@@ -2080,7 +2051,7 @@ self.addEventListener('fetch',e=>{{
                 vault.set('ollama_url', ollama_url)
                 saved.append('ollama')
             # Test all provided keys
-            from .llm import _http_post
+            from salmalm.llm import _http_post
             test_results = []
             if body.get('anthropic_api_key'):
                 try:
@@ -2137,7 +2108,7 @@ self.addEventListener('fetch',e=>{{
 
         # === Gateway-Node Protocol ===
         elif self.path == '/api/gateway/register':
-            from .nodes import gateway
+            from salmalm.nodes import gateway
             node_id = body.get('node_id', '')
             url = body.get('url', '')
             if not node_id or not url:
@@ -2151,17 +2122,17 @@ self.addEventListener('fetch',e=>{{
             self._json(result)  # type: ignore[arg-type]
 
         elif self.path == '/api/gateway/heartbeat':
-            from .nodes import gateway
+            from salmalm.nodes import gateway
             node_id = body.get('node_id', '')
             self._json(gateway.heartbeat(node_id))
 
         elif self.path == '/api/gateway/unregister':
-            from .nodes import gateway
+            from salmalm.nodes import gateway
             node_id = body.get('node_id', '')
             self._json(gateway.unregister(node_id))
 
         elif self.path == '/api/gateway/dispatch':
-            from .nodes import gateway
+            from salmalm.nodes import gateway
             node_id = body.get('node_id', '')
             tool = body.get('tool', '')
             args = body.get('args', {})
@@ -2175,7 +2146,7 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/webhook/slack':
             # Slack Event API webhook
-            from .slack_bot import slack_bot
+            from salmalm.slack_bot import slack_bot
             if not slack_bot.bot_token:
                 self._json({'error': 'Slack not configured'}, 503)
                 return
@@ -2198,7 +2169,7 @@ self.addEventListener('fetch',e=>{{
             if not instance_id:
                 self._json({'error': 'instanceId required'}, 400)
                 return
-            from .presence import presence_manager
+            from salmalm.presence import presence_manager
             entry = presence_manager.register(
                 instance_id,
                 host=body.get('host', ''),
@@ -2210,7 +2181,7 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/webhook/telegram':
             # Telegram webhook endpoint
-            from .telegram import telegram_bot
+            from salmalm.telegram import telegram_bot
             if not telegram_bot.token:
                 self._json({'error': 'Telegram not configured'}, 503)
                 return
@@ -2242,13 +2213,13 @@ self.addEventListener('fetch',e=>{{
         elif self.path == '/api/sla/config':
             # Update SLA config (SLA 설정 업데이트)
             if not self._require_auth('admin'): return
-            from .sla import sla_config
+            from salmalm.sla import sla_config
             sla_config.update(body)
             self._json({'ok': True, 'config': sla_config.get_all()})
 
         elif self.path == '/api/node/execute':
             # Node endpoint: execute a tool locally (called by gateway)
-            from .tool_handlers import execute_tool
+            from salmalm.tool_handlers import execute_tool
             tool = body.get('tool', '')
             args = body.get('args', {})
             if not tool:
@@ -2261,7 +2232,7 @@ self.addEventListener('fetch',e=>{{
                 self._json({'error': str(e)[:500]}, 500)
 
         elif self.path == '/api/thoughts':
-            from .thoughts import thought_stream
+            from salmalm.thoughts import thought_stream
             content = body.get('content', '').strip()
             if not content:
                 self._json({'error': 'content required'}, 400)
@@ -2271,7 +2242,7 @@ self.addEventListener('fetch',e=>{{
             self._json({'ok': True, 'id': tid})
 
         elif self.path.startswith('/api/thoughts/search'):
-            from .thoughts import thought_stream
+            from salmalm.thoughts import thought_stream
             q = body.get('q', body.get('query', ''))
             if not q:
                 self._json({'error': 'query required'}, 400)
