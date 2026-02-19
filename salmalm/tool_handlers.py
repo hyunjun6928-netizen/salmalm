@@ -13,7 +13,7 @@ from .constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS,
                         PROTECTED_FILES, WORKSPACE_DIR, VERSION, KST, MEMORY_FILE, MEMORY_DIR, AUDIT_DB)
 from .crypto import vault, log
 from .core import (audit_log, get_usage_report, _tfidf, SubAgent, SkillLoader,
-                   _sessions, get_session, _tg_bot)
+                   _sessions, get_session, _tg_bot, memory_manager)
 from .llm import _http_post, _http_get
 
 # clipboard lock
@@ -257,24 +257,10 @@ def execute_tool(name: str, args: dict) -> str:
             return extractor.get_text()[:max_chars]
 
         elif name == 'memory_read':
-            fname = args['file']
-            if fname == 'MEMORY.md':
-                p = MEMORY_FILE
-            else:
-                p = MEMORY_DIR / fname
-            if not p.exists():
-                return f'❌ File not found: {fname}'
-            return p.read_text(encoding='utf-8')[:30000]
+            return memory_manager.read(args['file'])[:30000]
 
         elif name == 'memory_write':
-            fname = args['file']
-            if fname == 'MEMORY.md':
-                p = MEMORY_FILE
-            else:
-                p = MEMORY_DIR / fname
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(args['content'], encoding='utf-8')
-            return f'✅ {fname} saved'
+            return memory_manager.write(args['file'], args['content'])
 
         elif name == 'usage_report':
             report = get_usage_report()
@@ -290,8 +276,7 @@ def execute_tool(name: str, args: dict) -> str:
         elif name == 'memory_search':
             query = args['query']
             max_results = args.get('max_results', 5)
-            # Use TF-IDF semantic search
-            results = _tfidf.search(query, max_results)
+            results = memory_manager.search(query, max_results)
             if not results:
                 return f'No results for: "{query}"'
             out = []

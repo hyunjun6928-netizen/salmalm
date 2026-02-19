@@ -40,12 +40,19 @@ def build_system_prompt(full: bool = True) -> str:
         else:
             parts.append(f"# Long-term Memory (recent)\n{mem[-2000:]}")
 
-    # Today's memory log
-    today = datetime.now(KST).strftime('%Y-%m-%d')
-    today_log = MEMORY_DIR / f'{today}.md'
-    if today_log.exists():
-        tlog = today_log.read_text(encoding='utf-8')
-        parts.append(f"# Today's Log\n{tlog[-2000:]}")
+    # Session memory context (today + yesterday)
+    try:
+        from .memory import memory_manager
+        session_ctx = memory_manager.load_session_context()
+        if session_ctx:
+            parts.append(session_ctx)
+    except Exception:
+        # Fallback: just load today's log
+        today = datetime.now(KST).strftime('%Y-%m-%d')
+        today_log = MEMORY_DIR / f'{today}.md'
+        if today_log.exists():
+            tlog = today_log.read_text(encoding='utf-8')
+            parts.append(f"# Today's Log\n{tlog[-2000:]}")
 
     # AGENTS.md (behavior rules)
     if AGENTS_FILE.exists():
