@@ -104,7 +104,7 @@ class PresenceManager:
 
     def get(self, instance_id: str) -> Optional[PresenceEntry]:
         entry = self._entries.get(instance_id)
-        if entry and not entry.is_expired:
+        if entry and (time.time() - entry.last_activity) <= self._ttl:
             return entry
         return None
 
@@ -130,7 +130,9 @@ class PresenceManager:
 
     def _evict_expired(self) -> int:
         """Remove expired entries. Returns count removed."""
-        expired = [k for k, v in self._entries.items() if v.is_expired]
+        now = time.time()
+        expired = [k for k, v in self._entries.items()
+                   if (now - v.last_activity) > self._ttl]
         for k in expired:
             del self._entries[k]
         return len(expired)

@@ -61,7 +61,7 @@ class TestPresenceEntry(unittest.TestCase):
 
 class TestPresenceManager(unittest.TestCase):
     def setUp(self):
-        self.pm = PresenceManager(ttl=2, max_entries=5)
+        self.pm = PresenceManager(ttl=300, max_entries=5)
 
     def test_register(self):
         e = self.pm.register('inst1', host='h1')
@@ -104,7 +104,7 @@ class TestPresenceManager(unittest.TestCase):
 
     def test_ttl_expiry(self):
         self.pm.register('inst1')
-        self.pm._entries['inst1'].last_activity = time.time() - 10
+        self.pm._entries['inst1'].last_activity = time.time() - 400
         self.assertEqual(self.pm.count(), 0)  # evicted on count()
 
     def test_count_by_state(self):
@@ -128,7 +128,7 @@ class TestPresenceManager(unittest.TestCase):
 
     def test_get_expired(self):
         self.pm.register('inst1')
-        self.pm._entries['inst1'].last_activity = time.time() - 10
+        self.pm._entries['inst1'].last_activity = time.time() - 400
         e = self.pm.get('inst1')
         self.assertIsNone(e)
 
