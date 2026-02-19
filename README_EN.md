@@ -1,4 +1,4 @@
-# 😈 SalmAlm v0.11.1
+# 😈 SalmAlm v0.12.4
 
 [![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
@@ -63,7 +63,7 @@ python -m salmalm
 Think of it as your own local ChatGPT, but with superpowers:
 
 - **Talk to 27 LLMs** — Claude, GPT, Grok, Gemini, DeepSeek, Llama — through one interface
-- **30 built-in tools** — run commands, edit files, search the web, manage cron jobs, control browsers
+- **43 built-in tools — exec, files, web, Gmail, Calendar, reminders, weather, RSS, translate, QR, workflows
 - **RAG search** — BM25 over your local files, no OpenAI embeddings needed
 - **MCP support** — connect to Cursor, VS Code, or any MCP-compatible client
 - **WebSocket** — real-time streaming via a from-scratch RFC 6455 implementation
@@ -177,9 +177,9 @@ Not just a chat proxy. Every message goes through:
 ## 📊 Stats
 
 - ~10,400 lines of Python across 25 modules
-- 30 built-in tools + plugin extensibility
+- 43 built-in tools + plugin extensibility
 - 27+ LLM models with cost tracking (including Ollama local models)
-- 85 unit tests
+- 498 unit tests / 48% coverage / mypy 0 errors
 - 21/21 self-test on startup
 - 8-component health monitoring
 

@@ -1,4 +1,4 @@
-# 😈 삶앎 (SalmAlm) v0.11.1
+# 😈 삶앎 (SalmAlm) v0.12.4
 
 [![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
@@ -30,16 +30,18 @@
 | 🔐 **Security** | AES-256-GCM 볼트, JWT 인증, RBAC, CORS 화이트리스트, 레이트 리밋, PBKDF2 |
 | 📊 **Cost Tracking** | 모델별 토큰/비용 실시간 추적 (27개 모델) |
 | ⏰ **Cron** | LLM 기반 스케줄 작업, cron 표현식/인터벌/원샷 지원 |
-| 🔧 **30 Tools** | exec, 파일 CRUD, 웹 검색, RAG, MCP, 브라우저, 노드, 헬스체크 등 |
+| 🔧 **43 Tools** | exec, 파일, 웹, RAG, MCP, 브라우저, Gmail, Calendar, 리마인더, 날씨, RSS, 번역, QR, 워크플로우 등 |
+| 🔗 **Google OAuth2** | Gmail + Calendar 원클릭 연동 (설정에서 Connect Google 클릭) |
 | 🧩 **Plugins** | `plugins/` 폴더에 .py 드롭 → 자동 도구 로딩 |
 | 📁 **.env 지원** | vault 대신 `.env` 파일로 API 키 관리 가능 (vault 폴백) |
 
 ## 📊 Stats
 
-- **25 modules** / ~10,400 lines of Python
-- **30 built-in tools** + plugin extensibility
+- **25 modules** / ~12,000+ lines of Python
+- **43 built-in tools** + plugin extensibility
 - **27+ LLM models** (Anthropic, OpenAI, xAI, Google, DeepSeek, Meta, Ollama)
-- **85 unit tests** + **21/21 self-test** on startup
+- **498 unit tests** / 48% coverage / mypy 0 errors / 98% docstrings
+- **CI**: 12-matrix (Python 3.10–3.13 × Ubuntu/macOS/Windows)
 - **1 optional dependency** (`cryptography` for AES-256-GCM — graceful fallback without it)
 
 ## 🏗️ Architecture

@@ -1,5 +1,58 @@
 # Changelog
 
+## v0.12.4 (2026-02-19)
+
+### ✨ Features
+- **Google OAuth2 Setup Wizard** — `/api/google/auth` redirects to Google consent screen, `/api/google/callback` exchanges code for refresh token and saves to vault automatically
+- **Google Connect UI** — Settings page now has a Google Account card with Client ID/Secret inputs and one-click "Connect Google" button
+- **43 tools** with categorized system prompt — AI now knows all available tools including gmail, google_calendar, reminder, workflow, weather, rss_reader, translate, qr_code, etc.
+
+### 🐛 Fixes
+- **Global fetch error handler** — all fetch() calls now show toast notifications on network errors (no more silent failures)
+- **Toast notification system** — replaces browser alert() with styled, auto-dismissing toast messages
+- **Unlock page try/catch** — prevents unhandled promise rejection on network error
+- **CI fix** — `test_http_request_get` mocked to avoid httpbin.org 502 flakiness
+
+### 📝 Changes
+- System prompt updated: 31 → 43 tools with categorized descriptions
+- Manifest description updated to 43 tools
+
+## v0.12.2 (2026-02-19)
+
+### ✨ Features
+- **4 new tools** (43 total): `weather` (wttr.in), `rss_reader` (stdlib XML), `translate` (Google free API), `qr_code` (QR generation)
+- **Korean natural language time parsing** — "내일 오전 9시", "30분 후", "다음주 월요일" for reminders
+- **i18n labels** for all new tools (EN/KO)
+
+## v0.12.0 (2026-02-19)
+
+### ✨ Features
+- **MCP Server + Client** — JSON-RPC 2.0 stdio transport, tools/resources/prompts endpoints
+- **7 new tools** (39 total): `google_calendar`, `gmail`, `reminder`, `tts_generate`, `workflow`, `file_index`, `notification`
+- **412 tests** passing
+- **Dockerfile** + Ollama onboarding support
+
+## v0.11.12 (2026-02-19)
+
+### 🐛 Fixes
+- i18n for setup/unlock pages (JS localStorage)
+- Service worker version-aware caching
+- VERSION scope bug in do_GET
+
+## v0.11.6 (2026-02-19)
+
+### 🐛 Fixes
+- **Python 3.14 SyntaxError** — 36 invalid escape sequences doubled in templates.py JS
+- **CSP Google Fonts** — added fonts.googleapis.com/fonts.gstatic.com to style-src
+
+## v0.11.5 (2026-02-19)
+
+### ✨ Quality
+- **CSP nonce** — removed unsafe-inline from script-src; 49 inline handlers converted to data-action event delegation
+- **98% docstring coverage**
+- **375 tests**, mypy 0 errors, 48% coverage
+- Accessibility: aria-labels on interactive elements
+
 ## v0.11.1 (2026-02-19)
 
 ### ✨ Features

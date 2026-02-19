@@ -265,6 +265,19 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="key-test-result" style="margin-top:8px;font-size:12px"></div>
     <div id="vault-keys" style="margin-top:12px"></div>
   </div>
+  <div class="settings-card">
+    <h3>🔗 Google Account</h3>
+    <p style="font-size:12px;color:var(--text2);margin:0 0 8px">Connect Gmail &amp; Calendar. Requires OAuth2 Client ID from <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent)">Google Cloud Console</a>.</p>
+    <label>Client ID</label>
+    <input id="g-client-id" type="password" placeholder="xxx.apps.googleusercontent.com" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;margin-bottom:4px">
+    <label>Client Secret</label>
+    <input id="g-client-secret" type="password" placeholder="GOCSPX-..." style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;margin-bottom:8px">
+    <div style="display:flex;gap:8px">
+      <button class="btn" data-action="saveGoogleCreds" style="background:var(--accent);color:#fff">Save Credentials</button>
+      <button class="btn" data-action="connectGoogle" style="background:#4285f4;color:#fff">🔗 Connect Google</button>
+    </div>
+    <div id="google-status" style="margin-top:8px;font-size:12px"></div>
+  </div>
   <div class="settings-card" id="usage-card">
     <h3data-i18n="h-usage">📊 Token Usage</h3>
     <div id="usage-detail"></div>
@@ -339,6 +352,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     fileNameEl=document.getElementById('file-name'),fileSizeEl=document.getElementById('file-size'),
     imgPrev=document.getElementById('img-preview'),inputArea=document.getElementById('input-area');
   let _tok=sessionStorage.getItem('tok')||'',pendingFile=null;
+  function _toast(msg,type){var t=document.createElement('div');t.textContent=msg;t.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;color:#fff;font-size:14px;z-index:99999;transition:opacity 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.3);max-width:80vw;text-align:center;'+(type==='error'?'background:#ef4444':'background:#22c55e');document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove()},300)},3000)}
+  var _origFetch=window.fetch;window.fetch=function(){return _origFetch.apply(this,arguments).catch(function(e){_toast(e.message||'Network error','error');throw e})};
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
 
@@ -668,7 +683,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
               if(typingEl)typingEl.remove();
               var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
               addMsg('assistant',edata.response||'',(edata.model||'')+' · ⏱️'+_secs+'s');
-              fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+              fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)}).catch(function(e){_toast(e.message||'Network error','error')});
             }
           }
         }
@@ -686,7 +701,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
         if(d.response)addMsg('assistant',d.response,(d.model||'')+' · ⏱️'+_secs2+'s');
         else if(d.error)addMsg('assistant','❌ '+d.error);
-        fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+        fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)}).catch(function(e){_toast(e.message||'Network error','error')});
       }
     }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ Error: '+se.message)}
     finally{btn.disabled=false;input.focus()}
@@ -992,7 +1007,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='setPw')window.setPw();
     else if(a==='checkUpdate')window.checkUpdate();
     else if(a==='doUpdate')window.doUpdate();
-    else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){addMsg('assistant','\u2705 Saved')})}
+    else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){_toast('Ollama URL saved')})}
+    else if(a==='saveGoogleCreds'){var cid=document.getElementById('g-client-id').value,cs=document.getElementById('g-client-secret').value;if(!cid||!cs){_toast('Enter both Client ID and Secret','error');return}fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'google_client_id',value:cid})}).then(function(){return fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'google_client_secret',value:cs})})}).then(function(){_toast('Google credentials saved');document.getElementById('google-status').textContent='\u2705 Credentials saved. Click Connect Google to authorize.'})}
+    else if(a==='connectGoogle'){window.location.href='/api/google/auth'}
     else if(a==='switchSession'){e.stopPropagation();window.switchSession(el.getAttribute('data-sid'))}
     else if(a==='deleteSession'){e.stopPropagation();window.deleteSession(el.getAttribute('data-sid'))}
     else if(a==='copyCode'){var cid=el.getAttribute('data-copy-id');window.copyCode(cid)}
@@ -1315,11 +1332,13 @@ button:hover{background:#4338ca}
 </div>
 <script>
 async function unlock(){
+  try{
   const pw=document.getElementById('pw').value;
   const r=await fetch('/api/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
   const d=await r.json();
   if(d.ok){sessionStorage.setItem('tok',d.token||'');location.reload()}
   else{const e=document.getElementById('err');e.textContent=d.error;e.style.display='block'}
+  }catch(e){const er=document.getElementById('err');er.textContent=e.message;er.style.display='block'}
 }
 </script></body></html>'''
 
