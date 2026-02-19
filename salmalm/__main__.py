@@ -199,7 +199,9 @@ def main() -> None:
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     data = _json.loads(resp.read())
                 latest = data.get('info', {}).get('version', '')
-                if latest and latest != VERSION:
+                def _ver_tuple(v):
+                    return tuple(int(x) for x in v.split('.'))
+                if latest and _ver_tuple(latest) > _ver_tuple(VERSION):
                     if getattr(sys, 'frozen', False):
                         return (f"⬆️  New version {latest} available!\n"
                                 f"   Download: https://github.com/hyunjun6928-netizen/salmalm/releases/latest")
