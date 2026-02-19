@@ -73,20 +73,20 @@ def generate_api_docs_html() -> str:
 <style>
 :root{{--bg:#0f1117;--bg2:#1a1d27;--text:#e0e0e0;--text2:#888;--accent:#7c5cfc;--green:#34d399;--border:#252838}}
 *{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}}
-.container{{max-width:1000px;margin:0 auto;padding:24px}}
+body{{font-family:-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.45}}
+.container{{max-width:900px;margin:0 auto;padding:16px}}
 h1{{color:var(--accent);margin-bottom:8px;font-size:28px}}
-h2{{color:var(--accent);margin:32px 0 16px;font-size:20px;border-bottom:1px solid var(--border);padding-bottom:8px}}
-.subtitle{{color:var(--text2);margin-bottom:32px}}
-table{{width:100%;border-collapse:collapse;margin:16px 0}}
-th,td{{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)}}
+h2{{color:var(--accent);margin:20px 0 10px;font-size:19px;border-bottom:1px solid var(--border);padding-bottom:6px}}
+.subtitle{{color:var(--text2);margin-bottom:16px}}
+table{{width:100%;border-collapse:collapse;margin:8px 0}}
+th,td{{padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}}
 th{{color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:1px}}
 code{{background:#252838;padding:2px 6px;border-radius:4px;font-size:13px}}
 .method{{padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:0.5px}}
 .method-get{{background:#0d3b2e;color:#34d399}}
 .method-post{{background:#3b2e0d;color:#fbbf24}}
 .method-ws{{background:#2e0d3b;color:#a78bfa}}
-.tool{{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px;margin:12px 0}}
+.tool{{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:8px 0}}
 .tool-name{{font-weight:700;color:var(--green);font-size:16px}}
 .tool-desc{{color:var(--text2);margin:4px 0 8px;font-size:14px}}
 .params{{font-size:13px}}
@@ -94,8 +94,8 @@ code{{background:#252838;padding:2px 6px;border-radius:4px;font-size:13px}}
 .param code{{color:var(--accent)}}
 .type{{color:var(--text2);font-size:12px}}
 .req{{color:#f87171;font-weight:bold}}
-.stats{{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}}
-.stat{{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:16px 20px;text-align:center}}
+.stats{{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}}
+.stat{{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center}}
 .stat-value{{font-size:24px;font-weight:700;color:var(--accent)}}
 .stat-label{{font-size:12px;color:var(--text2);margin-top:4px}}
 a{{color:var(--accent);text-decoration:none}}
@@ -141,7 +141,7 @@ a:hover{{text-decoration:underline}}
 <h2>🔧 Tools ({len(TOOL_DEFINITIONS)})</h2>
 {''.join(tool_rows)}
 
-<div style="margin-top:48px;padding:24px 0;border-top:1px solid var(--border);color:var(--text2);font-size:13px;text-align:center">
+<div style="margin-top:24px;padding:12px 0;border-top:1px solid var(--border);color:var(--text2);font-size:13px;text-align:center">
 SalmAlm v{VERSION} — <a href="https://github.com/hyunjun6928-netizen/salmalm">GitHub</a>
 </div>
 </div></body></html>'''
