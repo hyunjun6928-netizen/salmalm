@@ -2,7 +2,7 @@
 import asyncio, importlib, json, os, re, shutil, subprocess, threading, time
 from pathlib import Path
 
-from .constants import WORKSPACE_DIR
+from .constants import WORKSPACE_DIR, BASE_DIR
 from .crypto import log
 
 
