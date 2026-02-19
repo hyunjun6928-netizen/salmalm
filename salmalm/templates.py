@@ -270,26 +270,26 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="usage-detail"></div>
   </div>
   <div class="settings-card">
-    <h3>🔒 마스터 비밀번호</h3>
+    <h3 data-i18n="h-password">🔒 마스터 비밀번호</h3>
     <div id="pw-section-change">
-      <label>현재 비밀번호</label>
-      <input type="password" id="pw-old" placeholder="현재 비밀번호">
-      <label>새 비밀번호</label>
-      <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상, 비우면 해제)">
-      <label>새 비밀번호 확인</label>
-      <input type="password" id="pw-confirm" placeholder="새 비밀번호 다시 입력">
+      <label data-i18n="pw-current">현재 비밀번호</label>
+      <input type="password" id="pw-old" data-i18n-ph="pw-current" placeholder="현재 비밀번호">
+      <label data-i18n="pw-new">새 비밀번호</label>
+      <input type="password" id="pw-new" data-i18n-ph="pw-new-hint" placeholder="새 비밀번호 (4자 이상, 비우면 해제)">
+      <label data-i18n="pw-confirm">새 비밀번호 확인</label>
+      <input type="password" id="pw-confirm" data-i18n-ph="pw-confirm-hint" placeholder="새 비밀번호 다시 입력">
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn" data-action="changePw">변경</button>
-        <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="removePw">비밀번호 해제</button>
+        <button class="btn" data-action="changePw" data-i18n="pw-change">변경</button>
+        <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="removePw" data-i18n="pw-remove">비밀번호 해제</button>
       </div>
     </div>
     <div id="pw-section-set" style="display:none">
-      <p style="font-size:13px;color:var(--text2);margin-bottom:12px">현재 비밀번호가 설정되어 있지 않습니다.</p>
-      <label>새 비밀번호</label>
-      <input type="password" id="pw-set-new" placeholder="비밀번호 (4자 이상)">
-      <label>비밀번호 확인</label>
-      <input type="password" id="pw-set-confirm" placeholder="다시 입력">
-      <button class="btn" data-action="setPw">비밀번호 설정</button>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px" data-i18n="pw-not-set">현재 비밀번호가 설정되어 있지 않습니다.</p>
+      <label data-i18n="pw-new">새 비밀번호</label>
+      <input type="password" id="pw-set-new" data-i18n-ph="pw-min4" placeholder="비밀번호 (4자 이상)">
+      <label data-i18n="pw-confirm">비밀번호 확인</label>
+      <input type="password" id="pw-set-confirm" data-i18n-ph="pw-reenter" placeholder="다시 입력">
+      <button class="btn" data-action="setPw" data-i18n="pw-set">비밀번호 설정</button>
     </div>
     <div id="pw-result" style="margin-top:8px;font-size:12px"></div>
   </div>
@@ -713,6 +713,14 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'nav-image':'Image Gen','nav-tts':'TTS',
       'btn-save-ollama':'Save Ollama URL','btn-newchat':'🗨 New Chat',
       'sec-channels':'Channels','sec-admin':'Admin',
+      'h-password':'🔒 Master Password',
+      'pw-current':'Current Password','pw-new':'New Password','pw-confirm':'Confirm New Password',
+      'pw-new-hint':'New password (4+ chars, leave empty to remove)','pw-confirm-hint':'Re-enter new password',
+      'pw-change':'Change','pw-remove':'Remove Password','pw-set':'Set Password',
+      'pw-not-set':'No password is currently set.',
+      'pw-min4':'Password (4+ characters)','pw-reenter':'Re-enter',
+      'pw-mismatch':'New passwords do not match','pw-changed':'✅ Password changed',
+      'pw-fail':'❌ Change failed','pw-enter-current':'Please enter current password',
     },
     ko:{
       'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정',
@@ -734,6 +742,14 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'nav-image':'이미지 생성','nav-tts':'음성 합성',
       'btn-save-ollama':'Ollama URL 저장','btn-newchat':'🗨 새 대화',
       'sec-channels':'채널','sec-admin':'관리',
+      'h-password':'🔒 마스터 비밀번호',
+      'pw-current':'현재 비밀번호','pw-new':'새 비밀번호','pw-confirm':'새 비밀번호 확인',
+      'pw-new-hint':'새 비밀번호 (4자 이상, 비우면 해제)','pw-confirm-hint':'새 비밀번호 다시 입력',
+      'pw-change':'변경','pw-remove':'비밀번호 해제','pw-set':'비밀번호 설정',
+      'pw-not-set':'현재 비밀번호가 설정되어 있지 않습니다.',
+      'pw-min4':'비밀번호 (4자 이상)','pw-reenter':'다시 입력',
+      'pw-mismatch':'새 비밀번호가 일치하지 않습니다','pw-changed':'✅ 비밀번호가 변경되었습니다',
+      'pw-fail':'❌ 변경 실패','pw-enter-current':'현재 비밀번호를 입력하세요',
     }
   };
   var _lang=localStorage.getItem('salmalm-lang')||'en';
@@ -743,6 +759,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       var k=el.getAttribute('data-i18n');
       if(el.tagName==='INPUT'||el.tagName==='TEXTAREA')el.placeholder=t(k);
       else el.textContent=t(k);
+    });
+    document.querySelectorAll('[data-i18n-ph]').forEach(function(el){
+      el.placeholder=t(el.getAttribute('data-i18n-ph'));
     });
     // Translate Save/Test buttons by content matching
     document.querySelectorAll('button').forEach(function(btn){
@@ -769,27 +788,27 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   window.changePw=function(){
     var o=document.getElementById('pw-old').value,n=document.getElementById('pw-new').value,c=document.getElementById('pw-confirm').value;
     var re=document.getElementById('pw-result');
-    if(!o||!n){re.innerHTML='<span style="color:#f87171">모든 항목을 입력하세요</span>';return}
-    if(n!==c){re.innerHTML='<span style="color:#f87171">새 비밀번호가 일치하지 않습니다</span>';return}
-    if(n.length<4){re.innerHTML='<span style="color:#f87171">비밀번호는 4자 이상이어야 합니다</span>';return}
+    if(!o||!n){re.innerHTML='<span style="color:#f87171">'+t('pw-enter-current')+'</span>';return}
+    if(n!==c){re.innerHTML='<span style="color:#f87171">'+t('pw-mismatch')+'</span>';return}
+    if(n.length<4){re.innerHTML='<span style="color:#f87171">'+t('pw-min4')+'</span>';return}
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'change_password',old_password:o,new_password:n})}).then(function(r){return r.json()}).then(function(d){
-      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ 비밀번호가 변경되었습니다</span>';document.getElementById('pw-old').value='';document.getElementById('pw-new').value='';document.getElementById('pw-confirm').value=''}
-      else{re.innerHTML='<span style="color:#f87171">❌ '+(d.error||'변경 실패')+'</span>'}
+      if(d.ok){re.innerHTML='<span style="color:#4ade80">'+t('pw-changed')+'</span>';document.getElementById('pw-old').value='';document.getElementById('pw-new').value='';document.getElementById('pw-confirm').value=''}
+      else{re.innerHTML='<span style="color:#f87171">'+t('pw-fail')+' '+(d.error||'')+'</span>'}
     }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})};
   window.removePw=function(){
     var o=document.getElementById('pw-old').value;var re=document.getElementById('pw-result');
-    if(!o){re.innerHTML='<span style="color:#f87171">현재 비밀번호를 입력하세요</span>';return}
+    if(!o){re.innerHTML='<span style="color:#f87171">'+t('pw-enter-current')+'</span>';return}
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'change_password',old_password:o,new_password:''})}).then(function(r){return r.json()}).then(function(d){
-      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ 비밀번호가 해제되었습니다</span>';document.getElementById('pw-old').value='';document.getElementById('pw-section-change').style.display='none';document.getElementById('pw-section-set').style.display='block'}
-      else{re.innerHTML='<span style="color:#f87171">❌ '+(d.error||'실패')+'</span>'}}).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})};
+      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ '+t('pw-remove')+'</span>';document.getElementById('pw-old').value='';document.getElementById('pw-section-change').style.display='none';document.getElementById('pw-section-set').style.display='block'}
+      else{re.innerHTML='<span style="color:#f87171">'+t('pw-fail')+' '+(d.error||'')+'</span>'}}).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})};
   window.setPw=function(){
     var n=document.getElementById('pw-set-new').value,c=document.getElementById('pw-set-confirm').value;var re=document.getElementById('pw-result');
-    if(!n){re.innerHTML='<span style="color:#f87171">비밀번호를 입력하세요</span>';return}
-    if(n.length<4){re.innerHTML='<span style="color:#f87171">4자 이상 입력하세요</span>';return}
-    if(n!==c){re.innerHTML='<span style="color:#f87171">비밀번호가 일치하지 않습니다</span>';return}
+    if(!n){re.innerHTML='<span style="color:#f87171">'+t('pw-enter-current')+'</span>';return}
+    if(n.length<4){re.innerHTML='<span style="color:#f87171">'+t('pw-min4')+'</span>';return}
+    if(n!==c){re.innerHTML='<span style="color:#f87171">'+t('pw-mismatch')+'</span>';return}
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'change_password',old_password:'',new_password:n})}).then(function(r){return r.json()}).then(function(d){
-      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ 비밀번호가 설정되었습니다</span>';document.getElementById('pw-set-new').value='';document.getElementById('pw-set-confirm').value='';document.getElementById('pw-section-set').style.display='none';document.getElementById('pw-section-change').style.display='block'}
-      else{re.innerHTML='<span style="color:#f87171">❌ '+(d.error||'실패')+'</span>'}}).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})};
+      if(d.ok){re.innerHTML='<span style="color:#4ade80">'+t('pw-changed')+'</span>';document.getElementById('pw-set-new').value='';document.getElementById('pw-set-confirm').value='';document.getElementById('pw-section-set').style.display='none';document.getElementById('pw-section-change').style.display='block'}
+      else{re.innerHTML='<span style="color:#f87171">'+t('pw-fail')+' '+(d.error||'')+'</span>'}}).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})};
   window.checkUpdate=function(){
     var re=document.getElementById('update-result');
     re.innerHTML='<span style="color:var(--text2)">⏳ Checking PyPI...</span>';
