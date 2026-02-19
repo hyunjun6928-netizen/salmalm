@@ -12,12 +12,8 @@ class TestExecTool(unittest.TestCase):
     
     def test_exec_ls(self):
         from salmalm.tool_handlers import execute_tool
-        if sys.platform == 'win32':
-            result = execute_tool('exec', {'command': 'dir C:\\'})
-            self.assertIn('windows', result.lower() if isinstance(result, str) else str(result).lower())
-        else:
-            result = execute_tool('exec', {'command': 'ls /'})
-            self.assertIn('home', result.lower() if isinstance(result, str) else str(result).lower())
+        result = execute_tool('exec', {'command': 'echo test_exec_ls_ok'})
+        self.assertIn('test_exec_ls_ok', result.lower() if isinstance(result, str) else str(result).lower())
     
     def test_exec_pipe(self):
         from salmalm.tool_handlers import execute_tool
