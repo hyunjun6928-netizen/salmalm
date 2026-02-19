@@ -580,6 +580,13 @@ mcp_manager = MCPManager()
 
 async def _run_server_stdio():
     """Entry point for `python -m salmalm.mcp --server --stdio`."""
+    import logging
+    # Redirect all logging to stderr so stdout is clean JSON-RPC
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    logging.basicConfig(stream=sys.stderr, level=logging.INFO,
+                        format='%(asctime)s [%(levelname)s] %(message)s')
+
     from .tools import TOOL_DEFINITIONS, execute_tool
     server = MCPServer()
 
@@ -593,4 +600,10 @@ async def _run_server_stdio():
 
 if __name__ == "__main__":
     if "--server" in sys.argv:
+        # Ensure ALL logging goes to stderr before any imports trigger log output
+        import logging
+        for h in logging.root.handlers[:]:
+            logging.root.removeHandler(h)
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO,
+                            format='%(asctime)s [%(levelname)s] %(message)s')
         asyncio.run(_run_server_stdio())
