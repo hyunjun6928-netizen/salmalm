@@ -1,3 +1,4 @@
+from typing import Optional
 """SalmAlm agents — SubAgent, SkillLoader, PluginLoader."""
 import asyncio, importlib, json, os, re, shutil, subprocess, threading, time
 from datetime import datetime
@@ -22,7 +23,7 @@ class SubAgent:
     _lock = threading.Lock()
 
     @classmethod
-    def spawn(cls, task: str, model: str = None, notify_telegram: bool = True) -> str:
+    def spawn(cls, task: str, model: Optional[str] = None, notify_telegram: bool = True) -> str:
         """Spawn a background sub-agent. Returns agent ID."""
         with cls._lock:
             cls._counter += 1

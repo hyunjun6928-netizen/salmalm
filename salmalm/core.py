@@ -255,7 +255,7 @@ def _msg_content_str(msg: dict) -> str:
     return str(c)
 
 
-def compact_messages(messages: list, model: str = None) -> list:
+def compact_messages(messages: list, model: Optional[str] = None) -> list:
     """Multi-stage compaction: trim tool results → drop old tools → summarize.
     Hard limit: max 100 messages, max 500K chars (≈125K tokens)."""
     MAX_MESSAGES = 100
@@ -502,7 +502,7 @@ class LLMCronManager:
             log.error(f"Failed to save cron jobs: {e}")
 
     def add_job(self, name: str, schedule: dict, prompt: str,
-                model: str = None, notify: bool = True) -> dict:
+                model: Optional[str] = None, notify: bool = True) -> dict:
         """Add a new LLM cron job.
         schedule: {'kind': 'cron', 'expr': '0 6 * * *', 'tz': 'Asia/Seoul'}
                   {'kind': 'every', 'seconds': 3600}

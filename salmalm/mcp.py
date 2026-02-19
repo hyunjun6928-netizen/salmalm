@@ -43,7 +43,7 @@ def _next_id() -> int:
     _rpc_id += 1
     return _rpc_id
 
-def _rpc_request(method: str, params: dict = None, id: int = None) -> dict:
+def _rpc_request(method: str, params: Optional[dict] = None, id: int = None) -> dict:
     msg = {"jsonrpc": "2.0", "method": method}
     if params:
         msg["params"] = params
@@ -51,7 +51,7 @@ def _rpc_request(method: str, params: dict = None, id: int = None) -> dict:
         msg["id"] = id
     return msg
 
-def _rpc_response(id: int, result: Any = None, error: dict = None) -> dict:
+def _rpc_response(id: int, result: Optional[Any] = None, error: dict = None) -> dict:
     msg = {"jsonrpc": "2.0", "id": id}
     if error:
         msg["error"] = error
@@ -288,8 +288,8 @@ class MCPServer:
 class MCPClientConnection:
     """A connection to a single external MCP server (stdio transport)."""
 
-    def __init__(self, name: str, command: List[str], env: Dict[str, str] = None,
-                 cwd: str = None):
+    def __init__(self, name: str, command: List[str], env: Optional[Dict[str, str]] = None,
+                 cwd: Optional[str] = None):
         self.name = name
         self.command = command
         self.env = env or {}
@@ -389,7 +389,7 @@ class MCPClientConnection:
             log.debug(f"Suppressed: {e}")
         self._connected = False
 
-    def _send_request(self, method: str, params: dict = None,
+    def _send_request(self, method: str, params: Optional[dict] = None,
                       timeout: float = 30) -> Optional[dict]:
         """Send JSON-RPC request and wait for response."""
         if not self._process or self._process.poll() is not None:
@@ -413,7 +413,7 @@ class MCPClientConnection:
         log.warning(f"MCP timeout ({self.name}): {method}")
         return None
 
-    def _send_notification(self, method: str, params: dict = None):
+    def _send_notification(self, method: str, params: Optional[dict] = None):
         """Send JSON-RPC notification (no id, no response expected)."""
         if not self._process or self._process.poll() is not None:
             return
@@ -430,7 +430,7 @@ class MCPClientConnection:
         """List all available tools from connected MCP servers."""
         return self._tools
 
-    def call_tool(self, name: str, arguments: dict = None,
+    def call_tool(self, name: str, arguments: Optional[dict] = None,
                   timeout: float = 60) -> Optional[str]:
         """Call a tool on the remote MCP server."""
         if not self._connected:
@@ -474,7 +474,7 @@ class MCPManager:
         return self._server
 
     def add_server(self, name: str, command: List[str],
-                   env: Dict[str, str] = None, cwd: str = None,
+                   env: Optional[Dict[str, str]] = None, cwd: str = None,
                    auto_connect: bool = True) -> bool:
         """Add and optionally connect to an external MCP server."""
         if name in self._clients:

@@ -154,7 +154,7 @@ class Vault:
         'discord_token': 'DISCORD_TOKEN',
     }
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: Optional[Any] = None) -> Any:
         """Get a stored value. Falls back to environment variable if not in vault."""
         val = self._data.get(key)
         if val is not None:

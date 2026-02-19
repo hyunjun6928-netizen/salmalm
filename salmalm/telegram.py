@@ -23,13 +23,13 @@ class TelegramBot:
         self.token = token
         self.owner_id = owner_id
 
-    def _api(self, method: str, data: dict = None) -> dict:
+    def _api(self, method: str, data: Optional[dict] = None) -> dict:
         url = f'https://api.telegram.org/bot{self.token}/{method}'
         if data:
             return _http_post(url, {'Content-Type': 'application/json'}, data)
         return _http_get(url)
 
-    def send_message(self, chat_id, text: str, parse_mode: str = None):
+    def send_message(self, chat_id, text: str, parse_mode: Optional[str] = None):
         # Split long messages
         """Send a text message to a Telegram chat."""
         chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]

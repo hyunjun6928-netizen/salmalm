@@ -45,7 +45,7 @@ class SSHNode:
     """Remote node accessible via SSH."""
 
     def __init__(self, name: str, host: str, user: str = "root",
-                 port: int = 22, key: str = None):
+                 port: int = 22, key: Optional[str] = None):
         self.name = name
         self.host = host
         self.user = user
@@ -178,7 +178,7 @@ class HTTPNode:
         self.token = token
 
     def _request(self, path: str, method: str = "GET",
-                 data: dict = None, timeout: int = 30) -> dict:
+                 data: Optional[dict] = None, timeout: int = 30) -> dict:
         """Make HTTP request to node agent."""
         full_url = f"{self.url}{path}"
         headers = {"Content-Type": "application/json"}
@@ -282,7 +282,7 @@ class NodeManager:
             encoding='utf-8')
 
     def add_ssh_node(self, name: str, host: str, user: str = "root",
-                     port: int = 22, key: str = None) -> bool:
+                     port: int = 22, key: Optional[str] = None) -> bool:
         """Add an SSH node."""
         node = SSHNode(name, host, user, port, key)
         self._nodes[name] = node
@@ -374,7 +374,7 @@ class GatewayRegistry:
         self._nodes: Dict[str, dict] = {}  # node_id → {url, token, capabilities, last_heartbeat, status}
 
     def register(self, node_id: str, url: str, token: str = '',
-                 capabilities: list = None, name: str = '') -> dict:
+                 capabilities: Optional[list] = None, name: str = '') -> dict:
         """Register a node with the gateway."""
         self._nodes[node_id] = {
             'id': node_id,
@@ -479,7 +479,7 @@ class NodeAgent:
     """Node side: lightweight agent that receives and executes tool calls from gateway."""
 
     def __init__(self, gateway_url: str, node_id: str, token: str = '',
-                 capabilities: list = None, name: str = ''):
+                 capabilities: Optional[list] = None, name: str = ''):
         self.gateway_url = gateway_url.rstrip('/')
         self.node_id = node_id
         self.token = token

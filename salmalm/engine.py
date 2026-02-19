@@ -223,8 +223,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         return False
 
     async def run(self, session, user_message: str,
-                  model_override: str = None, on_tool=None,
-                  classification: dict = None) -> str:
+                  model_override: Optional[str] = None, on_tool=None,
+                  classification: Optional[dict] = None) -> str:
         """Main execution loop — Plan → Execute → Reflect."""
 
         if not classification:

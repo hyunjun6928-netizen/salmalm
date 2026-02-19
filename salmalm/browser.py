@@ -111,7 +111,7 @@ class CDPConnection:
                 f.set_exception(ConnectionError("Disconnected"))
         self._pending.clear()
 
-    async def send(self, method: str, params: dict = None, timeout: float = 30) -> dict:
+    async def send(self, method: str, params: Optional[dict] = None, timeout: float = 30) -> dict:
         """Send CDP command and wait for response."""
         if not self._connected:
             raise ConnectionError("Not connected to Chrome")

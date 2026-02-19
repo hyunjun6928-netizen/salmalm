@@ -34,7 +34,7 @@ AUTH_DB = BASE_DIR / "auth.db"
 
 # ── Password hashing (PBKDF2-HMAC-SHA256) ──────────────────
 
-def _hash_password(password: str, salt: bytes = None) -> Tuple[bytes, bytes]:
+def _hash_password(password: str, salt: Optional[bytes] = None) -> Tuple[bytes, bytes]:
     """Hash password with PBKDF2. Returns (hash, salt)."""
     if salt is None:
         salt = os.urandom(32)
@@ -53,7 +53,7 @@ class TokenManager:
 
     _SECRET_FILE = BASE_DIR / '.token_secret'
 
-    def __init__(self, secret: bytes = None):
+    def __init__(self, secret: Optional[bytes] = None):
         if secret:
             self._secret = secret
         elif self._SECRET_FILE.exists():

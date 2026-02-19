@@ -33,7 +33,7 @@ class DiscordBot:
         self._on_message: Optional[Callable] = None
         self._ws = None
 
-    def configure(self, token: str, owner_id: str = None):
+    def configure(self, token: str, owner_id: Optional[str] = None):
         """Configure the Discord bot with token and channel settings."""
         self.token = token
         self.owner_id = owner_id
@@ -45,7 +45,7 @@ class DiscordBot:
 
     # ── REST API ──
 
-    def _api(self, method: str, path: str, body: dict = None) -> dict:
+    def _api(self, method: str, path: str, body: Optional[dict] = None) -> dict:
         url = f'{API_BASE}{path}'
         data = json.dumps(body).encode() if body else None
         req = urllib.request.Request(url, data=data, method=method)
@@ -60,7 +60,7 @@ class DiscordBot:
             log.error(f'Discord API {method} {path}: {e.code} {err[:200]}')
             return {}
 
-    def send_message(self, channel_id: str, content: str, reply_to: str = None) -> dict:
+    def send_message(self, channel_id: str, content: str, reply_to: Optional[str] = None) -> dict:
         """Send a message to a channel."""
         body: Dict[str, Any] = {'content': content[:2000]}
         if reply_to:

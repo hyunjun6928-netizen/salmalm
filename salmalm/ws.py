@@ -175,7 +175,7 @@ class WebSocketServer:
             self._server.close()
             await self._server.wait_closed()
 
-    async def broadcast(self, data: dict, session_id: str = None):
+    async def broadcast(self, data: dict, session_id: Optional[str] = None):
         """Send to all connected clients (or filtered by session)."""
         for client in list(self.clients.values()):
             if session_id and client.session_id != session_id:
@@ -339,7 +339,7 @@ class WebSocketServer:
 class StreamingResponse:
     """Helper to stream LLM response chunks to a WS client."""
 
-    def __init__(self, client: WSClient, request_id: str = None):
+    def __init__(self, client: WSClient, request_id: Optional[str] = None):
         self.client = client
         self.request_id = request_id or str(int(time.time() * 1000))
         self._chunks: list = []
@@ -353,7 +353,7 @@ class StreamingResponse:
             "rid": self.request_id,
         })
 
-    async def send_tool_call(self, tool_name: str, tool_input: dict, result: str = None):
+    async def send_tool_call(self, tool_name: str, tool_input: dict, result: Optional[str] = None):
         """Notify client about a tool call."""
         await self.client.send_json({
             "type": "tool",
@@ -371,7 +371,7 @@ class StreamingResponse:
             "rid": self.request_id,
         })
 
-    async def send_done(self, full_text: str = None):
+    async def send_done(self, full_text: Optional[str] = None):
         """Signal completion."""
         if full_text is None:
             full_text = ''.join(self._chunks)
