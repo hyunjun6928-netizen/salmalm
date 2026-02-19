@@ -14,12 +14,38 @@ from .crypto import log
 from .core import router, compact_messages, get_session, _sessions
 from .prompt import build_system_prompt
 from .tool_handlers import execute_tool
-from .llm import call_llm as _call_llm_sync
+from .llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic
 
 
 async def _call_llm_async(*args, **kwargs):
     """Non-blocking LLM call — runs urllib in a thread to avoid blocking the event loop."""
     return await asyncio.to_thread(_call_llm_sync, *args, **kwargs)
+
+
+async def _call_llm_streaming(messages, model=None, tools=None,
+                               max_tokens=4096, thinking=False,
+                               on_token=None):
+    """Streaming LLM call — yields tokens via on_token callback, returns final result.
+
+    on_token: callback(event_dict) called for each streaming event.
+    Returns the same dict format as call_llm.
+    """
+    def _run():
+        final_result = None
+        for event in _stream_anthropic(messages, model=model, tools=tools,
+                                        max_tokens=max_tokens, thinking=thinking):
+            if on_token:
+                on_token(event)
+            if event.get('type') == 'message_end':
+                final_result = event
+            elif event.get('type') == 'error':
+                return {'content': event.get('error', '❌ Streaming error'),
+                        'tool_calls': [], 'usage': {'input': 0, 'output': 0},
+                        'model': model or '?'}
+        return final_result or {'content': '', 'tool_calls': [],
+                                 'usage': {'input': 0, 'output': 0},
+                                 'model': model or '?'}
+    return await asyncio.to_thread(_run)
 
 # ============================================================
 # Model aliases — sourced from constants.py (single source of truth)
@@ -224,7 +250,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
     async def run(self, session, user_message: str,
                   model_override: Optional[str] = None, on_tool=None,
-                  classification: Optional[dict] = None) -> str:
+                  classification: Optional[dict] = None,
+                  on_token=None) -> str:
         """Main execution loop — Plan → Execute → Reflect."""
 
         if not classification:
@@ -256,7 +283,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         # PHASE 2: EXECUTE — tool loop
         try:
           return await self._execute_loop(session, user_message, model_override,  # type: ignore[no-any-return]
-                                           on_tool, classification, tier)
+                                           on_tool, classification, tier,
+                                           on_token=on_token)
         except Exception as e:
             log.error(f"Engine.run error: {e}")
             import traceback; traceback.print_exc()
@@ -269,7 +297,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     MAX_CONSECUTIVE_ERRORS = 3
 
     async def _execute_loop(self, session, user_message, model_override,
-                             on_tool, classification, tier):
+                             on_tool, classification, tier, on_token=None):
         use_thinking = classification['thinking']
         thinking_budget = classification['thinking_budget']
         iteration = 0
@@ -298,8 +326,14 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                                and provider == 'anthropic'
                                and ('opus' in model or 'sonnet' in model))
 
-            result = await _call_llm_async(session.messages, model=model, tools=tools,
-                              thinking=think_this_call)
+            # Use streaming for Anthropic when on_token callback is provided
+            if on_token and provider == 'anthropic':
+                result = await _call_llm_streaming(
+                    session.messages, model=model, tools=tools,
+                    thinking=think_this_call, on_token=on_token)
+            else:
+                result = await _call_llm_async(session.messages, model=model, tools=tools,
+                                  thinking=think_this_call)
 
             # ── Token overflow: aggressive truncation + retry once ──
             if result.get('error') == 'token_overflow':
@@ -415,7 +449,8 @@ _engine = IntelligenceEngine()
 async def process_message(session_id: str, user_message: str,
                           model_override: Optional[str] = None,
                           image_data: Optional[Tuple[str, str]] = None,
-                          on_tool: Optional[Callable[[str, Any], None]] = None) -> str:
+                          on_tool: Optional[Callable[[str, Any], None]] = None,
+                          on_token: Optional[Callable] = None) -> str:
     """Process a user message through the Intelligence Engine pipeline."""
     session = get_session(session_id)
 
@@ -530,7 +565,8 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
     response = await _engine.run(session, user_message,
                               model_override=model_override,
                               on_tool=on_tool,
-                              classification=classification)
+                              classification=classification,
+                              on_token=on_token)
 
     # ── Completion Notification Hook ──
     # Notify other channels when a task completes

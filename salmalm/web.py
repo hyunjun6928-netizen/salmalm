@@ -821,24 +821,41 @@ self.addEventListener('fetch',e=>{{
                 def on_tool_sse(name, args):
                     tool_count[0] += 1
                     send_sse('tool', {'name': name, 'args': str(args)[:200], 'count': tool_count[0]})
-                    send_sse('status', {'text': f'🔧 Tool {tool_count[0]}: {name}...'})
+                    send_sse('status', {'text': f'🔧 Running {name}...'})
+
+                # Token-by-token streaming callback (OpenClaw-style)
+                streamed_text = ['']
+                def on_token_sse(event):
+                    try:
+                        etype = event.get('type', '')
+                        if etype == 'text_delta':
+                            text = event.get('text', '')
+                            if text:
+                                streamed_text[0] += text
+                                send_sse('chunk', {'text': text, 'streaming': True})
+                        elif etype == 'thinking_delta':
+                            send_sse('thinking', {'text': event.get('text', '')})
+                        elif etype == 'tool_use_start':
+                            tool_count[0] += 1
+                            send_sse('status', {'text': f'🔧 Running {event.get("name", "tool")}...'})
+                            send_sse('tool', {'name': event.get('name', ''), 'count': tool_count[0]})
+                        elif etype == 'error':
+                            send_sse('error', {'text': event.get('error', '')})
+                    except Exception:
+                        pass  # SSE write errors are non-fatal
+
                 try:
                     loop = asyncio.new_event_loop()
                     response = loop.run_until_complete(
                         process_message(session_id, message,
                                         image_data=(image_b64, image_mime) if image_b64 else None,
-                                        on_tool=on_tool_sse)
+                                        on_tool=on_tool_sse,
+                                        on_token=on_token_sse)
                     )
                     loop.close()
                 except Exception as e:
                     log.error(f"SSE process_message error: {e}")
                     response = f'❌ Internal error: {type(e).__name__}'
-                # Send response in chunks for smoother rendering
-                chunk_size = 80
-                if len(response) > chunk_size * 2:
-                    for i in range(0, len(response), chunk_size):
-                        chunk = response[i:i+chunk_size]
-                        send_sse('chunk', {'text': chunk, 'index': i // chunk_size})
                 send_sse('done', {'response': response, 'model': router.force_model or 'auto'})
                 try:
                     self.wfile.write(b"event: close\ndata: {}\n\n")
