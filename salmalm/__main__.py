@@ -51,6 +51,7 @@ def _run_update():
 def _run_node_mode():
     """Run as a lightweight node that registers with a gateway."""
     import http.server, json, threading
+    import secrets
 
     # Parse args: --node --gateway http://host:18800 --port 18810 --name mynode --token secret
     args = sys.argv[1:]
@@ -71,6 +72,13 @@ def _run_node_mode():
             token = args[i + 1]; i += 2
         else:
             i += 1
+
+    # Always require token auth for /api/node/execute in node mode.
+    # If user didn't provide one, generate an ephemeral token for this process.
+    if not token:
+        token = secrets.token_urlsafe(24)
+        print('[SEC] No --token provided; generated an ephemeral node token for this run.')
+    os.environ['SALMALM_NODE_TOKEN'] = token
 
     from salmalm.constants import VERSION
     from salmalm.web import WebHandler

@@ -531,17 +531,93 @@ def execute_tool(name: str, args: dict) -> str:
                 'shutil.rmtree', 'pathlib', '.vault', 'audit.db', 'auth.db',
                 'import socket', 'import http', 'import urllib', 'import requests',
                 'getattr(', 'globals(', 'locals(', '__builtins__', 'vars(',
+                '__class__', '__mro__', '__subclasses__', '__globals__',
             ]
             code_lower = code.lower().replace(' ', '')
             for blocked in _EVAL_BLOCKLIST:
                 if blocked.lower().replace(' ', '') in code_lower:
                     return f'❌ Security blocked: `{blocked}` not allowed. python_eval is for computation only.'
-            # Execute in isolated subprocess (no network, limited imports)
+            # Execute in isolated subprocess with AST-level validation and restricted builtins.
             wrapper = f'''
-import json, math, re, statistics, collections, itertools, functools, datetime, hashlib, base64, random, string, textwrap, csv, io
+import ast, json, math, re, statistics, collections, itertools, functools, datetime, hashlib, base64, random, string, textwrap, time
+
+_CODE = {repr(code)}
+_ALLOWED_IMPORTS = {{
+    'math', 're', 'statistics', 'collections', 'itertools',
+    'functools', 'datetime', 'hashlib', 'base64', 'random',
+    'string', 'textwrap', 'time'
+}}
+_BLOCKED_NAMES = {{
+    '__import__', '__builtins__', 'eval', 'exec', 'compile', 'open', 'input',
+    'globals', 'locals', 'vars', 'getattr', 'setattr', 'delattr', 'breakpoint',
+    'help', 'dir', 'os', 'sys', 'subprocess', 'shutil', 'pathlib', 'importlib'
+}}
+_BLOCKED_NODES = (
+    ast.With, ast.AsyncWith, ast.Try, ast.Raise, ast.ClassDef,
+    ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.Global,
+    ast.Nonlocal, ast.Delete, ast.Yield, ast.YieldFrom, ast.Await
+)
+
+def _validate_tree(tree):
+    for node in ast.walk(tree):
+        if isinstance(node, _BLOCKED_NODES):
+            raise ValueError(f"Forbidden syntax: {{type(node).__name__}}")
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root = alias.name.split('.')[0]
+                if root not in _ALLOWED_IMPORTS:
+                    raise ValueError(f"Import not allowed: {{alias.name}}")
+        if isinstance(node, ast.ImportFrom):
+            if node.level:
+                raise ValueError("Relative imports are not allowed")
+            root = (node.module or '').split('.')[0]
+            if root not in _ALLOWED_IMPORTS:
+                raise ValueError(f"Import not allowed: {{node.module}}")
+        if isinstance(node, ast.Attribute) and node.attr.startswith('_'):
+            raise ValueError("Private attributes are not allowed")
+        if isinstance(node, ast.Name):
+            if node.id.startswith('_') and node.id != '_result':
+                raise ValueError(f"Name not allowed: {{node.id}}")
+            if node.id in _BLOCKED_NAMES:
+                raise ValueError(f"Name not allowed: {{node.id}}")
+
+def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+    if level:
+        raise ImportError("Relative imports are not allowed")
+    root = name.split('.', 1)[0]
+    if root not in _ALLOWED_IMPORTS:
+        raise ImportError(f"Import not allowed: {{name}}")
+    return __import__(name, globals, locals, fromlist, level)
+
+_SAFE_BUILTINS = {{
+    '__import__': _safe_import,
+    'abs': abs, 'all': all, 'any': any, 'bool': bool, 'dict': dict,
+    'enumerate': enumerate, 'filter': filter, 'float': float, 'int': int,
+    'len': len, 'list': list, 'map': map, 'max': max, 'min': min,
+    'pow': pow, 'print': print, 'range': range, 'reversed': reversed,
+    'round': round, 'set': set, 'sorted': sorted, 'str': str, 'sum': sum,
+    'tuple': tuple, 'zip': zip,
+    # Common exception types for normal control flow.
+    'Exception': Exception, 'ValueError': ValueError, 'TypeError': TypeError,
+    'KeyError': KeyError, 'IndexError': IndexError, 'ZeroDivisionError': ZeroDivisionError,
+}}
+_SAFE_GLOBALS = {{
+    '__builtins__': _SAFE_BUILTINS,
+    'math': math, 're': re, 'statistics': statistics, 'collections': collections,
+    'itertools': itertools, 'functools': functools, 'datetime': datetime,
+    'hashlib': hashlib, 'base64': base64, 'random': random,
+    'string': string, 'textwrap': textwrap, 'time': time,
+}}
+_locals = {{}}
 _result = None
 try:
-    exec({repr(code)})
+    tree = ast.parse(_CODE, mode='exec')
+    _validate_tree(tree)
+    exec(compile(tree, '<python_eval>', 'exec'), _SAFE_GLOBALS, _locals)
+    if '_result' in _locals:
+        _result = _locals['_result']
+    elif '_result' in _SAFE_GLOBALS:
+        _result = _SAFE_GLOBALS['_result']
 except Exception as e:
     _result = f"Error: {{type(e).__name__}}: {{e}}"
 if _result is not None:

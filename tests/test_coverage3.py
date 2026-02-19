@@ -272,6 +272,18 @@ class TestToolHandlersEdgeCases(unittest.TestCase):
         result = execute_tool('python_eval', {'code': 'import time; time.sleep(0.1); print("ok")'})
         self.assertIn('ok', result)
 
+    def test_python_eval_blocks_dunder_escape(self):
+        from salmalm.tool_handlers import execute_tool
+        code = (
+            "s=(1).__class__.__mro__[1].__subclasses__();"
+            "_result=len(s)"
+        )
+        result = execute_tool('python_eval', {'code': code})
+        self.assertTrue(
+            'security blocked' in result.lower() or 'name not allowed' in result.lower() or 'private attributes' in result.lower(),
+            result
+        )
+
     def test_hash_md5(self):
         from salmalm.tool_handlers import execute_tool
         result = execute_tool('hash_text', {'text': 'hello', 'algorithm': 'md5'})

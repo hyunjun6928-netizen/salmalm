@@ -90,6 +90,22 @@ class TestAPIEndpoints(unittest.TestCase):
         status, data = self._request('GET', '/api/sessions')
         self.assertIn(status, (401, 403))
 
+    def test_node_execute_requires_auth(self):
+        """Node tool execution endpoint must not allow anonymous access."""
+        status, _ = self._request('POST', '/api/node/execute', {
+            'tool': 'exec',
+            'args': {'command': 'echo unsafe'}
+        })
+        self.assertIn(status, (401, 403))
+
+    def test_gateway_dispatch_requires_auth(self):
+        """Gateway dispatch endpoint must not allow anonymous access."""
+        status, _ = self._request('POST', '/api/gateway/dispatch', {
+            'tool': 'exec',
+            'args': {'command': 'echo unsafe'}
+        })
+        self.assertIn(status, (401, 403))
+
     def test_health_check(self):
         """GET /health should return 200."""
         conn = HTTPConnection('127.0.0.1', self._port, timeout=10)

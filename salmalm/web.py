@@ -126,6 +126,16 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self._json({'error': 'Authentication required'}, 401)
         return None
 
+    def _bearer_token(self) -> str:
+        """Extract bearer token from Authorization header."""
+        auth = self.headers.get('Authorization', '')
+        if not auth:
+            return ''
+        parts = auth.split(None, 1)
+        if len(parts) != 2 or parts[0].lower() != 'bearer':
+            return ''
+        return parts[1].strip()
+
     def _get_client_ip(self) -> str:
         """Get client IP. Only trusts X-Forwarded-For if SALMALM_TRUST_PROXY is set."""
         if os.environ.get('SALMALM_TRUST_PROXY'):
@@ -965,12 +975,27 @@ self.addEventListener('fetch',e=>{{
             from .nodes import gateway
             node_id = body.get('node_id', '')
             url = body.get('url', '')
+            node_token = str(body.get('token', '')).strip()
             if not node_id or not url:
                 self._json({'error': 'node_id and url required'}, 400)
                 return
+            auth_token = self._bearer_token()
+            gateway_token = os.environ.get('SALMALM_GATEWAY_TOKEN', '').strip()
+            if gateway_token:
+                if not auth_token or not secrets.compare_digest(auth_token, gateway_token):
+                    # Fallback for interactive admin calls.
+                    if not self._require_auth('admin'):
+                        return
+            else:
+                # In non-gateway-token mode, node registration must prove possession
+                # of its own non-empty token (header and payload must match).
+                if node_token and auth_token and secrets.compare_digest(auth_token, node_token):
+                    pass
+                elif not self._require_auth('admin'):
+                    return
             result = gateway.register(  # type: ignore[assignment]
                 node_id, url,
-                token=body.get('token', ''),
+                token=node_token,
                 capabilities=body.get('capabilities'),
                 name=body.get('name', ''))
             self._json(result)  # type: ignore[arg-type]
@@ -978,15 +1003,45 @@ self.addEventListener('fetch',e=>{{
         elif self.path == '/api/gateway/heartbeat':
             from .nodes import gateway
             node_id = body.get('node_id', '')
+            auth_token = self._bearer_token()
+            gateway_token = os.environ.get('SALMALM_GATEWAY_TOKEN', '').strip()
+            node = gateway._nodes.get(node_id) if node_id else None  # type: ignore[attr-defined]
+            node_secret = str(node.get('token', '')).strip() if node else ''
+            authorized = False
+            if gateway_token and auth_token and secrets.compare_digest(auth_token, gateway_token):
+                authorized = True
+            elif node_secret and auth_token and secrets.compare_digest(auth_token, node_secret):
+                authorized = True
+            if not authorized and not self._require_auth('admin'):
+                return
             self._json(gateway.heartbeat(node_id))
 
         elif self.path == '/api/gateway/unregister':
             from .nodes import gateway
             node_id = body.get('node_id', '')
+            auth_token = self._bearer_token()
+            gateway_token = os.environ.get('SALMALM_GATEWAY_TOKEN', '').strip()
+            node = gateway._nodes.get(node_id) if node_id else None  # type: ignore[attr-defined]
+            node_secret = str(node.get('token', '')).strip() if node else ''
+            authorized = False
+            if gateway_token and auth_token and secrets.compare_digest(auth_token, gateway_token):
+                authorized = True
+            elif node_secret and auth_token and secrets.compare_digest(auth_token, node_secret):
+                authorized = True
+            if not authorized and not self._require_auth('admin'):
+                return
             self._json(gateway.unregister(node_id))
 
         elif self.path == '/api/gateway/dispatch':
             from .nodes import gateway
+            auth_token = self._bearer_token()
+            gateway_token = os.environ.get('SALMALM_GATEWAY_TOKEN', '').strip()
+            if gateway_token:
+                if not auth_token or not secrets.compare_digest(auth_token, gateway_token):
+                    if not self._require_auth('admin'):
+                        return
+            elif not self._require_auth('admin'):
+                return
             node_id = body.get('node_id', '')
             tool = body.get('tool', '')
             args = body.get('args', {})
@@ -1000,6 +1055,14 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/node/execute':
             # Node endpoint: execute a tool locally (called by gateway)
+            node_token = os.environ.get('SALMALM_NODE_TOKEN', '').strip()
+            auth_token = self._bearer_token()
+            if node_token:
+                if not auth_token or not secrets.compare_digest(auth_token, node_token):
+                    self._json({'error': 'Node token required'}, 401)
+                    return
+            elif not self._require_auth('admin'):
+                return
             from .tool_handlers import execute_tool
             tool = body.get('tool', '')
             args = body.get('args', {})
@@ -1014,7 +1077,6 @@ self.addEventListener('fetch',e=>{{
 
         else:
             self._json({'error': 'Not found'}, 404)
-
 
 
 
