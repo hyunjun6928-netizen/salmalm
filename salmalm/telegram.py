@@ -462,7 +462,15 @@ class TelegramBot:
                 self._api('answerCallbackQuery', {'callback_query_id': cb['id']})
             except Exception:
                 pass
-            if cb_user_id == self.owner_id and cb_chat_id and cb_data.startswith('btn:'):
+            # Multi-tenant: allow registered users; legacy: owner only
+            from .users import user_manager as _um_cb
+            _cb_allowed = False
+            if _um_cb.multi_tenant_enabled:
+                _cb_tenant = _um_cb.get_user_by_telegram(str(cb_chat_id))
+                _cb_allowed = bool(_cb_tenant and _cb_tenant.get('enabled'))
+            else:
+                _cb_allowed = (cb_user_id == self.owner_id)
+            if _cb_allowed and cb_chat_id and cb_data.startswith('btn:'):
                 btn_text = cb_data[4:]
                 self.send_typing(cb_chat_id)
                 session_id = f'telegram_{cb_chat_id}'
@@ -479,12 +487,37 @@ class TelegramBot:
 
         chat_id = msg['chat']['id']
         user_id = str(msg['from']['id'])
+        tg_username = msg.get('from', {}).get('username', '')
 
-        # Owner check
-        if user_id != self.owner_id:
-            log.warning(f"[BLOCK] Unauthorized: {user_id} tried to message")
-            audit_log('unauthorized', f'user_id={user_id}')
-            return
+        # Multi-tenant auth check
+        from .users import user_manager
+        _tenant_user = None  # Resolved multi-tenant user dict
+        if user_manager.multi_tenant_enabled:
+            _tenant_user = user_manager.get_user_by_telegram(str(chat_id))
+            text_check = msg.get('text', '') or ''
+            # Allow /register and /start for unregistered users
+            if not _tenant_user and not text_check.startswith(('/register', '/start')):
+                self.send_message(chat_id,
+                    "🔐 등록이 필요합니다. /register <비밀번호>로 등록하세요.\n"
+                    "Registration required. Use /register <password> to sign up.")
+                return
+            if _tenant_user and not _tenant_user.get('enabled', True):
+                self.send_message(chat_id, "⛔ 계정이 비활성화되었습니다. 관리자에게 문의하세요. / Account disabled.")
+                return
+            # Check quota
+            if _tenant_user:
+                try:
+                    from .users import QuotaExceeded
+                    user_manager.check_quota(_tenant_user['id'])
+                except QuotaExceeded as e:
+                    self.send_message(chat_id, f"⚠️ {e.message}")
+                    return
+        else:
+            # Legacy single-user mode: owner check
+            if user_id != self.owner_id:
+                log.warning(f"[BLOCK] Unauthorized: {user_id} tried to message")
+                audit_log('unauthorized', f'user_id={user_id}')
+                return
 
         text = msg.get('text', '') or msg.get('caption', '') or ''
         file_info = None
@@ -576,11 +609,16 @@ class TelegramBot:
 
         # Commands
         if text.startswith('/'):
-            await self._handle_command(chat_id, text)
+            await self._handle_command(chat_id, text, tenant_user=_tenant_user)
             return
 
         # Process message with typing loop + block streaming
         session_id = f'telegram_{chat_id}'
+        # Bind user_id to session for multi-tenant
+        _session_user_id = _tenant_user['id'] if _tenant_user else None
+        _sess_obj = get_session(session_id, user_id=_session_user_id)
+        if _session_user_id and not _sess_obj.user_id:
+            _sess_obj.user_id = _session_user_id
 
         # Start continuous typing indicator
         typing_task = None
@@ -676,8 +714,92 @@ class TelegramBot:
             except Exception as e:
                 log.error(f"TTS error: {e}")
 
-    async def _handle_command(self, chat_id, text: str):
+    async def _handle_command(self, chat_id, text: str, tenant_user=None):
         cmd = text.split()[0].lower()
+
+        # Multi-tenant commands (available even when not registered)
+        if cmd == '/register':
+            from .users import user_manager
+            if not user_manager.multi_tenant_enabled:
+                self.send_message(chat_id, "멀티테넌트 모드가 비활성화되어 있습니다. / Multi-tenant mode is disabled.")
+                return
+            parts = text.split(maxsplit=1)
+            if len(parts) < 2 or len(parts[1].strip()) < 8:
+                self.send_message(chat_id, "❌ 사용법: /register <비밀번호> (8자 이상)\nUsage: /register <password> (8+ chars)")
+                return
+            password = parts[1].strip()
+            tg_username = ''  # Will be set from update context
+            result = user_manager.register_telegram_user(str(chat_id), password, tg_username)
+            if result['ok']:
+                self.send_message(chat_id,
+                    f"✅ 등록 완료! 사용자: {result['user']['username']}\n"
+                    f"Registration complete! User: {result['user']['username']}")
+            else:
+                self.send_message(chat_id, f"❌ {result['error']}")
+            return
+
+        if cmd == '/quota':
+            from .users import user_manager
+            if not user_manager.multi_tenant_enabled or not tenant_user:
+                self.send_message(chat_id, "멀티테넌트 모드가 비활성화되어 있습니다.")
+                return
+            parts = text.split()
+            # Admin: /quota set <user> <daily> <monthly>
+            if len(parts) >= 5 and parts[1] == 'set' and tenant_user.get('role') == 'admin':
+                target = user_manager.get_user_by_username(parts[2])
+                if not target:
+                    self.send_message(chat_id, f"❌ 사용자를 찾을 수 없습니다: {parts[2]}")
+                    return
+                try:
+                    user_manager.set_quota(target['id'],
+                                           daily_limit=float(parts[3]),
+                                           monthly_limit=float(parts[4]))
+                    self.send_message(chat_id, f"✅ {parts[2]} 쿼터 설정: 일 ${parts[3]}, 월 ${parts[4]}")
+                except Exception as e:
+                    self.send_message(chat_id, f"❌ {e}")
+                return
+            # Show own quota
+            quota = user_manager.get_quota(tenant_user['id'])
+            self.send_message(chat_id,
+                f"📊 사용량 / Quota\n"
+                f"  일일: ${quota.get('current_daily', 0):.2f} / ${quota.get('daily_limit', 5):.2f} "
+                f"(남은: ${quota.get('daily_remaining', 0):.2f})\n"
+                f"  월별: ${quota.get('current_monthly', 0):.2f} / ${quota.get('monthly_limit', 50):.2f} "
+                f"(남은: ${quota.get('monthly_remaining', 0):.2f})")
+            return
+
+        if cmd == '/user' and tenant_user and tenant_user.get('role') == 'admin':
+            from .users import user_manager
+            from .auth import auth_manager
+            parts = text.split()
+            if len(parts) >= 3 and parts[1] == 'create':
+                username = parts[2]
+                password = parts[3] if len(parts) > 3 else None
+                if not password:
+                    self.send_message(chat_id, "❌ /user create <username> <password>")
+                    return
+                try:
+                    user = auth_manager.create_user(username, password, 'user')
+                    user_manager.ensure_quota(user['id'])
+                    self.send_message(chat_id, f"✅ 사용자 생성: {username}")
+                except ValueError as e:
+                    self.send_message(chat_id, f"❌ {e}")
+                return
+            elif len(parts) >= 2 and parts[1] == 'list':
+                users = user_manager.get_all_users_with_stats()
+                lines = ["👥 사용자 목록:"]
+                for u in users:
+                    status = "✅" if u['enabled'] else "⛔"
+                    lines.append(f"  {status} {u['username']} ({u['role']}) - ${u.get('total_cost', 0):.2f}")
+                self.send_message(chat_id, '\n'.join(lines))
+                return
+            elif len(parts) >= 3 and parts[1] == 'delete':
+                ok = auth_manager.delete_user(parts[2])
+                self.send_message(chat_id, f"{'✅ 삭제됨' if ok else '❌ 실패'}: {parts[2]}")
+                return
+            self.send_message(chat_id, "Usage: /user create|list|delete")
+            return
+
         if cmd == '/start':
             self.send_message(chat_id, f'😈 {APP_NAME} v{VERSION} running\nready')
         elif cmd == '/usage':

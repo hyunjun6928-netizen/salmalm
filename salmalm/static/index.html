@@ -412,6 +412,28 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     </div>
     <div id="pw-result" style="margin-top:8px;font-size:12px"></div>
   </div>
+  <div class="settings-card" id="users-card">
+    <h3>👥 Users / 사용자 관리</h3>
+    <div id="users-panel">
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <label style="font-size:13px;margin:0"><input type="checkbox" id="mt-toggle"> Multi-tenant / 멀티테넌트</label>
+        <select id="reg-mode" style="width:auto;margin:0;padding:4px 8px">
+          <option value="admin_only">Admin-only registration</option>
+          <option value="open">Open registration</option>
+        </select>
+      </div>
+      <div id="user-list" style="font-size:13px;color:var(--text2);margin-bottom:12px">Loading...</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="new-user-name" placeholder="Username" style="width:120px;margin:0">
+        <input id="new-user-pw" type="password" placeholder="Password" style="width:120px;margin:0">
+        <select id="new-user-role" style="width:auto;margin:0;padding:4px 8px">
+          <option value="user">user</option>
+          <option value="admin">admin</option>
+        </select>
+        <button class="btn" data-action="createUser">+ Create</button>
+      </div>
+    </div>
+  </div>
   <div class="settings-card">
     <h3 data-i18n="h-update">🔄 Update</h3>
     <div style="display:flex;gap:8px;align-items:center">
@@ -1339,6 +1361,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   window.showSettings=function(){chat.style.display='none';inputArea.style.display='none';dashView.style.display='none';settingsEl.style.display='block';
     /* Load personas */
     if(window.loadPersonas)window.loadPersonas();
+    /* Load users panel */
+    if(window.loadUsers)window.loadUsers();
     /* Load routing config */
     fetch('/api/routing',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
       var cfg=d.config||{};var models=d.available_models||{};
@@ -1366,6 +1390,69 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       document.getElementById('usage-detail').innerHTML=h});
   };
   window.showUsage=window.showSettings;
+
+  /* ── Users Panel (Multi-tenant) ── */
+  window.loadUsers=function(){
+    fetch('/api/users',{headers:{'Authorization':'Bearer '+(_tok||localStorage.getItem('salm_token')||'')}})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.error){document.getElementById('user-list').textContent=d.error;return}
+      document.getElementById('mt-toggle').checked=!!d.multi_tenant;
+      var sel=document.getElementById('reg-mode');if(sel)sel.value=d.registration_mode||'admin_only';
+      var users=d.users||[];
+      if(!users.length){document.getElementById('user-list').textContent='No users yet.';return}
+      var h='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:1px solid var(--border)"><th>User</th><th>Role</th><th>Cost</th><th>Quota (D/M)</th><th>Status</th><th></th></tr>';
+      users.forEach(function(u){
+        var q=u.quota||{};
+        var status=u.enabled?'✅':'⛔';
+        h+='<tr style="border-bottom:1px solid var(--border);line-height:2.2">';
+        h+='<td>'+u.username+'</td><td>'+u.role+'</td>';
+        h+='<td>$'+(u.total_cost||0).toFixed(2)+'</td>';
+        h+='<td>$'+(q.current_daily||0).toFixed(2)+'/$'+(q.daily_limit||5).toFixed(0)+' / $'+(q.current_monthly||0).toFixed(2)+'/$'+(q.monthly_limit||50).toFixed(0)+'</td>';
+        h+='<td>'+status+'</td>';
+        h+='<td>';
+        if(u.role!=='admin'){
+          var toggleLabel=u.enabled?'Disable':'Enable';
+          h+='<button onclick="window.toggleUser('+u.id+','+(!u.enabled)+')" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text2);cursor:pointer">'+toggleLabel+'</button> ';
+          h+='<button onclick="window.deleteUser(\''+u.username+'\')" style="font-size:11px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;background:var(--bg3);color:var(--red);cursor:pointer">Delete</button>';
+        }
+        h+='</td></tr>';
+      });
+      h+='</table>';
+      document.getElementById('user-list').innerHTML=h;
+    }).catch(function(e){document.getElementById('user-list').textContent='Error: '+e});
+  };
+  window.createUser=function(){
+    var name=document.getElementById('new-user-name').value.trim();
+    var pw=document.getElementById('new-user-pw').value;
+    var role=document.getElementById('new-user-role').value;
+    if(!name||!pw){alert('Username and password required');return}
+    fetch('/api/users/register',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(_tok||localStorage.getItem('salm_token')||'')},
+      body:JSON.stringify({username:name,password:pw,role:role})})
+    .then(function(r){return r.json()}).then(function(d){
+      if(d.ok){document.getElementById('new-user-name').value='';document.getElementById('new-user-pw').value='';window.loadUsers()}
+      else alert(d.error||'Failed')
+    });
+  };
+  window.toggleUser=function(uid,enabled){
+    fetch('/api/users/toggle',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(_tok||localStorage.getItem('salm_token')||'')},
+      body:JSON.stringify({user_id:uid,enabled:enabled})})
+    .then(function(){window.loadUsers()});
+  };
+  window.deleteUser=function(username){
+    if(!confirm('Delete user '+username+'?'))return;
+    fetch('/api/users/delete',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(_tok||localStorage.getItem('salm_token')||'')},
+      body:JSON.stringify({username:username})})
+    .then(function(){window.loadUsers()});
+  };
+  document.getElementById('mt-toggle').addEventListener('change',function(){
+    fetch('/api/tenant/config',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(_tok||localStorage.getItem('salm_token')||'')},
+      body:JSON.stringify({multi_tenant:this.checked})});
+  });
+  document.getElementById('reg-mode').addEventListener('change',function(){
+    fetch('/api/tenant/config',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(_tok||localStorage.getItem('salm_token')||'')},
+      body:JSON.stringify({registration_mode:this.value})});
+  });
+
   window.showDashboard=function(){
     chat.style.display='none';inputArea.style.display='none';settingsEl.style.display='none';dashView.style.display='block';
     var dc=document.getElementById('dashboard-content');dc.innerHTML='<p style="color:var(--text2)">Loading...</p>';

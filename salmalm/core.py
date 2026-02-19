@@ -12,7 +12,7 @@ from .crypto import vault, log
 # ============================================================
 _audit_lock = threading.Lock()   # Audit log writes
 _usage_lock = threading.Lock()   # Usage tracking (separate to avoid contention)
-_thread_local = threading.local()  # Thread-local DB connections
+_thread_local = threading.local()  # Thread-local DB connections + user context
 
 
 _all_db_connections: list = []  # Track all connections for shutdown cleanup
@@ -300,8 +300,22 @@ def check_cost_cap():
                 f"Increase SALMALM_COST_CAP env var or restart.")
 
 
-def track_usage(model: str, input_tokens: int, output_tokens: int):
+def set_current_user_id(user_id: Optional[int]):
+    """Set the current user_id for cost tracking (thread-local)."""
+    _thread_local.current_user_id = user_id
+
+
+def get_current_user_id() -> Optional[int]:
+    """Get the current user_id from thread-local context."""
+    return getattr(_thread_local, 'current_user_id', None)
+
+
+def track_usage(model: str, input_tokens: int, output_tokens: int,
+                user_id: Optional[int] = None):
     """Record token usage and cost for a model call."""
+    # Auto-detect user_id from thread-local if not provided
+    if user_id is None:
+        user_id = get_current_user_id()
     with _usage_lock:
         short = model.split('/')[-1] if '/' in model else model
         cost_info = MODEL_COSTS.get(short, {'input': 1.0, 'output': 5.0})
@@ -315,14 +329,26 @@ def track_usage(model: str, input_tokens: int, output_tokens: int):
         _usage['by_model'][short]['output'] += output_tokens  # type: ignore[index]
         _usage['by_model'][short]['cost'] += cost  # type: ignore[index]
         _usage['by_model'][short]['calls'] += 1  # type: ignore[index]
-        # Persist to SQLite
+        # Persist to SQLite (with user_id for multi-tenant tracking)
         try:
             conn = _get_db()
-            conn.execute('INSERT INTO usage_stats (ts, model, input_tokens, output_tokens, cost) VALUES (?,?,?,?,?)',
-                         (datetime.now(KST).isoformat(), model, input_tokens, output_tokens, cost))
+            # Ensure user_id column exists
+            try:
+                conn.execute('ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL')
+            except Exception:
+                pass
+            conn.execute('INSERT INTO usage_stats (ts, model, input_tokens, output_tokens, cost, user_id) VALUES (?,?,?,?,?,?)',
+                         (datetime.now(KST).isoformat(), model, input_tokens, output_tokens, cost, user_id))
             conn.commit()
         except Exception as e:
             log.debug(f"Suppressed: {e}")
+        # Record cost against user quota
+        if user_id:
+            try:
+                from .users import user_manager
+                user_manager.record_cost(user_id, cost)
+            except Exception as e:
+                log.debug(f"Quota record error: {e}")
 
 
 def get_usage_report() -> dict:
@@ -901,8 +927,9 @@ class Session:
     - Session metadata tracking
     """
 
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str, user_id: Optional[int] = None):
         self.id = session_id
+        self.user_id = user_id  # Multi-tenant: owning user (None = legacy/local)
         self.messages: list = []
         self.created = time.time()
         self.last_active = time.time()
@@ -938,8 +965,13 @@ class Session:
                 elif isinstance(m.get('content'), str):
                     saveable.append(m)
             conn = _get_db()
-            conn.execute('INSERT OR REPLACE INTO session_store (session_id, messages, updated_at) VALUES (?,?,?)',
-                         (self.id, json.dumps(saveable, ensure_ascii=False), datetime.now(KST).isoformat()))
+            # Ensure user_id column exists
+            try:
+                conn.execute('ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL')
+            except Exception:
+                pass
+            conn.execute('INSERT OR REPLACE INTO session_store (session_id, messages, updated_at, user_id) VALUES (?,?,?,?)',
+                         (self.id, json.dumps(saveable, ensure_ascii=False), datetime.now(KST).isoformat(), self.user_id))
             conn.commit()
         except Exception as e:
             log.warning(f"Session persist error: {e}")
@@ -1023,12 +1055,12 @@ def _cleanup_sessions():
                 del _sessions[sid]
 
 
-def get_session(session_id: str) -> Session:
+def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
     """Get or create a chat session by ID."""
     _cleanup_sessions()
     with _session_lock:
         if session_id not in _sessions:
-            _sessions[session_id] = Session(session_id)
+            _sessions[session_id] = Session(session_id, user_id=user_id)
             # Try to restore from SQLite
             try:
                 conn = _get_db()

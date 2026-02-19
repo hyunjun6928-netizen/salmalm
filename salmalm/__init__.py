@@ -24,6 +24,7 @@ def _register_services() -> None:
     app.register('node_manager', lambda: __import__('salmalm.nodes', fromlist=['node_manager']).node_manager)
     app.register('health_monitor', lambda: __import__('salmalm.stability', fromlist=['health_monitor']).health_monitor)
     app.register('telegram_bot', lambda: __import__('salmalm.telegram', fromlist=['telegram_bot']).telegram_bot)
+    app.register('user_manager', lambda: __import__('salmalm.users', fromlist=['user_manager']).user_manager)
     app.register('discord_bot', lambda: __import__('salmalm.discord_bot', fromlist=['discord_bot']).discord_bot)
     app.register('ws_server', lambda: __import__('salmalm.ws', fromlist=['ws_server']).ws_server)
 

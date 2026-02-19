@@ -1030,6 +1030,18 @@ async def _process_message_inner(session_id: str, user_message: str,
 
     session = get_session(session_id)
 
+    # Set user context for cost tracking (multi-tenant)
+    from .core import set_current_user_id
+    set_current_user_id(session.user_id)
+
+    # Multi-tenant quota check
+    if session.user_id:
+        try:
+            from .users import user_manager, QuotaExceeded
+            user_manager.check_quota(session.user_id)
+        except QuotaExceeded as e:
+            return f'⚠️ {e.message}'
+
     # Fire on_message hook (메시지 수신 훅)
     try:
         from .hooks import hook_manager

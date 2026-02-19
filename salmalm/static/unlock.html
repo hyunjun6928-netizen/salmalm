@@ -16,8 +16,17 @@ button:hover{background:#4338ca}
 <div class="card">
 <h1>😈 SalmAlm</h1>
 <p>Personal AI Gateway {{VERSION}}</p>
+<div id="login-mode" style="display:none;margin-bottom:16px">
+<input type="text" id="login-user" placeholder="Username" style="margin-bottom:8px">
+<input type="password" id="login-pw" placeholder="Password">
+<button onclick="loginUser()" style="margin-top:8px">Login</button>
+<div style="margin-top:8px"><a href="#" onclick="toggleLoginMode(false);return false" style="color:#a78bfa;font-size:13px">← Vault unlock</a></div>
+</div>
+<div id="vault-mode">
 <input type="password" id="pw" placeholder="Master password" data-enter-action="unlock">
 <button data-action="unlock" onclick="unlock()">Unlock</button>
+<div style="margin-top:8px"><a href="#" onclick="toggleLoginMode(true);return false" style="color:#a78bfa;font-size:13px">User login →</a></div>
+</div>
 <div class="error" id="err"></div>
 <div id="unlock-help" style="margin-top:24px;font-size:13px;color:#999;line-height:1.8;text-align:left;max-width:400px"></div>
 <script>
@@ -31,6 +40,19 @@ button:hover{background:#4338ca}
 </script>
 </div>
 <script>
+function toggleLoginMode(showLogin){
+  document.getElementById('login-mode').style.display=showLogin?'block':'none';
+  document.getElementById('vault-mode').style.display=showLogin?'none':'block';
+}
+async function loginUser(){
+  var u=document.getElementById('login-user').value,p=document.getElementById('login-pw').value;
+  var r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+  var d=await r.json();
+  if(d.ok){sessionStorage.setItem('tok',d.token||'');localStorage.setItem('salm_token',d.token||'');location.reload()}
+  else{var e=document.getElementById('err');e.textContent=d.error||'Login failed';e.style.display='block'}
+}
+document.getElementById('login-user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('login-pw').focus()});
+document.getElementById('login-pw').addEventListener('keydown',function(e){if(e.key==='Enter')loginUser()});
 document.getElementById('pw').addEventListener('keydown',function(e){if(e.key==='Enter')unlock()});
 async function unlock(){
   const pw=document.getElementById('pw').value;

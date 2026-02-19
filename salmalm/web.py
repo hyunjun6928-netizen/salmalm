@@ -99,7 +99,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     # Public endpoints (no auth required)
     _PUBLIC_PATHS = {
         '/', '/index.html', '/api/status', '/api/health', '/api/unlock',
-        '/api/auth/login', '/api/onboarding', '/api/setup', '/docs',
+        '/api/auth/login', '/api/users/register', '/api/onboarding', '/api/setup', '/docs',
         '/api/google/callback', '/webhook/telegram',
     }
 
@@ -709,6 +709,54 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': 'Admin access required'}, 403)
             else:
                 self._json({'users': auth_manager.list_users()})
+        elif self.path == '/api/users':
+            # Admin: full user list with stats (멀티테넌트 사용자 관리)
+            user = extract_auth(dict(self.headers))
+            if not user:
+                ip = self._get_client_ip()
+                if ip in ('127.0.0.1', '::1', 'localhost') and vault.is_unlocked:
+                    user = {'username': 'local', 'role': 'admin', 'id': 0}
+            if not user or user.get('role') != 'admin':
+                self._json({'error': 'Admin access required'}, 403)
+            else:
+                from .users import user_manager
+                self._json({
+                    'users': user_manager.get_all_users_with_stats(),
+                    'multi_tenant': user_manager.multi_tenant_enabled,
+                    'registration_mode': user_manager.get_registration_mode(),
+                })
+        elif self.path == '/api/users/quota':
+            # Get own quota (사용량 확인)
+            user = extract_auth(dict(self.headers))
+            if not user:
+                self._json({'error': 'Authentication required'}, 401)
+            else:
+                from .users import user_manager
+                uid = user.get('uid') or user.get('id', 0)
+                quota = user_manager.get_quota(uid)
+                self._json({'quota': quota})
+        elif self.path == '/api/users/settings':
+            # Get own settings
+            user = extract_auth(dict(self.headers))
+            if not user:
+                self._json({'error': 'Authentication required'}, 401)
+            else:
+                from .users import user_manager
+                uid = user.get('uid') or user.get('id', 0)
+                settings = user_manager.get_user_settings(uid)
+                self._json({'settings': settings})
+        elif self.path == '/api/tenant/config':
+            # Admin: get multi-tenant config
+            user = extract_auth(dict(self.headers))
+            if not user or user.get('role') != 'admin':
+                self._json({'error': 'Admin access required'}, 403)
+            else:
+                from .users import user_manager
+                self._json({
+                    'multi_tenant': user_manager.multi_tenant_enabled,
+                    'registration_mode': user_manager.get_registration_mode(),
+                    'telegram_allowlist': user_manager.get_telegram_allowlist_mode(),
+                })
         elif self.path == '/api/google/auth':
             if not self._require_auth('user'): return
             client_id = vault.get('google_client_id') or ''
@@ -949,6 +997,110 @@ self.addEventListener('fetch',e=>{{
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 self._json({'error': f'Invalid JSON body: {e}'}, 400)
                 return
+
+        # ── Multi-tenant user management endpoints ──────────
+        if self.path == '/api/users/register':
+            # Register new user (admin or open registration)
+            from .users import user_manager
+            requester = extract_auth(dict(self.headers))
+            reg_mode = user_manager.get_registration_mode()
+            if reg_mode == 'admin_only':
+                if not requester or requester.get('role') != 'admin':
+                    self._json({'error': 'Admin access required for registration / 관리자만 등록 가능'}, 403)
+                    return
+            try:
+                user = auth_manager.create_user(
+                    body.get('username', ''), body.get('password', ''),
+                    body.get('role', 'user'))
+                user_manager.ensure_quota(user['id'])
+                self._json({'ok': True, 'user': user})
+            except ValueError as e:
+                self._json({'error': str(e)}, 400)
+            return
+
+        if self.path == '/api/users/delete':
+            requester = extract_auth(dict(self.headers))
+            if not requester or requester.get('role') != 'admin':
+                self._json({'error': 'Admin access required'}, 403)
+                return
+            uid = body.get('user_id')
+            username = body.get('username', '')
+            if username:
+                ok = auth_manager.delete_user(username)
+            elif uid:
+                from .users import user_manager
+                u = user_manager.get_user_by_id(uid)
+                ok = auth_manager.delete_user(u['username']) if u else False
+            else:
+                self._json({'error': 'user_id or username required'}, 400)
+                return
+            self._json({'ok': ok})
+            return
+
+        if self.path == '/api/users/toggle':
+            # Enable/disable user (admin only)
+            requester = extract_auth(dict(self.headers))
+            if not requester or requester.get('role') != 'admin':
+                self._json({'error': 'Admin access required'}, 403)
+                return
+            from .users import user_manager
+            uid = body.get('user_id')
+            enabled = body.get('enabled', True)
+            if not uid:
+                self._json({'error': 'user_id required'}, 400)
+                return
+            ok = user_manager.toggle_user(uid, enabled)
+            self._json({'ok': ok})
+            return
+
+        if self.path == '/api/users/quota/set':
+            # Set user quota (admin only)
+            requester = extract_auth(dict(self.headers))
+            if not requester or requester.get('role') != 'admin':
+                self._json({'error': 'Admin access required'}, 403)
+                return
+            from .users import user_manager
+            uid = body.get('user_id')
+            if not uid:
+                self._json({'error': 'user_id required'}, 400)
+                return
+            user_manager.set_quota(
+                uid,
+                daily_limit=body.get('daily_limit'),
+                monthly_limit=body.get('monthly_limit'))
+            self._json({'ok': True, 'quota': user_manager.get_quota(uid)})
+            return
+
+        if self.path == '/api/users/settings':
+            # Update own settings
+            user = extract_auth(dict(self.headers))
+            if not user:
+                self._json({'error': 'Authentication required'}, 401)
+                return
+            from .users import user_manager
+            uid = user.get('uid') or user.get('id', 0)
+            allowed_keys = ('model_preference', 'persona', 'tts_enabled', 'tts_voice')
+            updates = {k: v for k, v in body.items() if k in allowed_keys}
+            if updates:
+                user_manager.set_user_settings(uid, **updates)
+            self._json({'ok': True, 'settings': user_manager.get_user_settings(uid)})
+            return
+
+        if self.path == '/api/tenant/config':
+            # Admin: update multi-tenant config
+            requester = extract_auth(dict(self.headers))
+            if not requester or requester.get('role') != 'admin':
+                self._json({'error': 'Admin access required'}, 403)
+                return
+            from .users import user_manager
+            if 'multi_tenant' in body:
+                user_manager.enable_multi_tenant(body['multi_tenant'])
+            if 'registration_mode' in body:
+                user_manager.set_registration_mode(body['registration_mode'])
+            if 'telegram_allowlist' in body:
+                user_manager.set_telegram_allowlist_mode(body['telegram_allowlist'])
+            self._json({'ok': True})
+            return
 
         if self.path == '/api/auth/login':
             username = body.get('username', '')
