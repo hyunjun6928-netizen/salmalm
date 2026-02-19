@@ -27,6 +27,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 .side-nav{flex:1;padding:12px;overflow-y:auto}
 .nav-section{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;padding:12px 8px 6px;font-weight:600}
 .nav-item{padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text2);display:flex;align-items:center;gap:10px;transition:all 0.15s}
+.session-item{padding:7px 10px;font-size:12px;gap:4px}.session-item:hover .session-del{opacity:0.8}
 .nav-item:hover{background:var(--accent-dim);color:var(--text)}
 .nav-item.active{background:var(--accent-dim);color:var(--accent2);font-weight:500}
 .nav-item .badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
@@ -146,11 +147,15 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div class="tagline">Personal AI Gateway</div>
   </div>
   <div class="side-nav">
-    <div class="nav-section" data-i18n="sec-channels">Channels</div>
-    <div class="nav-item active" onclick="showChat()">💬 Web Chat</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px 4px">
+      <div class="nav-section" style="margin:0;padding:0" data-i18n="sec-chats">💬 Chats</div>
+      <button onclick="window.newSession()" title="New Chat" style="background:var(--accent);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+    </div>
+    <div id="session-list" style="max-height:240px;overflow-y:auto;padding:0 8px 4px"></div>
+    <div class="nav-section" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px">📡 Channels</div>
     <div class="nav-item" id="tg-status">📡 Telegram <span class="badge">ON</span></div>
-    <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ Tools (30) ▾</div>
-    <div id="tools-list">
+    <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ Tools (31) ▾</div>
+    <div id="tools-list" style="display:none">
     <div class="nav-item" onclick="quickCmd('/help')">🔧 exec · file · search</div>
     <div class="nav-item" onclick="quickCmd('Check system status')">🖥️ System Monitor</div>
     <div class="nav-item" onclick="quickCmd('Show memory files')">🧠 Memory</div>
@@ -180,7 +185,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div class="cost">Cost: <b id="cost-display">$0.0000</b></div>
   <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
   <button id="export-btn" onclick="window.exportChat('md')" title="Export chat" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer"data-i18n="btn-export">📥 Export</button>
-  <button id="new-chat-btn" onclick="window.newChat()" title="New Chat">🗑️ New Chat</button>
+  <button id="new-chat-btn" onclick="window.newSession()" title="New Chat">✨ New</button>
 </div>
 
 <div id="chat"></div>
@@ -322,11 +327,94 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     fileNameEl=document.getElementById('file-name'),fileSizeEl=document.getElementById('file-size'),
     imgPrev=document.getElementById('img-preview'),inputArea=document.getElementById('input-area');
   let _tok=sessionStorage.getItem('tok')||'',pendingFile=null;
+  var _currentSession=localStorage.getItem('salm_active_session')||'web';
+  var _sessionCache={};
+
+  /* --- Session Management --- */
+  function _genId(){return 's_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6)}
+  function _storageKey(sid){return 'salm_chat_'+sid}
+
+  function loadSessionList(){
+    fetch('/api/sessions',{headers:{'X-Session-Token':_tok}})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var el=document.getElementById('session-list');if(!el)return;
+      if(!d.sessions||!d.sessions.length){
+        el.innerHTML='<div style="padding:8px 12px;opacity:0.5;font-size:12px">No conversations yet</div>';
+        return;
+      }
+      var html='';
+      d.sessions.forEach(function(s){
+        var active=s.id===_currentSession?' style="background:var(--accent-dim);border-radius:8px"':'';
+        var title=s.title||s.id;
+        if(title.length>40)title=title.slice(0,40)+'...';
+        html+='<div class="nav-item session-item"'+active+' onclick="window.switchSession(\''+s.id+'\')" data-sid="'+s.id+'">'
+          +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</span>'
+          +'<span class="session-del" onclick="event.stopPropagation();window.deleteSession(\''+s.id+'\')" title="Delete" style="opacity:0.4;cursor:pointer;padding:2px 4px;font-size:11px">✕</span>'
+          +'</div>';
+      });
+      el.innerHTML=html;
+    }).catch(function(){});
+  }
+
+  window.switchSession=function(sid){
+    /* Save current chat to cache */
+    _sessionCache[_currentSession]=chat.innerHTML;
+    localStorage.setItem(_storageKey(_currentSession),localStorage.getItem('salm_chat')||'[]');
+    /* Switch */
+    _currentSession=sid;
+    localStorage.setItem('salm_active_session',sid);
+    /* Restore from cache or localStorage */
+    chat.innerHTML='';
+    localStorage.removeItem('salm_chat');
+    var stored=localStorage.getItem(_storageKey(sid));
+    if(stored){
+      localStorage.setItem('salm_chat',stored);
+      var hist=JSON.parse(stored);
+      if(hist.length){window._restoring=true;hist.forEach(function(m){addMsg(m.role,m.text,m.model)});window._restoring=false}
+    }
+    loadSessionList();
+    /* Close sidebar on mobile */
+    var sb=document.getElementById('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();
+  };
+
+  window.newSession=function(){
+    var sid=_genId();
+    _sessionCache[_currentSession]=chat.innerHTML;
+    localStorage.setItem(_storageKey(_currentSession),localStorage.getItem('salm_chat')||'[]');
+    _currentSession=sid;
+    localStorage.setItem('salm_active_session',sid);
+    localStorage.removeItem('salm_chat');
+    chat.innerHTML='';
+    addMsg('system','😈 New conversation started.');
+    loadSessionList();
+    var sb=document.getElementById('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();
+  };
+
+  window.deleteSession=function(sid){
+    if(!confirm('Delete this conversation?'))return;
+    fetch('/api/sessions/delete',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+      body:JSON.stringify({session_id:sid})}).then(function(){
+      localStorage.removeItem(_storageKey(sid));
+      delete _sessionCache[sid];
+      if(sid===_currentSession){
+        _currentSession='web';
+        localStorage.setItem('salm_active_session','web');
+        localStorage.removeItem('salm_chat');
+        chat.innerHTML='';
+        addMsg('system','😈 New conversation started.');
+      }
+      loadSessionList();
+    }).catch(function(){});
+  };
 
   /* --- Restore chat history --- */
   (function(){
+    var stored=localStorage.getItem(_storageKey(_currentSession));
+    if(stored)localStorage.setItem('salm_chat',stored);
     var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
     if(hist.length){window._restoring=true;hist.forEach(function(m){addMsg(m.role,m.text,m.model)});window._restoring=false}
+    loadSessionList();
   })();
 
   /* --- Export chat --- */
@@ -352,12 +440,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* --- New chat --- */
   window.newChat=function(){
-    if(!confirm('Delete chat history and start a new conversation?'))return;
-    localStorage.removeItem('salm_chat');
-    chat.innerHTML='';
-    fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
-      body:JSON.stringify({message:'/clear',session:'web'})}).catch(function(){});
-    addMsg('system','😈 New conversation started.');
+    window.newSession();
   };
 
   /* --- Theme --- */
@@ -463,6 +546,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       hist.push({role:role,text:text,model:model||null});
       if(hist.length>200)hist=hist.slice(-200);
       localStorage.setItem('salm_chat',JSON.stringify(hist));
+      localStorage.setItem(_storageKey(_currentSession),JSON.stringify(hist));
+      /* Auto-refresh session list after first user message */
+      if(role==='user'&&hist.filter(function(m){return m.role==='user'}).length===1)setTimeout(loadSessionList,500);
     }
   }
   function addTyping(){
@@ -534,7 +620,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
     addTyping();
     var _sendStart=Date.now();
-    var chatBody={message:msg,session:'web'};
+    var chatBody={message:msg,session:_currentSession};
     if(imgData){chatBody.image_base64=imgData;chatBody.image_mime=imgMime}
     try{
       var useStream=true;
@@ -743,7 +829,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ Error: '+e.message+'</span>'})
   };
   window.setModel=function(m){modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
-    fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'/model '+(m==='auto'?'auto':m),session:'web'})})};
+    fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'/model '+(m==='auto'?'auto':m),session:_currentSession})})};
 
   /* --- Drag highlight --- */
   var ia=document.getElementById('input-area');

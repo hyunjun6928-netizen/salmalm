@@ -222,6 +222,43 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._html(ONBOARDING_HTML)
             else:
                 self._html(WEB_HTML)
+        elif self.path == '/api/sessions':
+            if not self._require_auth('user'): return
+            from .core import _get_db
+            conn = _get_db()
+            # Ensure title column exists
+            try:
+                conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
+                conn.commit()
+            except Exception:
+                pass
+            rows = conn.execute(
+                'SELECT session_id, updated_at, title FROM session_store ORDER BY updated_at DESC'
+            ).fetchall()
+            sessions = []
+            for r in rows:
+                sid = r[0]
+                stored_title = r[2] if len(r) > 2 else ''
+                if stored_title:
+                    title = stored_title
+                    msg_count = 0
+                else:
+                    try:
+                        msgs = json.loads(
+                            conn.execute('SELECT messages FROM session_store WHERE session_id=?', (sid,)).fetchone()[0]
+                        )
+                        title = ''
+                        for m in msgs:
+                            if m.get('role') == 'user' and isinstance(m.get('content'), str):
+                                title = m['content'][:60]
+                                break
+                        msg_count = len([m for m in msgs if m.get('role') in ('user', 'assistant')])
+                    except Exception:
+                        title = sid
+                        msg_count = 0
+                sessions.append({'id': sid, 'title': title or sid, 'updated_at': r[1], 'messages': msg_count})
+            self._json({'sessions': sessions})
+
         elif self.path == '/api/notifications':
             if not self._require_auth('user'): return
             from .core import _sessions
@@ -563,6 +600,40 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             else:
                 audit_log('unlock_fail', 'wrong password')
                 self._json({'ok': False, 'error': 'Wrong password'}, 401)
+
+        elif self.path == '/api/sessions/delete':
+            if not self._require_auth('user'): return
+            sid = body.get('session_id', '')
+            if not sid:
+                self._json({'ok': False, 'error': 'Missing session_id'}, 400)
+                return
+            from .core import _sessions, _get_db
+            if sid in _sessions:
+                del _sessions[sid]
+            conn = _get_db()
+            conn.execute('DELETE FROM session_store WHERE session_id=?', (sid,))
+            conn.commit()
+            audit_log('session_delete', sid)
+            self._json({'ok': True})
+
+        elif self.path == '/api/sessions/rename':
+            if not self._require_auth('user'): return
+            sid = body.get('session_id', '')
+            title = body.get('title', '').strip()[:60]
+            if not sid or not title:
+                self._json({'ok': False, 'error': 'Missing session_id or title'}, 400)
+                return
+            from .core import _get_db
+            conn = _get_db()
+            # Store title in a separate column (add if not exists)
+            try:
+                conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
+                conn.commit()
+            except Exception:
+                pass  # column already exists
+            conn.execute('UPDATE session_store SET title=? WHERE session_id=?', (title, sid))
+            conn.commit()
+            self._json({'ok': True})
 
         elif self.path in ('/api/chat', '/api/chat/stream'):
             self._auto_unlock_localhost()
