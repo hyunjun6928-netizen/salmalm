@@ -156,7 +156,7 @@ class Vault:
     def get(self, key: str, default: Any = None) -> Any:
         """Get a stored value. Falls back to environment variable if not in vault."""
         val = self._data.get(key)
-        if val:
+        if val is not None:
             return val
         # Fallback: check env var
         env_name = self._ENV_MAP.get(key, key.upper())

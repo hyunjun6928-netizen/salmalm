@@ -445,6 +445,9 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         return f'Unknown model: {model_name}\\nAvailable: {", ".join(sorted(MODEL_ALIASES.keys()))}'
 
     # --- Normal message processing ---
+    if not user_message.strip() and not image_data:
+        return "Please enter a message."
+
     if image_data:
         b64, mime = image_data
         log.info(f"[IMG] Image attached: {mime}, {len(b64)//1024}KB base64")
