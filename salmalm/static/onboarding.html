@@ -30,17 +30,17 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 .progress .dot.done{background:#34d399}
 </style></head><body>
 <div class="wizard">
-<h1>😈 SalmAlm Setup Wizard</h1>
-<p class="sub">You need at least 1 API key to use the AI Gateway</p>
+<h1>😈 <span data-i18n="title">SalmAlm Setup Wizard</span></h1>
+<p class="sub" data-i18n="sub">You need at least 1 API key to use the AI Gateway</p>
 <div class="progress"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
 
 <div class="step">
-<label class="required">Anthropic API Key (Claude)</label>
+<label class="required" data-i18n="lbl-anthropic">Anthropic API Key (Claude)</label>
 <input type="password" id="anthropic" placeholder="sk-ant-...">
 <div class="hint">Recommended. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
 </div>
 <div class="step">
-<label>OpenAI API Key (GPT)</label>
+<label data-i18n="lbl-openai">OpenAI API Key (GPT)</label>
 <input type="password" id="openai" placeholder="sk-...">
 <div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
 </div>
@@ -54,7 +54,7 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 </div>
 <div class="divider"></div>
 <div class="step">
-<label>Brave Search API Key (Web Search)</label>
+<label data-i18n="lbl-brave">Brave Search API Key (Web Search)</label>
 <input type="password" id="brave" placeholder="BSA...">
 <div class="hint">Optional. <a href="https://brave.com/search/api/" target="_blank" style="color:#7c5cfc">Get Free Key →</a></div>
 </div>
@@ -71,11 +71,33 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 <div class="hint">If Ollama is installed, enter URL. Free without API keys! <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">Install →</a></div>
 </div>
 
-<button id="btn" data-action="save">Save & Test</button>
+<button id="btn" data-action="save" data-i18n="btn-save">Save & Test</button>
 <div class="result" id="result"></div>
-<div class="skip"><a data-action="reload">Skip (configure later)</a></div>
+<div class="skip"><a data-action="reload" data-i18n="btn-skip">Skip (configure later)</a></div>
 </div>
 <script>
+const _i18n={
+  en:{
+    'title':'SalmAlm Setup Wizard','sub':'You need at least 1 API key to use the AI Gateway',
+    'lbl-anthropic':'Anthropic API Key (Claude)','lbl-openai':'OpenAI API Key (GPT)',
+    'lbl-xai':'xAI API Key (Grok)','lbl-google':'Google API Key (Gemini)',
+    'lbl-brave':'Brave Search API Key (Web Search)',
+    'btn-save':'Save & Test','btn-skip':'Skip (configure later)',
+    'err-empty':'Enter at least 1 API key or Ollama URL'
+  },
+  ko:{
+    'title':'삶앎 초기 설정','sub':'AI 게이트웨이를 사용하려면 최소 1개의 API 키가 필요합니다',
+    'lbl-anthropic':'Anthropic API 키 (Claude)','lbl-openai':'OpenAI API 키 (GPT)',
+    'lbl-xai':'xAI API 키 (Grok)','lbl-google':'Google API 키 (Gemini)',
+    'lbl-brave':'Brave Search API 키 (웹 검색)',
+    'btn-save':'저장 및 테스트','btn-skip':'건너뛰기 (나중에 설정)',
+    'err-empty':'최소 1개의 API 키 또는 Ollama URL을 입력하세요'
+  }
+};
+const _lang=localStorage.getItem('salmalm-lang')||'en';
+function t(k){return (_i18n[_lang]||_i18n.en)[k]||(_i18n.en[k]||k)}
+document.querySelectorAll('[data-i18n]').forEach(function(el){el.textContent=t(el.getAttribute('data-i18n'))});
+
 async function save(){
   const btn=document.getElementById('btn');
   btn.disabled=true; btn.textContent='Testing...';
@@ -89,7 +111,7 @@ async function save(){
   const ollama=document.getElementById('ollama').value.trim();
   if(ollama) body.ollama_url=ollama;
   if(!Object.keys(body).length){
-    show('Enter at least 1 API key or Ollama URL','err');
+    show(t('err-empty'),'err');
     btn.disabled=false; btn.textContent='Save & Test'; return;
   }
   try{

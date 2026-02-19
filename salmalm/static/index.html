@@ -266,15 +266,15 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <label style="margin-top:8px"data-i18n="lbl-ollama">Ollama URL (Local LLM)</label>
     <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
     <button data-action="saveOllama" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px"data-i18n="btn-save-ollama">Save Ollama URL</button>
-    <h3 style="margin-top:20px">🔀 Auto Routing Models</h3>
-    <p style="font-size:12px;color:var(--text2);margin:4px 0 8px">When "Auto Routing" is selected, messages are classified by complexity and routed to these models:</p>
-    <label style="font-size:12px">⚡ Simple (greetings, short questions)</label>
+    <h3 style="margin-top:20px" data-i18n="h-routing">🔀 Auto Routing Models</h3>
+    <p style="font-size:12px;color:var(--text2);margin:4px 0 8px" data-i18n="routing-desc">When "Auto Routing" is selected, messages are classified by complexity and routed to these models:</p>
+    <label style="font-size:12px" data-i18n="lbl-route-simple">⚡ Simple (greetings, short questions)</label>
     <select id="route-simple" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
-    <label style="font-size:12px">🔧 Moderate (code, analysis, summaries)</label>
+    <label style="font-size:12px" data-i18n="lbl-route-moderate">🔧 Moderate (code, analysis, summaries)</label>
     <select id="route-moderate" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
-    <label style="font-size:12px">💎 Complex (architecture, long reasoning)</label>
+    <label style="font-size:12px" data-i18n="lbl-route-complex">💎 Complex (architecture, long reasoning)</label>
     <select id="route-complex" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
-    <button data-action="saveRouting" style="padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px">Save Routing</button>
+    <button data-action="saveRouting" style="padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px" data-i18n="btn-save-routing">Save Routing</button>
     <span id="route-status" style="font-size:11px;color:var(--text2);margin-left:8px"></span>
   </div>
   <div class="settings-card">
@@ -293,43 +293,43 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="vault-keys" style="margin-top:12px"></div>
   </div>
   <div class="settings-card" id="google-oauth-card">
-    <h3>🔗 Google 연동 (Calendar & Gmail)</h3>
+    <h3 data-i18n="h-google-oauth">🔗 Google Integration (Calendar & Gmail)</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
-      Google Calendar, Gmail 기능을 사용하려면 OAuth2 연동이 필요합니다.<br>
-      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--accent2)">Google Cloud Console</a>에서 OAuth 2.0 Client ID를 생성하세요.
+      <span data-i18n="google-oauth-desc">OAuth2 integration is required for Google Calendar and Gmail features.</span><br>
+      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--accent2)">Google Cloud Console</a> — <span data-i18n="google-oauth-console">Create an OAuth 2.0 Client ID at Google Cloud Console.</span>
     </p>
-    <label>Google Client ID</label>
+    <label data-i18n="lbl-google-client-id">Google Client ID</label>
     <div style="display:flex;gap:6px"><input id="sk-google-client-id" type="password" placeholder="xxxx.apps.googleusercontent.com"><button class="btn" data-action="save-google-client-id">Save</button></div>
-    <label>Google Client Secret</label>
+    <label data-i18n="lbl-google-client-secret">Google Client Secret</label>
     <div style="display:flex;gap:6px"><input id="sk-google-client-secret" type="password" placeholder="GOCSPX-..."><button class="btn" data-action="save-google-client-secret">Save</button></div>
     <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-      <button class="btn" data-action="googleConnect" id="google-connect-btn">🔗 Google 계정 연결</button>
-      <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="googleDisconnect">연결 해제</button>
+      <button class="btn" data-action="googleConnect" id="google-connect-btn" data-i18n="btn-google-connect">🔗 Connect Google Account</button>
+      <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="googleDisconnect" data-i18n="btn-google-disconnect">Disconnect</button>
       <span id="google-status" style="font-size:12px;color:var(--text2)"></span>
     </div>
     <div id="google-result" style="margin-top:8px;font-size:12px"></div>
     <details style="margin-top:12px">
-      <summary style="font-size:12px;color:var(--text2);cursor:pointer">📋 설정 가이드</summary>
+      <summary style="font-size:12px;color:var(--text2);cursor:pointer" data-i18n="google-guide-title">📋 Setup Guide</summary>
       <ol style="font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2">
-        <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--accent2)">Google Cloud Console</a> → 프로젝트 생성/선택</li>
-        <li>API 및 서비스 → 사용자 인증 정보 → OAuth 2.0 클라이언트 ID 만들기</li>
-        <li>애플리케이션 유형: <b>웹 애플리케이션</b></li>
-        <li>승인된 리디렉션 URI: <code style="background:var(--bg);padding:2px 6px;border-radius:4px">http://localhost:PORT/api/google/callback</code></li>
-        <li>Client ID와 Client Secret을 위에 입력</li>
-        <li><b>🔗 Google 계정 연결</b> 클릭</li>
+        <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--accent2)">Google Cloud Console</a> — <span data-i18n="google-guide-1">Google Cloud Console → Create/Select Project</span></li>
+        <li data-i18n="google-guide-2">APIs & Services → Credentials → Create OAuth 2.0 Client ID</li>
+        <li data-i18n="google-guide-3">Application type: Web application</li>
+        <li><span data-i18n="google-guide-4">Authorized redirect URI:</span> <code style="background:var(--bg);padding:2px 6px;border-radius:4px">http://localhost:PORT/api/google/callback</code></li>
+        <li data-i18n="google-guide-5">Enter Client ID and Client Secret above</li>
+        <li data-i18n="google-guide-6">Click Connect Google Account</li>
       </ol>
     </details>
   </div>
   <div class="settings-card" id="soul-card">
-    <h3>📜 SOUL.md (Custom System Prompt)</h3>
+    <h3 data-i18n="h-soul">📜 SOUL.md (Custom System Prompt)</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.6">
-      커스텀 시스템 프롬프트를 설정합니다. 모든 대화의 앞에 삽입됩니다.<br>
-      <code style="font-size:11px">~/.salmalm/SOUL.md</code> · 비우면 기본값 복원
+      <span data-i18n="soul-desc">Set a custom system prompt. It will be prepended to all conversations.</span><br>
+      <code style="font-size:11px" data-i18n="soul-path">~/.salmalm/SOUL.md · Leave empty to restore default</code>
     </p>
     <textarea id="soul-editor" style="width:100%;min-height:150px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:'SF Mono',monospace;resize:vertical;line-height:1.6" placeholder="# My Custom Persona\n\nYou are ..."></textarea>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn" data-action="saveSoul">💾 Save</button>
-      <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="resetSoul">🔄 Reset</button>
+      <button class="btn" data-action="saveSoul" data-i18n="btn-save-soul">💾 Save</button>
+      <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="resetSoul" data-i18n="btn-reset-soul">🔄 Reset</button>
     </div>
     <div id="soul-result" style="margin-top:6px;font-size:12px"></div>
   </div>
@@ -392,20 +392,20 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     </div>
     <img id="img-preview" style="display:none;max-height:120px;border-radius:8px;margin-top:8px">
   </div>
-  <div class="input-hint">Enter to send · Shift+Enter newline · Ctrl+V paste · Drag&Drop files</div>
+  <div class="input-hint" data-i18n="input-hint">Enter to send · Shift+Enter newline · Ctrl+V paste · Drag&Drop files</div>
 </div>
 
 <div id="dashboard-view" style="display:none;padding:20px;max-width:1200px;margin:0 auto">
-  <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px">← Back to Chat</a></div>
-  <h2 style="margin-bottom:16px">📈 Dashboard</h2>
-  <div id="dashboard-content" style="color:var(--text2)">Loading...</div>
+  <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px" data-i18n="dash-back">← Back to Chat</a></div>
+  <h2 style="margin-bottom:16px" data-i18n="dash-title">📈 Dashboard</h2>
+  <div id="dashboard-content" style="color:var(--text2)" data-i18n="dash-loading">Loading...</div>
 </div>
 
 <div id="search-modal">
   <div id="search-box">
-    <input id="search-input" type="text" placeholder="🔍 Search conversations... (Ctrl+K)">
+    <input id="search-input" type="text" placeholder="🔍 Search conversations... (Ctrl+K)" data-i18n-ph="search-ph">
     <div id="search-results"></div>
-    <div id="search-hint">Esc to close · Enter to select · Type to search</div>
+    <div id="search-hint" data-i18n="search-hint">Esc to close · Enter to select · Type to search</div>
   </div>
 </div>
 
@@ -434,7 +434,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     .then(function(d){
       var el=document.getElementById('session-list');if(!el)return;
       if(!d.sessions||!d.sessions.length){
-        el.innerHTML='<div style="padding:8px 12px;opacity:0.5;font-size:12px">No conversations yet</div>';
+        el.innerHTML='<div style="padding:8px 12px;opacity:0.5;font-size:12px">'+t('no-sessions')+'</div>';
         return;
       }
       var html='';
@@ -498,13 +498,13 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     localStorage.setItem('salm_active_session',sid);
     localStorage.removeItem('salm_chat');
     chat.innerHTML='';
-    addMsg('system','😈 New conversation started.');
+    addMsg('system',t('new-session-msg'));
     loadSessionList();
     var sb=document.getElementById('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();
   };
 
   window.deleteSession=function(sid){
-    if(!confirm('Delete this conversation?'))return;
+    if(!confirm(t('confirm-delete')))return;
     fetch('/api/sessions/delete',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
       body:JSON.stringify({session_id:sid})}).then(function(){
       localStorage.removeItem(_storageKey(sid));
@@ -514,7 +514,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         localStorage.setItem('salm_active_session','web');
         localStorage.removeItem('salm_chat');
         chat.innerHTML='';
-        addMsg('system','😈 New conversation started.');
+        addMsg('system',t('new-session-msg'));
       }
       loadSessionList();
     }).catch(function(){});
@@ -532,7 +532,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- Export chat --- */
   window.exportChat=function(fmt){
     var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
-    if(!hist.length){addMsg('assistant','No chat to export.');return}
+    if(!hist.length){addMsg('assistant',t('no-chat-export'));return}
     var content='';
     if(fmt==='json'){
       content=JSON.stringify(hist,null,2);
@@ -665,7 +665,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     mt.appendChild(document.createTextNode(meta_parts.filter(function(p){return!p.includes('/')}).join(' · ')));
     /* TTS button for assistant messages */
     if(role==='assistant'&&_cleanText&&_cleanText.length>5){
-      var ttsBtn=document.createElement('button');ttsBtn.className='tts-btn';ttsBtn.textContent='🔊';ttsBtn.title='Read aloud';
+      var ttsBtn=document.createElement('button');ttsBtn.className='tts-btn';ttsBtn.textContent='🔊';ttsBtn.title=t('btn-tts-title');
       ttsBtn.onclick=function(){
         if('speechSynthesis' in window){
           window.speechSynthesis.cancel();
@@ -682,7 +682,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     }
     if(role==='assistant'&&text){
       var regenBtn=document.createElement('span');
-      regenBtn.textContent=' 🔄';regenBtn.style.cursor='pointer';regenBtn.title='Regenerate';
+      regenBtn.textContent=' 🔄';regenBtn.style.cursor='pointer';regenBtn.title=t('btn-regen-title');
       regenBtn.onclick=function(){
         var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
         /* Find last user message */
@@ -696,7 +696,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     }
     var branchBtn=document.createElement('span');
     branchBtn.textContent=' 🌿';branchBtn.style.cssText='cursor:pointer;opacity:0;transition:opacity 0.15s;font-size:12px';
-    branchBtn.title='Branch from here';
+    branchBtn.title=t('btn-branch-title');
     branchBtn.onclick=function(){
       var allMsgs=chat.querySelectorAll('.msg-row');
       var idx=-1;for(var bi=0;bi<allMsgs.length;bi++){if(allMsgs[bi]===row){idx=bi;break;}}
@@ -705,7 +705,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         body:JSON.stringify({session_id:_currentSession,message_index:idx})})
       .then(function(r){return r.json()}).then(function(d){
         if(d.ok){switchSession(d.new_session_id);loadSessionList();}
-        else{alert(d.error||'Branch failed');}
+        else{alert(d.error||t('branch-fail'));}
       });
     };
     mt.appendChild(branchBtn);
@@ -736,7 +736,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* --- File handling --- */
   window.setFile=function(file){
-    if(file.type.startsWith('image/')&&file.size>5*1024*1024){alert('Image too large (max 5MB)');return}
+    if(file.type.startsWith('image/')&&file.size>5*1024*1024){alert(t('img-too-large'));return}
     pendingFile=file;
     const isImg=file.type.startsWith('image/');
     fileIconEl.textContent=isImg?'🖼️':'📎';
@@ -762,7 +762,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var _dragCtr=0;
   var _dropOv=document.createElement('div');
   _dropOv.style.cssText='display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(99,102,241,0.15);z-index:9999;pointer-events:none;align-items:center;justify-content:center';
-  _dropOv.innerHTML='<div style="padding:32px 48px;background:var(--bg2);border:3px dashed var(--accent);border-radius:16px;color:var(--accent);font-size:20px;font-weight:600;pointer-events:none">📎 Drop image or file here</div>';
+  _dropOv.innerHTML='<div style="padding:32px 48px;background:var(--bg2);border:3px dashed var(--accent);border-radius:16px;color:var(--accent);font-size:20px;font-weight:600;pointer-events:none" data-i18n="drop-overlay">📎 Drop image or file here</div>';
   document.body.appendChild(_dropOv);
   document.addEventListener('dragenter',function(e){e.preventDefault();_dragCtr++;if(_dragCtr===1)_dropOv.style.display='flex'});
   document.addEventListener('dragleave',function(e){e.preventDefault();_dragCtr--;if(_dragCtr<=0){_dragCtr=0;_dropOv.style.display='none'}});
@@ -915,10 +915,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         body:JSON.stringify({session_id:_currentSession,count:cnt})})
       .then(function(r){return r.json()}).then(function(d){
         if(d.ok){
-          addMsg('assistant','⏪ Rolled back '+d.removed+' message pair(s).');
+          addMsg('assistant',t('rollback-done')+' '+d.removed+' '+t('rollback-pairs'));
           /* Reload session */
           switchSession(_currentSession);
-        }else{addMsg('assistant','❌ Rollback failed: '+(d.error||''));}
+        }else{addMsg('assistant',t('rollback-fail')+' '+(d.error||''));}
       });
       return;
     }
@@ -931,7 +931,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         body:JSON.stringify({session_id:_currentSession,message_index:idx})})
       .then(function(r){return r.json()}).then(function(d){
         if(d.ok){switchSession(d.new_session_id);loadSessionList();}
-        else{addMsg('assistant','❌ Branch failed: '+(d.error||''));}
+        else{addMsg('assistant',t('branch-fail')+' '+(d.error||''));}
       });
       return;
     }
@@ -950,8 +950,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         var ur=await fetch('/api/upload',{method:'POST',body:fd});
         var ud=await ur.json();
         if(ud.ok){fileMsg=ud.info;if(ud.image_base64){imgData=ud.image_base64;imgMime=ud.image_mime;window._pendingWsImage={data:imgData,mime:imgMime}}}
-        else addMsg('assistant','❌ Upload failed: '+(ud.error||''));
-      }catch(ue){addMsg('assistant','❌ Upload error: '+ue.message)}
+        else addMsg('assistant',t('upload-fail')+' '+(ud.error||''));
+      }catch(ue){addMsg('assistant',t('upload-error')+' '+ue.message)}
       window.clearFile();
     }
 
@@ -1005,7 +1005,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'nav-weather':'Weather','nav-rss':'RSS','nav-remind':'Reminders','nav-translate':'Translate',
       'nav-workflow':'Workflows','nav-qr':'QR Code','nav-notify':'Notifications','nav-fileindex':'File Search',
       'btn-save-ollama':'Save Ollama URL','btn-newchat':'🗨 New Chat',
-      'sec-channels':'Channels','sec-admin':'Admin',
+      'sec-chats':'💬 Chats','sec-channels':'Channels','sec-admin':'Admin',
       'h-password':'🔒 Master Password',
       'pw-current':'Current Password','pw-new':'New Password','pw-confirm':'Confirm New Password',
       'pw-new-hint':'New password (4+ chars, leave empty to remove)','pw-confirm-hint':'Re-enter new password',
@@ -1014,6 +1014,64 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'pw-min4':'Password (4+ characters)','pw-reenter':'Re-enter',
       'pw-mismatch':'New passwords do not match','pw-changed':'✅ Password changed',
       'pw-fail':'❌ Change failed','pw-enter-current':'Please enter current password',
+      'h-routing':'🔀 Auto Routing Models',
+      'routing-desc':'When "Auto Routing" is selected, messages are classified by complexity and routed to these models:',
+      'lbl-route-simple':'⚡ Simple (greetings, short questions)',
+      'lbl-route-moderate':'🔧 Moderate (code, analysis, summaries)',
+      'lbl-route-complex':'💎 Complex (architecture, long reasoning)',
+      'btn-save-routing':'Save Routing',
+      'h-soul':'📜 SOUL.md (Custom System Prompt)',
+      'soul-desc':'Set a custom system prompt. It will be prepended to all conversations.',
+      'soul-path':'~/.salmalm/SOUL.md · Leave empty to restore default',
+      'soul-ph':'# My Custom Persona\n\nYou are ...',
+      'btn-save-soul':'💾 Save','btn-reset-soul':'🔄 Reset',
+      'h-google-oauth':'🔗 Google Integration (Calendar & Gmail)',
+      'google-oauth-desc':'OAuth2 integration is required for Google Calendar and Gmail features.',
+      'google-oauth-console':'Create an OAuth 2.0 Client ID at Google Cloud Console.',
+      'lbl-google-client-id':'Google Client ID','lbl-google-client-secret':'Google Client Secret',
+      'btn-google-connect':'🔗 Connect Google Account','btn-google-disconnect':'Disconnect',
+      'google-guide-title':'📋 Setup Guide',
+      'google-guide-1':'Google Cloud Console → Create/Select Project',
+      'google-guide-2':'APIs & Services → Credentials → Create OAuth 2.0 Client ID',
+      'google-guide-3':'Application type: Web application',
+      'google-guide-4':'Authorized redirect URI:',
+      'google-guide-5':'Enter Client ID and Client Secret above',
+      'google-guide-6':'Click Connect Google Account',
+      'google-connected':'🟢 Connected','google-not-connected':'⚪ Not connected',
+      'google-no-client-id':'❌ Save Client ID first',
+      'google-redirecting':'🔗 Redirecting to Google login...',
+      'google-confirm-disconnect':'Disconnect Google integration?',
+      'google-disconnected':'✅ Google integration disconnected',
+      'search-ph':'🔍 Search conversations... (Ctrl+K)',
+      'search-hint':'Esc to close · Enter to select · Type to search',
+      'search-type-to-search':'Type to search across all conversations',
+      'search-no-results':'No results for',
+      'search-error':'Search error',
+      'shortcut-title':'⌨️ Keyboard Shortcuts',
+      'shortcut-search':'Search sessions',
+      'shortcut-newchat':'New chat','shortcut-sidebar':'Toggle sidebar',
+      'shortcut-escape':'Close modal / settings','shortcut-help':'This help',
+      'btn-close':'Close',
+      'drop-overlay':'📎 Drop image or file here',
+      'input-hint':'Enter to send · Shift+Enter newline · Ctrl+V paste · Drag&Drop files',
+      'thinking-on':'🧠 Extended Thinking: ON','thinking-off':'Extended Thinking: OFF',
+      'btn-thinking-title':'Extended Thinking','btn-attach-title':'Attach file',
+      'btn-mic-title':'Voice input','btn-tts-title':'Read aloud',
+      'btn-branch-title':'Branch from here','btn-regen-title':'Regenerate',
+      'confirm-delete':'Delete this conversation?',
+      'no-sessions':'No conversations yet',
+      'new-session-msg':'😈 New conversation started.',
+      'no-chat-export':'No chat to export.',
+      'welcome-msg':'😈 Welcome to SalmAlm!\n\nUse on Telegram and Web simultaneously.\nCtrl+V paste image · Drag&Drop · Enter to send\nType /help for commands',
+      'dash-back':'← Back to Chat','dash-title':'📈 Dashboard','dash-loading':'Loading...',
+      'sidebar-running':'Running',
+      'sidebar-channels':'📡 Channels',
+      'sidebar-tools':'🛠️ Tools (32) ▾',
+      'filter-ph':'Search sessions...','filter-no-results':'No results',
+      'img-too-large':'Image too large (max 5MB)','mic-denied':'Microphone access denied',
+      'rollback-done':'⏪ Rolled back','rollback-pairs':'message pair(s).',
+      'rollback-fail':'❌ Rollback failed:','branch-fail':'❌ Branch failed:',
+      'upload-fail':'❌ Upload failed:','upload-error':'❌ Upload error:',
     },
     ko:{
       'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정',
@@ -1036,7 +1094,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'nav-weather':'날씨','nav-rss':'뉴스 피드','nav-remind':'리마인더','nav-translate':'번역',
       'nav-workflow':'워크플로우','nav-qr':'QR 코드','nav-notify':'알림','nav-fileindex':'파일 검색',
       'btn-save-ollama':'Ollama URL 저장','btn-newchat':'🗨 새 대화',
-      'sec-channels':'채널','sec-admin':'관리',
+      'sec-chats':'💬 대화','sec-channels':'채널','sec-admin':'관리',
       'h-password':'🔒 마스터 비밀번호',
       'pw-current':'현재 비밀번호','pw-new':'새 비밀번호','pw-confirm':'새 비밀번호 확인',
       'pw-new-hint':'새 비밀번호 (4자 이상, 비우면 해제)','pw-confirm-hint':'새 비밀번호 다시 입력',
@@ -1045,6 +1103,64 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'pw-min4':'비밀번호 (4자 이상)','pw-reenter':'다시 입력',
       'pw-mismatch':'새 비밀번호가 일치하지 않습니다','pw-changed':'✅ 비밀번호가 변경되었습니다',
       'pw-fail':'❌ 변경 실패','pw-enter-current':'현재 비밀번호를 입력하세요',
+      'h-routing':'🔀 자동 라우팅 모델',
+      'routing-desc':'자동 라우팅을 선택하면, 메시지가 복잡도에 따라 분류되어 해당 모델로 전달됩니다:',
+      'lbl-route-simple':'⚡ 간단 (인사, 짧은 질문)',
+      'lbl-route-moderate':'🔧 보통 (코드, 분석, 요약)',
+      'lbl-route-complex':'💎 복잡 (설계, 긴 추론)',
+      'btn-save-routing':'라우팅 저장',
+      'h-soul':'📜 SOUL.md (커스텀 시스템 프롬프트)',
+      'soul-desc':'커스텀 시스템 프롬프트를 설정합니다. 모든 대화의 앞에 삽입됩니다.',
+      'soul-path':'~/.salmalm/SOUL.md · 비우면 기본값 복원',
+      'soul-ph':'# 나만의 페르소나\n\n당신은 ...',
+      'btn-save-soul':'💾 저장','btn-reset-soul':'🔄 초기화',
+      'h-google-oauth':'🔗 Google 연동 (Calendar & Gmail)',
+      'google-oauth-desc':'Google Calendar, Gmail 기능을 사용하려면 OAuth2 연동이 필요합니다.',
+      'google-oauth-console':'Google Cloud Console에서 OAuth 2.0 Client ID를 생성하세요.',
+      'lbl-google-client-id':'Google Client ID','lbl-google-client-secret':'Google Client Secret',
+      'btn-google-connect':'🔗 Google 계정 연결','btn-google-disconnect':'연결 해제',
+      'google-guide-title':'📋 설정 가이드',
+      'google-guide-1':'Google Cloud Console → 프로젝트 생성/선택',
+      'google-guide-2':'API 및 서비스 → 사용자 인증 정보 → OAuth 2.0 클라이언트 ID 만들기',
+      'google-guide-3':'애플리케이션 유형: 웹 애플리케이션',
+      'google-guide-4':'승인된 리디렉션 URI:',
+      'google-guide-5':'Client ID와 Client Secret을 위에 입력',
+      'google-guide-6':'🔗 Google 계정 연결 클릭',
+      'google-connected':'🟢 연결됨','google-not-connected':'⚪ 연결 안됨',
+      'google-no-client-id':'❌ Client ID를 먼저 저장하세요',
+      'google-redirecting':'🔗 Google 로그인 페이지로 이동합니다...',
+      'google-confirm-disconnect':'Google 연동을 해제하시겠습니까?',
+      'google-disconnected':'✅ Google 연동이 해제되었습니다',
+      'search-ph':'🔍 대화 검색... (Ctrl+K)',
+      'search-hint':'Esc 닫기 · Enter 선택 · 입력하여 검색',
+      'search-type-to-search':'모든 대화에서 검색합니다',
+      'search-no-results':'검색 결과 없음:',
+      'search-error':'검색 오류',
+      'shortcut-title':'⌨️ 키보드 단축키',
+      'shortcut-search':'세션 검색',
+      'shortcut-newchat':'새 대화','shortcut-sidebar':'사이드바 토글',
+      'shortcut-escape':'모달 / 설정 닫기','shortcut-help':'이 도움말',
+      'btn-close':'닫기',
+      'drop-overlay':'📎 이미지 또는 파일을 놓으세요',
+      'input-hint':'Enter 전송 · Shift+Enter 줄바꿈 · Ctrl+V 붙여넣기 · 파일 드래그&드롭',
+      'thinking-on':'🧠 확장 사고 모드: 켜짐','thinking-off':'확장 사고 모드: 꺼짐',
+      'btn-thinking-title':'확장 사고 모드','btn-attach-title':'파일 첨부',
+      'btn-mic-title':'음성 입력','btn-tts-title':'소리로 듣기',
+      'btn-branch-title':'여기서 분기','btn-regen-title':'다시 생성',
+      'confirm-delete':'이 대화를 삭제하시겠습니까?',
+      'no-sessions':'아직 대화가 없습니다',
+      'new-session-msg':'😈 새 대화가 시작되었습니다.',
+      'no-chat-export':'내보낼 대화가 없습니다.',
+      'welcome-msg':'😈 삶앎에 오신 것을 환영합니다!\n\nTelegram과 웹에서 동시에 사용할 수 있습니다.\nCtrl+V 이미지 붙여넣기 · 드래그&드롭 · Enter로 전송\n/help로 명령어 확인',
+      'dash-back':'← 채팅으로 돌아가기','dash-title':'📈 대시보드','dash-loading':'불러오는 중...',
+      'sidebar-running':'실행 중',
+      'sidebar-channels':'📡 채널',
+      'sidebar-tools':'🛠️ 도구 (32) ▾',
+      'filter-ph':'세션 검색...','filter-no-results':'결과 없음',
+      'img-too-large':'이미지가 너무 큽니다 (최대 5MB)','mic-denied':'마이크 접근이 거부되었습니다',
+      'rollback-done':'⏪ 되돌리기 완료:','rollback-pairs':'개의 메시지 쌍',
+      'rollback-fail':'❌ 되돌리기 실패:','branch-fail':'❌ 분기 실패:',
+      'upload-fail':'❌ 업로드 실패:','upload-error':'❌ 업로드 오류:',
     }
   };
   var _lang=localStorage.getItem('salmalm-lang')||'en';
@@ -1195,20 +1311,20 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'get',key:'google_client_id'})})
     .then(function(r){return r.json()}).then(function(d){
-      if(!d.value){re.innerHTML='<span style="color:#f87171">❌ Client ID를 먼저 저장하세요</span>';return}
-      re.innerHTML='<span style="color:#4ade80">🔗 Google 로그인 페이지로 이동합니다...</span>';
+      if(!d.value){re.innerHTML='<span style="color:#f87171">'+t('google-no-client-id')+'</span>';return}
+      re.innerHTML='<span style="color:#4ade80">'+t('google-redirecting')+'</span>';
       window.open('/api/google/auth','_blank','width=500,height=600')})
     .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})
   };
   window.googleDisconnect=function(){
     var re=document.getElementById('google-result');
-    if(!confirm('Google 연동을 해제하시겠습니까?'))return;
+    if(!confirm(t('google-confirm-disconnect')))return;
     Promise.all([
       fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',key:'google_refresh_token'})}),
       fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',key:'google_access_token'})})
     ]).then(function(){
-      re.innerHTML='<span style="color:#4ade80">✅ Google 연동이 해제되었습니다</span>';
-      document.getElementById('google-status').innerHTML='<span style="color:var(--text2)">⚪ 연결 안됨</span>';
+      re.innerHTML='<span style="color:#4ade80">'+t('google-disconnected')+'</span>';
+      document.getElementById('google-status').innerHTML='<span style="color:var(--text2)">'+t('google-not-connected')+'</span>';
     }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})
   };
   window.checkGoogleStatus=function(){
@@ -1217,8 +1333,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'get',key:'google_refresh_token'})})
     .then(function(r){return r.json()}).then(function(d){
-      if(d.value){st.innerHTML='<span style="color:#4ade80">🟢 연결됨</span>'}
-      else{st.innerHTML='<span style="color:var(--text2)">⚪ 연결 안됨</span>'}
+      if(d.value){st.innerHTML='<span style="color:#4ade80">'+t('google-connected')+'</span>'}
+      else{st.innerHTML='<span style="color:var(--text2)">'+t('google-not-connected')+'</span>'}
     }).catch(function(){st.innerHTML=''})
   };
   window.setModel=function(m){modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
@@ -1274,13 +1390,13 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- Keyboard shortcuts + modals --- */
   var _shortcutModal=document.createElement('div');_shortcutModal.id='shortcut-modal';
   _shortcutModal.style.cssText='display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;z-index:10000;min-width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
-  _shortcutModal.innerHTML='<h3 style="margin-bottom:12px;color:var(--accent2)">\u2328\ufe0f Keyboard Shortcuts</h3><div style="font-size:13px;line-height:2.2;color:var(--text)"><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+K</kbd> Search sessions</div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+N</kbd> New chat</div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+S</kbd> Toggle sidebar</div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Escape</kbd> Close modal / settings</div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+/</kbd> This help</div></div><button data-action="closeShortcutModal" style="margin-top:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px">Close</button>';
+  _shortcutModal.innerHTML='<h3 style="margin-bottom:12px;color:var(--accent2)" data-i18n="shortcut-title">\u2328\ufe0f Keyboard Shortcuts</h3><div style="font-size:13px;line-height:2.2;color:var(--text)"><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+K</kbd> <span data-i18n="shortcut-search">Search sessions</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+N</kbd> <span data-i18n="shortcut-newchat">New chat</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+S</kbd> <span data-i18n="shortcut-sidebar">Toggle sidebar</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Escape</kbd> <span data-i18n="shortcut-escape">Close modal / settings</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+/</kbd> <span data-i18n="shortcut-help">This help</span></div></div><button data-action="closeShortcutModal" style="margin-top:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px" data-i18n="btn-close">Close</button>';
   document.body.appendChild(_shortcutModal);
   var _shortcutOv=document.createElement('div');_shortcutOv.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999';_shortcutOv.setAttribute('data-action','closeShortcutModal');document.body.appendChild(_shortcutOv);
 
   var _filterModal=document.createElement('div');_filterModal.id='filter-modal';
   _filterModal.style.cssText='display:none;position:fixed;top:20%;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:20px;z-index:10000;min-width:400px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
-  _filterModal.innerHTML='<input id="session-filter-input" type="text" placeholder="Search sessions..." style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none" autocomplete="off"><div id="session-filter-results" style="margin-top:8px;max-height:300px;overflow-y:auto"></div>';
+  _filterModal.innerHTML='<input id="session-filter-input" type="text" data-i18n-ph="filter-ph" placeholder="Search sessions..." style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none" autocomplete="off"><div id="session-filter-results" style="margin-top:8px;max-height:300px;overflow-y:auto"></div>';
   document.body.appendChild(_filterModal);
   var _filterOv=document.createElement('div');_filterOv.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999';_filterOv.setAttribute('data-action','closeFilterModal');document.body.appendChild(_filterOv);
 
@@ -1296,7 +1412,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       var filtered=q?d.sessions.filter(function(s){return(s.title||s.id).toLowerCase().indexOf(q.toLowerCase())>=0}):d.sessions;
       el.innerHTML=filtered.slice(0,20).map(function(s){
         return '<div style="padding:8px 12px;cursor:pointer;border-radius:6px;font-size:13px;color:var(--text)" data-action="filterSelect" data-sid="'+s.id+'">'+(s.title||s.id)+'</div>';
-      }).join('')||'<div style="padding:8px;color:var(--text2);font-size:13px">No results</div>';
+      }).join('')||'<div style="padding:8px;color:var(--text2);font-size:13px">'+t('filter-no-results')+'</div>';
     });
   }
   function _closeAllModals(){_shortcutModal.style.display='none';_shortcutOv.style.display='none';_filterModal.style.display='none';_filterOv.style.display='none'}
@@ -1326,7 +1442,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var _searchInput=document.getElementById('search-input');
   var _searchResults=document.getElementById('search-results');
   var _searchTimer=null;
-  function _openSearchModal(){_searchModal.classList.add('open');_searchInput.value='';_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">Type to search across all conversations</div>';_searchInput.focus()}
+  function _openSearchModal(){_searchModal.classList.add('open');_searchInput.value='';_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">'+t('search-type-to-search')+'</div>';_searchInput.focus()}
   function _closeSearchModal(){_searchModal.classList.remove('open')}
   _searchModal.addEventListener('click',function(e){if(e.target===_searchModal)_closeSearchModal()});
   _searchInput.addEventListener('keydown',function(e){
@@ -1336,11 +1452,11 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   _searchInput.addEventListener('input',function(){
     clearTimeout(_searchTimer);
     var q=_searchInput.value.trim();
-    if(q.length<2){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">Type to search...</div>';return}
+    if(q.length<2){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">'+t('search-type-to-search')+'</div>';return}
     _searchTimer=setTimeout(function(){
       fetch('/api/search?q='+encodeURIComponent(q)+'&limit=15',{headers:{'X-Session-Token':_tok}})
       .then(function(r){return r.json()}).then(function(d){
-        if(!d.results||!d.results.length){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">No results for "'+q+'"</div>';return}
+        if(!d.results||!d.results.length){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--text2)">'+t('search-no-results')+' "'+q+'"</div>';return}
         var html='';
         var re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
         d.results.forEach(function(r){
@@ -1351,13 +1467,13 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
             +'<div class="sr-snippet">'+snippet+'</div></div>';
         });
         _searchResults.innerHTML=html;
-      }).catch(function(){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--red)">Search error</div>'});
+      }).catch(function(){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--red)">'+t('search-error')+'</div>'});
     },300);
   });
 
   /* --- Welcome (only if no history) --- */
   if(!JSON.parse(localStorage.getItem('salm_chat')||'[]').length){
-    addMsg('assistant','😈 Welcome to SalmAlm!\n\nUse on Telegram and Web simultaneously.\nCtrl+V paste image · Drag&Drop · Enter to send\nType /help for commands','system');
+    addMsg('assistant',t('welcome-msg'),'system');
   }
   input.focus();
 
@@ -1472,12 +1588,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       btn.style.background='var(--accent)';btn.style.color='#fff';
       fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify({message:'/thinking on',session:_currentSession})}).catch(function(){});
-      addMsg('system','🧠 Extended Thinking: ON');
+      addMsg('system',t('thinking-on'));
     }else{
       btn.style.background='var(--bg3)';btn.style.color='var(--text2)';
       fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify({message:'/thinking off',session:_currentSession})}).catch(function(){});
-      addMsg('system','Extended Thinking: OFF');
+      addMsg('system',t('thinking-off'));
     }
   };
 
@@ -1516,7 +1632,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       };
       _mediaRec.start();
       btn.style.background='var(--red)';btn.style.color='#fff';
-    }).catch(function(){addMsg('assistant','Microphone access denied')});
+    }).catch(function(){addMsg('assistant',t('mic-denied'))});
   };
 
   /* --- Double-click to rename session title --- */

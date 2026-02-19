@@ -26,37 +26,37 @@ a.back{color:var(--accent);text-decoration:none;font-size:13px}
 .model-table td{padding:6px 8px;border-bottom:1px solid var(--border)}
 @media(max-width:600px){body{padding:12px}.grid{grid-template-columns:1fr}}
 </style></head><body>
-<a class="back" href="/">← Back to Chat</a>
-<h1>😈 SalmAlm Dashboard</h1>
+<a class="back" href="/" data-i18n="back">← Back to Chat</a>
+<h1>😈 <span data-i18n="title">SalmAlm Dashboard</span></h1>
 
 <div class="grid" id="stats-grid">
-  <div class="card"><h3>💰 Total Cost</h3><div class="big-num" id="total-cost">$0.00</div></div>
-  <div class="card"><h3>💬 Sessions</h3><div class="big-num" id="total-sessions">0</div></div>
-  <div class="card"><h3>🔧 Tool Calls (24h)</h3><div class="big-num" id="total-tools">0</div></div>
-  <div class="card"><h3>📡 Status</h3><div class="big-num" style="font-size:20px" id="status-text">Loading...</div></div>
+  <div class="card"><h3 data-i18n="h-cost">💰 Total Cost</h3><div class="big-num" id="total-cost">$0.00</div></div>
+  <div class="card"><h3 data-i18n="h-sessions">💬 Sessions</h3><div class="big-num" id="total-sessions">0</div></div>
+  <div class="card"><h3 data-i18n="h-tools">🔧 Tool Calls (24h)</h3><div class="big-num" id="total-tools">0</div></div>
+  <div class="card"><h3 data-i18n="h-status">📡 Status</h3><div class="big-num" style="font-size:20px" id="status-text" data-i18n="loading">Loading...</div></div>
 </div>
 
 <div class="grid">
   <div class="card">
-    <h3>📊 Tool Usage (24h)</h3>
+    <h3 data-i18n="h-tool-usage">📊 Tool Usage (24h)</h3>
     <div class="chart-wrap"><canvas id="toolChart"></canvas></div>
   </div>
   <div class="card">
-    <h3>💸 Cost by Model</h3>
+    <h3 data-i18n="h-cost-model">💸 Cost by Model</h3>
     <div class="chart-wrap"><canvas id="costChart"></canvas></div>
   </div>
 </div>
 
 <div class="card" style="margin-bottom:16px">
-  <h3>🧠 Model Usage</h3>
+  <h3 data-i18n="h-model-usage">🧠 Model Usage</h3>
   <table class="model-table">
-    <thead><tr><th>Model</th><th>Calls</th><th>Tokens In</th><th>Tokens Out</th><th>Cost</th></tr></thead>
+    <thead><tr><th data-i18n="th-model">Model</th><th data-i18n="th-calls">Calls</th><th data-i18n="th-in">Tokens In</th><th data-i18n="th-out">Tokens Out</th><th data-i18n="th-cost">Cost</th></tr></thead>
     <tbody id="model-tbody"></tbody>
   </table>
 </div>
 
 <div class="card" style="margin-bottom:16px">
-  <h3>📋 Audit Log
+  <h3><span data-i18n="h-audit">📋 Audit Log</span>
     <select id="audit-filter" style="float:right;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px">
       <option value="">All</option>
       <option value="tool_call">tool_call</option>
@@ -69,23 +69,47 @@ a.back{color:var(--accent);text-decoration:none;font-size:13px}
     </select>
   </h3>
   <table class="model-table" style="margin-top:8px">
-    <thead><tr><th>Time</th><th>Type</th><th>Session</th><th>Detail</th></tr></thead>
+    <thead><tr><th data-i18n="th-time">Time</th><th data-i18n="th-type">Type</th><th data-i18n="th-session">Session</th><th data-i18n="th-detail">Detail</th></tr></thead>
     <tbody id="audit-tbody"><tr><td colspan="4" style="color:var(--text2)">Loading...</td></tr></tbody>
   </table>
 </div>
 
 <div class="grid">
   <div class="card">
-    <h3>⏰ Cron Jobs</h3>
+    <h3 data-i18n="h-cron">⏰ Cron Jobs</h3>
     <div id="cron-list" style="font-size:13px">None</div>
   </div>
   <div class="card">
-    <h3>🧩 Plugins</h3>
+    <h3 data-i18n="h-plugins">🧩 Plugins</h3>
     <div id="plugin-list" style="font-size:13px">None</div>
   </div>
 </div>
 
 <script>
+const _i18n={
+  en:{
+    'back':'← Back to Chat','title':'SalmAlm Dashboard',
+    'h-cost':'💰 Total Cost','h-sessions':'💬 Sessions','h-tools':'🔧 Tool Calls (24h)','h-status':'📡 Status',
+    'loading':'Loading...','h-tool-usage':'📊 Tool Usage (24h)','h-cost-model':'💸 Cost by Model',
+    'h-model-usage':'🧠 Model Usage','h-audit':'📋 Audit Log',
+    'th-model':'Model','th-calls':'Calls','th-in':'Tokens In','th-out':'Tokens Out','th-cost':'Cost',
+    'th-time':'Time','th-type':'Type','th-session':'Session','th-detail':'Detail',
+    'h-cron':'⏰ Cron Jobs','h-plugins':'🧩 Plugins','no-entries':'No entries'
+  },
+  ko:{
+    'back':'← 채팅으로 돌아가기','title':'삶앎 대시보드',
+    'h-cost':'💰 총 비용','h-sessions':'💬 세션','h-tools':'🔧 도구 호출 (24시간)','h-status':'📡 상태',
+    'loading':'불러오는 중...','h-tool-usage':'📊 도구 사용량 (24시간)','h-cost-model':'💸 모델별 비용',
+    'h-model-usage':'🧠 모델 사용량','h-audit':'📋 감사 로그',
+    'th-model':'모델','th-calls':'호출','th-in':'입력 토큰','th-out':'출력 토큰','th-cost':'비용',
+    'th-time':'시간','th-type':'유형','th-session':'세션','th-detail':'상세',
+    'h-cron':'⏰ 크론 작업','h-plugins':'🧩 플러그인','no-entries':'항목 없음'
+  }
+};
+const _lang=localStorage.getItem('salmalm-lang')||'en';
+function t(k){return (_i18n[_lang]||_i18n.en)[k]||(_i18n.en[k]||k)}
+document.querySelectorAll('[data-i18n]').forEach(function(el){el.textContent=t(el.getAttribute('data-i18n'))});
+
 const tok=sessionStorage.getItem('tok')||'';
 const hdr={'X-Session-Token':tok};
 

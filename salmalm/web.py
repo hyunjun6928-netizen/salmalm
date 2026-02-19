@@ -404,6 +404,62 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             results = search_messages(query, limit=lim)
             self._json({'query': query, 'results': results, 'count': len(results)})
 
+        elif self.path.startswith('/api/sessions/') and '/export' in self.path:
+            if not self._require_auth('user'): return
+            import urllib.parse
+            m = re.match(r'^/api/sessions/([^/]+)/export', self.path)
+            if not m:
+                self._json({'error': 'Invalid path'}, 400)
+                return
+            sid = m.group(1)
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            fmt = params.get('format', ['json'])[0]
+            from .core import _get_db
+            conn = _get_db()
+            row = conn.execute('SELECT messages, updated_at FROM session_store WHERE session_id=?', (sid,)).fetchone()
+            if not row:
+                self._json({'error': 'Session not found'}, 404)
+                return
+            msgs = json.loads(row[0])
+            updated_at = row[1]
+            if fmt == 'md':
+                lines = [f'# SalmAlm Chat Export', f'Session: {sid}', f'Date: {updated_at}', '']
+                for msg in msgs:
+                    role = msg.get('role', '')
+                    if role == 'system':
+                        continue
+                    content = msg.get('content', '')
+                    if isinstance(content, list):
+                        content = ' '.join(b.get('text', '') for b in content if isinstance(b, dict) and b.get('type') == 'text')
+                    icon = '## 👤 User' if role == 'user' else '## 😈 Assistant'
+                    lines.append(icon)
+                    lines.append(str(content))
+                    lines.append('')
+                    lines.append('---')
+                    lines.append('')
+                body = '\n'.join(lines).encode('utf-8')
+                fname = f'salmalm_{sid}_{updated_at[:10]}.md'
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/markdown; charset=utf-8')
+                self.send_header('Content-Disposition', f'attachment; filename="{fname}"')
+                self.send_header('Content-Length', str(len(body)))
+                self._cors()
+                self.end_headers()
+                self.wfile.write(body)
+            else:
+                export_data = {'session_id': sid, 'updated_at': updated_at, 'messages': msgs}
+                body = json.dumps(export_data, ensure_ascii=False, indent=2).encode('utf-8')
+                fname = f'salmalm_{sid}_{updated_at[:10]}.json'
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Content-Disposition', f'attachment; filename="{fname}"')
+                self.send_header('Content-Length', str(len(body)))
+                self._cors()
+                self.end_headers()
+                self.wfile.write(body)
+            return
+
         elif self.path.startswith('/api/rag/search'):
             if not self._require_auth('user'): return
             from .rag import rag_engine
@@ -945,6 +1001,29 @@ self.addEventListener('fetch',e=>{{
                 return
             from .core import rollback_session
             result = rollback_session(sid, count)
+            self._json(result)
+
+        elif self.path == '/api/messages/edit':
+            if not self._require_auth('user'): return
+            sid = body.get('session_id', '')
+            idx = body.get('message_index')
+            content = body.get('content', '')
+            if not sid or idx is None or not content:
+                self._json({'ok': False, 'error': 'Missing session_id, message_index, or content'}, 400)
+                return
+            from .core import edit_message
+            result = edit_message(sid, int(idx), content)
+            self._json(result)
+
+        elif self.path == '/api/messages/delete':
+            if not self._require_auth('user'): return
+            sid = body.get('session_id', '')
+            idx = body.get('message_index')
+            if not sid or idx is None:
+                self._json({'ok': False, 'error': 'Missing session_id or message_index'}, 400)
+                return
+            from .core import delete_message
+            result = delete_message(sid, int(idx))
             self._json(result)
 
         elif self.path == '/api/sessions/branch':

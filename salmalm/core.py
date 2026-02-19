@@ -1545,6 +1545,77 @@ def write_daily_log(entry: str):
         ts = datetime.now(KST).strftime('%H:%M')
         f.write(f'{header}- [{ts}] {entry}\n')
 
+def edit_message(session_id: str, message_index: int, new_content: str) -> dict:
+    """Edit a message at the given index in a session.
+
+    Backs up the original messages first, then replaces the content.
+    Returns {'ok': True, 'index': int} or {'ok': False, 'error': ...}.
+    """
+    session = get_session(session_id)
+    if message_index < 0 or message_index >= len(session.messages):
+        return {'ok': False, 'error': f'Invalid message_index: {message_index}'}
+    msg = session.messages[message_index]
+    if msg.get('role') != 'user':
+        return {'ok': False, 'error': 'Can only edit user messages'}
+    # Backup current state
+    conn = _get_db()
+    conn.execute(
+        'INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)',
+        (session_id, json.dumps(session.messages, ensure_ascii=False),
+         datetime.now(KST).isoformat(), 'edit'))
+    conn.commit()
+    # Update the message content
+    session.messages[message_index]['content'] = new_content
+    # Remove all messages after this index (assistant response will be regenerated)
+    removed_count = len(session.messages) - message_index - 1
+    session.messages = session.messages[:message_index + 1]
+    session._persist()
+    try:
+        save_session_to_disk(session_id)
+    except Exception:
+        pass
+    audit_log('message_edit', f'{session_id}: edited index {message_index}, removed {removed_count} subsequent',
+              session_id=session_id)
+    return {'ok': True, 'index': message_index, 'removed_after': removed_count}
+
+
+def delete_message(session_id: str, message_index: int) -> dict:
+    """Delete a user message and its paired assistant response.
+
+    Backs up removed messages to session_message_backup table.
+    Returns {'ok': True, 'removed': int} or {'ok': False, 'error': ...}.
+    """
+    session = get_session(session_id)
+    if message_index < 0 or message_index >= len(session.messages):
+        return {'ok': False, 'error': f'Invalid message_index: {message_index}'}
+    msg = session.messages[message_index]
+    if msg.get('role') != 'user':
+        return {'ok': False, 'error': 'Can only delete user messages'}
+    indices_to_remove = [message_index]
+    # Also remove the paired assistant message (next one if it's assistant)
+    if message_index + 1 < len(session.messages) and session.messages[message_index + 1].get('role') == 'assistant':
+        indices_to_remove.append(message_index + 1)
+    # Backup
+    removed_msgs = [session.messages[i] for i in indices_to_remove]
+    conn = _get_db()
+    conn.execute(
+        'INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)',
+        (session_id, json.dumps(removed_msgs, ensure_ascii=False),
+         datetime.now(KST).isoformat(), 'delete'))
+    conn.commit()
+    # Remove in reverse order
+    for i in sorted(indices_to_remove, reverse=True):
+        session.messages.pop(i)
+    session._persist()
+    try:
+        save_session_to_disk(session_id)
+    except Exception:
+        pass
+    audit_log('message_delete', f'{session_id}: deleted {len(indices_to_remove)} messages at index {message_index}',
+              session_id=session_id)
+    return {'ok': True, 'removed': len(indices_to_remove)}
+
+
 def search_messages(query: str, limit: int = 20) -> list:
     """Search messages across all sessions using LIKE matching.
 
@@ -1603,5 +1674,5 @@ __all__ = [
     'get_telegram_bot', 'set_telegram_bot',
     'Session', 'MemoryManager', 'HeartbeatManager', 'LLMCronManager',
     'SubAgent', 'SkillLoader', 'PluginLoader',
-    'search_messages',
+    'search_messages', 'edit_message', 'delete_message',
 ]
