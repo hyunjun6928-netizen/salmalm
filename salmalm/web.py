@@ -100,7 +100,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     _PUBLIC_PATHS = {
         '/', '/index.html', '/api/status', '/api/health', '/api/unlock',
         '/api/auth/login', '/api/onboarding', '/api/setup', '/docs',
-        '/api/google/callback',
+        '/api/google/callback', '/webhook/telegram',
     }
 
     def _require_auth(self, min_role: str = 'user') -> Optional[dict]:
@@ -550,6 +550,27 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json(result)
             except Exception as e:
                 self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
+        elif self.path == '/api/update/check':
+            # Alias for /api/check-update
+            try:
+                import urllib.request
+                resp = urllib.request.urlopen('https://pypi.org/pypi/salmalm/json', timeout=10)
+                data = json.loads(resp.read().decode())
+                latest = data.get('info', {}).get('version', VERSION)
+                is_exe = getattr(sys, 'frozen', False)
+                result = {'current': VERSION, 'latest': latest, 'exe': is_exe,
+                          'update_available': latest != VERSION}
+                if is_exe:
+                    result['download_url'] = 'https://github.com/hyunjun6928-netizen/salmalm/releases/latest'
+                self._json(result)
+            except Exception as e:
+                self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
+        elif self.path == '/api/personas':
+            from .prompt import list_personas, get_active_persona
+            session_id = self.headers.get('X-Session-Id', 'web')
+            personas = list_personas()
+            active = get_active_persona(session_id)
+            self._json({'personas': personas, 'active': active})
         elif self.path == '/api/metrics':
             from .core import _metrics
             usage = get_usage_report()
@@ -860,6 +881,75 @@ self.addEventListener('fetch',e=>{{
             self._json({'ok': True, 'message': 'Restarting...'})
             # Restart the server process
             os.execv(sys.executable, [sys.executable] + sys.argv)
+            return
+
+        if self.path == '/api/update':
+            # Alias for /api/do-update with WebSocket progress
+            if not self._require_auth('admin'): return
+            if self._get_client_ip() not in ('127.0.0.1', '::1', 'localhost'):
+                self._json({'error': 'Update only allowed from localhost'}, 403); return
+            try:
+                import subprocess
+                # Broadcast update start via WebSocket
+                try:
+                    from .ws import ws_server
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.ensure_future(ws_server.broadcast({'type': 'update_status', 'status': 'installing'}))
+                except Exception:
+                    pass
+                result = subprocess.run(
+                    [sys.executable, '-m', 'pip', 'install', '--upgrade', '--no-cache-dir', 'salmalm'],
+                    capture_output=True, text=True, timeout=120)
+                if result.returncode == 0:
+                    ver_result = subprocess.run(
+                        [sys.executable, '-c', 'from salmalm.constants import VERSION; print(VERSION)'],
+                        capture_output=True, text=True, timeout=10)
+                    new_ver = ver_result.stdout.strip() or '?'
+                    audit_log('update', f'upgraded to v{new_ver}')
+                    self._json({'ok': True, 'version': new_ver, 'output': result.stdout[-200:]})
+                else:
+                    self._json({'ok': False, 'error': result.stderr[-200:]})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)[:200]})
+            return
+
+        if self.path == '/api/persona/switch':
+            session_id = body.get('session_id', self.headers.get('X-Session-Id', 'web'))
+            name = body.get('name', '')
+            if not name:
+                self._json({'error': 'name required'}, 400); return
+            from .prompt import switch_persona
+            content = switch_persona(session_id, name)
+            if content is None:
+                self._json({'error': f'Persona "{name}" not found'}, 404); return
+            self._json({'ok': True, 'name': name, 'content': content})
+            return
+
+        if self.path == '/api/persona/create':
+            name = body.get('name', '')
+            content = body.get('content', '')
+            if not name or not content:
+                self._json({'error': 'name and content required'}, 400); return
+            from .prompt import create_persona
+            ok = create_persona(name, content)
+            if ok:
+                self._json({'ok': True})
+            else:
+                self._json({'error': 'Invalid persona name'}, 400)
+            return
+
+        if self.path == '/api/persona/delete':
+            name = body.get('name', '')
+            if not name:
+                self._json({'error': 'name required'}, 400); return
+            from .prompt import delete_persona
+            ok = delete_persona(name)
+            if ok:
+                self._json({'ok': True})
+            else:
+                self._json({'error': 'Cannot delete built-in persona or not found'}, 400)
             return
 
         if self.path == '/api/test-key':
@@ -1344,6 +1434,37 @@ self.addEventListener('fetch',e=>{{
                 if result is None:
                     result = {'error': 'No available node for this tool'}
             self._json(result)  # type: ignore[arg-type]
+
+        elif self.path == '/webhook/telegram':
+            # Telegram webhook endpoint
+            from .telegram import telegram_bot
+            if not telegram_bot.token:
+                self._json({'error': 'Telegram not configured'}, 503)
+                return
+            # Verify secret token
+            secret = self.headers.get('X-Telegram-Bot-Api-Secret-Token', '')
+            if telegram_bot._webhook_secret and not telegram_bot.verify_webhook_request(secret):
+                log.warning("[BLOCK] Telegram webhook: invalid secret token")
+                self._json({'error': 'Forbidden'}, 403)
+                return
+            try:
+                update = body
+                # Run async handler in event loop
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.ensure_future(telegram_bot.handle_webhook_update(update))
+                    else:
+                        loop.run_until_complete(telegram_bot.handle_webhook_update(update))
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    loop.run_until_complete(telegram_bot.handle_webhook_update(update))
+                    loop.close()
+                self._json({'ok': True})
+            except Exception as e:
+                log.error(f"Webhook handler error: {e}")
+                self._json({'ok': True})  # Always return 200 to Telegram
 
         elif self.path == '/api/node/execute':
             # Node endpoint: execute a tool locally (called by gateway)

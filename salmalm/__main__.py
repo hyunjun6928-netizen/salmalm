@@ -153,6 +153,11 @@ def main() -> None:
     if '--node' in sys.argv:
         _run_node_mode()
         return
+    if 'tray' in sys.argv[1:2] or '--tray' in sys.argv:
+        from salmalm.tray import run_tray
+        port = int(os.environ.get('SALMALM_PORT', 18800))
+        run_tray(port)
+        return
 
     # Ensure working directory has required folders
     for d in ('memory', 'workspace', 'uploads', 'plugins'):
@@ -305,7 +310,14 @@ def main() -> None:
                 tg_owner = vault.get('telegram_owner_id')
                 if tg_token and tg_owner:
                     telegram_bot.configure(tg_token, tg_owner)
-                    asyncio.create_task(telegram_bot.poll())
+                    import os as _os2
+                    _wh_url = _os2.environ.get('SALMALM_TELEGRAM_WEBHOOK_URL') or vault.get('telegram_webhook_url') or ''
+                    if _wh_url:
+                        telegram_bot.set_webhook(_wh_url.rstrip('/') + '/webhook/telegram'
+                                                 if not _wh_url.endswith('/webhook/telegram')
+                                                 else _wh_url)
+                    else:
+                        asyncio.create_task(telegram_bot.poll())
 
             rag_stats = rag_engine.get_stats()
             st = f"{selftest['passed']}/{selftest['total']}"

@@ -446,6 +446,91 @@ TOOL_DEFINITIONS = [
         }
     },
     {
+        'name': 'calendar_list',
+        'description': 'List upcoming Google Calendar events. Use period="today" for today, "week" for this week, "month" for this month.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'period': {'type': 'string', 'description': 'today, week, month (default: week)', 'enum': ['today', 'week', 'month']},
+                'calendar_id': {'type': 'string', 'description': 'Calendar ID (default: primary)'},
+            },
+        }
+    },
+    {
+        'name': 'calendar_add',
+        'description': 'Add an event to Google Calendar.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'title': {'type': 'string', 'description': 'Event title'},
+                'date': {'type': 'string', 'description': 'Date in YYYY-MM-DD format'},
+                'time': {'type': 'string', 'description': 'Start time HH:MM (omit for all-day)'},
+                'duration_minutes': {'type': 'integer', 'description': 'Duration in minutes (default: 60)'},
+                'description': {'type': 'string', 'description': 'Event description'},
+                'calendar_id': {'type': 'string', 'description': 'Calendar ID (default: primary)'},
+            },
+            'required': ['title', 'date']
+        }
+    },
+    {
+        'name': 'calendar_delete',
+        'description': 'Delete an event from Google Calendar by event_id.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'event_id': {'type': 'string', 'description': 'Event ID to delete'},
+                'calendar_id': {'type': 'string', 'description': 'Calendar ID (default: primary)'},
+            },
+            'required': ['event_id']
+        }
+    },
+    {
+        'name': 'email_inbox',
+        'description': 'List recent emails from Gmail inbox.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'count': {'type': 'integer', 'description': 'Number of messages (default: 10, max: 30)'},
+            },
+        }
+    },
+    {
+        'name': 'email_read',
+        'description': 'Read a specific email by message_id.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'message_id': {'type': 'string', 'description': 'Gmail message ID'},
+            },
+            'required': ['message_id']
+        }
+    },
+    {
+        'name': 'email_send',
+        'description': 'Send an email via Gmail.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'to': {'type': 'string', 'description': 'Recipient email address'},
+                'subject': {'type': 'string', 'description': 'Email subject'},
+                'body': {'type': 'string', 'description': 'Email body text'},
+            },
+            'required': ['to', 'subject']
+        }
+    },
+    {
+        'name': 'email_search',
+        'description': 'Search emails using Gmail search syntax (e.g. "from:user@example.com", "is:unread", "subject:keyword").',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'query': {'type': 'string', 'description': 'Gmail search query'},
+                'count': {'type': 'integer', 'description': 'Max results (default: 10)'},
+            },
+            'required': ['query']
+        }
+    },
+    {
         'name': 'reminder',
         'description': 'Set a reminder. Triggers notification via configured channel (Telegram/desktop) at specified time.',
         'input_schema': {

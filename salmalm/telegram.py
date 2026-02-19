@@ -17,6 +17,8 @@ class TelegramBot:
         self.owner_id: Optional[str] = None
         self.offset = 0
         self._running = False
+        self._webhook_secret: Optional[str] = None
+        self._webhook_mode = False
 
     def configure(self, token: str, owner_id: str):
         """Configure the Telegram bot with token and owner chat ID."""
@@ -170,6 +172,39 @@ class TelegramBot:
             self._api('sendChatAction', {'chat_id': chat_id, 'action': 'typing'})
         except Exception:
             pass
+
+    # ── Webhook support ──────────────────────────────────────────
+
+    def set_webhook(self, url: str) -> dict:
+        """Set Telegram webhook. Generates a secret_token for request verification."""
+        self._webhook_secret = secrets.token_hex(32)
+        result = self._api('setWebhook', {
+            'url': url,
+            'secret_token': self._webhook_secret,
+            'allowed_updates': ['message', 'callback_query'],
+        })
+        if result.get('ok'):
+            self._webhook_mode = True
+            log.info(f"[NET] Telegram webhook set: {url}")
+        return result
+
+    def delete_webhook(self) -> dict:
+        """Delete Telegram webhook and return to polling mode."""
+        result = self._api('deleteWebhook', {'drop_pending_updates': False})
+        self._webhook_mode = False
+        self._webhook_secret = None
+        log.info("[NET] Telegram webhook deleted, polling mode restored")
+        return result
+
+    def verify_webhook_request(self, secret_token: str) -> bool:
+        """Verify the X-Telegram-Bot-Api-Secret-Token header."""
+        if not self._webhook_secret:
+            return False
+        return secrets.compare_digest(secret_token, self._webhook_secret)
+
+    async def handle_webhook_update(self, update: dict):
+        """Process a single update received via webhook."""
+        await self._handle_update(update)
 
     async def poll(self):
         """Long-polling loop for Telegram updates."""
@@ -430,8 +465,112 @@ class TelegramBot:
                 /clear — Clear conversation
                 /tts [on|off] — Voice replies
                 /voice [name] — TTS voice
+                /cal [today|week|month] — Calendar
+                /cal add YYYY-MM-DD HH:MM title — Add event
+                /cal delete <event_id> — Delete event
+                /mail [inbox] — Recent emails
+                /mail read <id> — Read email
+                /mail send to subject body — Send email
+                /mail search <query> — Search emails
+                /telegram [webhook <url>|polling] — Bot mode
                 /help — This help
             """).strip())
+        elif cmd == '/telegram':
+            parts = text.split(maxsplit=2)
+            if len(parts) >= 2 and parts[1] == 'webhook':
+                if len(parts) < 3:
+                    self.send_message(chat_id, '❌ Usage: /telegram webhook <url>')
+                    return
+                url = parts[2].strip()
+                result = self.set_webhook(url)
+                if result.get('ok'):
+                    self.send_message(chat_id, f'✅ Webhook set: {url}')
+                else:
+                    self.send_message(chat_id, f'❌ Webhook failed: {result}')
+            elif len(parts) >= 2 and parts[1] == 'polling':
+                result = self.delete_webhook()
+                self.send_message(chat_id, '✅ Switched to polling mode')
+            else:
+                mode = 'webhook' if self._webhook_mode else 'polling'
+                self.send_message(chat_id, f'📡 Mode: {mode}\n/telegram webhook <url>\n/telegram polling')
+
+        elif cmd in ('/cal', '/calendar'):
+            parts = text.split(maxsplit=3)
+            sub = parts[1] if len(parts) > 1 else 'today'
+            from .tool_registry import execute_tool as _exec_tool
+            if sub == 'today':
+                result = _exec_tool('calendar_list', {'period': 'today'})
+            elif sub == 'week':
+                result = _exec_tool('calendar_list', {'period': 'week'})
+            elif sub == 'month':
+                result = _exec_tool('calendar_list', {'period': 'month'})
+            elif sub == 'add':
+                # /cal add 2026-02-20 14:00 회의
+                rest = parts[2] if len(parts) > 2 else ''
+                cal_parts = rest.split(maxsplit=2)
+                if len(cal_parts) < 2:
+                    self.send_message(chat_id, '❌ Usage: /cal add YYYY-MM-DD HH:MM 제목')
+                    return
+                date_str = cal_parts[0]
+                # Check if second part is time or title
+                if ':' in cal_parts[1]:
+                    time_str = cal_parts[1]
+                    title = cal_parts[2] if len(cal_parts) > 2 else 'Event'
+                else:
+                    time_str = ''
+                    title = ' '.join(cal_parts[1:])
+                args = {'title': title, 'date': date_str}
+                if time_str:
+                    args['time'] = time_str
+                result = _exec_tool('calendar_add', args)
+            elif sub == 'delete':
+                event_id = parts[2] if len(parts) > 2 else ''
+                if not event_id:
+                    self.send_message(chat_id, '❌ Usage: /cal delete <event_id>')
+                    return
+                result = _exec_tool('calendar_delete', {'event_id': event_id})
+            else:
+                result = _exec_tool('calendar_list', {'period': 'week'})
+            self.send_message(chat_id, result)
+
+        elif cmd in ('/mail', '/email'):
+            parts = text.split(maxsplit=4)
+            sub = parts[1] if len(parts) > 1 else 'inbox'
+            from .tool_registry import execute_tool as _exec_tool
+            if sub == 'inbox':
+                result = _exec_tool('email_inbox', {})
+            elif sub == 'read':
+                msg_id = parts[2] if len(parts) > 2 else ''
+                if not msg_id:
+                    self.send_message(chat_id, '❌ Usage: /mail read <message_id>')
+                    return
+                result = _exec_tool('email_read', {'message_id': msg_id})
+            elif sub == 'send':
+                # /mail send to@email.com "제목" "본문"
+                if len(parts) < 4:
+                    self.send_message(chat_id, '❌ Usage: /mail send to@email.com "제목" "본문"')
+                    return
+                to_addr = parts[2]
+                rest = text.split(to_addr, 1)[1].strip() if to_addr in text else ''
+                # Parse quoted subject and body
+                import shlex
+                try:
+                    parsed = shlex.split(rest)
+                except ValueError:
+                    parsed = rest.split(maxsplit=1)
+                subject = parsed[0] if parsed else 'No subject'
+                body = parsed[1] if len(parsed) > 1 else ''
+                result = _exec_tool('email_send', {'to': to_addr, 'subject': subject, 'body': body})
+            elif sub == 'search':
+                query = ' '.join(parts[2:]) if len(parts) > 2 else ''
+                if not query:
+                    self.send_message(chat_id, '❌ Usage: /mail search <query>')
+                    return
+                result = _exec_tool('email_search', {'query': query})
+            else:
+                result = _exec_tool('email_inbox', {})
+            self.send_message(chat_id, result)
+
         else:
             # Route unknown /commands through engine (handles /model auto/opus/sonnet/haiku etc.)
             self.send_typing(chat_id)

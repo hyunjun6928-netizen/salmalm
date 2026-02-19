@@ -216,7 +216,14 @@ async def main():
         tg_owner = vault.get('telegram_owner_id')
         if tg_token and tg_owner:
             telegram_bot.configure(tg_token, tg_owner)
-            asyncio.create_task(telegram_bot.poll())
+            # Check for webhook mode
+            webhook_url = os.environ.get('SALMALM_TELEGRAM_WEBHOOK_URL') or vault.get('telegram_webhook_url') or ''
+            if webhook_url:
+                telegram_bot.set_webhook(webhook_url.rstrip('/') + '/webhook/telegram'
+                                         if not webhook_url.endswith('/webhook/telegram')
+                                         else webhook_url)
+            else:
+                asyncio.create_task(telegram_bot.poll())
 
         # ══ Discord bot ══
         dc_token = vault.get('discord_token')
