@@ -663,6 +663,20 @@ class LLMCronManager:
                         _tg_bot.owner_id,
                         f"⏰ SalmAlm scheduled task completed: {job['name']}\n\n{summary}")
 
+                # Notify via web (store for polling)
+                if job.get('notify'):
+                    web_session = _sessions.get('web')
+                    if web_session:
+                        if not hasattr(web_session, '_notifications'):
+                            web_session._notifications = []
+                        web_session._notifications.append({
+                            'time': time.time(),
+                            'text': f"⏰ Cron [{job['name']}]: {response[:200]}"
+                        })
+
+                # Log to daily memory
+                write_daily_log(f"[CRON] {job['name']}: {response[:150]}")
+
                 # One-shot jobs: auto-disable
                 if job['schedule']['kind'] == 'at':
                     job['enabled'] = False
@@ -865,12 +879,35 @@ class HeartbeatManager:
     Reads HEARTBEAT.md for a checklist of things to do on each heartbeat.
     Runs in an isolated session to avoid polluting main conversation.
     Announces results to configured channels.
+    Tracks check state in heartbeat-state.json.
     """
 
     _HEARTBEAT_FILE = BASE_DIR / 'HEARTBEAT.md'
+    _STATE_FILE = MEMORY_DIR / 'heartbeat-state.json'
     _DEFAULT_INTERVAL = 1800  # 30 minutes
     _last_beat = 0.0
     _enabled = True
+    _beat_count = 0
+
+    @classmethod
+    def _load_state(cls) -> dict:
+        """Load heartbeat state from JSON file."""
+        try:
+            if cls._STATE_FILE.exists():
+                return json.loads(cls._STATE_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+        return {'lastChecks': {}, 'history': [], 'totalBeats': 0}
+
+    @classmethod
+    def _save_state(cls, state: dict):
+        """Persist heartbeat state to JSON file."""
+        try:
+            MEMORY_DIR.mkdir(exist_ok=True)
+            cls._STATE_FILE.write_text(
+                json.dumps(state, indent=2, ensure_ascii=False), encoding='utf-8')
+        except Exception as e:
+            log.error(f"[HEARTBEAT] Failed to save state: {e}")
 
     @classmethod
     def get_prompt(cls) -> str:
@@ -899,6 +936,32 @@ class HeartbeatManager:
         return True
 
     @classmethod
+    def get_state(cls) -> dict:
+        """Get current heartbeat state (for tools/API)."""
+        state = cls._load_state()
+        state['enabled'] = cls._enabled
+        state['interval'] = cls._DEFAULT_INTERVAL
+        state['lastBeat'] = cls._last_beat
+        state['beatCount'] = cls._beat_count
+        return state
+
+    @classmethod
+    def update_check(cls, check_name: str):
+        """Record that a specific check was performed (email, calendar, etc)."""
+        state = cls._load_state()
+        state['lastChecks'][check_name] = time.time()
+        cls._save_state(state)
+
+    @classmethod
+    def time_since_check(cls, check_name: str) -> Optional[float]:
+        """Seconds since a named check was last performed. None if never."""
+        state = cls._load_state()
+        ts = state.get('lastChecks', {}).get(check_name)
+        if ts:
+            return time.time() - ts
+        return None
+
+    @classmethod
     async def beat(cls) -> Optional[str]:
         """Execute a heartbeat check in an isolated session.
 
@@ -910,16 +973,42 @@ class HeartbeatManager:
             return None
 
         cls._last_beat = time.time()
+        cls._beat_count += 1
         log.info("[HEARTBEAT] Running periodic heartbeat check")
+
+        # Load state for context injection
+        state = cls._load_state()
+        state_ctx = ''
+        if state.get('lastChecks'):
+            checks = []
+            for name, ts in state['lastChecks'].items():
+                ago = int((time.time() - ts) / 60)
+                checks.append(f"  {name}: {ago}min ago")
+            state_ctx = f"\n\nLast checks:\n" + '\n'.join(checks)
 
         try:
             from .engine import process_message
             # Run in isolated session (OpenClaw pattern: no cross-contamination)
             result = await process_message(
                 f'heartbeat-{int(time.time())}',
-                f"[Heartbeat check]\n{prompt}\n\nIf nothing needs attention, reply HEARTBEAT_OK.",
+                f"[Heartbeat check]\n{prompt}{state_ctx}\n\n"
+                f"If nothing needs attention, reply HEARTBEAT_OK.",
                 model_override=None  # Use auto-routing
             )
+
+            # Update state
+            state['totalBeats'] = state.get('totalBeats', 0) + 1
+            state['lastBeatTime'] = time.time()
+            state['lastBeatResult'] = 'ok' if (result and 'HEARTBEAT_OK' in result) else 'action'
+            # Keep last 20 history entries
+            history = state.get('history', [])
+            history.append({
+                'time': time.time(),
+                'result': state['lastBeatResult'],
+                'summary': (result or '')[:200]
+            })
+            state['history'] = history[-20:]
+            cls._save_state(state)
 
             # Announce if result is meaningful
             if result and 'HEARTBEAT_OK' not in result:
