@@ -83,7 +83,7 @@ class ResponseCache:
             entry = self._cache[k]
             if time.time() - entry['ts'] < self._ttl:
                 self._cache.move_to_end(k)
-                log.info(f"💰 Cache hit — saved API call")
+                log.info(f"[COST] Cache hit -- saved API call")
                 return entry['response']
             del self._cache[k]
         return None
@@ -260,7 +260,7 @@ def compact_messages(messages: list, model: str = None) -> list:
         system_msgs = [m for m in messages if m['role'] == 'system'][:1]
         recent = [m for m in messages if m['role'] != 'system'][-40:]
         messages = system_msgs + recent
-        log.warning(f"🔪 Hard msg limit: truncated to {len(messages)} messages")
+        log.warning(f"[CUT] Hard msg limit: truncated to {len(messages)} messages")
 
     total_chars = sum(len(_msg_content_str(m)) for m in messages)
 
@@ -270,12 +270,12 @@ def compact_messages(messages: list, model: str = None) -> list:
         recent = [m for m in messages if m['role'] != 'system'][-20:]
         messages = system_msgs + recent
         total_chars = sum(len(_msg_content_str(m)) for m in messages)
-        log.warning(f"🔪 Hard char limit: truncated to {len(messages)} msgs ({total_chars} chars)")
+        log.warning(f"[CUT] Hard char limit: truncated to {len(messages)} msgs ({total_chars} chars)")
 
     if total_chars < COMPACTION_THRESHOLD:
         return messages
 
-    log.info(f"📦 Compacting {len(messages)} messages ({total_chars} chars)")
+    log.info(f"[PKG] Compacting {len(messages)} messages ({total_chars} chars)")
 
     # Stage 1: Trim long tool results (keep first 500 chars)
     trimmed = []
@@ -296,7 +296,7 @@ def compact_messages(messages: list, model: str = None) -> list:
 
     total_after_trim = sum(len(_msg_content_str(m)) for m in trimmed)
     if total_after_trim < COMPACTION_THRESHOLD:
-        log.info(f"📦 Stage 1 sufficient: {total_chars} -> {total_after_trim} chars")
+        log.info(f"[PKG] Stage 1 sufficient: {total_chars} -> {total_after_trim} chars")
         return trimmed
 
     # Stage 2: Drop old tool messages entirely, keep last 10 messages
@@ -311,7 +311,7 @@ def compact_messages(messages: list, model: str = None) -> list:
     stage2 = system_msgs + old_important + recent
     total_after_drop = sum(len(_msg_content_str(m)) for m in stage2)
     if total_after_drop < COMPACTION_THRESHOLD:
-        log.info(f"📦 Stage 2 sufficient: {total_chars} -> {total_after_drop} chars")
+        log.info(f"[PKG] Stage 2 sufficient: {total_chars} -> {total_after_drop} chars")
         return stage2
 
     # Stage 3: Summarize old messages
@@ -338,7 +338,7 @@ def compact_messages(messages: list, model: str = None) -> list:
         {'role': 'system', 'content': f'[Previous conversation summary]\n{summary_result["content"]}'}
     ] + recent
 
-    log.info(f"📦 Stage 3 compacted: {len(messages)} -> {len(compacted)} messages, "
+    log.info(f"[PKG] Stage 3 compacted: {len(messages)} -> {len(compacted)} messages, "
              f"{total_chars} → {sum(len(_msg_content_str(m)) for m in compacted)} chars")
     return compacted
 
@@ -426,7 +426,7 @@ class TFIDFSearch:
                          for t, df in doc_freq.items()}
         self._built = True
         self._last_index_time = now
-        log.info(f"🔍 TF-IDF index built: {len(self._docs)} chunks from {len(search_files)} files")
+        log.info(f"[SEARCH] TF-IDF index built: {len(self._docs)} chunks from {len(search_files)} files")
 
     def search(self, query: str, max_results: int = 5) -> list:
         """Search with TF-IDF + cosine similarity. Returns [(score, label, lineno, snippet)]."""

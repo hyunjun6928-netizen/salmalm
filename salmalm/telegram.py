@@ -140,7 +140,7 @@ class TelegramBot:
 
         # Owner check
         if user_id != self.owner_id:
-            log.warning(f"🚫 Unauthorized: {user_id} tried to message")
+            log.warning(f"[BLOCK] Unauthorized: {user_id} tried to message")
             audit_log('unauthorized', f'user_id={user_id}')
             return
 
@@ -157,7 +157,7 @@ class TelegramBot:
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
                 file_info = f'[📷 Image saved: uploads/{fname} ({len(data)//1024}KB)]'
-                log.info(f"📷 Photo saved: {save_path}")
+                log.info(f"[PHOTO] Photo saved: {save_path}")
                 # Prepare vision data
                 import base64 as _b64
                 _image_data = (_b64.b64encode(data).decode(), 'image/jpeg')
@@ -173,7 +173,7 @@ class TelegramBot:
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
                 file_info = f'[📎 File saved: uploads/{save_path.name} ({len(data)//1024}KB)]'
-                log.info(f"📎 File saved: {save_path}")
+                log.info(f"[CLIP] File saved: {save_path}")
                 # If text file, include content preview
                 if save_path.suffix in ('.txt', '.md', '.py', '.js', '.json', '.csv', '.log', '.html', '.css', '.sh', '.bat'):
                     try:

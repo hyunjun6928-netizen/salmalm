@@ -78,7 +78,7 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
                 f'try switching models: `/model auto`', 'tool_calls': [],
                 'usage': {'input': 0, 'output': 0}, 'model': model}
 
-    log.info(f"🤖 LLM call: {model} ({len(messages)} msgs, tools={len(tools or [])})")
+    log.info(f"[BOT] LLM call: {model} ({len(messages)} msgs, tools={len(tools or [])})")
 
     try:
         result = _call_provider(provider, api_key, model_id, messages, tools, max_tokens,
@@ -95,7 +95,7 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
 
         # ── Token overflow detection — don't fallback, truncate instead ──
         if 'prompt is too long' in err_str or 'maximum context' in err_str.lower():
-            log.warning(f"🚨 Token overflow detected ({len(messages)} msgs). Force-truncating.")
+            log.warning(f"[ERR] Token overflow detected ({len(messages)} msgs). Force-truncating.")
             return {'content': '', 'tool_calls': [], 'error': 'token_overflow',
                     'usage': {'input': 0, 'output': 0}, 'model': model}
 

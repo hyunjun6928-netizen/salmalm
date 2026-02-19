@@ -115,7 +115,7 @@ class DiscordBot:
         if b'101' not in resp.split(b'\r\n')[0]:
             raise ConnectionError(f'WebSocket handshake failed: {resp[:100]}')
 
-        log.info('🎮 Discord Gateway connected')
+        log.info('[DISC] Discord Gateway connected')
 
     def _ws_send(self, data: dict):
         """Send a WebSocket frame (masked, as client)."""
@@ -226,7 +226,7 @@ class DiscordBot:
             if t == 'READY':
                 self._session_id = d.get('session_id')
                 self._bot_user = d.get('user', {})
-                log.info(f"🎮 Discord ready: {self._bot_user.get('username')}#{self._bot_user.get('discriminator')}")
+                log.info(f"[DISC] Discord ready: {self._bot_user.get('username')}#{self._bot_user.get('discriminator')}")
 
             elif t == 'MESSAGE_CREATE':
                 # Ignore own messages
@@ -294,7 +294,7 @@ class DiscordBot:
                 log.error(f'Discord gateway error: {e}')
 
             if self._running:
-                log.info(f'🎮 Discord reconnecting in {retry_delay}s...')
+                log.info(f'[DISC] Discord reconnecting in {retry_delay}s...')
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 60)
 

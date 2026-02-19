@@ -158,7 +158,7 @@ class WebSocketServer:
         self._server = await asyncio.start_server(
             self._handle_connection, self.host, self.port
         )
-        log.info(f"⚡ WebSocket server: ws://{self.host}:{self.port}")
+        log.info(f"[FAST] WebSocket server: ws://{self.host}:{self.port}")
         asyncio.create_task(self._keepalive_loop())
 
     async def stop(self):
@@ -245,7 +245,7 @@ class WebSocketServer:
 
         client = WSClient(reader, writer, session_id)
         self.clients[client._id] = client
-        log.info(f"⚡ WS client connected (session={session_id}, total={len(self.clients)})")
+        log.info(f"[FAST] WS client connected (session={session_id}, total={len(self.clients)})")
 
         if self._on_connect:
             try:
@@ -305,7 +305,7 @@ class WebSocketServer:
                 writer.close()
             except Exception:
                 pass
-            log.info(f"⚡ WS client disconnected (total={len(self.clients)})")
+            log.info(f"[FAST] WS client disconnected (total={len(self.clients)})")
 
     async def _keepalive_loop(self):
         """Ping clients every 30s, drop dead ones."""
@@ -325,7 +325,7 @@ class WebSocketServer:
                 c = self.clients.pop(cid, None)
                 if c:
                     c.connected = False
-                    log.info(f"⚡ WS client dropped (timeout)")
+                    log.info(f"[FAST] WS client dropped (timeout)")
 
 
 # ── Streaming response helper ──────────────────────────────────

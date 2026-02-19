@@ -47,7 +47,7 @@ class SubAgent:
                 agent_info['result'] = result
                 agent_info['status'] = 'completed'
                 agent_info['completed'] = datetime.now(KST).isoformat()
-                log.info(f"🤖 Sub-agent {agent_id} completed: {len(result)} chars")
+                log.info(f"[BOT] Sub-agent {agent_id} completed: {len(result)} chars")
 
                 # Notify via Telegram
                 if agent_info['notify_telegram'] and _core()._tg_bot and _core()._tg_bot.token:
@@ -75,7 +75,7 @@ class SubAgent:
         agent_info['thread'] = t
         cls._agents[agent_id] = agent_info
         t.start()
-        log.info(f"🤖 Sub-agent {agent_id} spawned: {task[:80]}")
+        log.info(f"[BOT] Sub-agent {agent_id} spawned: {task[:80]}")
         return agent_id
 
     @classmethod

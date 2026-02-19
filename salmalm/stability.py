@@ -75,7 +75,7 @@ class CircuitBreaker:
 
             if recent >= self.threshold:
                 self._tripped[component] = now
-                log.warning(f"⚡ Circuit breaker tripped: {component} "
+                log.warning(f"[FAST] Circuit breaker tripped: {component} "
                            f"({recent} errors in {self.window_sec}s)")
                 return True
             return False
@@ -372,10 +372,10 @@ class HealthMonitor:
                 passed += 1
             except Exception as e:
                 results[name] = f"FAIL: {e}"
-                log.error(f"Self-test FAIL: {name} — {e}")
+                log.error(f"Self-test FAIL: {name} -- {e}")
 
         total = len(modules)
-        log.info(f"🧪 Self-test: {passed}/{total} modules OK")
+        log.info(f"[TEST] Self-test: {passed}/{total} modules OK")
         return {
             "passed": passed,
             "total": total,

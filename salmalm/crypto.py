@@ -18,9 +18,9 @@ try:
     from cryptography.hazmat.primitives import hashes as crypto_hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
     HAS_CRYPTO = True
-    log.info("[OK] cryptography available — AES-256-GCM enabled")
+    log.info("[OK] cryptography available -- AES-256-GCM enabled")
 except ImportError:
-    log.warning("[WARN] cryptography not installed — vault encryption disabled. Use .env for API keys instead.")
+    log.warning("[WARN] cryptography not installed -- vault encryption disabled. Use .env for API keys instead.")
 
 
 def _derive_key(password: str, salt: bytes, length: int = 32) -> bytes:

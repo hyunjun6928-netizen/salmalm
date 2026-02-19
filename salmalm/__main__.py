@@ -28,7 +28,7 @@ pause
 '''
         with open(bat_path, 'w', encoding='utf-8') as f:
             f.write(bat_content)
-        print(f"[PIN] Created SalmAlm.bat on Desktop — double-click to start!")
+        print(f"[PIN] Created SalmAlm.bat on Desktop -- double-click to start!")
     except Exception as e:
         print(f"[WARN]  Could not create desktop shortcut: {e}")
 
@@ -94,12 +94,12 @@ def _run_node_mode():
 
     # Start HTTP server for tool execution
     server = http.server.ThreadingHTTPServer(('0.0.0.0', port), WebHandler)
-    print(f"╔══════════════════════════════════════════════╗")
-    print(f"║  [NET] SalmAlm Node v{VERSION:<27s}║")
-    print(f"║  Name: {name:<37s}║")
-    print(f"║  Port: {port:<37s}║")
-    print(f"║  Gateway: {gateway_url:<34s}║")
-    print(f"╚══════════════════════════════════════════════╝")
+    print(f"+==============================================+")
+    print(f"|  [NET] SalmAlm Node v{VERSION:<27s}|")
+    print(f"|  Name: {name:<37s}|")
+    print(f"|  Port: {port:<37s}|")
+    print(f"|  Gateway: {gateway_url:<34s}|")
+    print(f"+==============================================+")
 
     try:
         server.serve_forever()
@@ -144,7 +144,7 @@ def main() -> None:
         if sys.platform == 'win32':
             _ensure_windows_shortcut()
         else:
-            print("ℹ️  Desktop shortcuts are Windows-only.")
+            print("[INFO]  Desktop shortcuts are Windows-only.")
         sys.exit(0)
     if '--version' in sys.argv or '-v' in sys.argv:
         from salmalm.constants import VERSION

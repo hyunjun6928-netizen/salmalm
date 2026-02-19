@@ -396,7 +396,7 @@ def execute_tool(name: str, args: dict) -> str:
                 save_path.write_bytes(img_data)
 
             size_kb = len(img_data) / 1024
-            log.info(f"🎨 Image generated: {fname} ({size_kb:.1f}KB)")
+            log.info(f"[ART] Image generated: {fname} ({size_kb:.1f}KB)")
             return f'✅ Image generated: uploads/{fname} ({size_kb:.1f}KB)\nPrompt: {prompt}'
 
         elif name == 'image_analyze':

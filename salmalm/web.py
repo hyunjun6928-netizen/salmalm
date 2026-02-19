@@ -477,7 +477,7 @@ self.addEventListener('fetch',e=>{
             return True
         if origin in self._ALLOWED_ORIGINS:
             return True
-        log.warning(f"🚫 CSRF blocked: Origin={origin} on {self.path}")
+        log.warning(f"[BLOCK] CSRF blocked: Origin={origin} on {self.path}")
         self.send_response(403)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
@@ -852,7 +852,7 @@ self.addEventListener('fetch',e=>{
                             info += f'\n[File content]\n{preview}'
                         except Exception:
                             pass
-                    log.info(f"📤 Web upload: {fname} ({size_kb:.1f}KB)")
+                    log.info(f"[SEND] Web upload: {fname} ({size_kb:.1f}KB)")
                     audit_log('web_upload', fname)
                     resp = {'ok': True, 'filename': fname, 'size': len(file_data),
                                 'info': info, 'is_image': is_image}

@@ -181,7 +181,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 outputs[tc_id] = f.result(timeout=60)
             except Exception as e:
                 outputs[tc_id] = f'❌ Tool execution error: {e}'
-        log.info(f"⚡ Parallel: {len(tool_calls)} tools completed")
+        log.info(f"[FAST] Parallel: {len(tool_calls)} tools completed")
         return outputs
 
     def _append_tool_results(self, session, provider, result, tool_calls, tool_outputs):
@@ -288,14 +288,14 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     system_msgs = [m for m in session.messages if m['role'] == 'system'][:1]
                     recent_msgs = session.messages[-10:]
                     session.messages = system_msgs + recent_msgs
-                    log.warning(f"🔪 Force-truncated: {msg_count} -> {len(session.messages)} msgs")
+                    log.warning(f"[CUT] Force-truncated: {msg_count} -> {len(session.messages)} msgs")
                     # Retry with truncated context
                     result = await _call_llm_async(session.messages, model=model, tools=tools,
                                       thinking=think_this_call)
                     if result.get('error') == 'token_overflow':
                         # Still too long — nuclear option: keep only last 4
                         session.messages = (system_msgs or []) + session.messages[-4:]
-                        log.warning(f"🔪🔪 Nuclear truncation: -> {len(session.messages)} msgs")
+                        log.warning(f"[CUT][CUT] Nuclear truncation: -> {len(session.messages)} msgs")
                         result = await _call_llm_async(session.messages, model=model, tools=tools)
                         if result.get('error'):
                             session.add_assistant("⚠️ Context too large. Use /clear to reset.")
@@ -328,7 +328,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             # PHASE 3: REFLECT — self-evaluation for complex tasks
             if self._should_reflect(classification, response, iteration):
-                log.info(f"🔍 Reflection pass on {classification['intent']} response")
+                log.info(f"[SEARCH] Reflection pass on {classification['intent']} response")
                 reflect_msgs = [
                     {'role': 'system', 'content': self.REFLECT_PROMPT},
                     {'role': 'user', 'content': f'Original question: {user_message[:REFLECT_SNIPPET_LEN]}'},
@@ -345,10 +345,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     skip_phrases = ['satisfactory', 'sufficient', 'correct', ]
                     if not any(p in improved[:100].lower() for p in skip_phrases):
                         response = improved
-                    log.info(f"🔍 Reflection improved: {len(response)} chars")
+                    log.info(f"[SEARCH] Reflection improved: {len(response)} chars")
 
             session.add_assistant(response)
-            log.info(f"💬 Response ({result.get('model', '?')}): {len(response)} chars, "
+            log.info(f"[CHAT] Response ({result.get('model', '?')}): {len(response)} chars, "
                      f"iteration {iteration + 1}, intent={classification['intent']}")
 
             # Clean up planning message if added (use marker, not content comparison)
@@ -447,7 +447,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
     # --- Normal message processing ---
     if image_data:
         b64, mime = image_data
-        log.info(f"🖼️ Image attached: {mime}, {len(b64)//1024}KB base64")
+        log.info(f"[IMG] Image attached: {mime}, {len(b64)//1024}KB base64")
         content = [
             {'type': 'image', 'source': {'type': 'base64', 'media_type': mime, 'data': b64}},
             {'type': 'text', 'text': user_message or 'Analyze this image.'}
