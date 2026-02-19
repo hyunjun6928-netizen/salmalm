@@ -21,17 +21,20 @@ class TestCostCap(unittest.TestCase):
 
     def test_cost_cap_exceeded_raises(self):
         """CostCapExceeded should be raised when cost >= COST_CAP."""
-        from salmalm.core import CostCapExceeded, _usage, _usage_lock, COST_CAP
-        original = _usage['total_cost']
+        import salmalm.core as _core
+        from salmalm.core import CostCapExceeded, _usage, _usage_lock, check_cost_cap
+        original_cost = _usage['total_cost']
+        original_cap = _core.COST_CAP
         try:
+            _core.COST_CAP = 10.0
             with _usage_lock:
-                _usage['total_cost'] = COST_CAP + 1.0
+                _usage['total_cost'] = 11.0
             with self.assertRaises(CostCapExceeded):
-                from salmalm.core import check_cost_cap
                 check_cost_cap()
         finally:
+            _core.COST_CAP = original_cap
             with _usage_lock:
-                _usage['total_cost'] = original
+                _usage['total_cost'] = original_cost
 
     def test_cost_cap_not_exceeded(self):
         """check_cost_cap should not raise when under cap."""
@@ -56,16 +59,20 @@ class TestCostCap(unittest.TestCase):
 
     def test_cost_cap_exact_boundary(self):
         """Cost exactly at cap should trigger."""
-        from salmalm.core import CostCapExceeded, _usage, _usage_lock, COST_CAP, check_cost_cap
-        original = _usage['total_cost']
+        import salmalm.core as _core
+        from salmalm.core import CostCapExceeded, _usage, _usage_lock, check_cost_cap
+        original_cost = _usage['total_cost']
+        original_cap = _core.COST_CAP
         try:
+            _core.COST_CAP = 10.0
             with _usage_lock:
-                _usage['total_cost'] = COST_CAP  # exactly at cap
+                _usage['total_cost'] = 10.0  # exactly at cap
             with self.assertRaises(CostCapExceeded):
                 check_cost_cap()
         finally:
+            _core.COST_CAP = original_cap
             with _usage_lock:
-                _usage['total_cost'] = original
+                _usage['total_cost'] = original_cost
 
     def test_track_usage_updates_cost(self):
         """track_usage should increment total_cost."""
