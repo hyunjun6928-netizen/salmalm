@@ -357,6 +357,9 @@ class HealthMonitor:
             ("tls", "salmalm.tls"),
             ("logging_ext", "salmalm.logging_ext"),
             ("docs", "salmalm.docs"),
+            ("agents", "salmalm.agents"),
+            ("templates", "salmalm.templates"),
+            ("tool_handlers", "salmalm.tool_handlers"),
         ]
 
         passed = 0
