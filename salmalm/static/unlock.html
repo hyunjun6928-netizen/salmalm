@@ -17,7 +17,7 @@ button:hover{background:#4338ca}
 <h1>😈 SalmAlm</h1>
 <p>Personal AI Gateway v0.12.6</p>
 <input type="password" id="pw" placeholder="Master password" data-enter-action="unlock">
-<button data-action="unlock">Unlock</button>
+<button data-action="unlock" onclick="unlock()">Unlock</button>
 <div class="error" id="err"></div>
 <div id="unlock-help" style="margin-top:24px;font-size:13px;color:#999;line-height:1.8;text-align:left;max-width:400px"></div>
 <script>
@@ -31,6 +31,7 @@ button:hover{background:#4338ca}
 </script>
 </div>
 <script>
+document.getElementById('pw').addEventListener('keydown',function(e){if(e.key==='Enter')unlock()});
 async function unlock(){
   const pw=document.getElementById('pw').value;
   const r=await fetch('/api/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
