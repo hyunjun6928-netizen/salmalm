@@ -1,0 +1,2273 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Personal AI Gateway — Your AI Assistant in One Command">
+      
+      
+      
+        <link rel="canonical" href="https://hyunjun6928-netizen.github.io/salmalm/token-optimization-gap/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+    
+    
+      
+        <title>SalmAlm 토큰 최적화 갭 분석 - SalmAlm Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#salmalm" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="SalmAlm Documentation" class="md-header__button md-logo" aria-label="SalmAlm Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SalmAlm Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              SalmAlm 토큰 최적화 갭 분석
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/hyunjun6928-netizen/salmalm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    hyunjun6928-netizen/salmalm
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../commands/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Commands
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../tools/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Tools
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../api/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../features/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../deployment/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Deployment
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="SalmAlm Documentation" class="md-nav__button md-logo" aria-label="SalmAlm Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    SalmAlm Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/hyunjun6928-netizen/salmalm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    hyunjun6928-netizen/salmalm
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/channels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/multi-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Model Routing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/thinking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extended Thinking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/rag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RAG & Knowledge Base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/sessions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/personal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Personal Assistant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/channels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telegram & Discord
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/self-evolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-Evolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/sla/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SLA & Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-tool-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Tool Schema 압축
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Tool Schema 압축">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#openclaw" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenClaw 방식
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#salmalm_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SalmAlm 현재 구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        갭: 부분구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        권장사항
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-image-auto-resize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Image Auto-Resize
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Image Auto-Resize">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#openclaw_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenClaw 방식
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#salmalm_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SalmAlm 현재 구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        갭: 미구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        권장사항
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-partial-credit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 응답 중단 시 Partial Credit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. 응답 중단 시 Partial Credit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#openclaw_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenClaw 방식
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#salmalm_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SalmAlm 현재 구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        갭: 완전구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        권장사항
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-transcript-hygiene" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Transcript Hygiene
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Transcript Hygiene">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#openclaw_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenClaw 방식
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#salmalm_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SalmAlm 현재 구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        갭: 부분구현 (기능은 유사하나 세부 튜닝 부족)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        차이점
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        권장사항
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-session-pruning-compaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Session Pruning 전략 (Compaction 비교)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Session Pruning 전략 (Compaction 비교)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#openclaw_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenClaw 방식
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#salmalm_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SalmAlm 현재 구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        갭: 부분구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        차이점
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        권장사항
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-streaming-latency-first-token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Streaming Latency (First-Token 최적화)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Streaming Latency (First-Token 최적화)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#openclaw_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenClaw 방식
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#salmalm_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SalmAlm 현재 구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        갭: 부분구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        차이점
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        권장사항
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-system-prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. System Prompt 최적화
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. System Prompt 최적화">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#openclaw_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OpenClaw 방식
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#salmalm_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SalmAlm 현재 구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        갭: 부분구현
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        주요 이슈
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        권장사항
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        요약 매트릭스
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="요약 매트릭스">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-wins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        즉시 실행 가능한 Quick Wins
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="salmalm">SalmAlm 토큰 최적화 갭 분석<a class="headerlink" href="#salmalm" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>비교 대상: OpenClaw (v2025) vs SalmAlm (v0.5.0)
+분석일: 2026-02-20</p>
+</blockquote>
+<hr />
+<h2 id="1-tool-schema">1. Tool Schema 압축<a class="headerlink" href="#1-tool-schema" title="Permanent link">&para;</a></h2>
+<h3 id="openclaw">OpenClaw 방식<a class="headerlink" href="#openclaw" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>/context detail</code>로 도구별 스키마 크기 확인 가능</li>
+<li>정책(tool policy)으로 세션/서브에이전트별 사용 도구 필터링</li>
+<li>스키마는 매 런마다 필요한 것만 전송; 미사용 도구 제외 가능</li>
+<li>도구 목록은 짧은 description + JSON schema 분리</li>
+</ul>
+<h3 id="salmalm_1">SalmAlm 현재 구현<a class="headerlink" href="#salmalm_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>tools.py</code>에 43개 도구 스키마를 <strong>항상 전부</strong> 전송</li>
+<li>서브에이전트용 <code>subagent_tool_policy.json</code>으로 서브에이전트 도구 필터링 존재 (<code>features/agents.py:_filter_tools_for_subagent</code>)</li>
+<li>메인 세션에서는 도구 필터링 없음</li>
+<li>시스템 프롬프트(<code>prompt.py</code>)에도 43개 도구 목록을 텍스트로 중복 하드코딩</li>
+</ul>
+<h3 id="_1">갭: <strong>부분구현</strong><a class="headerlink" href="#_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>서브에이전트 필터링은 있으나, 메인 세션 도구 필터링 없음</li>
+<li>시스템 프롬프트 내 도구 목록 텍스트 + JSON 스키마 이중 전송으로 ~2x 오버헤드</li>
+</ul>
+<h3 id="_2">권장사항<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>prompt.py</code>의 하드코딩된 도구 텍스트 목록 제거 — JSON 스키마가 이미 전송되므로 중복</li>
+<li>세션 컨텍스트에 따라 사용하지 않는 도구 스키마 제외 (예: google_calendar 미설정 시 해당 도구 제외)</li>
+<li><code>tools.py</code>에 <code>get_tools(context: dict) -&gt; list</code> 패턴 도입하여 조건부 스키마 로딩</li>
+</ol>
+<hr />
+<h2 id="2-image-auto-resize">2. Image Auto-Resize<a class="headerlink" href="#2-image-auto-resize" title="Permanent link">&para;</a></h2>
+<h3 id="openclaw_1">OpenClaw 방식<a class="headerlink" href="#openclaw_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>문서에 명시적 기술 없으나, session pruning에서 이미지 블록은 prune 대상 제외</li>
+<li>이미지 토큰은 API 수준(provider)에서 자동 처리</li>
+</ul>
+<h3 id="salmalm_2">SalmAlm 현재 구현<a class="headerlink" href="#salmalm_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>transcript_hygiene.py:_sanitize_images()</code> — 1MB 초과 이미지 감지만 하고 <strong>리사이즈 안 함</strong> (주석: "Can't resize without Pillow; just log")</li>
+<li>compaction 시 오래된 이미지는 <code>[Image attached]</code> 텍스트로 교체 (<code>core.py</code>)</li>
+<li>session pruning에서 이미지 블록 보호 (<code>_has_image_block</code>)</li>
+</ul>
+<h3 id="_3">갭: <strong>미구현</strong><a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>대용량 이미지 감지는 하나 실제 리사이즈 불가</li>
+</ul>
+<h3 id="_4">권장사항<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Pillow 없이 구현하려면: base64 이미지의 해상도 추정 후 API 전송 시 <code>detail: "low"</code> 파라미터 사용 (OpenAI) 또는 크기 경고 메시지</li>
+<li>stdlib만 사용 원칙 유지 시: 과도하게 큰 이미지(&gt;1MB)는 전송 전 경고 또는 거부</li>
+<li>compaction의 <code>[Image attached]</code> 교체 로직은 이미 좋음 — 이를 pruning 단계에서도 적용 (오래된 이미지 블록을 placeholder로 교체)</li>
+</ol>
+<hr />
+<h2 id="3-partial-credit">3. 응답 중단 시 Partial Credit<a class="headerlink" href="#3-partial-credit" title="Permanent link">&para;</a></h2>
+<h3 id="openclaw_2">OpenClaw 방식<a class="headerlink" href="#openclaw_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>문서에 명시적 기술 없음 (중단된 응답은 세션 히스토리에 그대로 유지)</li>
+</ul>
+<h3 id="salmalm_3">SalmAlm 현재 구현<a class="headerlink" href="#salmalm_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>engine.py:561-567</code> — abort controller로 중단 감지, partial 텍스트를 <code>⏹ [생성 중단됨]</code> 메시지와 함께 반환</li>
+<li>중단된 응답의 partial 텍스트가 세션 히스토리에 <strong>저장됨</strong> (후속 요청에서 컨텍스트로 사용)</li>
+</ul>
+<h3 id="_5">갭: <strong>완전구현</strong><a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>이미 partial 텍스트 보존 및 세션 반영 처리됨</li>
+</ul>
+<h3 id="_6">권장사항<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li>현재 구현 충분. 개선 여지: 중단된 tool_call의 결과를 synthetic <code>(cancelled)</code> 로 자동 삽입하면 Anthropic API 오류 방지에 도움</li>
+</ul>
+<hr />
+<h2 id="4-transcript-hygiene">4. Transcript Hygiene<a class="headerlink" href="#4-transcript-hygiene" title="Permanent link">&para;</a></h2>
+<h3 id="openclaw_3">OpenClaw 방식<a class="headerlink" href="#openclaw_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Session pruning이 오래된 tool result를 soft-trim(head+tail) 및 hard-clear 처리</li>
+<li>이미지 블록 보호, keepLastAssistants 기반 cutoff</li>
+<li>도구별 allow/deny 필터링</li>
+<li>in-memory only (디스크 미수정)</li>
+</ul>
+<h3 id="salmalm_4">SalmAlm 현재 구현<a class="headerlink" href="#salmalm_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>transcript_hygiene.py</code> — provider별 규칙 적용 (Anthropic: 연속 user 병합, orphan tool_result 제거, synthetic tool_result 삽입)</li>
+<li><code>session_manager.py:prune_context()</code> — cache TTL 기반 pruning, soft-trim(4000자) + hard-clear(50K자), 이미지 보호</li>
+<li>compaction에서 tool result 500자 truncate, base64 이미지 교체</li>
+</ul>
+<h3 id="_7">갭: <strong>부분구현</strong> (기능은 유사하나 세부 튜닝 부족)<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<h3 id="_8">차이점<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>항목</th>
+<th>OpenClaw</th>
+<th>SalmAlm</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Soft-trim headChars</td>
+<td>1500</td>
+<td>1500</td>
+</tr>
+<tr>
+<td>Soft-trim tailChars</td>
+<td>1500</td>
+<td>500 ← <strong>불균형</strong></td>
+</tr>
+<tr>
+<td>Hard-clear 임계값</td>
+<td>50K (configurable)</td>
+<td>50K (하드코딩)</td>
+</tr>
+<tr>
+<td>Tool allow/deny</td>
+<td>와일드카드 지원</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>Cache TTL pruning</td>
+<td>provider별 configurable</td>
+<td>5분 고정</td>
+</tr>
+<tr>
+<td>사용자 설정 가능</td>
+<td>yaml config</td>
+<td>불가</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_9">권장사항<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>_PRUNE_TAIL</code>을 1500으로 증가 (session_manager.py) — tail에 중요 정보가 많음</li>
+<li>프루닝 설정을 환경변수/config로 노출: <code>SALMALM_PRUNE_TTL</code>, <code>SALMALM_PRUNE_SOFT_LIMIT</code> 등</li>
+<li>도구별 prune deny 지원 추가 (이미지 관련 도구 제외 등)</li>
+</ol>
+<hr />
+<h2 id="5-session-pruning-compaction">5. Session Pruning 전략 (Compaction 비교)<a class="headerlink" href="#5-session-pruning-compaction" title="Permanent link">&para;</a></h2>
+<h3 id="openclaw_4">OpenClaw 방식<a class="headerlink" href="#openclaw_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Pruning</strong>: in-memory, tool result만, cache-TTL 기반, 요청별 적용</li>
+<li><strong>Compaction</strong>: LLM 요약 → JSONL에 persist, auto-compact on context overflow</li>
+<li>pre-compaction memory flush (중요 컨텍스트를 디스크에 보존)</li>
+<li><code>/compact</code> 수동 + 자동 트리거</li>
+</ul>
+<h3 id="salmalm_5">SalmAlm 현재 구현<a class="headerlink" href="#salmalm_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Pruning</strong>: <code>session_manager.py:prune_context()</code> — cache-TTL 기반, soft/hard trim</li>
+<li><strong>Compaction</strong>: <code>core.py:compact_messages()</code> — 3단계 (tool trim → old tool drop → LLM summarize)</li>
+<li>Stage 1: tool result 500자 truncate + 이미지 placeholder</li>
+<li>Stage 2: 오래된 tool 메시지 drop, user/assistant만 보존</li>
+<li>Stage 3: LLM 요약 (threshold 초과 시)</li>
+<li>하드 리밋: 100 messages / 500K chars</li>
+<li>pre-compaction memory flush 구현됨 (<code>core/memory.py:flush_before_compaction</code>)</li>
+</ul>
+<h3 id="_10">갭: <strong>부분구현</strong><a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<h3 id="_11">차이점<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
+<ul>
+<li>OpenClaw: compaction 결과가 JSONL에 persist → 재시작 후에도 요약 유지</li>
+<li>SalmAlm: compaction이 in-memory로만 동작하는지 확인 필요 (세션 JSONL 없음)</li>
+<li>OpenClaw: cache-ttl pruning 후 TTL window reset으로 cache write cost 최적화</li>
+<li>SalmAlm: TTL reset 로직 있음 (<code>_record_api_call_time</code>)</li>
+</ul>
+<h3 id="_12">권장사항<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<ol>
+<li>compaction 결과를 세션 파일에 persist (현재는 메모리에서만 유지되는 것으로 보임)</li>
+<li>auto-compact 트리거를 engine의 LLM 호출 전 체크에 통합 (현재 compact_messages는 수동 호출 의존)</li>
+<li><code>/compact</code> 명령어 인자(focus area) 지원은 이미 있으나, 자동 트리거 시에도 smart focus 적용 검토</li>
+</ol>
+<hr />
+<h2 id="6-streaming-latency-first-token">6. Streaming Latency (First-Token 최적화)<a class="headerlink" href="#6-streaming-latency-first-token" title="Permanent link">&para;</a></h2>
+<h3 id="openclaw_5">OpenClaw 방식<a class="headerlink" href="#openclaw_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Anthropic SSE 스트리밍 기본</li>
+<li>Block streaming + coalescing으로 체감 응답 시간 최적화</li>
+<li>Telegram draft streaming (partial bubble update)</li>
+<li>Human-like pacing (800-2500ms 랜덤 딜레이)</li>
+<li>Non-Anthropic provider는 non-streaming fallback</li>
+</ul>
+<h3 id="salmalm_6">SalmAlm 현재 구현<a class="headerlink" href="#salmalm_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>llm.py:stream_anthropic()</code> — Anthropic SSE 스트리밍 구현 (urllib 기반)</li>
+<li>text_delta, thinking_delta, tool_use 이벤트 yield</li>
+<li>비-Anthropic provider는 non-streaming 전체 응답 → single chunk yield</li>
+<li>Telegram bot에서 draft streaming 여부는 별도 확인 필요</li>
+</ul>
+<h3 id="_13">갭: <strong>부분구현</strong><a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
+<h3 id="_14">차이점<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
+<ul>
+<li>SalmAlm: Anthropic만 실시간 스트리밍, 나머지 provider는 전체 응답 대기</li>
+<li>Block coalescing/chunking 없음</li>
+<li>Telegram draft bubble update 미확인</li>
+<li>Human-like pacing 없음</li>
+</ul>
+<h3 id="_15">권장사항<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
+<ol>
+<li>OpenAI/XAI provider도 SSE 스트리밍 지원 추가 (<code>stream: true</code> 파라미터)</li>
+<li>Telegram에서 <code>editMessageText</code>로 progressive update 구현 (first-token 체감 시간 단축)</li>
+<li>스트리밍 timeout을 180초에서 provider별 분리 (간단한 쿼리에는 30초면 충분)</li>
+</ol>
+<hr />
+<h2 id="7-system-prompt">7. System Prompt 최적화<a class="headerlink" href="#7-system-prompt" title="Permanent link">&para;</a></h2>
+<h3 id="openclaw_6">OpenClaw 방식<a class="headerlink" href="#openclaw_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li>시스템 프롬프트를 매 런마다 동적 조립</li>
+<li>Anthropic cache_control <code>ephemeral</code> 마킹으로 prompt caching 활용</li>
+<li>도구 스키마에도 cache_control 마킹 (마지막 도구)</li>
+<li>워크스페이스 파일 per-file 20K char truncation</li>
+<li>스킬은 메타데이터만 (instruction은 on-demand read)</li>
+<li>Heartbeat로 cache warm 유지 (TTL 직전 호출)</li>
+</ul>
+<h3 id="salmalm_7">SalmAlm 현재 구현<a class="headerlink" href="#salmalm_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>prompt.py:build_system_prompt()</code> — 동적 조립</li>
+<li>per-file truncation 구현: <code>MAX_FILE_CHARS=15K</code>, <code>MAX_MEMORY_CHARS=5K</code>, <code>MAX_AGENTS_CHARS=2K</code></li>
+<li><code>_agents_loaded_full</code> 플래그로 AGENTS.md 재로드 시 축소</li>
+<li>Anthropic cache_control 구현 (<code>llm.py:_call_anthropic</code> — system + 마지막 tool)</li>
+<li><strong>문제점</strong>: 시스템 프롬프트에 43개 도구 설명이 텍스트로 하드코딩 (~2000자) + JSON 스키마 별도 전송</li>
+<li><strong>문제점</strong>: 정확한 시간 대신 timezone만 주입 (캐시 효율을 위한 의도적 선택 — 좋음 ✅)</li>
+<li>subagent용 minimal 모드 구현</li>
+</ul>
+<h3 id="_16">갭: <strong>부분구현</strong><a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
+<h3 id="_17">주요 이슈<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>도구 목록 이중 전송</strong> — <code>prompt.py</code>의 <code>## 도구 (43개)</code> 섹션이 JSON 스키마와 중복 (~2000 토큰 낭비)</li>
+<li><strong>시스템 프롬프트 크기</strong> — 메타인지 프로토콜, 응답 품질 기준, Design Philosophy 등이 매 요청마다 전송</li>
+<li><strong>cache_control 위치</strong> — system prompt 전체를 하나의 cache block으로 처리 (OpenClaw는 더 세분화)</li>
+</ol>
+<h3 id="_18">권장사항<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>즉시 적용 (높은 ROI)</strong>:</li>
+<li><code>prompt.py</code>의 <code>## 도구 (43개)</code> 텍스트 블록 제거 → JSON 스키마만으로 충분 (~500 토큰 절약)</li>
+<li><code>## Design Philosophy</code> 섹션을 SOUL.md로 이동 (system prompt에서 제거)</li>
+<li><strong>중기</strong>:</li>
+<li>system prompt를 2개 cache block으로 분리: static(persona+rules) + dynamic(memory+time)</li>
+<li>static 부분에 cache_control, dynamic은 uncached → cache hit rate 향상</li>
+<li><strong>장기</strong>:</li>
+<li>스킬 목록을 prompt에서 제거하고, 도구 호출로 on-demand 로딩 (OpenClaw 패턴)</li>
+<li>Heartbeat에서 cache warm 유지 로직 추가</li>
+</ol>
+<hr />
+<h2 id="_19">요약 매트릭스<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>항목</th>
+<th>갭 상태</th>
+<th>예상 토큰 절약</th>
+<th>우선순위</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Tool schema 압축</td>
+<td>부분구현</td>
+<td>~500-1000 tok/req</td>
+<td>🔴 높음</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Image auto-resize</td>
+<td>미구현</td>
+<td>가변 (이미지 시)</td>
+<td>🟡 중간</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Partial credit</td>
+<td>완전구현</td>
+<td>-</td>
+<td>✅ 완료</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Transcript hygiene</td>
+<td>부분구현</td>
+<td>~200-500 tok/req</td>
+<td>🟡 중간</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Session pruning/compaction</td>
+<td>부분구현</td>
+<td>~1000+ tok/session</td>
+<td>🟡 중간</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Streaming latency</td>
+<td>부분구현</td>
+<td>0 (체감 속도)</td>
+<td>🟡 중간</td>
+</tr>
+<tr>
+<td>7</td>
+<td>System prompt 최적화</td>
+<td>부분구현</td>
+<td>~500-800 tok/req</td>
+<td>🔴 높음</td>
+</tr>
+</tbody>
+</table>
+<h3 id="quick-wins">즉시 실행 가능한 Quick Wins<a class="headerlink" href="#quick-wins" title="Permanent link">&para;</a></h3>
+<ol>
+<li><code>prompt.py</code>에서 <code>## 도구 (43개)</code> 하드코딩 블록 제거 → <strong>~500 tok/req 절약</strong></li>
+<li><code>_PRUNE_TAIL</code>을 500→1500으로 변경 → <strong>pruning 품질 향상</strong></li>
+<li>미설정 도구(google_calendar 등) 스키마 조건부 제외 → <strong>~200 tok/req 절약</strong></li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/hyunjun6928-netizen/salmalm" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://pypi.org/project/salmalm/" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
