@@ -241,12 +241,13 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             except Exception:
                 pass
             rows = conn.execute(
-                'SELECT session_id, updated_at, title FROM session_store ORDER BY updated_at DESC'
+                'SELECT session_id, updated_at, title, parent_session_id FROM session_store ORDER BY updated_at DESC'
             ).fetchall()
             sessions = []
             for r in rows:
                 sid = r[0]
                 stored_title = r[2] if len(r) > 2 else ''
+                parent_sid = r[3] if len(r) > 3 else None
                 if stored_title:
                     title = stored_title
                     msg_count = 0
@@ -264,7 +265,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     except Exception:
                         title = sid
                         msg_count = 0
-                sessions.append({'id': sid, 'title': title or sid, 'updated_at': r[1], 'messages': msg_count})
+                entry = {'id': sid, 'title': title or sid, 'updated_at': r[1], 'messages': msg_count}
+                if parent_sid:
+                    entry['parent_session_id'] = parent_sid
+                sessions.append(entry)
             self._json({'sessions': sessions})
 
         elif self.path == '/api/notifications':
@@ -823,6 +827,28 @@ self.addEventListener('fetch',e=>{{
             conn.execute('UPDATE session_store SET title=? WHERE session_id=?', (title, sid))
             conn.commit()
             self._json({'ok': True})
+
+        elif self.path == '/api/sessions/rollback':
+            if not self._require_auth('user'): return
+            sid = body.get('session_id', '')
+            count = int(body.get('count', 1))
+            if not sid:
+                self._json({'ok': False, 'error': 'Missing session_id'}, 400)
+                return
+            from .core import rollback_session
+            result = rollback_session(sid, count)
+            self._json(result)
+
+        elif self.path == '/api/sessions/branch':
+            if not self._require_auth('user'): return
+            sid = body.get('session_id', '')
+            message_index = body.get('message_index')
+            if not sid or message_index is None:
+                self._json({'ok': False, 'error': 'Missing session_id or message_index'}, 400)
+                return
+            from .core import branch_session
+            result = branch_session(sid, int(message_index))
+            self._json(result)
 
         elif self.path in ('/api/chat', '/api/chat/stream'):
             self._auto_unlock_localhost()
