@@ -18,7 +18,7 @@ The only optional dependency is `cryptography` for AES-256-GCM vault encryption.
 ### pip (Recommended)
 
 ```bash
-pip install salmalm
+python -m pip install salmalm
 python -m salmalm
 # → Opens http://localhost:18800
 # Add your API keys in Settings

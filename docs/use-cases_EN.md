@@ -15,7 +15,7 @@ BRAVE_API_KEY=BSA...
 ```
 
 ```bash
-pip install salmalm
+python -m pip install salmalm
 python -m salmalm
 ```
 
@@ -37,7 +37,7 @@ Like GitHub Copilot, but it understands your entire codebase.
 ### Setup
 
 ```bash
-pip install salmalm
+python -m pip install salmalm
 python -m salmalm
 # Open http://localhost:18800
 # Enter your API key
@@ -80,7 +80,7 @@ ollama pull codellama:13b   # 7GB, coding
 ollama pull mistral         # 4GB, multipurpose
 
 # 3. Run SalmAlm
-pip install salmalm
+python -m pip install salmalm
 python -m salmalm
 # During onboarding, set Ollama URL: http://localhost:11434/v1
 ```
@@ -135,7 +135,7 @@ Analyze images, screenshots, diagrams — locally or via cloud vision models.
 ### Setup
 
 ```bash
-pip install salmalm
+python -m pip install salmalm
 python -m salmalm
 # Add an OpenAI or Anthropic API key with vision support
 ```

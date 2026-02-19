@@ -112,7 +112,7 @@ GPT-4o 또는 Claude Vision을 사용합니다.
 
 ### Q: 업데이트하려면?
 ```bash
-pip install --upgrade salmalm
+python -m pip install --upgrade salmalm
 python -m salmalm
 ```
 또는 웹 UI Settings → Update → Check for Updates

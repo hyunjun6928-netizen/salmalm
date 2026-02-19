@@ -15,7 +15,7 @@ BRAVE_API_KEY=BSA...
 ```
 
 ```bash
-pip install salmalm
+python -m pip install salmalm
 python -m salmalm
 ```
 
@@ -36,7 +36,7 @@ GitHub Copilot 대신, 내 코드베이스를 이해하는 AI 비서.
 ### 설정
 
 ```bash
-pip install salmalm
+python -m pip install salmalm
 python -m salmalm
 # 브라우저에서 http://localhost:18800
 # API 키 입력
@@ -79,7 +79,7 @@ ollama pull codellama:13b   # 7GB, 코딩용
 ollama pull mistral         # 4GB, 다목적
 
 # 3. SalmAlm 실행
-pip install salmalm
+python -m pip install salmalm
 python -m salmalm
 # 온보딩에서 Ollama URL: http://localhost:11434/v1
 ```

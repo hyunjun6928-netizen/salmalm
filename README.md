@@ -78,7 +78,7 @@ salmalm/
 ### pip (권장)
 
 ```bash
-pip install salmalm
+python -m pip install salmalm
 python -m salmalm
 # → http://localhost:18800
 # Settings에서 API 키 입력

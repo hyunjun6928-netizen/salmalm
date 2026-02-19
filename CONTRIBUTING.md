@@ -7,7 +7,7 @@ First off, thanks for considering contributing! 🎉
 ```bash
 git clone https://github.com/hyunjun6928-netizen/salmalm.git
 cd salmalm
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 python -m unittest discover tests/ -v
 ```
 

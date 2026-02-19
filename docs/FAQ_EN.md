@@ -110,7 +110,7 @@ Make sure the server is running. Run `python -m salmalm`, then visit http://loca
 
 ### Q: How do I update?
 ```bash
-pip install --upgrade salmalm
+python -m pip install --upgrade salmalm
 python -m salmalm
 ```
 Or use Web UI → Settings → Update → Check for Updates
