@@ -303,7 +303,7 @@ class DiscordBot:
         try:
             if self._ws_raw:
                 self._ws_raw.close()
-        except Exception:
+        except Exception as e:
             log.debug(f"Suppressed: {e}")
 
 

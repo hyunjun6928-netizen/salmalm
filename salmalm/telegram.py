@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from .constants import *
 from .crypto import vault, log
-from .core import router, get_session, _sessions, audit_log
+from .core import router, get_session, _sessions, audit_log, compact_messages
 from .llm import _http_post, _http_get
 from .prompt import build_system_prompt
 from .tools import execute_tool

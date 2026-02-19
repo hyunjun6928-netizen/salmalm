@@ -432,6 +432,7 @@ def execute_tool(name: str, args: dict) -> str:
                 'os.system', 'os.popen', 'os.exec', 'os.spawn', 'os.remove', 'os.unlink',
                 'shutil.rmtree', 'pathlib', '.vault', 'audit.db', 'auth.db',
                 'import socket', 'import http', 'import urllib', 'import requests',
+                'getattr(', 'globals(', 'locals(', '__builtins__', 'vars(',
             ]
             code_lower = code.lower().replace(' ', '')
             for blocked in _EVAL_BLOCKLIST:
