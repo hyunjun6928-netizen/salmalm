@@ -611,7 +611,11 @@ memory_manager = MemoryManager()
 # LLM CRON MANAGER — Scheduled tasks with LLM execution
 # ============================================================
 class LLMCronManager:
-    """Manages LLM-powered scheduled tasks (like OpenClaw cron jobs)."""
+    """OpenClaw-style LLM cron with isolated session execution.
+
+    Each cron job runs in its own isolated session (no cross-contamination).
+    Completed tasks announce results to configured channels.
+    """
 
     _JOBS_FILE = BASE_DIR / '.cron_jobs.json'
 
@@ -729,7 +733,14 @@ class LLMCronManager:
         return False
 
     async def tick(self):
-        """Check and execute due jobs."""
+        """Check and execute due jobs. Also runs heartbeat if due."""
+        # OpenClaw-style heartbeat check
+        if heartbeat.should_beat():
+            try:
+                await heartbeat.beat()
+            except Exception as e:
+                log.error(f"[HEARTBEAT] Tick error: {e}")
+
         for job in self.jobs:
             if not self._should_run(job):
                 continue
@@ -889,7 +900,7 @@ def get_session(session_id: str) -> Session:
 
 
 class CronScheduler:
-    """Simple cron-like scheduler."""
+    """OpenClaw-style cron scheduler with isolated session execution."""
 
     def __init__(self):
         self.jobs = []
@@ -933,6 +944,109 @@ cron = CronScheduler()
 
 
 # ============================================================
+# HEARTBEAT SYSTEM — OpenClaw-style periodic self-check
+# ============================================================
+
+class HeartbeatManager:
+    """OpenClaw-style heartbeat: periodic self-check with HEARTBEAT.md.
+
+    Reads HEARTBEAT.md for a checklist of things to do on each heartbeat.
+    Runs in an isolated session to avoid polluting main conversation.
+    Announces results to configured channels.
+    """
+
+    _HEARTBEAT_FILE = BASE_DIR / 'HEARTBEAT.md'
+    _DEFAULT_INTERVAL = 1800  # 30 minutes
+    _last_beat = 0.0
+    _enabled = True
+
+    @classmethod
+    def get_prompt(cls) -> str:
+        """Read HEARTBEAT.md for the heartbeat checklist."""
+        if cls._HEARTBEAT_FILE.exists():
+            try:
+                content = cls._HEARTBEAT_FILE.read_text(encoding='utf-8', errors='replace')
+                if content.strip():
+                    return content
+            except Exception:
+                pass
+        return ''
+
+    @classmethod
+    def should_beat(cls) -> bool:
+        """Check if it's time for a heartbeat."""
+        if not cls._enabled:
+            return False
+        now = time.time()
+        if now - cls._last_beat < cls._DEFAULT_INTERVAL:
+            return False
+        # Respect quiet hours (23:00-08:00 KST)
+        hour = datetime.now(KST).hour
+        if hour >= 23 or hour < 8:
+            return False
+        return True
+
+    @classmethod
+    async def beat(cls) -> Optional[str]:
+        """Execute a heartbeat check in an isolated session.
+
+        Returns the heartbeat result or None if nothing to do.
+        """
+        prompt = cls.get_prompt()
+        if not prompt:
+            cls._last_beat = time.time()
+            return None
+
+        cls._last_beat = time.time()
+        log.info("[HEARTBEAT] Running periodic heartbeat check")
+
+        try:
+            from .engine import process_message
+            # Run in isolated session (OpenClaw pattern: no cross-contamination)
+            result = await process_message(
+                f'heartbeat-{int(time.time())}',
+                f"[Heartbeat check]\n{prompt}\n\nIf nothing needs attention, reply HEARTBEAT_OK.",
+                model_override=None  # Use auto-routing
+            )
+
+            # Announce if result is meaningful
+            if result and 'HEARTBEAT_OK' not in result:
+                cls._announce(result)
+                write_daily_log(f"[HEARTBEAT] {result[:200]}")
+
+            return result
+        except Exception as e:
+            log.error(f"[HEARTBEAT] Error: {e}")
+            return None
+
+    @classmethod
+    def _announce(cls, result: str):
+        """Announce heartbeat results to configured channels."""
+        # Telegram notification
+        if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
+            try:
+                summary = result[:800] + ('...' if len(result) > 800 else '')
+                _tg_bot.send_message(
+                    _tg_bot.owner_id,
+                    f"💓 Heartbeat alert:\n{summary}")
+            except Exception as e:
+                log.error(f"[HEARTBEAT] Announce error: {e}")
+
+        # Store for web polling
+        web_session = _sessions.get('web')
+        if web_session:
+            if not hasattr(web_session, '_notifications'):
+                web_session._notifications = []
+            web_session._notifications.append({
+                'time': time.time(),
+                'text': f"💓 Heartbeat: {result[:200]}"
+            })
+
+
+heartbeat = HeartbeatManager()
+
+
+# ============================================================
 # DAILY MEMORY LOG
 # ============================================================
 def write_daily_log(entry: str):
@@ -947,3 +1061,12 @@ def write_daily_log(entry: str):
 
 # Re-export from agents.py
 from .agents import SubAgent, SkillLoader, PluginLoader
+
+# Module-level exports for convenience
+__all__ = [
+    'audit_log', 'response_cache', 'router', 'track_usage', 'get_usage_report',
+    'compact_messages', 'get_session', 'write_daily_log', 'cron',
+    'memory_manager', 'heartbeat',
+    'Session', 'MemoryManager', 'HeartbeatManager', 'LLMCronManager',
+    'SubAgent', 'SkillLoader', 'PluginLoader',
+]
