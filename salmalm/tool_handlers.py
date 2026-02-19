@@ -9,8 +9,8 @@ try:
 except ImportError:
     _resource_mod = None
 
-from .constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, PROTECTED_FILES,
-                        WORKSPACE_DIR, VERSION, KST, MEMORY_FILE, MEMORY_DIR, AUDIT_DB)
+from .constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, EXEC_ELEVATED,
+                        PROTECTED_FILES, WORKSPACE_DIR, VERSION, KST, MEMORY_FILE, MEMORY_DIR, AUDIT_DB)
 from .crypto import vault, log
 from .core import (audit_log, get_usage_report, _tfidf, SubAgent, SkillLoader,
                    _sessions, get_session, _tg_bot)
@@ -40,7 +40,9 @@ def _is_safe_command(cmd: str) -> tuple[bool, str]:
         first_word = words[0].split('/')[-1]  # strip path prefix
         if first_word in EXEC_BLOCKLIST:
             return False, f'Blocked command in pipeline: {first_word}'
-        if first_word not in EXEC_ALLOWLIST:
+        if first_word in EXEC_ELEVATED:
+            log.warning(f"⚠️ Elevated exec: {first_word} (can run arbitrary code)")
+        elif first_word not in EXEC_ALLOWLIST:
             return False, f'Command not in allowlist: {first_word}'
 
     # Check for subshell/backtick/process substitution bypasses

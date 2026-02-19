@@ -49,3 +49,4 @@ plugins/
 dist/
 build/
 *.egg-info/
+.token_secret

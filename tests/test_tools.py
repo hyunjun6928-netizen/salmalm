@@ -34,10 +34,15 @@ class TestExecBlocklist(unittest.TestCase):
             self.assertTrue(matched, f"Should block: {cmd}")
 
     def test_safe_commands_in_allowlist(self):
-        safe = ['ls', 'cat', 'grep', 'find', 'wc', 'head', 'tail',
-                'python3', 'git', 'ping']
+        from salmalm.constants import EXEC_ELEVATED
+        safe = ['ls', 'cat', 'grep', 'find', 'wc', 'head', 'tail', 'git', 'ping']
         for cmd in safe:
             self.assertIn(cmd, EXEC_ALLOWLIST, f"{cmd} should be in allowlist")
+            self.assertNotIn(cmd, EXEC_BLOCKLIST, f"{cmd} should not be blocked")
+        # Elevated commands should be in EXEC_ELEVATED, not in BLOCKLIST
+        elevated = ['python3', 'node', 'docker']
+        for cmd in elevated:
+            self.assertIn(cmd, EXEC_ELEVATED, f"{cmd} should be in elevated set")
             self.assertNotIn(cmd, EXEC_BLOCKLIST, f"{cmd} should not be blocked")
 
     def test_allowlist_not_empty(self):

@@ -221,7 +221,7 @@ def main() -> None:
             server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
             web_thread = threading.Thread(target=server.serve_forever, daemon=True)
             web_thread.start()
-            log.info(f"🌐 Web UI: http://127.0.0.1:{port}")
+            log.info(f"🌐 Web UI: http://{bind_addr}:{port}")
 
             vault_pw = os.environ.get('SALMALM_VAULT_PW')
             if vault_pw and VAULT_FILE.exists():

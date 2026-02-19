@@ -34,10 +34,9 @@ EXEC_ALLOWLIST = {
     'tr', 'cut', 'tee', 'xargs', 'diff', 'patch', 'env', 'pwd', 'whoami',
     'uname', 'hostname', 'id', 'dirname', 'basename', 'realpath', 'readlink',
     'md5sum', 'sha256sum', 'base64', 'xxd', 'hexdump', 'yes', 'true', 'false',
-    # Dev tools
-    'python3', 'python', 'pip', 'pip3', 'node', 'npm', 'npx', 'deno', 'bun',
+    # Dev tools (safe)
     'git', 'gh', 'cargo', 'rustc', 'go', 'java', 'javac', 'gcc', 'g++', 'make',
-    'cmake', 'docker', 'kubectl', 'terraform',
+    'cmake', 'pip', 'pip3', 'npm', 'npx',
     # Network (read-only)
     'ping', 'dig', 'nslookup', 'host', 'traceroute', 'ss', 'ip',
     # curl/wget removed: SSRF bypass risk (use web_fetch/http_request tools instead)
@@ -47,6 +46,11 @@ EXEC_ALLOWLIST = {
     'jq', 'yq', 'csvtool', 'sqlite3', 'psql', 'mysql',
     # System info
     'ps', 'top', 'htop', 'free', 'uptime', 'lsof', 'nproc', 'lscpu', 'lsblk',
+}
+# Elevated commands: allowed but logged with warning (can run arbitrary code)
+EXEC_ELEVATED = {
+    'python3', 'python', 'node', 'deno', 'bun',
+    'docker', 'kubectl', 'terraform',
 }
 EXEC_BLOCKLIST = {
     'rm', 'rmdir', 'mkfs', 'dd', 'shutdown', 'reboot', 'halt', 'poweroff',

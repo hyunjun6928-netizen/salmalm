@@ -58,10 +58,11 @@ async def main():
 
     # Start web server
     port = int(os.environ.get('SALMALM_PORT', 18800))
-    server = http.server.ThreadingHTTPServer(('127.0.0.1', port), WebHandler)
+    bind = os.environ.get('SALMALM_BIND', '127.0.0.1')
+    server = http.server.ThreadingHTTPServer((bind, port), WebHandler)
     web_thread = threading.Thread(target=server.serve_forever, daemon=True)
     web_thread.start()
-    log.info(f"🌐 Web UI: http://127.0.0.1:{port}")
+    log.info(f"🌐 Web UI: http://{bind}:{port}")
 
     # Auto-unlock vault
     vault_pw = os.environ.get('SALMALM_VAULT_PW')

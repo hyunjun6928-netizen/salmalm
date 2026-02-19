@@ -51,8 +51,20 @@ def _verify_password(password: str, stored_hash: bytes, salt: bytes) -> bool:
 class TokenManager:
     """Stateless token creation/verification using HMAC-SHA256."""
 
+    _SECRET_FILE = BASE_DIR / '.token_secret'
+
     def __init__(self, secret: bytes = None):
-        self._secret = secret or os.urandom(32)
+        if secret:
+            self._secret = secret
+        elif self._SECRET_FILE.exists():
+            self._secret = self._SECRET_FILE.read_bytes()
+        else:
+            self._secret = os.urandom(32)
+            try:
+                self._SECRET_FILE.write_bytes(self._secret)
+                self._SECRET_FILE.chmod(0o600)
+            except Exception:
+                pass  # In-memory only if write fails
 
     def create(self, payload: dict, expires_in: int = 86400) -> str:
         """Create a signed token. Default expiry: 24h."""
