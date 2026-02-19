@@ -132,13 +132,13 @@ class RequestLogger:
         }
 
         if status_code >= 500:
-            self._logger.error(f"{method} {path} → {status_code} ({duration_ms:.0f}ms)",
+            self._logger.error(f"{method} {path} -> {status_code} ({duration_ms:.0f}ms)",
                               extra=extra)
         elif status_code >= 400:
-            self._logger.warning(f"{method} {path} → {status_code} ({duration_ms:.0f}ms)",
+            self._logger.warning(f"{method} {path} -> {status_code} ({duration_ms:.0f}ms)",
                                 extra=extra)
         else:
-            self._logger.info(f"{method} {path} → {status_code} ({duration_ms:.0f}ms)",
+            self._logger.info(f"{method} {path} -> {status_code} ({duration_ms:.0f}ms)",
                              extra=extra)
 
         # Update metrics

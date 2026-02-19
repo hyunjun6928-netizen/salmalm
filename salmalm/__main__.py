@@ -28,23 +28,23 @@ pause
 '''
         with open(bat_path, 'w', encoding='utf-8') as f:
             f.write(bat_content)
-        print(f"📌 Created SalmAlm.bat on Desktop — double-click to start!")
+        print(f"[PIN] Created SalmAlm.bat on Desktop — double-click to start!")
     except Exception as e:
-        print(f"⚠️  Could not create desktop shortcut: {e}")
+        print(f"[WARN]  Could not create desktop shortcut: {e}")
 
 
 def _run_update():
     """Self-update via pip."""
     import subprocess as _sp
-    print("⬆️  Updating SalmAlm...")
+    print("[UP]  Updating SalmAlm...")
     result = _sp.run(
         [sys.executable, '-m', 'pip', 'install', '--upgrade', '--no-cache-dir',
          '--force-reinstall', 'salmalm'],
         capture_output=False)
     if result.returncode == 0:
-        print("\n✅ Updated! Run 'salmalm' or 'python -m salmalm' to start.")
+        print("\n[OK] Updated! Run 'salmalm' or 'python -m salmalm' to start.")
     else:
-        print("\n❌ Update failed. Try manually: pip install --upgrade salmalm")
+        print("\n[FAIL] Update failed. Try manually: pip install --upgrade salmalm")
     sys.exit(result.returncode)
 
 
@@ -86,7 +86,7 @@ def _run_node_mode():
     # Register with gateway
     result = agent.register()
     if 'error' in result:
-        print(f"⚠️  Gateway registration failed: {result['error']}")
+        print(f"[WARN]  Gateway registration failed: {result['error']}")
         print(f"   Starting standalone anyway on :{port}")
 
     # Start heartbeat
@@ -95,7 +95,7 @@ def _run_node_mode():
     # Start HTTP server for tool execution
     server = http.server.ThreadingHTTPServer(('0.0.0.0', port), WebHandler)
     print(f"╔══════════════════════════════════════════════╗")
-    print(f"║  📡 SalmAlm Node v{VERSION:<27s}║")
+    print(f"║  [NET] SalmAlm Node v{VERSION:<27s}║")
     print(f"║  Name: {name:<37s}║")
     print(f"║  Port: {port:<37s}║")
     print(f"║  Gateway: {gateway_url:<34s}║")
@@ -106,7 +106,7 @@ def _run_node_mode():
     except KeyboardInterrupt:
         agent.stop()
         server.shutdown()
-        print("\n📡 Node stopped.")
+        print("\n[NET] Node stopped.")
 
 
 def main() -> None:
@@ -130,7 +130,7 @@ def main() -> None:
                 k, v = k.strip(), v.strip().strip('"').strip("'")
                 if k and v:
                     os.environ.setdefault(k, v)
-        print(f"📄 Loaded .env file")
+        print(f"[FILE] Loaded .env file")
 
     # Windows: create desktop shortcut on first run
     if sys.platform == 'win32' and not getattr(sys, 'frozen', False):
@@ -225,12 +225,12 @@ def main() -> None:
             server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
             web_thread = threading.Thread(target=server.serve_forever, daemon=True)
             web_thread.start()
-            log.info(f"🌐 Web UI: http://{bind_addr}:{port}")
+            log.info(f"[WEB] Web UI: http://{bind_addr}:{port}")
 
             vault_pw = os.environ.get('SALMALM_VAULT_PW')
             if vault_pw and VAULT_FILE.exists():
                 if vault.unlock(vault_pw):
-                    log.info("🔓 Vault auto-unlocked from env")
+                    log.info("[UNLOCK] Vault auto-unlocked from env")
 
             _core._tg_bot = telegram_bot
 

@@ -230,7 +230,7 @@ class RAGEngine:
             self._conn.execute("ROLLBACK")
             raise
         self._load_stats()
-        log.info(f"🧠 RAG index rebuilt: {len(new_docs)} chunks from {len(files)} files, "
+        log.info(f"[AI] RAG index rebuilt: {len(new_docs)} chunks from {len(files)} files, "
                  f"{len(doc_freq)} unique terms")
 
     def search(self, query: str, max_results: int = 8,

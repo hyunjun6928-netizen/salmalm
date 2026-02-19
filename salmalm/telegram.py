@@ -98,7 +98,7 @@ class TelegramBot:
     async def poll(self):
         """Long-polling loop for Telegram updates."""
         self._running = True
-        log.info(f"📡 Telegram bot started (owner: {self.owner_id})")
+        log.info(f"[NET] Telegram bot started (owner: {self.owner_id})")
 
         while self._running:
             try:
@@ -193,7 +193,7 @@ class TelegramBot:
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
                 file_info = f'[🎤 Voice saved: uploads/{fname} ({len(data)//1024}KB)]'
-                log.info(f"🎤 Voice saved: {save_path}")
+                log.info(f"[MIC] Voice saved: {save_path}")
                 # Whisper transcription
                 api_key = vault.get('openai_api_key')
                 if api_key:
@@ -216,7 +216,7 @@ class TelegramBot:
                         transcript = result.get('text', '')
                         if transcript:
                             file_info = f'[🎤 Voice transcription]\n{transcript}'
-                            log.info(f"🎤 Transcribed: {transcript[:100]}")
+                            log.info(f"[MIC] Transcribed: {transcript[:100]}")
                     except Exception as we:
                         log.error(f"Whisper error: {we}")
                         file_info += f'\n[Transcription failed: {we}]'

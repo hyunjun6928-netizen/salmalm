@@ -233,7 +233,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         tier = classification['tier']
         use_thinking = classification['thinking']
         thinking_budget = classification['thinking_budget']
-        log.info(f"🧠 Intent: {classification['intent']} (tier={tier}, "
+        log.info(f"[AI] Intent: {classification['intent']} (tier={tier}, "
                  f"think={use_thinking}, budget={thinking_budget}, "
                  f"score={classification['score']})")
 
@@ -288,14 +288,14 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     system_msgs = [m for m in session.messages if m['role'] == 'system'][:1]
                     recent_msgs = session.messages[-10:]
                     session.messages = system_msgs + recent_msgs
-                    log.warning(f"🔪 Force-truncated: {msg_count} → {len(session.messages)} msgs")
+                    log.warning(f"🔪 Force-truncated: {msg_count} -> {len(session.messages)} msgs")
                     # Retry with truncated context
                     result = await _call_llm_async(session.messages, model=model, tools=tools,
                                       thinking=think_this_call)
                     if result.get('error') == 'token_overflow':
                         # Still too long — nuclear option: keep only last 4
                         session.messages = (system_msgs or []) + session.messages[-4:]
-                        log.warning(f"🔪🔪 Nuclear truncation: → {len(session.messages)} msgs")
+                        log.warning(f"🔪🔪 Nuclear truncation: -> {len(session.messages)} msgs")
                         result = await _call_llm_async(session.messages, model=model, tools=tools)
                         if result.get('error'):
                             session.add_assistant("⚠️ Context too large. Use /clear to reset.")
@@ -311,7 +311,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     return "⚠️ Context too large. Use /clear to reset."
 
             if result.get('thinking'):
-                log.info(f"🧠 Thinking: {len(result['thinking'])} chars")
+                log.info(f"[AI] Thinking: {len(result['thinking'])} chars")
 
             if result.get('tool_calls'):
                 tool_outputs = await asyncio.to_thread(

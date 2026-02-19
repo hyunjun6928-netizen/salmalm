@@ -41,7 +41,7 @@ def _is_safe_command(cmd: str) :
         if first_word in EXEC_BLOCKLIST:
             return False, f'Blocked command in pipeline: {first_word}'
         if first_word in EXEC_ELEVATED:
-            log.warning(f"⚠️ Elevated exec: {first_word} (can run arbitrary code)")
+            log.warning(f"[WARN] Elevated exec: {first_word} (can run arbitrary code)")
         elif first_word not in EXEC_ALLOWLIST:
             return False, f'Command not in allowlist: {first_word}'
 
@@ -474,7 +474,7 @@ def execute_tool(name: str, args: dict) -> str:
                 audio = resp.read()
             save_path.write_bytes(audio)
             size_kb = len(audio) / 1024
-            log.info(f"🔊 TTS generated: {fname} ({size_kb:.1f}KB)")
+            log.info(f"[AUDIO] TTS generated: {fname} ({size_kb:.1f}KB)")
             return f'✅ TTS generated: uploads/{fname} ({size_kb:.1f}KB)\nText: {text[:100]}'
 
         elif name == 'stt':
@@ -513,7 +513,7 @@ def execute_tool(name: str, args: dict) -> str:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 result = json.loads(resp.read())
             text = result.get('text', '')
-            log.info(f"🎤 STT transcribed: {len(text)} chars")
+            log.info(f"[MIC] STT transcribed: {len(text)} chars")
             return f'🎤 Transcription:\n{text}'
 
         elif name == 'python_eval':

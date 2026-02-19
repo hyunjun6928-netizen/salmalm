@@ -136,7 +136,7 @@ class SkillLoader:
                 dest = skills_dir / src.name
                 if not dest.exists():
                     shutil.copytree(str(src), str(dest))
-                    log.info(f"📚 Default skill installed: {src.name}")
+                    log.info(f"[LOAD] Default skill installed: {src.name}")
 
     @classmethod
     def scan(cls) -> list:
@@ -179,7 +179,7 @@ class SkillLoader:
                 continue
 
         cls._last_scan = now
-        log.info(f"📚 Skills scanned: {len(cls._cache)} found")
+        log.info(f"[LOAD] Skills scanned: {len(cls._cache)} found")
         return list(cls._cache.values())
 
     @classmethod
@@ -216,7 +216,7 @@ class SkillLoader:
         if best_score >= 2:  # At least 2 keyword matches
             content = cls.load(best_match['dir_name'])
             if content:
-                log.info(f"📚 Skill matched: {best_match['name']} (score={best_score})")
+                log.info(f"[LOAD] Skill matched: {best_match['name']} (score={best_score})")
                 return content
         return None
 
@@ -354,11 +354,11 @@ def execute(name: str, args: dict) -> str:
                         'execute': execute_fn, 'path': str(py_file)
                     }
                     count += len(tools)
-                    log.info(f"🔌 Plugin loaded: {py_file.stem} ({len(tools)} tools)")
+                    log.info(f"[CONN] Plugin loaded: {py_file.stem} ({len(tools)} tools)")
             except Exception as e:
                 log.error(f"Plugin load error ({py_file.name}): {e}")
 
-        log.info(f"🔌 Plugins: {len(cls._plugins)} loaded, {count} tools total")
+        log.info(f"[CONN] Plugins: {len(cls._plugins)} loaded, {count} tools total")
         return count
 
     @classmethod

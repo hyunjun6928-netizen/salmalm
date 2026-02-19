@@ -110,7 +110,7 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
             fb_model_id = FALLBACK_MODELS.get(fb_provider)
             if not fb_model_id:
                 continue
-            log.info(f"🔄 Fallback: {provider} → {fb_provider}/{fb_model_id}")
+            log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id}")
             try:
                 if not tools:
                     fb_tools = None
@@ -214,7 +214,7 @@ def _call_anthropic(api_key: str, model_id: str, messages: List[Dict[str, Any]],
     }
     if thinking_text:
         result['thinking'] = thinking_text
-        log.info(f"🧠 Thinking: {len(thinking_text)} chars")
+        log.info(f"[AI] Thinking: {len(thinking_text)} chars")
     return result
 
 

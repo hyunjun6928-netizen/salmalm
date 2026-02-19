@@ -255,7 +255,7 @@ class NodeManager:
                         token=cfg.get("token", ""),
                     )
             if self._nodes:
-                log.info(f"📡 Loaded {len(self._nodes)} nodes")
+                log.info(f"[NET] Loaded {len(self._nodes)} nodes")
         except Exception as e:
             log.error(f"Node config error: {e}")
 
@@ -284,7 +284,7 @@ class NodeManager:
         node = SSHNode(name, host, user, port, key)
         self._nodes[name] = node
         self.save_config()
-        log.info(f"📡 Added SSH node: {name} ({user}@{host}:{port})")
+        log.info(f"[NET] Added SSH node: {name} ({user}@{host}:{port})")
         return True
 
     def add_http_node(self, name: str, url: str, token: str = "") -> bool:
@@ -292,7 +292,7 @@ class NodeManager:
         node = HTTPNode(name, url, token)
         self._nodes[name] = node
         self.save_config()
-        log.info(f"📡 Added HTTP node: {name} ({url})")
+        log.info(f"[NET] Added HTTP node: {name} ({url})")
         return True
 
     def remove_node(self, name: str) -> bool:
@@ -382,7 +382,7 @@ class GatewayRegistry:
             'tool_calls': 0,
             'errors': 0,
         }
-        log.info(f"📡 Node registered: {node_id} ({url})")
+        log.info(f"[NET] Node registered: {node_id} ({url})")
         return {'ok': True, 'node_id': node_id}
 
     def heartbeat(self, node_id: str) -> dict:
@@ -398,7 +398,7 @@ class GatewayRegistry:
         """Remove a node."""
         if node_id in self._nodes:
             del self._nodes[node_id]
-            log.info(f"📡 Node unregistered: {node_id}")
+            log.info(f"[NET] Node unregistered: {node_id}")
             return {'ok': True}
         return {'error': 'Node not found'}
 
@@ -503,10 +503,10 @@ class NodeAgent:
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 result = json.loads(resp.read())
-                log.info(f"📡 Registered with gateway: {self.gateway_url}")
+                log.info(f"[NET] Registered with gateway: {self.gateway_url}")
                 return result
         except Exception as e:
-            log.error(f"📡 Gateway registration failed: {e}")
+            log.error(f"[NET] Gateway registration failed: {e}")
             return {'error': str(e)}
 
     def _get_local_ip(self) -> str:

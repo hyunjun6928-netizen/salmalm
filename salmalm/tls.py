@@ -43,7 +43,7 @@ def ensure_cert(cn: str = "localhost", days: int = 365) -> bool:
             "-addext", f"subjectAltName=DNS:{cn},DNS:localhost,IP:127.0.0.1",
         ], capture_output=True, check=True, timeout=30)
         os.chmod(str(KEY_FILE), 0o600)
-        log.info(f"🔒 Self-signed certificate generated: {CERT_FILE}")
+        log.info(f"[LOCK] Self-signed certificate generated: {CERT_FILE}")
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         pass
@@ -57,7 +57,7 @@ import ssl, tempfile, subprocess, os
 # Generate using openssl via python
 subprocess.run(["openssl", "version"], capture_output=True, check=True)
 '''
-        log.warning("🔒 OpenSSL not available. TLS disabled.")
+        log.warning("[LOCK] OpenSSL not available. TLS disabled.")
         log.warning("   Install OpenSSL or use a reverse proxy for HTTPS.")
         return False
     except Exception:
@@ -75,7 +75,7 @@ def create_ssl_context() -> Optional[ssl.SSLContext]:
         # Security settings
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         ctx.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS')
-        log.info("🔒 TLS context created (TLS 1.2+)")
+        log.info("[LOCK] TLS context created (TLS 1.2+)")
         return ctx
     except Exception as e:
         log.error(f"TLS context error: {e}")
@@ -94,9 +94,9 @@ def create_https_server(address: tuple, handler_class,
         server.socket = ssl_context.wrap_socket(
             server.socket, server_side=True
         )
-        log.info(f"🔒 HTTPS server on {address[0]}:{address[1]}")
+        log.info(f"[LOCK] HTTPS server on {address[0]}:{address[1]}")
     else:
-        log.info(f"🌐 HTTP server on {address[0]}:{address[1]} (no TLS)")
+        log.info(f"[WEB] HTTP server on {address[0]}:{address[1]} (no TLS)")
 
     return server
 

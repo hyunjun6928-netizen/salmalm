@@ -58,7 +58,7 @@ class CircuitBreaker:
                 elapsed = time.time() - self._tripped[component]
                 if elapsed > self.cooldown_sec:
                     del self._tripped[component]
-                    log.info(f"🔄 Circuit breaker reset: {component}")
+                    log.info(f"[SYNC] Circuit breaker reset: {component}")
 
     def is_tripped(self, component: str) -> bool:
         """Check if circuit breaker is open (too many errors)."""
@@ -302,7 +302,7 @@ class HealthMonitor:
             hour_key = f"{comp}_{int(time.time() // 3600)}"
             attempts = self._recovery_attempts.get(hour_key, 0)
             if attempts >= self._max_recovery:
-                log.warning(f"🔧 Recovery budget exhausted: {comp} ({attempts} attempts this hour)")
+                log.warning(f"[FIX] Recovery budget exhausted: {comp} ({attempts} attempts this hour)")
                 continue
 
             self._recovery_attempts[hour_key] = attempts + 1
@@ -313,13 +313,13 @@ class HealthMonitor:
                     if not ws_server._running:
                         await ws_server.start()
                         recovered.append(comp)
-                        log.info(f"🔧 Auto-recovered: {comp}")
+                        log.info(f"[FIX] Auto-recovered: {comp}")
 
                 elif comp == "rag" and status.get("status") == "empty":
                     from .rag import rag_engine
                     rag_engine.reindex(force=True)
                     recovered.append(comp)
-                    log.info(f"🔧 Auto-recovered: {comp}")
+                    log.info(f"[FIX] Auto-recovered: {comp}")
 
                 elif comp == "cron":
                     from .core import cron
@@ -327,10 +327,10 @@ class HealthMonitor:
                         import asyncio
                         asyncio.create_task(cron.run())
                         recovered.append(comp)
-                        log.info(f"🔧 Auto-recovered: {comp}")
+                        log.info(f"[FIX] Auto-recovered: {comp}")
 
             except Exception as e:
-                log.error(f"🔧 Recovery failed ({comp}): {e}")
+                log.error(f"[FIX] Recovery failed ({comp}): {e}")
                 self.circuit_breaker.record_error(f"recovery_{comp}", str(e))
 
         return recovered
@@ -395,23 +395,23 @@ async def watchdog_tick(monitor: HealthMonitor):
         degraded = [name for name, s in health["components"].items()
                     if s.get("status") not in ("ok", "not_configured", "locked")]
         if degraded:
-            log.warning(f"⚠️ Degraded components: {', '.join(degraded)}")
+            log.warning(f"[WARN] Degraded components: {', '.join(degraded)}")
 
     # Memory check — warn if > 500MB
     mem_mb = health.get("system", {}).get("memory_mb", 0)
     if mem_mb > 500:
-        log.warning(f"⚠️ High memory usage: {mem_mb}MB")
+        log.warning(f"[WARN] High memory usage: {mem_mb}MB")
 
     # Disk check — warn if < 500MB free
     disk_free = health.get("system", {}).get("disk_free_mb", 9999)
     if disk_free < 500:
-        log.warning(f"⚠️ Low disk space: {disk_free}MB free")
+        log.warning(f"[WARN] Low disk space: {disk_free}MB free")
 
     # Auto-recover if needed
     if health["status"] in ("degraded", "critical"):
         recovered = await monitor.auto_recover()
         if recovered:
-            log.info(f"🔧 Auto-recovered: {', '.join(recovered)}")
+            log.info(f"[FIX] Auto-recovered: {', '.join(recovered)}")
 
 
 # Module-level instance

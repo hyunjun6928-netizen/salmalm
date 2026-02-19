@@ -271,7 +271,7 @@ class BrowserController:
             # Capture console
             self._cdp.on_event("Runtime.consoleAPICalled", self._on_console)
 
-            log.info(f"🌐 Browser connected: {target.get('title', '?')}")
+            log.info(f"[WEB] Browser connected: {target.get('title', '?')}")
             return True
 
         except Exception as e:

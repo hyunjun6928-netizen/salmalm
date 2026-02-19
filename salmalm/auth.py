@@ -218,12 +218,12 @@ class AuthManager:
             # SECURITY: Never log passwords to file — console only via stderr
             import sys
             print(f"\n{'='*50}", file=sys.stderr)
-            print(f"👤 Default admin created", file=sys.stderr)
+            print(f"[USER] Default admin created", file=sys.stderr)
             print(f"   Username: admin", file=sys.stderr)
             print(f"   Password: {default_pw}", file=sys.stderr)
-            print(f"⚠️  Save this password! It won't be shown again.", file=sys.stderr)
+            print(f"[WARN]  Save this password! It won't be shown again.", file=sys.stderr)
             print(f"{'='*50}\n", file=sys.stderr)
-            log.info("👤 Default admin user created (password shown in console only)")
+            log.info("[USER] Default admin user created (password shown in console only)")
         conn.close()
         self._initialized = True
 
@@ -273,7 +273,7 @@ class AuthManager:
             attempts = self._login_attempts.get(username, [])
             recent = [t for t in attempts if time.time() - t < self._lockout_duration]
             if len(recent) >= self._max_attempts:
-                log.warning(f"🔒 Account locked: {username} ({len(recent)} failed attempts)")
+                log.warning(f"[LOCK] Account locked: {username} ({len(recent)} failed attempts)")
                 return None
 
         conn = sqlite3.connect(str(AUTH_DB))

@@ -114,7 +114,7 @@ def _restore_usage():
             _usage['by_model'][short] = {'input': inp or 0, 'output': out or 0,
                                           'cost': cost or 0, 'calls': calls or 0}
         if _usage['total_cost'] > 0:
-            log.info(f"📊 Usage restored: ${_usage['total_cost']:.4f} total")
+            log.info(f"[STAT] Usage restored: ${_usage['total_cost']:.4f} total")
     except Exception as e:
         log.warning(f"Usage restore failed: {e}")
 
@@ -167,7 +167,7 @@ class ModelRouter:
                 saved = self._MODEL_PREF_FILE.read_text().strip()
                 if saved and saved != 'auto':
                     self.force_model = saved
-                    log.info(f"🔧 Restored model preference: {saved}")
+                    log.info(f"[FIX] Restored model preference: {saved}")
         except Exception as e:
             log.debug(f"Suppressed: {e}")
 
@@ -296,7 +296,7 @@ def compact_messages(messages: list, model: str = None) -> list:
 
     total_after_trim = sum(len(_msg_content_str(m)) for m in trimmed)
     if total_after_trim < COMPACTION_THRESHOLD:
-        log.info(f"📦 Stage 1 sufficient: {total_chars} → {total_after_trim} chars")
+        log.info(f"📦 Stage 1 sufficient: {total_chars} -> {total_after_trim} chars")
         return trimmed
 
     # Stage 2: Drop old tool messages entirely, keep last 10 messages
@@ -311,7 +311,7 @@ def compact_messages(messages: list, model: str = None) -> list:
     stage2 = system_msgs + old_important + recent
     total_after_drop = sum(len(_msg_content_str(m)) for m in stage2)
     if total_after_drop < COMPACTION_THRESHOLD:
-        log.info(f"📦 Stage 2 sufficient: {total_chars} → {total_after_drop} chars")
+        log.info(f"📦 Stage 2 sufficient: {total_chars} -> {total_after_drop} chars")
         return stage2
 
     # Stage 3: Summarize old messages
@@ -338,7 +338,7 @@ def compact_messages(messages: list, model: str = None) -> list:
         {'role': 'system', 'content': f'[Previous conversation summary]\n{summary_result["content"]}'}
     ] + recent
 
-    log.info(f"📦 Stage 3 compacted: {len(messages)} → {len(compacted)} messages, "
+    log.info(f"📦 Stage 3 compacted: {len(messages)} -> {len(compacted)} messages, "
              f"{total_chars} → {sum(len(_msg_content_str(m)) for m in compacted)} chars")
     return compacted
 
@@ -483,7 +483,7 @@ class LLMCronManager:
         try:
             if self._JOBS_FILE.exists():
                 self.jobs = json.loads(self._JOBS_FILE.read_text())
-                log.info(f"⏰ Loaded {len(self.jobs)} LLM cron jobs")
+                log.info(f"[CRON] Loaded {len(self.jobs)} LLM cron jobs")
         except Exception as e:
             log.error(f"Failed to load cron jobs: {e}")
             self.jobs = []
@@ -517,7 +517,7 @@ class LLMCronManager:
         }
         self.jobs.append(job)
         self.save_jobs()
-        log.info(f"⏰ LLM cron job added: {name} ({job['id']})")
+        log.info(f"[CRON] LLM cron job added: {name} ({job['id']})")
         return job
 
     def remove_job(self, job_id: str) -> bool:
@@ -591,7 +591,7 @@ class LLMCronManager:
         for job in self.jobs:
             if not self._should_run(job):
                 continue
-            log.info(f"⏰ LLM cron firing: {job['name']} ({job['id']})")
+            log.info(f"[CRON] LLM cron firing: {job['name']} ({job['id']})")
             try:
                 from .engine import process_message
                 response = await process_message(
@@ -600,7 +600,7 @@ class LLMCronManager:
                 job['last_run'] = datetime.now(KST).isoformat()
                 job['run_count'] = job.get('run_count', 0) + 1
                 self.save_jobs()
-                log.info(f"⏰ Cron completed: {job['name']} ({len(response)} chars)")
+                log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
 
                 # Notify via Telegram
                 if job.get('notify') and _tg_bot and _tg_bot.token and _tg_bot.owner_id:
@@ -695,7 +695,7 @@ def _cleanup_sessions():
             pass
         del _sessions[sid]
     if stale:
-        log.info(f"🧹 Session cleanup: removed {len(stale)} inactive sessions")
+        log.info(f"[CLEAN] Session cleanup: removed {len(stale)} inactive sessions")
     # Hard cap
     if len(_sessions) > _SESSION_MAX:
         by_age = sorted(_sessions.items(), key=lambda x: x[1].last_active)
@@ -714,7 +714,7 @@ def get_session(session_id: str) -> Session:
             if row:
                 restored = json.loads(row[0])
                 _sessions[session_id].messages = restored
-                log.info(f"📋 Session restored: {session_id} ({len(restored)} msgs)")
+                log.info(f"[NOTE] Session restored: {session_id} ({len(restored)} msgs)")
                 # Refresh system prompt
                 from .prompt import build_system_prompt
                 _sessions[session_id].add_system(build_system_prompt(full=False))
@@ -723,7 +723,7 @@ def get_session(session_id: str) -> Session:
             log.warning(f"Session restore error: {e}")
         from .prompt import build_system_prompt
         _sessions[session_id].add_system(build_system_prompt(full=True))
-        log.info(f"📋 New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
+        log.info(f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
     return _sessions[session_id]
 
 
@@ -744,7 +744,7 @@ class CronScheduler:
 
     async def run(self):
         self._running = True
-        log.info(f"⏰ Cron scheduler started ({len(self.jobs)} jobs)")
+        log.info(f"[CRON] Cron scheduler started ({len(self.jobs)} jobs)")
         while self._running:
             now = time.time()
             for job in self.jobs:
@@ -752,7 +752,7 @@ class CronScheduler:
                     continue
                 if now - job['last_run'] >= job['interval']:
                     try:
-                        log.info(f"⏰ Running cron: {job['name']}")
+                        log.info(f"[CRON] Running cron: {job['name']}")
                         if asyncio.iscoroutinefunction(job['callback']):
                             await job['callback'](**job['kwargs'])
                         else:

@@ -246,7 +246,7 @@ class MCPServer:
 
     async def run_stdio(self):
         """Run MCP server on stdin/stdout (for subprocess transport)."""
-        log.info("🔌 MCP Server starting (stdio transport)")
+        log.info("[CONN] MCP Server starting (stdio transport)")
         loop = asyncio.get_event_loop()
 
         reader = asyncio.StreamReader()
@@ -278,7 +278,7 @@ class MCPServer:
                     await writer.drain()
         except (EOFError, ConnectionError, BrokenPipeError):
             pass
-        log.info("🔌 MCP Server stopped (stdio)")
+        log.info("[CONN] MCP Server stopped (stdio)")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -346,7 +346,7 @@ class MCPClientConnection:
                 self._resources = res_resp["result"].get("resources", [])
 
             self._connected = True
-            log.info(f"🔌 MCP client connected: {self.name} "
+            log.info(f"[CONN] MCP client connected: {self.name} "
                      f"({len(self._tools)} tools, {len(self._resources)} resources)")
             return True
 
@@ -542,7 +542,7 @@ class MCPManager:
             json.dumps(config, indent=2, ensure_ascii=False),
             encoding='utf-8'
         )
-        log.info(f"🔌 MCP config saved ({len(config)} servers)")
+        log.info(f"[CONN] MCP config saved ({len(config)} servers)")
 
     def load_config(self):
         """Load and auto-connect configured MCP servers."""
