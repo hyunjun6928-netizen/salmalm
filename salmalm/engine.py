@@ -424,7 +424,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         if not think_msg:
             return 'Usage: /think <question>'
         session.add_user(think_msg)
-        session.messages = compact_messages(session.messages)
+        session.messages = await asyncio.to_thread(compact_messages, session.messages)
         classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
                           'thinking_budget': 16000, 'max_tools': 30, 'score': 5}
         return await _engine.run(session, think_msg,
@@ -435,7 +435,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         if not plan_msg:
             return 'Usage: /plan <task description>'
         session.add_user(plan_msg)
-        session.messages = compact_messages(session.messages)
+        session.messages = await asyncio.to_thread(compact_messages, session.messages)
         classification = {'intent': 'code', 'tier': 3, 'thinking': True,
                           'thinking_budget': 10000, 'max_tools': 30, 'score': 5}
         return await _engine.run(session, plan_msg, model_override=model_override,
@@ -467,7 +467,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         session.add_user(user_message)
 
     # Context management
-    session.messages = compact_messages(session.messages)
+    session.messages = await asyncio.to_thread(compact_messages, session.messages)
     if len(session.messages) % 20 == 0:
         session.add_system(build_system_prompt(full=False))
 

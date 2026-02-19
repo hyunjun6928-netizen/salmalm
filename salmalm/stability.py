@@ -360,6 +360,8 @@ class HealthMonitor:
             ("agents", "salmalm.agents"),
             ("templates", "salmalm.templates"),
             ("tool_handlers", "salmalm.tool_handlers"),
+            ("container", "salmalm.container"),
+            ("discord_bot", "salmalm.discord_bot"),
         ]
 
         passed = 0
