@@ -122,6 +122,10 @@ response_cache = ResponseCache()
 _usage = {'total_input': 0, 'total_output': 0, 'total_cost': 0.0,
           'by_model': {}, 'session_start': time.time()}
 
+# Production observability metrics
+_metrics = {"llm_calls": 0, "llm_errors": 0, "tool_calls": 0, "tool_errors": 0,
+            "total_cost": 0.0, "total_tokens_in": 0, "total_tokens_out": 0}
+
 # Hard cost cap — stop all LLM calls after this threshold (per session lifetime)
 # Override with SALMALM_COST_CAP env var (in USD)
 COST_CAP = float(os.environ.get('SALMALM_COST_CAP', '50.0'))
@@ -769,6 +773,11 @@ class Session:
         self.messages.append({'role': 'assistant', 'content': content})
         self.last_active = time.time()
         self._persist()
+        # Auto-save to disk after final response (debounced — not on tool calls)
+        try:
+            save_session_to_disk(self.id)
+        except Exception:
+            pass
 
     def add_tool_results(self, results: list):
         """Add tool results as a single user message with all results.
@@ -849,6 +858,72 @@ def get_session(session_id: str) -> Session:
             log.info(f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
         return _sessions[session_id]
 
+
+
+_SESSIONS_DIR = Path.home() / '.salmalm' / 'sessions'
+
+
+def save_session_to_disk(session_id: str):
+    """Serialize session state to ~/.salmalm/sessions/{id}.json."""
+    with _session_lock:
+        session = _sessions.get(session_id)
+        if not session:
+            return
+    try:
+        _SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+        saveable_msgs = []
+        for m in session.messages[-50:]:
+            if isinstance(m.get('content'), list):
+                texts = [b for b in m['content'] if isinstance(b, dict) and b.get('type') == 'text']
+                if texts:
+                    saveable_msgs.append({**m, 'content': texts})
+            elif isinstance(m.get('content'), str):
+                saveable_msgs.append(m)
+        data = {
+            'session_id': session.id,
+            'messages': saveable_msgs,
+            'created': session.created,
+            'last_active': session.last_active,
+            'metadata': session.metadata,
+        }
+        path = _SESSIONS_DIR / f'{session_id}.json'
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+    except Exception as e:
+        log.warning(f"[DISK] Failed to save session {session_id}: {e}")
+
+
+def restore_session(session_id: str) -> Optional[Session]:
+    """Load session from ~/.salmalm/sessions/{id}.json."""
+    path = _SESSIONS_DIR / f'{session_id}.json'
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+        session = Session(session_id)
+        session.messages = data.get('messages', [])
+        session.created = data.get('created', time.time())
+        session.last_active = data.get('last_active', time.time())
+        session.metadata = data.get('metadata', {})
+        with _session_lock:
+            _sessions[session_id] = session
+        log.info(f"[DISK] Restored session from disk: {session_id} ({len(session.messages)} msgs)")
+        return session
+    except Exception as e:
+        log.warning(f"[DISK] Failed to restore session {session_id}: {e}")
+        return None
+
+
+def restore_all_sessions_from_disk():
+    """On startup, restore all sessions from disk."""
+    if not _SESSIONS_DIR.exists():
+        return
+    count = 0
+    for path in _SESSIONS_DIR.glob('*.json'):
+        sid = path.stem
+        if restore_session(sid):
+            count += 1
+    if count:
+        log.info(f"[DISK] Restored {count} sessions from disk")
 
 
 class CronScheduler:
@@ -1092,7 +1167,8 @@ from .agents import SubAgent, SkillLoader, PluginLoader
 # Module-level exports for convenience
 __all__ = [
     'audit_log', 'response_cache', 'router', 'track_usage', 'get_usage_report', 'check_cost_cap', 'CostCapExceeded',
-    'compact_messages', 'get_session', 'write_daily_log', 'cron',
+    '_metrics', 'compact_messages', 'get_session', 'write_daily_log', 'cron',
+    'save_session_to_disk', 'restore_session', 'restore_all_sessions_from_disk',
     'memory_manager', 'heartbeat',
     'get_telegram_bot', 'set_telegram_bot',
     'Session', 'MemoryManager', 'HeartbeatManager', 'LLMCronManager',

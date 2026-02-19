@@ -10,8 +10,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from .constants import (VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG,
                         INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN,
                         MODEL_ALIASES as _CONST_ALIASES, COMMAND_MODEL)
+import re as _re
 from .crypto import log
-from .core import router, compact_messages, get_session, _sessions
+from .core import router, compact_messages, get_session, _sessions, _metrics
 from .prompt import build_system_prompt
 from .tool_handlers import execute_tool
 from .llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic
@@ -206,10 +207,17 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         if len(tool_calls) == 1:
             tc = tool_calls[0]
-            return {tc['id']: self._truncate_tool_result(execute_tool(tc['name'], tc['arguments']))}
+            _metrics['tool_calls'] += 1
+            try:
+                result = self._truncate_tool_result(execute_tool(tc['name'], tc['arguments']))
+            except Exception as e:
+                _metrics['tool_errors'] += 1
+                result = f'❌ Tool execution error: {e}'
+            return {tc['id']: result}
 
         futures = {}
         for tc in tool_calls:
+            _metrics['tool_calls'] += 1
             f = self._tool_executor.submit(execute_tool, tc['name'], tc['arguments'])
             futures[tc['id']] = f
         outputs = {}
@@ -217,6 +225,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             try:
                 outputs[tc_id] = self._truncate_tool_result(f.result(timeout=60))
             except Exception as e:
+                _metrics['tool_errors'] += 1
                 outputs[tc_id] = f'❌ Tool execution error: {e}'
         log.info(f"[FAST] Parallel: {len(tool_calls)} tools completed")
         return outputs
@@ -456,12 +465,28 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 _engine = IntelligenceEngine()
 
 
+_MAX_MESSAGE_LENGTH = 100_000
+_SESSION_ID_RE = _re.compile(r'^[a-zA-Z0-9\-]+$')
+
+
+def _sanitize_input(text: str) -> str:
+    """Strip null bytes and control characters (keep newlines/tabs)."""
+    return ''.join(c for c in text if c == '\n' or c == '\t' or c == '\r' or (ord(c) >= 32) or ord(c) > 127)
+
+
 async def process_message(session_id: str, user_message: str,
                           model_override: Optional[str] = None,
                           image_data: Optional[Tuple[str, str]] = None,
                           on_tool: Optional[Callable[[str, Any], None]] = None,
                           on_token: Optional[Callable] = None) -> str:
     """Process a user message through the Intelligence Engine pipeline."""
+    # Input sanitization
+    if not _SESSION_ID_RE.match(session_id):
+        return '❌ Invalid session ID format (alphanumeric and hyphens only).'
+    if len(user_message) > _MAX_MESSAGE_LENGTH:
+        return f'❌ Message too long ({len(user_message)} chars). Maximum is {_MAX_MESSAGE_LENGTH}.'
+    user_message = _sanitize_input(user_message)
+
     session = get_session(session_id)
 
     # --- Slash commands (fast path, no LLM) ---

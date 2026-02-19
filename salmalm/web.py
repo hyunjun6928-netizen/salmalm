@@ -353,7 +353,40 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             })
         elif self.path == '/api/health':
             from .stability import health_monitor
-            self._json(health_monitor.check_health())
+            base_health = health_monitor.check_health()
+            # Deep check: verify LLM connectivity
+            llm_ok = False
+            llm_error = None
+            try:
+                from .llm import _http_post
+                from .core import router
+                model = router.force_model or router._pick_available(1)
+                provider = model.split('/')[0] if '/' in model else 'anthropic'
+                from .crypto import vault as _vault
+                if provider == 'anthropic' and _vault.get('anthropic_api_key'):
+                    _http_post('https://api.anthropic.com/v1/messages',
+                        {'x-api-key': _vault.get('anthropic_api_key'),
+                         'content-type': 'application/json', 'anthropic-version': '2023-06-01'},
+                        {'model': 'claude-3-5-haiku-20241022', 'max_tokens': 5,
+                         'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=10)
+                    llm_ok = True
+                elif provider == 'google' and _vault.get('google_api_key'):
+                    import urllib.request
+                    gk = _vault.get('google_api_key')
+                    req = urllib.request.Request(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gk}",
+                        data=json.dumps({'contents': [{'parts': [{'text': 'ping'}]}]}).encode(),
+                        headers={'Content-Type': 'application/json'})
+                    urllib.request.urlopen(req, timeout=10)
+                    llm_ok = True
+                else:
+                    llm_error = f'No key for {provider}'
+            except Exception as e:
+                llm_error = str(e)[:200]
+            base_health['llm_connected'] = llm_ok
+            if llm_error:
+                base_health['llm_error'] = llm_error
+            self._json(base_health)
         elif self.path == '/api/nodes':
             from .nodes import node_manager
             self._json({'nodes': node_manager.list_nodes()})
@@ -379,7 +412,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
         elif self.path == '/api/metrics':
-            self._json(request_logger.get_metrics())
+            from .core import _metrics, get_usage_report
+            usage = get_usage_report()
+            _metrics['total_cost'] = usage.get('total_cost', 0.0)
+            merged = {**request_logger.get_metrics(), **_metrics}
+            self._json(merged)
         elif self.path == '/api/cert':
             from .tls import get_cert_info
             self._json(get_cert_info())

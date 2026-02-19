@@ -14,7 +14,10 @@ import urllib.request
 
 from .constants import DEFAULT_MAX_TOKENS, FALLBACK_MODELS
 from .crypto import vault, log
-from .core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded
+from .core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded, _metrics
+
+import os as _os
+_LLM_TIMEOUT = int(_os.environ.get('SALMALM_LLM_TIMEOUT', '30'))
 
 _UA: str = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
@@ -90,18 +93,26 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
 
     log.info(f"[BOT] LLM call: {model} ({len(messages)} msgs, tools={len(tools or [])})")
 
+    _metrics['llm_calls'] += 1
+    _t0 = time.time()
     try:
         result = _call_provider(provider, api_key, model_id, messages, tools, max_tokens,
                                 thinking=thinking)
         result['model'] = model
         usage = result.get('usage', {})
-        track_usage(model, usage.get('input', 0), usage.get('output', 0))
+        inp_tok = usage.get('input', 0)
+        out_tok = usage.get('output', 0)
+        track_usage(model, inp_tok, out_tok)
+        _metrics['total_tokens_in'] += inp_tok
+        _metrics['total_tokens_out'] += out_tok
         if not result.get('tool_calls') and result.get('content'):
             response_cache.put(model, messages, result['content'])
         return result
     except Exception as e:
+        _metrics['llm_errors'] += 1
+        _elapsed = time.time() - _t0
         err_str = str(e)
-        log.error(f"LLM error ({model}): {err_str}")
+        log.error(f"LLM error ({model}): {err_str} [latency={_elapsed:.2f}s, cost_so_far=${_metrics['total_cost']:.4f}]")
 
         # ── Token overflow detection — don't fallback, truncate instead ──
         if 'prompt is too long' in err_str or 'maximum context' in err_str.lower():
@@ -120,7 +131,7 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
             fb_model_id = FALLBACK_MODELS.get(fb_provider)
             if not fb_model_id:
                 continue
-            log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id}")
+            log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id} [after {time.time()-_t0:.2f}s]")
             try:
                 if not tools:
                     fb_tools = None
@@ -133,10 +144,14 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
                 else:
                     fb_tools = None
                 result = _call_provider(fb_provider, fb_key, fb_model_id, messages,
-                                        fb_tools, max_tokens)
+                                        fb_tools, max_tokens, timeout=_LLM_TIMEOUT)
                 result['model'] = f'{fb_provider}/{fb_model_id}'
                 usage = result.get('usage', {})
-                track_usage(result['model'], usage.get('input', 0), usage.get('output', 0))
+                inp_tok = usage.get('input', 0)
+                out_tok = usage.get('output', 0)
+                track_usage(result['model'], inp_tok, out_tok)
+                _metrics['total_tokens_in'] += inp_tok
+                _metrics['total_tokens_out'] += out_tok
                 return result
             except Exception as e2:
                 log.error(f"Fallback {fb_provider} also failed: {e2}")
@@ -148,10 +163,13 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
 def _call_provider(provider: str, api_key: str, model_id: str,
                     messages: List[Dict[str, Any]],
                     tools: Optional[List[dict]], max_tokens: int,
-                    thinking: bool = False) -> Dict[str, Any]:
+                    thinking: bool = False,
+                    timeout: int = 0) -> Dict[str, Any]:
+    if not timeout:
+        timeout = _LLM_TIMEOUT
     if provider == 'anthropic':
         return _call_anthropic(api_key, model_id, messages, tools, max_tokens,
-                                thinking=thinking)
+                                thinking=thinking, timeout=timeout)
     elif provider in ('openai', 'xai'):
         base_url = 'https://api.x.ai/v1' if provider == 'xai' else 'https://api.openai.com/v1'
         return _call_openai(api_key, model_id, messages, tools, max_tokens, base_url)
@@ -175,7 +193,7 @@ def _call_provider(provider: str, api_key: str, model_id: str,
 
 def _call_anthropic(api_key: str, model_id: str, messages: List[Dict[str, Any]],
                      tools: Optional[List[dict]], max_tokens: int,
-                     thinking: bool = False) -> Dict[str, Any]:
+                     thinking: bool = False, timeout: int = 0) -> Dict[str, Any]:
     system_msgs = [m['content'] for m in messages if m['role'] == 'system']
     chat_msgs = [m for m in messages if m['role'] != 'system']
 
@@ -201,7 +219,7 @@ def _call_anthropic(api_key: str, model_id: str, messages: List[Dict[str, Any]],
         'https://api.anthropic.com/v1/messages',
         {'x-api-key': api_key, 'content-type': 'application/json',
          'anthropic-version': '2023-06-01'},
-        body
+        body, timeout=timeout or _LLM_TIMEOUT
     )
     content = ''
     thinking_text = ''
