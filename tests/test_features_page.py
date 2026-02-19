@@ -8,9 +8,9 @@ def _make_handler():
     import sys, types
     # Import the web module
     sys.path.insert(0, '/tmp/salmalm')
-    from salmalm.web import SalmAlmHandler
+    from salmalm.web import WebHandler
 
-    class FakeHandler(SalmAlmHandler):
+    class FakeHandler(WebHandler):
         def __init__(self):
             self._response_data = None
             self._status = 200
