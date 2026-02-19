@@ -128,7 +128,7 @@ _metrics = {"llm_calls": 0, "llm_errors": 0, "tool_calls": 0, "tool_errors": 0,
 
 # Hard cost cap — stop all LLM calls after this threshold (per session lifetime)
 # Override with SALMALM_COST_CAP env var (in USD)
-COST_CAP = float(os.environ.get('SALMALM_COST_CAP', '50.0'))
+COST_CAP = float(os.environ.get('SALMALM_COST_CAP', '0'))
 
 
 class CostCapExceeded(Exception):
