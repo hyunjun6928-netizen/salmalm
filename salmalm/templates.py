@@ -557,7 +557,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
             if(etype==='status'){
               if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb)tb.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> '+edata.text}
             }else if(etype==='tool'){
-              if(typingEl){var tb2=typingEl.querySelector('.bubble');if(tb2)tb2.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> 🔧 '+edata.name+'...'}
+              if(typingEl){var tb2=typingEl.querySelector('.bubble');if(tb2)tb2.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> 🔧 '+edata.name+(edata.count?' ('+edata.count+')':'')+'...'}
+            }else if(etype==='chunk'){
+              if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4.innerHTML=''}tb4.innerHTML+=edata.text.replace(/</g,'&lt;')}}
             }else if(etype==='done'){
               gotDone=true;
               if(typingEl)typingEl.remove();

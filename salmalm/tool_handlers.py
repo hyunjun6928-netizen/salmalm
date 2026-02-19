@@ -399,6 +399,59 @@ def execute_tool(name: str, args: dict) -> str:
             log.info(f"🎨 Image generated: {fname} ({size_kb:.1f}KB)")
             return f'✅ Image generated: uploads/{fname} ({size_kb:.1f}KB)\nPrompt: {prompt}'
 
+        elif name == 'image_analyze':
+            image_path = args['image_path']
+            question = args.get('question', 'Describe this image in detail.')
+            import base64 as b64mod
+            # Load image
+            if image_path.startswith('http://') or image_path.startswith('https://'):
+                image_url = image_path
+                content_parts = [
+                    {'type': 'image_url', 'image_url': {'url': image_url}},
+                    {'type': 'text', 'text': question}
+                ]
+            else:
+                img_path = Path(image_path)
+                if not img_path.is_absolute():
+                    img_path = WORKSPACE_DIR / img_path
+                if not img_path.exists():
+                    return f'❌ Image not found: {image_path}'
+                ext = img_path.suffix.lower()
+                mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp'}
+                mime = mime_map.get(ext, 'image/png')
+                img_b64 = b64mod.b64encode(img_path.read_bytes()).decode()
+                content_parts = [
+                    {'type': 'image_url', 'image_url': {'url': f'data:{mime};base64,{img_b64}'}},
+                    {'type': 'text', 'text': question}
+                ]
+            # Try OpenAI first, then Anthropic
+            api_key = vault.get('openai_api_key')
+            if api_key:
+                resp = _http_post(
+                    'https://api.openai.com/v1/chat/completions',
+                    {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+                    {'model': 'gpt-4o', 'messages': [{'role': 'user', 'content': content_parts}], 'max_tokens': 1000}
+                )
+                return resp['choices'][0]['message']['content']
+            api_key = vault.get('anthropic_api_key')
+            if api_key:
+                # Convert to Anthropic format
+                img_source = content_parts[0]['image_url']['url']
+                if img_source.startswith('data:'):
+                    media_type = img_source.split(';')[0].split(':')[1]
+                    data = img_source.split(',')[1]
+                    img_block = {'type': 'image', 'source': {'type': 'base64', 'media_type': media_type, 'data': data}}
+                else:
+                    img_block = {'type': 'image', 'source': {'type': 'url', 'url': img_source}}
+                resp = _http_post(
+                    'https://api.anthropic.com/v1/messages',
+                    {'x-api-key': api_key, 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01'},
+                    {'model': 'claude-sonnet-4-20250514', 'max_tokens': 1000,
+                     'messages': [{'role': 'user', 'content': [img_block, {'type': 'text', 'text': question}]}]}
+                )
+                return resp['content'][0]['text']
+            return '❌ No vision API key found (need OpenAI or Anthropic)'
+
         elif name == 'tts':
             text = args['text']
             voice = args.get('voice', 'nova')

@@ -1,4 +1,4 @@
-"""SalmAlm tool definitions — schema for all 30 tools."""
+"""SalmAlm tool definitions — schema for all 31 tools."""
 
 TOOL_DEFINITIONS = [
     {
@@ -126,6 +126,18 @@ TOOL_DEFINITIONS = [
                 'size': {'type': 'string', 'description': 'Image size', 'default': '1024x1024'}
             },
             'required': ['prompt']
+        }
+    },
+    {
+        'name': 'image_analyze',
+        'description': 'Analyze an image using vision AI (GPT-4o/Claude). Describe, OCR, or answer questions about images.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'image_path': {'type': 'string', 'description': 'Path to local image file or URL'},
+                'question': {'type': 'string', 'description': 'What to analyze (e.g., "describe this image", "read the text", "what color is the car")', 'default': 'Describe this image in detail.'}
+            },
+            'required': ['image_path']
         }
     },
     {

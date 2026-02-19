@@ -593,17 +593,28 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         pass
 
                 send_sse('status', {'text': '🤔 Thinking...'})
+                tool_count = [0]
+                def on_tool_sse(name, args):
+                    tool_count[0] += 1
+                    send_sse('tool', {'name': name, 'args': str(args)[:200], 'count': tool_count[0]})
+                    send_sse('status', {'text': f'🔧 Tool {tool_count[0]}: {name}...'})
                 try:
                     loop = asyncio.new_event_loop()
                     response = loop.run_until_complete(
                         process_message(session_id, message,
                                         image_data=(image_b64, image_mime) if image_b64 else None,
-                                        on_tool=lambda name, args: send_sse('tool', {'name': name, 'args': str(args)[:200]}))
+                                        on_tool=on_tool_sse)
                     )
                     loop.close()
                 except Exception as e:
                     log.error(f"SSE process_message error: {e}")
                     response = f'❌ Internal error: {type(e).__name__}'
+                # Send response in chunks for smoother rendering
+                chunk_size = 80
+                if len(response) > chunk_size * 2:
+                    for i in range(0, len(response), chunk_size):
+                        chunk = response[i:i+chunk_size]
+                        send_sse('chunk', {'text': chunk, 'index': i // chunk_size})
                 send_sse('done', {'response': response, 'model': router.force_model or 'auto'})
                 try:
                     self.wfile.write(b"event: close\ndata: {}\n\n")
