@@ -120,8 +120,11 @@ class TestPomodoro(unittest.TestCase):
 
 class TestBriefing(unittest.TestCase):
     def test_briefing_returns_string(self):
+        from unittest.mock import patch
         from salmalm.tool_handlers import execute_tool
-        result = execute_tool('briefing', {'action': 'generate'})
+        # Mock inner execute_tool calls (weather, calendar, email) to avoid network/blocking
+        with patch('salmalm.tool_registry.execute_tool', side_effect=lambda name, args: f"mock {name}"):
+            result = execute_tool('briefing', {'action': 'generate'})
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 0)
 

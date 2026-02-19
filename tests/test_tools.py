@@ -59,7 +59,7 @@ class TestProtectedFiles(unittest.TestCase):
 class TestPythonEvalBlocklist(unittest.TestCase):
 
     def _get_blocklist(self):
-        tools_py = Path(__file__).parent.parent / 'salmalm' / 'tools_exec.py'
+        tools_py = Path(__file__).parent.parent / 'salmalm' / 'tools' / 'tools_exec.py'
         content = tools_py.read_text(encoding='utf-8')
         match = re.search(r'_EVAL_BLOCKLIST\s*=\s*\[(.*?)\]', content, re.DOTALL)
         self.assertIsNotNone(match, "_EVAL_BLOCKLIST not found")

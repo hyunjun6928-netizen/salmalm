@@ -216,23 +216,23 @@ def test_cost_estimation_haiku():
 
 def test_ttl_prune_fresh_cache():
     """Should NOT prune when cache is fresh (within TTL)."""
-    import salmalm.engine as eng
-    eng._last_api_call_time = time.time()  # Just called
-    assert not eng._should_prune_for_cache()
+    import salmalm.core.session_manager as sm
+    sm._last_api_call_time = time.time()  # Just called
+    assert not sm._should_prune_for_cache()
 
 
 def test_ttl_prune_expired_cache():
     """Should prune when cache TTL expired."""
-    import salmalm.engine as eng
-    eng._last_api_call_time = time.time() - 600  # 10 min ago
-    assert eng._should_prune_for_cache()
+    import salmalm.core.session_manager as sm
+    sm._last_api_call_time = time.time() - 600  # 10 min ago
+    assert sm._should_prune_for_cache()
 
 
 def test_ttl_prune_never_called():
     """Should prune on first call (no previous API call)."""
-    import salmalm.engine as eng
-    eng._last_api_call_time = 0.0
-    assert eng._should_prune_for_cache()
+    import salmalm.core.session_manager as sm
+    sm._last_api_call_time = 0.0
+    assert sm._should_prune_for_cache()
 
 
 # ── 7. Token estimation ──
