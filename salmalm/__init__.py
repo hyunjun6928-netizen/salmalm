@@ -33,7 +33,9 @@ try:
     if not log.handlers:
         log.setLevel(logging.INFO)
         log.addHandler(logging.FileHandler(LOG_FILE, encoding='utf-8'))
-        log.addHandler(logging.StreamHandler(sys.stdout))
+        _sh = logging.StreamHandler(sys.stdout)
+        _sh.setStream(open(sys.stdout.fileno(), 'w', encoding='utf-8', errors='replace', closefd=False))
+        log.addHandler(_sh)
         for h in log.handlers:
             h.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
 
