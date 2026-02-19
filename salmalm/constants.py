@@ -39,7 +39,8 @@ EXEC_ALLOWLIST = {
     'git', 'gh', 'cargo', 'rustc', 'go', 'java', 'javac', 'gcc', 'g++', 'make',
     'cmake', 'docker', 'kubectl', 'terraform',
     # Network (read-only)
-    'curl', 'wget', 'ping', 'dig', 'nslookup', 'host', 'traceroute', 'ss', 'ip',
+    'ping', 'dig', 'nslookup', 'host', 'traceroute', 'ss', 'ip',
+    # curl/wget removed: SSRF bypass risk (use web_fetch/http_request tools instead)
     # File ops (safe)
     'cp', 'mv', 'mkdir', 'touch', 'ln', 'tar', 'gzip', 'gunzip', 'zip', 'unzip',
     # Text

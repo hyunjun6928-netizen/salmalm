@@ -35,7 +35,7 @@ class TestExecBlocklist(unittest.TestCase):
 
     def test_safe_commands_in_allowlist(self):
         safe = ['ls', 'cat', 'grep', 'find', 'wc', 'head', 'tail',
-                'python3', 'git', 'curl']
+                'python3', 'git', 'ping']
         for cmd in safe:
             self.assertIn(cmd, EXEC_ALLOWLIST, f"{cmd} should be in allowlist")
             self.assertNotIn(cmd, EXEC_BLOCKLIST, f"{cmd} should not be blocked")

@@ -5,15 +5,16 @@ services:
     build: .
     # Or use: image: python:3.12-slim + command below
     ports:
-      - "18800:18800"
-      - "18801:18801"
+      - "127.0.0.1:18800:18800"
+      - "127.0.0.1:18801:18801"
     volumes:
       - ./data/memory:/app/memory
       - ./data/workspace:/app/workspace
       - ./data/uploads:/app/uploads
       - ./data/plugins:/app/plugins
     environment:
-      - SALMALM_VAULT_PW=changeme
+      - SALMALM_BIND=0.0.0.0    # Required inside container
+      # - SALMALM_VAULT_PW=changeme  # Optional: vault encryption
       # Add your API keys:
       # - ANTHROPIC_API_KEY=sk-...
       # - OPENAI_API_KEY=sk-...

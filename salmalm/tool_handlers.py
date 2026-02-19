@@ -22,18 +22,37 @@ telegram_bot = None
 
 def _is_safe_command(cmd: str) -> tuple[bool, str]:
     """Check if command is safe to execute (allowlist + blocklist double defense)."""
-    first_word = cmd.strip().split()[0].split('/')[-1] if cmd.strip() else ''
-    if not first_word:
+    if not cmd.strip():
         return False, 'Empty command'
-    # Blocklist takes priority (even if somehow in allowlist)
-    if first_word in EXEC_BLOCKLIST:
-        return False, f'Blocked command: {first_word}'
+
+    # Blocklist patterns first (catches dangerous combos)
     for pattern in EXEC_BLOCKLIST_PATTERNS:
         if re.search(pattern, cmd):
             return False, f'Blocked pattern: {pattern}'
-    # Allowlist check — unknown commands blocked
-    if first_word not in EXEC_ALLOWLIST:
-        return False, f'Command not in allowlist: {first_word} (not in EXEC_ALLOWLIST)'
+
+    # Split on pipe/chain operators and check EVERY stage
+    # This prevents: curl ... | sh  (curl is allowed, sh is not)
+    stages = re.split(r'\s*(?:\|\||&&|;|\|)\s*', cmd)
+    for stage in stages:
+        words = stage.strip().split()
+        if not words:
+            continue
+        first_word = words[0].split('/')[-1]  # strip path prefix
+        if first_word in EXEC_BLOCKLIST:
+            return False, f'Blocked command in pipeline: {first_word}'
+        if first_word not in EXEC_ALLOWLIST:
+            return False, f'Command not in allowlist: {first_word}'
+
+    # Check for subshell/backtick/process substitution bypasses
+    if re.search(r'`.*`|\$\(.*\)|<\(|>\(', cmd):
+        # Verify the inner command too
+        inner = re.findall(r'`([^`]+)`|\$\(([^)]+)\)', cmd)
+        for groups in inner:
+            inner_cmd = groups[0] or groups[1]
+            inner_first = inner_cmd.strip().split()[0].split('/')[-1] if inner_cmd.strip() else ''
+            if inner_first and inner_first not in EXEC_ALLOWLIST:
+                return False, f'Blocked subshell command: {inner_first}'
+
     return True, ''
 
 
@@ -63,6 +82,28 @@ def _resolve_path(path: str, writing: bool = False) -> Path:
     if writing and p.name in PROTECTED_FILES:
         raise PermissionError(f'Protected file: {p.name}')
     return p
+
+
+def _is_private_url(url: str) -> tuple[bool, str]:
+    """Check if URL resolves to a private/internal IP. Returns (blocked, reason)."""
+    import ipaddress, socket
+    from urllib.parse import urlparse
+    hostname = urlparse(url).hostname or ''
+    if not hostname:
+        return True, 'No hostname'
+    # Quick string check for known dangerous hosts
+    if hostname in ('metadata.google.internal', '169.254.169.254'):
+        return True, f'Blocked metadata endpoint: {hostname}'
+    try:
+        # Resolve ALL addresses (IPv4 + IPv6)
+        addrs = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _, _, _, sockaddr in addrs:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return True, f'Internal IP blocked: {hostname} → {ip}'
+    except socket.gaierror:
+        return True, f'DNS resolution failed: {hostname}'
+    return False, ''
 
 
 def _is_subpath(path: Path, parent: Path) -> bool:
@@ -162,14 +203,10 @@ def execute_tool(name: str, args: dict) -> str:
         elif name == 'web_fetch':
             url = args['url']
             max_chars = args.get('max_chars', 10000)
-            # SSRF protection: block internal/private IPs
-            from urllib.parse import urlparse
-            _host = urlparse(url).hostname or ''
-            _blocked = ('localhost', '127.', '10.', '192.168.', '172.16.',
-                        '172.17.', '172.18.', '172.19.', '172.2', '172.30.', '172.31.',
-                        '169.254.', '0.0.0.0', '::1', 'metadata.google', '169.254.169.254')
-            if any(_host.startswith(b) or _host == b for b in _blocked):
-                return f'❌ Internal network access blocked: {_host}'
+            # SSRF protection: DNS-resolve based private IP check
+            blocked, reason = _is_private_url(url)
+            if blocked:
+                return f'❌ {reason}'
             req = urllib.request.Request(url, headers={
                 'User-Agent': 'Mozilla/5.0 (SalmAlm/0.1)'
             })
@@ -498,14 +535,10 @@ else:
             timeout_sec = min(args.get('timeout', 15), 60)
             if not url:
                 return '❌ URL is required'
-            # SSRF protection: block internal/private IPs
-            from urllib.parse import urlparse
-            _host = urlparse(url).hostname or ''
-            _blocked = ('localhost', '127.', '10.', '192.168.', '172.16.',
-                        '172.17.', '172.18.', '172.19.', '172.2', '172.30.', '172.31.',
-                        '169.254.', '0.0.0.0', '::1', 'metadata.google', '169.254.169.254')
-            if any(_host.startswith(b) or _host == b for b in _blocked):
-                return f'❌ Internal network access blocked: {_host}'
+            # SSRF protection: DNS-resolve based private IP check
+            blocked, reason = _is_private_url(url)
+            if blocked:
+                return f'❌ {reason}'
             headers.setdefault('User-Agent', f'SalmAlm/{VERSION}')
             data = body_str.encode('utf-8') if body_str else None
             try:
