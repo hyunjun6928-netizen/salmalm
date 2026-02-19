@@ -266,6 +266,16 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <label style="margin-top:8px"data-i18n="lbl-ollama">Ollama URL (Local LLM)</label>
     <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
     <button data-action="saveOllama" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px"data-i18n="btn-save-ollama">Save Ollama URL</button>
+    <h3 style="margin-top:20px">🔀 Auto Routing Models</h3>
+    <p style="font-size:12px;color:var(--text2);margin:4px 0 8px">When "Auto Routing" is selected, messages are classified by complexity and routed to these models:</p>
+    <label style="font-size:12px">⚡ Simple (greetings, short questions)</label>
+    <select id="route-simple" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
+    <label style="font-size:12px">🔧 Moderate (code, analysis, summaries)</label>
+    <select id="route-moderate" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
+    <label style="font-size:12px">💎 Complex (architecture, long reasoning)</label>
+    <select id="route-complex" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
+    <button data-action="saveRouting" style="padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px">Save Routing</button>
+    <span id="route-status" style="font-size:11px;color:var(--text2);margin-left:8px"></span>
   </div>
   <div class="settings-card">
     <h3 data-i18n="h-keys">🔑 API Key Management</h3>
@@ -1062,6 +1072,19 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var dashView=document.getElementById('dashboard-view');
   window.showChat=function(){settingsEl.style.display='none';dashView.style.display='none';chat.style.display='flex';inputArea.style.display='block'};
   window.showSettings=function(){chat.style.display='none';inputArea.style.display='none';dashView.style.display='none';settingsEl.style.display='block';
+    /* Load routing config */
+    fetch('/api/routing',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var cfg=d.config||{};var models=d.available_models||{};
+      var opts='';var allModels=[];
+      for(var k in models){allModels.push({key:k,val:models[k]})}
+      /* Also add model options from the main select */
+      var mainSel=document.getElementById('s-model');
+      if(mainSel){for(var i=0;i<mainSel.options.length;i++){var o=mainSel.options[i];if(o.value&&o.value!=='auto'){var found=false;for(var j=0;j<allModels.length;j++){if(allModels[j].val===o.value){found=true;break}}if(!found)allModels.push({key:o.value,val:o.value})}}}
+      opts='';for(var i=0;i<allModels.length;i++){opts+='<option value="'+allModels[i].val+'">'+allModels[i].val.split('/').pop()+' ('+allModels[i].key+')</option>'}
+      ['simple','moderate','complex'].forEach(function(tier){
+        var sel=document.getElementById('route-'+tier);if(sel){sel.innerHTML=opts;sel.value=cfg[tier]||''}
+      });
+    }).catch(function(){});
     /* Load SOUL.md */
     fetch('/api/soul',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
       var ed=document.getElementById('soul-editor');if(ed)ed.value=d.content||'';
@@ -1400,6 +1423,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='checkUpdate')window.checkUpdate();
     else if(a==='doUpdate')window.doUpdate();
     else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){addMsg('assistant','✅ Saved')})}
+    else if(a==='saveRouting'){var rc={simple:document.getElementById('route-simple').value,moderate:document.getElementById('route-moderate').value,complex:document.getElementById('route-complex').value};fetch('/api/routing',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify(rc)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('route-status');if(st){st.textContent='✅ Saved!';setTimeout(function(){st.textContent=''},2000)}}).catch(function(){var st=document.getElementById('route-status');if(st)st.textContent='❌ Error'})}
     else if(a==='saveSoul'){
       var sc=document.getElementById('soul-editor').value;
       fetch('/api/soul',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({content:sc})}).then(function(r){return r.json()}).then(function(d){

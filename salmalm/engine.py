@@ -71,6 +71,36 @@ _COMPLEX_KEYWORDS = ['설계', '아키텍처', 'architecture', 'design', 'system
                       'from scratch', '처음부터', '전체', 'migration', '마이그레이션']
 
 from .constants import MODELS as _MODELS
+import json as _json
+from pathlib import Path as _Path
+
+# Routing config: user can override which model to use for each complexity level
+_ROUTING_CONFIG_FILE = _Path.home() / '.salmalm' / 'routing.json'
+
+def _load_routing_config() -> dict:
+    """Load user's model routing config. Returns {simple, moderate, complex} model IDs."""
+    defaults = {'simple': _MODELS['haiku'], 'moderate': _MODELS['sonnet'], 'complex': _MODELS['opus']}
+    try:
+        if _ROUTING_CONFIG_FILE.exists():
+            cfg = _json.loads(_ROUTING_CONFIG_FILE.read_text(encoding='utf-8'))
+            for k in ('simple', 'moderate', 'complex'):
+                if k in cfg and cfg[k]:
+                    defaults[k] = cfg[k]
+    except Exception:
+        pass
+    return defaults
+
+def _save_routing_config(config: dict):
+    """Save user's model routing config."""
+    try:
+        _ROUTING_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _ROUTING_CONFIG_FILE.write_text(_json.dumps(config, indent=2), encoding='utf-8')
+    except Exception:
+        pass
+
+def get_routing_config() -> dict:
+    """Public getter for routing config (used by web API)."""
+    return _load_routing_config()
 
 def _select_model(message: str, session) -> tuple:
     """Select optimal model based on message complexity.
@@ -91,36 +121,36 @@ def _select_model(message: str, session) -> tuple:
             # Direct model string
             return override, 'manual'
 
+    rc = _load_routing_config()
     msg_lower = message.lower()
     msg_len = len(message)
 
     # Check thinking mode
     if getattr(session, 'thinking_enabled', False):
-        return _MODELS['opus'], 'complex'
+        return rc['complex'], 'complex'
 
     # Complex: long messages, architecture keywords
     if msg_len > 500:
-        return _MODELS['opus'], 'complex'
+        return rc['complex'], 'complex'
     for kw in _COMPLEX_KEYWORDS:
         if kw in msg_lower:
-            return _MODELS['opus'], 'complex'
+            return rc['complex'], 'complex'
 
     # Moderate: code blocks, analysis keywords
     if '```' in message or 'def ' in message or 'class ' in message:
-        return _MODELS['sonnet'], 'moderate'
+        return rc['moderate'], 'moderate'
     for kw in _MODERATE_KEYWORDS:
         if kw in msg_lower:
-            return _MODELS['sonnet'], 'moderate'
+            return rc['moderate'], 'moderate'
 
     # Simple: short + greeting/simple question pattern
     if msg_len < 50 and _SIMPLE_PATTERNS.match(message.strip()):
-        return _MODELS['haiku'], 'simple'
+        return rc['simple'], 'simple'
     if msg_len < 50:
-        # Short but not a pattern match — still use haiku for cost savings
-        return _MODELS['haiku'], 'simple'
+        return rc['simple'], 'simple'
 
     # Default: moderate
-    return _MODELS['sonnet'], 'moderate'
+    return rc['moderate'], 'moderate'
 
 
 class TaskClassifier:

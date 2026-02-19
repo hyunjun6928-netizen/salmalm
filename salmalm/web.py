@@ -279,6 +279,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not self._require_auth('user'): return
             from .prompt import get_user_soul, USER_SOUL_FILE
             self._json({'content': get_user_soul(), 'path': str(USER_SOUL_FILE)})
+        elif self.path == '/api/routing':
+            if not self._require_auth('user'): return
+            from .engine import get_routing_config
+            from .constants import MODELS
+            self._json({'config': get_routing_config(), 'available_models': MODELS})
         elif self.path == '/api/sessions':
             if not self._require_auth('user'): return
             from .core import _get_db
@@ -899,6 +904,17 @@ self.addEventListener('fetch',e=>{{
             else:
                 reset_user_soul()
                 self._json({'ok': True, 'message': 'SOUL.md reset to default'})
+            return
+
+        elif self.path == '/api/routing':
+            if not self._require_auth('user'): return
+            from .engine import _save_routing_config, get_routing_config
+            cfg = get_routing_config()
+            for k in ('simple', 'moderate', 'complex'):
+                if k in body and body[k]:
+                    cfg[k] = body[k]
+            _save_routing_config(cfg)
+            self._json({'ok': True, 'config': cfg})
             return
 
         elif self.path == '/api/sessions/rename':
