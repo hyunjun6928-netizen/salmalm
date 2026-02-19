@@ -1,7 +1,7 @@
 """SalmAlm Telegram bot."""
 from __future__ import annotations
 
-import asyncio, json, re, textwrap, time, urllib.request
+import asyncio, json, re, secrets, textwrap, time, urllib.request
 from typing import Any, Dict, List, Optional
 
 from .constants import *
@@ -46,7 +46,7 @@ class TelegramBot:
         """Send a photo file to Telegram."""
         try:
             import mimetypes
-            boundary = f'----SalmAlm{int(time.time())}'
+            boundary = f'----SalmAlm{secrets.token_hex(8)}'
             body = b''
             # chat_id field
             body += f'--{boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n{chat_id}\r\n'.encode()
@@ -70,7 +70,7 @@ class TelegramBot:
     def _send_audio(self, chat_id, path: Path, caption: str = ''):
         """Send an audio file to Telegram."""
         try:
-            boundary = f'----SalmAlm{int(time.time())}'
+            boundary = f'----SalmAlm{secrets.token_hex(8)}'
             body = b''
             body += f'--{boundary}\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n{chat_id}\r\n'.encode()
             if caption:
@@ -198,7 +198,7 @@ class TelegramBot:
                 api_key = vault.get('openai_api_key')
                 if api_key:
                     try:
-                        boundary = f'----Whisper{int(time.time())}'
+                        boundary = f'----Whisper{secrets.token_hex(8)}'
                         body = b''
                         body += f'--{boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n'.encode()
                         body += f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{fname}"\r\nContent-Type: audio/ogg\r\n\r\n'.encode()

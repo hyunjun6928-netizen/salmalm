@@ -12,12 +12,23 @@ from .crypto import vault, log
 # ============================================================
 _audit_lock = threading.Lock()   # Audit log writes
 _usage_lock = threading.Lock()   # Usage tracking (separate to avoid contention)
+_thread_local = threading.local()  # Thread-local DB connections
+
+
+def _get_db() -> sqlite3.Connection:
+    """Get thread-local SQLite connection (reused across calls, WAL mode)."""
+    conn = getattr(_thread_local, 'audit_conn', None)
+    if conn is None:
+        conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        _thread_local.audit_conn = conn
+    return conn
 
 
 def _init_audit_db():
-    conn = sqlite3.connect(str(AUDIT_DB))
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
+    conn = _get_db()
     conn.execute('''CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ts TEXT NOT NULL, event TEXT NOT NULL,
@@ -34,12 +45,11 @@ def _init_audit_db():
         updated_at TEXT NOT NULL
     )''')
     conn.commit()
-    conn.close()
 
 
 def audit_log(event: str, detail: str = ''):
     with _audit_lock:
-        conn = sqlite3.connect(str(AUDIT_DB))
+        conn = _get_db()
         row = conn.execute(
             'SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1'
         ).fetchone()
@@ -52,7 +62,6 @@ def audit_log(event: str, detail: str = ''):
             (ts, event, detail[:500], prev, h)
         )
         conn.commit()
-        conn.close()
 
 
 
@@ -95,7 +104,7 @@ _usage = {'total_input': 0, 'total_output': 0, 'total_cost': 0.0,
 def _restore_usage():
     """Restore cumulative usage from SQLite on startup."""
     try:
-        conn = sqlite3.connect(str(AUDIT_DB))
+        conn = _get_db()
         rows = conn.execute('SELECT model, SUM(input_tokens), SUM(output_tokens), SUM(cost), COUNT(*) FROM usage_stats GROUP BY model').fetchall()
         for model, inp, out, cost, calls in rows:
             short = model.split('/')[-1] if '/' in model else model
@@ -104,7 +113,6 @@ def _restore_usage():
             _usage['total_cost'] += (cost or 0)
             _usage['by_model'][short] = {'input': inp or 0, 'output': out or 0,
                                           'cost': cost or 0, 'calls': calls or 0}
-        conn.close()
         if _usage['total_cost'] > 0:
             log.info(f"📊 Usage restored: ${_usage['total_cost']:.4f} total")
     except Exception as e:
@@ -127,11 +135,10 @@ def track_usage(model: str, input_tokens: int, output_tokens: int):
         _usage['by_model'][short]['calls'] += 1
         # Persist to SQLite
         try:
-            conn = sqlite3.connect(str(AUDIT_DB))
+            conn = _get_db()
             conn.execute('INSERT INTO usage_stats (ts, model, input_tokens, output_tokens, cost) VALUES (?,?,?,?,?)',
                          (datetime.now(KST).isoformat(), model, input_tokens, output_tokens, cost))
             conn.commit()
-            conn.close()
         except Exception as e:
             log.debug(f"Suppressed: {e}")
 
@@ -640,11 +647,10 @@ class Session:
                         saveable.append({**m, 'content': texts})
                 elif isinstance(m.get('content'), str):
                     saveable.append(m)
-            conn = sqlite3.connect(str(AUDIT_DB))
+            conn = _get_db()
             conn.execute('INSERT OR REPLACE INTO session_store (session_id, messages, updated_at) VALUES (?,?,?)',
                          (self.id, json.dumps(saveable, ensure_ascii=False), datetime.now(KST).isoformat()))
             conn.commit()
-            conn.close()
         except Exception as e:
             log.warning(f"Session persist error: {e}")
 
@@ -654,6 +660,7 @@ class Session:
 
     def add_assistant(self, content: str):
         self.messages.append({'role': 'assistant', 'content': content})
+        self.last_active = time.time()
         self._persist()
 
     def add_tool_results(self, results: list):
@@ -667,16 +674,43 @@ class Session:
 
 _tg_bot = None  # Set during startup by telegram module
 _sessions: dict[str, Session] = {}
+_session_cleanup_ts = 0.0
+_SESSION_TTL = 3600 * 8  # 8 hours
+_SESSION_MAX = 200
+
+
+def _cleanup_sessions():
+    """Remove inactive sessions older than TTL."""
+    global _session_cleanup_ts
+    now = time.time()
+    if now - _session_cleanup_ts < 600:  # Check every 10 min
+        return
+    _session_cleanup_ts = now
+    stale = [sid for sid, s in _sessions.items()
+             if now - s.last_active > _SESSION_TTL]
+    for sid in stale:
+        try:
+            _sessions[sid]._persist()
+        except Exception:
+            pass
+        del _sessions[sid]
+    if stale:
+        log.info(f"🧹 Session cleanup: removed {len(stale)} inactive sessions")
+    # Hard cap
+    if len(_sessions) > _SESSION_MAX:
+        by_age = sorted(_sessions.items(), key=lambda x: x[1].last_active)
+        for sid, _ in by_age[:len(_sessions) - _SESSION_MAX]:
+            del _sessions[sid]
 
 
 def get_session(session_id: str) -> Session:
+    _cleanup_sessions()
     if session_id not in _sessions:
         _sessions[session_id] = Session(session_id)
         # Try to restore from SQLite
         try:
-            conn = sqlite3.connect(str(AUDIT_DB))
+            conn = _get_db()
             row = conn.execute('SELECT messages FROM session_store WHERE session_id=?', (session_id,)).fetchone()
-            conn.close()
             if row:
                 restored = json.loads(row[0])
                 _sessions[session_id].messages = restored

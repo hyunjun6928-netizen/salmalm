@@ -107,11 +107,21 @@ class RateLimiter:
             'ip': {'rate': 120, 'per': 60, 'burst': 200},      # 120 req/min per IP
         }
 
+    _last_cleanup = 0.0
+
     def check(self, key: str, role: str = 'anonymous') -> bool:
         """Check rate limit. Raises RateLimitExceeded if exceeded."""
         with self._lock:
             limit = self._limits.get(role, self._limits['anonymous'])
             now = time.time()
+
+            # Auto-cleanup stale buckets every 10 minutes
+            if now - self._last_cleanup > 600:
+                stale = [k for k, v in self._buckets.items()
+                         if now - v['last_refill'] > 3600]
+                for k in stale:
+                    del self._buckets[k]
+                self._last_cleanup = now
 
             if key not in self._buckets:
                 self._buckets[key] = {
