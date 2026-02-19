@@ -55,6 +55,42 @@ a.back{color:var(--accent);text-decoration:none;font-size:13px}
   </table>
 </div>
 
+<!-- SLA Section (SLA 섹션) -->
+<div class="card" style="margin-bottom:16px">
+  <h3 data-i18n="h-sla">📊 SLA Dashboard</h3>
+  <div class="grid" style="margin-top:12px">
+    <div style="text-align:center">
+      <div id="sla-uptime-light" style="width:20px;height:20px;border-radius:50%;background:#22c55e;display:inline-block;margin-bottom:4px"></div>
+      <div style="font-size:13px;color:var(--text2)" data-i18n="sla-uptime-label">Uptime</div>
+      <div id="sla-uptime" style="font-size:24px;font-weight:700">—</div>
+      <div id="sla-uptime-pct" style="font-size:13px;color:var(--text2)">—</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:13px;color:var(--text2)" data-i18n="sla-ttft-label">TTFT P95</div>
+      <div id="sla-ttft" style="font-size:24px;font-weight:700">—</div>
+      <div id="sla-ttft-target" style="font-size:13px;color:var(--text2)">target: —</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:13px;color:var(--text2)" data-i18n="sla-resp-label">Response P95</div>
+      <div id="sla-resp" style="font-size:24px;font-weight:700">—</div>
+      <div id="sla-resp-target" style="font-size:13px;color:var(--text2)">target: —</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:13px;color:var(--text2)" data-i18n="sla-monthly-label">Monthly Uptime</div>
+      <div id="sla-monthly" style="font-size:24px;font-weight:700">—</div>
+      <div id="sla-monthly-target" style="font-size:13px;color:var(--text2)">target: —</div>
+    </div>
+  </div>
+  <div style="margin-top:16px">
+    <div style="font-size:13px;color:var(--text2);margin-bottom:8px" data-i18n="sla-trend-label">Response Time Trend (recent)</div>
+    <svg id="sla-trend-svg" width="100%" height="80" style="background:var(--bg);border-radius:8px"></svg>
+  </div>
+  <div style="margin-top:12px">
+    <div style="font-size:13px;color:var(--text2);margin-bottom:6px" data-i18n="sla-incidents-label">Recent Incidents</div>
+    <div id="sla-incidents" style="font-size:12px;color:var(--text2)">—</div>
+  </div>
+</div>
+
 <div class="card" style="margin-bottom:16px">
   <h3><span data-i18n="h-audit">📋 Audit Log</span>
     <select id="audit-filter" style="float:right;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px">
@@ -91,7 +127,10 @@ const _i18n={
     'back':'← Back to Chat','title':'SalmAlm Dashboard',
     'h-cost':'💰 Total Cost','h-sessions':'💬 Sessions','h-tools':'🔧 Tool Calls (24h)','h-status':'📡 Status',
     'loading':'Loading...','h-tool-usage':'📊 Tool Usage (24h)','h-cost-model':'💸 Cost by Model',
-    'h-model-usage':'🧠 Model Usage','h-audit':'📋 Audit Log',
+    'h-model-usage':'🧠 Model Usage','h-audit':'📋 Audit Log','h-sla':'📊 SLA Dashboard',
+    'sla-uptime-label':'Uptime','sla-ttft-label':'TTFT P95','sla-resp-label':'Response P95',
+    'sla-monthly-label':'Monthly Uptime','sla-trend-label':'Response Time Trend (recent)',
+    'sla-incidents-label':'Recent Incidents',
     'th-model':'Model','th-calls':'Calls','th-in':'Tokens In','th-out':'Tokens Out','th-cost':'Cost',
     'th-time':'Time','th-type':'Type','th-session':'Session','th-detail':'Detail',
     'h-cron':'⏰ Cron Jobs','h-plugins':'🧩 Plugins','no-entries':'No entries'
@@ -100,7 +139,10 @@ const _i18n={
     'back':'← 채팅으로 돌아가기','title':'삶앎 대시보드',
     'h-cost':'💰 총 비용','h-sessions':'💬 세션','h-tools':'🔧 도구 호출 (24시간)','h-status':'📡 상태',
     'loading':'불러오는 중...','h-tool-usage':'📊 도구 사용량 (24시간)','h-cost-model':'💸 모델별 비용',
-    'h-model-usage':'🧠 모델 사용량','h-audit':'📋 감사 로그',
+    'h-model-usage':'🧠 모델 사용량','h-audit':'📋 감사 로그','h-sla':'📊 SLA 대시보드',
+    'sla-uptime-label':'업타임','sla-ttft-label':'TTFT P95','sla-resp-label':'응답 시간 P95',
+    'sla-monthly-label':'월별 업타임','sla-trend-label':'응답 시간 트렌드 (최근)',
+    'sla-incidents-label':'최근 인시던트',
     'th-model':'모델','th-calls':'호출','th-in':'입력 토큰','th-out':'출력 토큰','th-cost':'비용',
     'th-time':'시간','th-type':'유형','th-session':'세션','th-detail':'상세',
     'h-cron':'⏰ 크론 작업','h-plugins':'🧩 플러그인','no-entries':'항목 없음'
@@ -209,4 +251,41 @@ async function loadAudit(){
 loadAudit();
 document.getElementById('audit-filter').addEventListener('change',loadAudit);
 setInterval(loadAudit,30000);
+
+/* SLA Dashboard */
+async function loadSLA(){
+  try{
+    const res=await fetch('/api/sla',{headers:hdr});
+    const data=await res.json();
+    const u=data.uptime||{};
+    const l=data.latency||{};
+    document.getElementById('sla-uptime').textContent=u.uptime_human||'—';
+    const pct=u.monthly_uptime_pct||0;
+    const target=u.target_pct||99.9;
+    document.getElementById('sla-uptime-pct').textContent=u.start_time?(u.start_time||'').slice(0,19):'—';
+    document.getElementById('sla-monthly').textContent=pct.toFixed(2)+'%';
+    document.getElementById('sla-monthly-target').textContent='target: '+target+'%';
+    const light=document.getElementById('sla-uptime-light');
+    light.style.background=pct>=target?'#22c55e':pct>=99?'#eab308':'#ef4444';
+    const ttft=l.ttft||{};const total=l.total||{};const targets=l.targets||{};
+    document.getElementById('sla-ttft').textContent=ttft.p95?ttft.p95+'ms':'—';
+    document.getElementById('sla-ttft-target').textContent='target: <'+(targets.ttft_ms||3000)+'ms';
+    document.getElementById('sla-resp').textContent=total.p95?total.p95+'ms':'—';
+    document.getElementById('sla-resp-target').textContent='target: <'+(targets.response_ms||30000)+'ms';
+    document.getElementById('sla-ttft').style.color=(ttft.p95&&ttft.p95>(targets.ttft_ms||3000))?'#ef4444':'var(--accent)';
+    document.getElementById('sla-resp').style.color=(total.p95&&total.p95>(targets.response_ms||30000))?'#ef4444':'var(--accent)';
+    const recent=l.recent||[];
+    const svg=document.getElementById('sla-trend-svg');
+    if(recent.length>1){
+      const w=svg.clientWidth||400,h=80,pad=10;
+      const vals=recent.map(r=>r.total);const maxV=Math.max(...vals,1);
+      const pts=vals.map((v,i)=>{const x=pad+i*(w-2*pad)/(vals.length-1);const y=h-pad-(v/maxV)*(h-2*pad);return x+','+y;}).join(' ');
+      svg.innerHTML='<polyline points="'+pts+'" fill="none" stroke="#6366f1" stroke-width="2"/>'+vals.map((v,i)=>{const x=pad+i*(w-2*pad)/(vals.length-1);const y=h-pad-(v/maxV)*(h-2*pad);return '<circle cx="'+x+'" cy="'+y+'" r="3" fill="#6366f1"><title>'+v+'ms</title></circle>';}).join('');
+    }else{svg.innerHTML='<text x="50%" y="50%" text-anchor="middle" fill="#94a3b8" font-size="12">No data</text>';}
+    const incidents=(u.recent_incidents||[]);const incDiv=document.getElementById('sla-incidents');
+    if(!incidents.length){incDiv.textContent='No recent incidents ✅';}
+    else{incDiv.innerHTML=incidents.map(i=>'<div style="margin-bottom:2px">⚠️ '+(i.start||'').slice(0,19)+' — '+i.reason+' ('+(i.duration_sec?Math.round(i.duration_sec)+'s':'?')+')</div>').join('');}
+  }catch(e){console.error('SLA:',e)}
+}
+loadSLA();setInterval(loadSLA,30000);
 </script></body></html>

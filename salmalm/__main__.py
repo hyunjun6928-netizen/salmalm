@@ -225,6 +225,15 @@ def main() -> None:
             audit_log('startup', f'{APP_NAME} v{VERSION}')
             MEMORY_DIR.mkdir(exist_ok=True)
 
+            # SLA: Initialize uptime monitor + watchdog (SLA 초기화)
+            try:
+                from .sla import uptime_monitor, watchdog
+                uptime_monitor.on_startup()
+                watchdog.start()
+                log.info("[SLA] Uptime monitor + watchdog initialized")
+            except Exception as e:
+                log.warning(f"[SLA] Init error: {e}")
+
             # Initialize hooks, plugins, agents (훅/플러그인/에이전트 초기화)
             try:
                 from .hooks import hook_manager
@@ -417,6 +426,15 @@ def main() -> None:
                 hook_manager.fire('on_shutdown', {'message': 'Server shutting down'})
             except Exception:
                 pass
+
+            # SLA: Graceful shutdown (SLA 정상 종료)
+            try:
+                from .sla import uptime_monitor, watchdog
+                watchdog.stop()
+                uptime_monitor.on_shutdown()
+                log.info("[SHUTDOWN] SLA cleanup complete")
+            except Exception as e:
+                log.warning(f"[SHUTDOWN] SLA cleanup error: {e}")
 
             audit_log('shutdown', f'{APP_NAME} v{VERSION} graceful shutdown')
             log.info("[SHUTDOWN] Complete. Goodbye! 😈")
