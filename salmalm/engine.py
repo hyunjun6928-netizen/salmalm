@@ -43,23 +43,23 @@ class TaskClassifier:
         'code': {'keywords': ['code', 'implement', 'function', 'function', 'class', 
                                'bug', 'fix', 'refactor', 'refactor', 'debug',
                                'API', 'server', 'deploy', 'deploy', 'build'],
-                 'tier': 3, 'thinking': True, 'max_tools': 30},
+                 'tier': 3, 'thinking': True, 'max_tools': 200},
         'analysis': {'keywords': ['analyze', 'compare', 'review',
                                    'audit', 'security', 'performance'],
-                     'tier': 3, 'thinking': True, 'max_tools': 20},
+                     'tier': 3, 'thinking': True, 'max_tools': 200},
         'creative': {'keywords': ['write', 'story', 'poem',
                                    'translate', 'summarize'],
-                     'tier': 2, 'thinking': False, 'max_tools': 10},
+                     'tier': 2, 'thinking': False, 'max_tools': 50},
         'search': {'keywords': ['search', 'find', 'news',
                                  'latest', 'weather', 'price'],
-                   'tier': 2, 'thinking': False, 'max_tools': 15},
+                   'tier': 2, 'thinking': False, 'max_tools': 50},
         'system': {'keywords': ['file', 'exec', 'run', 'install',
                                  'process', 'disk', 'memory'],
-                   'tier': 2, 'thinking': False, 'max_tools': 20},
+                   'tier': 2, 'thinking': False, 'max_tools': 200},
         'memory': {'keywords': ['remember', 'memo', 'record',
                                  'diary', 'learn'],
-                   'tier': 1, 'thinking': False, 'max_tools': 5},
-        'chat': {'keywords': [], 'tier': 1, 'thinking': False, 'max_tools': 3},
+                   'tier': 1, 'thinking': False, 'max_tools': 20},
+        'chat': {'keywords': [], 'tier': 1, 'thinking': False, 'max_tools': 10},
     }
 
     @classmethod
@@ -218,7 +218,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         # Only reflect on complex tasks with significant responses
         if classification['intent'] not in ('code', 'analysis'):
             return False
-        if iteration > 5:  # Already iterated a lot
+        if iteration > 20:  # Already iterated a lot
             return False
         if len(response) < 100:  # Too short to be code/analysis
             return False
