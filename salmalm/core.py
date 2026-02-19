@@ -154,7 +154,9 @@ def _restore_usage():
 
 
 def check_cost_cap():
-    """Raise CostCapExceeded if cumulative cost exceeds the cap."""
+    """Raise CostCapExceeded if cumulative cost exceeds the cap. 0 = disabled."""
+    if COST_CAP <= 0:
+        return
     with _usage_lock:
         if _usage['total_cost'] >= COST_CAP:
             raise CostCapExceeded(
