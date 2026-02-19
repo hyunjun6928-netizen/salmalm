@@ -62,31 +62,35 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _security_headers(self):
+    def _security_headers(self, nonce: str = ''):
         """Add security headers to all responses."""
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'DENY')
         self.send_header('Referrer-Policy', 'no-referrer')
-        self.send_header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
-        # CSP: allow inline scripts (required) but block external scripts/objects
+        self.send_header('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()')
+        script_src = f"'nonce-{nonce}'" if nonce else "'self'"
         self.send_header('Content-Security-Policy',
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: blob:; "
-            "connect-src 'self' ws://127.0.0.1:* wss://127.0.0.1:*; "
-            "font-src 'self' data:; "
-            "object-src 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
+            f"default-src 'self'; "
+            f"script-src {script_src}; "
+            f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            f"img-src 'self' data: blob:; "
+            f"connect-src 'self' ws://127.0.0.1:* wss://127.0.0.1:*; "
+            f"font-src 'self' data: https://fonts.gstatic.com; "
+            f"object-src 'none'; "
+            f"base-uri 'self'; "
+            f"form-action 'self'"
         )
 
     def _html(self, content: str):
+        import secrets as _sec
+        nonce = _sec.token_hex(16)
+        # Inject nonce into all <script> tags
+        content = content.replace('<script>', f'<script nonce="{nonce}">')
         body = content.encode('utf-8')
         self.send_response(200)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
         self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
-        self._security_headers()
+        self._security_headers(nonce=nonce)
         body = self._maybe_gzip(body)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()

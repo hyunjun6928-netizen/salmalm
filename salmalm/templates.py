@@ -153,26 +153,26 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div class="side-nav">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px 4px">
       <div class="nav-section" style="margin:0;padding:0" data-i18n="sec-chats">💬 Chats</div>
-      <button onclick="window.newSession()" title="New Chat" style="background:var(--accent);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+      <button data-action="newSession" title="New Chat" style="background:var(--accent);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
     </div>
     <div id="session-list" style="max-height:240px;overflow-y:auto;padding:0 8px 4px"></div>
     <div class="nav-section" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px">📡 Channels</div>
     <div class="nav-item" id="tg-status">📡 Telegram <span class="badge">ON</span></div>
-    <div class="nav-section" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer">🛠️ Tools (32) ▾</div>
+    <div class="nav-section" data-action="toggleTools" style="cursor:pointer">🛠️ Tools (32) ▾</div>
     <div id="tools-list" style="display:none">
-    <div class="nav-item" onclick="quickCmd('/help')">🔧 exec · file · search</div>
-    <div class="nav-item" onclick="quickCmd('Check system status')">🖥️ System Monitor</div>
-    <div class="nav-item" onclick="quickCmd('Show memory files')">🧠 Memory</div>
-    <div class="nav-item" onclick="quickCmd('Show cost report')">💰 Cost Tracker</div>
-    <div class="nav-item" onclick="quickCmd('Show cron jobs')">⏰ Cron Manager</div>
-    <div class="nav-item" onclick="quickCmd('Calculate 1+1 in Python')">🐍 Python Exec</div>
-    <div class="nav-item" onclick="quickCmd('Generate image: a cat in galaxy')">🎨 Image Gen</div>
-    <div class="nav-item" onclick="quickCmd('Convert to speech: Hello world')">🔊 TTS</div>
+    <div class="nav-item" data-action="qc-help">🔧 exec · file · search</div>
+    <div class="nav-item" data-action="qc-sysmon">🖥️ System Monitor</div>
+    <div class="nav-item" data-action="qc-memory">🧠 Memory</div>
+    <div class="nav-item" data-action="qc-cost">💰 Cost Tracker</div>
+    <div class="nav-item" data-action="qc-cron">⏰ Cron Manager</div>
+    <div class="nav-item" data-action="qc-python">🐍 Python Exec</div>
+    <div class="nav-item" data-action="qc-image">🎨 Image Gen</div>
+    <div class="nav-item" data-action="qc-tts">🔊 TTS</div>
     </div>
     <div class="nav-section" data-i18n="sec-admin">Admin</div>
-    <div class="nav-item" onclick="showSettings()"data-i18n="nav-settings">⚙️ Settings</div>
-    <div class="nav-item" onclick="showUsage()">📊 Usage</div>
-    <div class="nav-item" onclick="window.open('/dashboard','_blank')">📈 Dashboard</div>
+    <div class="nav-item" data-action="showSettings"data-i18n="nav-settings">⚙️ Settings</div>
+    <div class="nav-item" data-action="showUsage">📊 Usage</div>
+    <div class="nav-item" data-action="openDashboard">📈 Dashboard</div>
   </div>
   <div class="side-footer">
     <div class="status"><span class="dot"></span> Running</div>
@@ -180,17 +180,17 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   </div>
 </div>
 
-<div class="side-overlay" id="side-overlay" onclick="toggleSidebar()"></div>
+<div class="side-overlay" id="side-overlay" data-action="toggleSidebar"></div>
 
 <div id="header">
-  <button id="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+  <button id="mobile-menu-btn" data-action="toggleSidebar">☰</button>
   <div class="title">💬 Web Chat</div>
   <div class="model-badge" id="model-badge">auto routing</div>
   <div class="spacer"></div>
   <div class="cost">Cost: <b id="cost-display">$0.0000</b></div>
-  <button id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-  <button id="export-btn" onclick="window.exportChat('md')" title="Export chat" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer"data-i18n="btn-export">📥 Export</button>
-  <button id="new-chat-btn" onclick="window.newSession()" title="New Chat">✨ New</button>
+  <button id="theme-toggle" data-action="toggleTheme" title="Toggle theme">🌙</button>
+  <button id="export-btn" data-action="exportChat" title="Export chat" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer"data-i18n="btn-export">📥 Export</button>
+  <button id="new-chat-btn" data-action="newSession" title="New Chat">✨ New</button>
 </div>
 
 <div id="chat"></div>
@@ -198,7 +198,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 <div id="settings">
   <div class="settings-card">
     <h3 data-i18n="h-lang">🌐 Language</h3>
-    <select id="s-lang" onchange="setLang(this.value)" style="width:200px">
+    <select id="s-lang" data-action="setLang" style="width:200px">
       <option value="en">English</option>
       <option value="ko">한국어</option>
     </select>
@@ -206,7 +206,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div class="settings-card">
     <h3 data-i18n="h-model">🤖 Model Settings</h3>
     <labeldata-i18n="lbl-model">Default Model</label>
-    <select id="s-model" onchange="setModel(this.value)">
+    <select id="s-model" data-action="setModel">
       <optgroup label="🔄 Auto">
         <option value="auto">Auto Routing (Recommended)</option>
       </optgroup>
@@ -248,20 +248,20 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     </select>
     <label style="margin-top:8px"data-i18n="lbl-ollama">Ollama URL (Local LLM)</label>
     <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
-    <button onclick="fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:document.getElementById('s-ollama-url').value})}).then(function(){alert('Saved')})" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px"data-i18n="btn-save-ollama">Save Ollama URL</button>
+    <button data-action="saveOllama" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px"data-i18n="btn-save-ollama">Save Ollama URL</button>
   </div>
   <div class="settings-card">
     <h3 data-i18n="h-keys">🔑 API Key Management</h3>
     <labeldata-i18n="lbl-anthropic">Anthropic API Key</label>
-    <div style="display:flex;gap:6px"><input id="sk-anthropic" type="password" placeholder="sk-ant-..."><button class="btn" onclick="saveKey('anthropic_api_key','sk-anthropic')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('anthropic')">Test</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-anthropic" type="password" placeholder="sk-ant-..."><button class="btn" data-action="save-anthropic">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-anthropic">Test</button></div>
     <labeldata-i18n="lbl-openai">OpenAI API Key</label>
-    <div style="display:flex;gap:6px"><input id="sk-openai" type="password" placeholder="sk-..."><button class="btn" onclick="saveKey('openai_api_key','sk-openai')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('openai')">Test</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-openai" type="password" placeholder="sk-..."><button class="btn" data-action="save-openai">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-openai">Test</button></div>
     <labeldata-i18n="lbl-xai">xAI API Key (Grok)</label>
-    <div style="display:flex;gap:6px"><input id="sk-xai" type="password" placeholder="xai-..."><button class="btn" onclick="saveKey('xai_api_key','sk-xai')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('xai')">Test</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-xai" type="password" placeholder="xai-..."><button class="btn" data-action="save-xai">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-xai">Test</button></div>
     <labeldata-i18n="lbl-google">Google API Key (Gemini)</label>
-    <div style="display:flex;gap:6px"><input id="sk-google" type="password" placeholder="AIza..."><button class="btn" onclick="saveKey('google_api_key','sk-google')">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="testKey('google')">Test</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-google" type="password" placeholder="AIza..."><button class="btn" data-action="save-google">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-google">Test</button></div>
     <labeldata-i18n="lbl-brave">Brave Search API Key</label>
-    <div style="display:flex;gap:6px"><input id="sk-brave" type="password" placeholder="BSA..."><button class="btn" onclick="saveKey('brave_api_key','sk-brave')">Save</button></div>
+    <div style="display:flex;gap:6px"><input id="sk-brave" type="password" placeholder="BSA..."><button class="btn" data-action="save-brave">Save</button></div>
     <div id="key-test-result" style="margin-top:8px;font-size:12px"></div>
     <div id="vault-keys" style="margin-top:12px"></div>
   </div>
@@ -279,8 +279,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       <label>새 비밀번호 확인</label>
       <input type="password" id="pw-confirm" placeholder="새 비밀번호 다시 입력">
       <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn" onclick="changePw()">변경</button>
-        <button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="removePw()">비밀번호 해제</button>
+        <button class="btn" data-action="changePw">변경</button>
+        <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="removePw">비밀번호 해제</button>
       </div>
     </div>
     <div id="pw-section-set" style="display:none">
@@ -289,7 +289,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       <input type="password" id="pw-set-new" placeholder="비밀번호 (4자 이상)">
       <label>비밀번호 확인</label>
       <input type="password" id="pw-set-confirm" placeholder="다시 입력">
-      <button class="btn" onclick="setPw()">비밀번호 설정</button>
+      <button class="btn" data-action="setPw">비밀번호 설정</button>
     </div>
     <div id="pw-result" style="margin-top:8px;font-size:12px"></div>
   </div>
@@ -297,8 +297,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <h3 data-i18n="h-update">🔄 Update</h3>
     <div style="display:flex;gap:8px;align-items:center">
       <span id="update-ver" style="font-size:13px;color:var(--text2)">Current: v<span id="cur-ver"></span></span>
-      <button class="btn" style="background:var(--bg3);color:var(--text2)" onclick="checkUpdate()"data-i18n="btn-check">Check for Updates</button>
-      <button class="btn" id="do-update-btn" style="display:none" onclick="doUpdate()">⬆️ Update</button>
+      <button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="checkUpdate"data-i18n="btn-check">Check for Updates</button>
+      <button class="btn" id="do-update-btn" style="display:none" data-action="doUpdate">⬆️ Update</button>
     </div>
     <div id="update-result" style="margin-top:8px;font-size:12px"></div>
   </div>
@@ -307,7 +307,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 <div id="input-area">
   <div class="input-box">
     <textarea id="input" rows="1" placeholder="Type a message..." data-i18n="input-ph"></textarea>
-    <button id="mic-btn" onclick="window.toggleMic()" title="Voice input" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🎤</button>
+    <button id="mic-btn" data-action="toggleMic" title="Voice input" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🎤</button>
     <button id="send-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
     </button>
@@ -317,7 +317,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       <span id="file-icon">📎</span>
       <span id="file-name" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
       <span id="file-size"></span>
-      <button onclick="clearFile()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button>
+      <button data-action="clearFile" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button>
     </div>
     <img id="img-preview" style="display:none;max-height:120px;border-radius:8px;margin-top:8px">
   </div>
@@ -354,9 +354,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         var active=s.id===_currentSession?' style="background:var(--accent-dim);border-radius:8px"':'';
         var title=s.title||s.id;
         if(title.length>40)title=title.slice(0,40)+'...';
-        html+='<div class="nav-item session-item"'+active+' onclick="window.switchSession(\\x27'+s.id+'\\x27)" data-sid="'+s.id+'">'
+        html+='<div class="nav-item session-item"'+active+' data-action="switchSession" data-sid="'+s.id+'">'
           +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</span>'
-          +'<span class="session-del" onclick="event.stopPropagation();window.deleteSession(\\x27'+s.id+'\\x27)" title="Delete" style="opacity:0.4;cursor:pointer;padding:2px 4px;font-size:11px">✕</span>'
+          +'<span class="session-del" data-action="deleteSession" data-sid="'+s.id+'" title="Delete" style="opacity:0.4;cursor:pointer;padding:2px 4px;font-size:11px">✕</span>'
           +'</div>';
       });
       el.innerHTML=html;
@@ -483,7 +483,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     var codeBlocks=[];
     t=t.replace(/```(\\w+)?\\n?([\\s\\S]*?)```/g,function(_,lang,code){
       _copyId++;var id='cp'+_copyId;
-      var safe='<pre style="position:relative"><button class="copy-btn" onclick="copyCode(&quot;'+id+'&quot;)" id="btn'+id+'">📋 Copy</button><code id="'+id+'">'+(lang?'/* '+lang+' */\\n':'')+escHtml(code)+'</code></pre>';
+      var safe='<pre style="position:relative"><button class="copy-btn" data-action="copyCode" data-copy-id="'+id+'" id="btn'+id+'">📋 Copy</button><code id="'+id+'">'+(lang?'/* '+lang+' */\\n':'')+escHtml(code)+'</code></pre>';
       codeBlocks.push(safe);return '%%CODEBLOCK'+(codeBlocks.length-1)+'%%';
     });
     /* Escape remaining HTML to prevent XSS */
@@ -506,7 +506,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     t=t.replace(/^[•\\-] (.+)$/gm,'<div style="padding-left:16px;position:relative"><span style="position:absolute;left:4px">•</span>$1</div>');
     t=t.replace(/^(\\d+)\\. (.+)$/gm,'<div style="padding-left:16px">$1. $2</div>');
     t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1</a>');
-    t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" onclick="window.open(this.src)">');
+    t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" data-action="openImage">');
     t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
     t=t.replace(/\\n/g,'<br>');
     return t;
@@ -902,6 +902,65 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     }catch(e){}
   },30000);
   applyLang();
+
+  /* --- CSP-safe event delegation --- */
+  var _qcMap={'qc-help':'/help','qc-sysmon':'Check system status','qc-memory':'Show memory files',
+    'qc-cost':'Show cost report','qc-cron':'Show cron jobs','qc-python':'Calculate 1+1 in Python',
+    'qc-image':'Generate image: a cat in galaxy','qc-tts':'Convert to speech: Hello world'};
+  document.addEventListener('click',function(e){
+    var el=e.target.closest('[data-action]');if(!el)return;
+    var a=el.getAttribute('data-action');
+    if(a==='newSession')window.newSession();
+    else if(a==='showSettings')window.showSettings();
+    else if(a==='showUsage')window.showSettings();
+    else if(a==='toggleSidebar')window.toggleSidebar();
+    else if(a==='toggleTheme')window.toggleTheme();
+    else if(a==='openDashboard')window.open('/dashboard','_blank');
+    else if(a==='exportChat')window.exportChat('md');
+    else if(a==='toggleMic')window.toggleMic();
+    else if(a==='clearFile')window.clearFile();
+    else if(a==='toggleTools'){var nx=el.nextElementSibling;nx.style.display=nx.style.display==='none'?'block':'none'}
+    else if(a.startsWith('qc-'))window.quickCmd(_qcMap[a]);
+    else if(a==='save-anthropic')window.saveKey('anthropic_api_key','sk-anthropic');
+    else if(a==='test-anthropic')window.testKey('anthropic');
+    else if(a==='save-openai')window.saveKey('openai_api_key','sk-openai');
+    else if(a==='test-openai')window.testKey('openai');
+    else if(a==='save-xai')window.saveKey('xai_api_key','sk-xai');
+    else if(a==='test-xai')window.testKey('xai');
+    else if(a==='save-google')window.saveKey('google_api_key','sk-google');
+    else if(a==='test-google')window.testKey('google');
+    else if(a==='save-brave')window.saveKey('brave_api_key','sk-brave');
+    else if(a==='changePw')window.changePw();
+    else if(a==='removePw')window.removePw();
+    else if(a==='setPw')window.setPw();
+    else if(a==='checkUpdate')window.checkUpdate();
+    else if(a==='doUpdate')window.doUpdate();
+    else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){alert('Saved')})}
+    else if(a==='switchSession'){e.stopPropagation();window.switchSession(el.getAttribute('data-sid'))}
+    else if(a==='deleteSession'){e.stopPropagation();window.deleteSession(el.getAttribute('data-sid'))}
+    else if(a==='copyCode'){var cid=el.getAttribute('data-copy-id');window.copyCode(cid)}
+    else if(a==='openImage')window.open(el.src);
+    else if(a==='save'&&typeof save==='function')save();
+    else if(a==='reload')location.reload();
+    else if(a==='pickTrue'&&typeof pick==='function')pick(true);
+    else if(a==='pickFalse'&&typeof pick==='function')pick(false);
+    else if(a==='go'&&typeof go==='function')go();
+    else if(a==='unlock'&&typeof unlock==='function')unlock();
+  });
+  document.addEventListener('change',function(e){
+    var el=e.target.closest('[data-action]');if(!el)return;
+    var a=el.getAttribute('data-action');
+    if(a==='setLang')window.setLang(el.value);
+    else if(a==='setModel')window.setModel(el.value);
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Enter')return;
+    var el=e.target.closest('[data-enter-action]');if(!el)return;
+    var a=el.getAttribute('data-enter-action');
+    if(a==='go'&&typeof go==='function')go();
+    else if(a==='unlock'&&typeof unlock==='function')unlock();
+  });
+
   /* STT — Voice Input */
   var _mediaRec=null,_audioChunks=[];
   window.toggleMic=function(){
@@ -1022,9 +1081,9 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 <div class="hint">If Ollama is installed, enter URL. Free without API keys! <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">Install →</a></div>
 </div>
 
-<button id="btn" onclick="save()">Save & Test</button>
+<button id="btn" data-action="save">Save & Test</button>
 <div class="result" id="result"></div>
-<div class="skip"><a onclick="location.reload()">Skip (configure later)</a></div>
+<div class="skip"><a data-action="reload">Skip (configure later)</a></div>
 </div>
 <script>
 async function save(){
@@ -1085,16 +1144,16 @@ h1{color:#a78bfa;font-size:26px;margin-bottom:8px}
 <p class="sub">처음 오신 것을 환영합니다!<br>시작하기 전에 하나만 물어볼게요.</p>
 <p style="font-size:15px;color:#ccc;margin-bottom:20px;font-weight:500">🔒 마스터 비밀번호를 설정하시겠습니까?</p>
 <div class="choice">
-  <button id="btn-yes" onclick="pick(true)">네, 설정할게요</button>
-  <button id="btn-no" onclick="pick(false)">아니요, 바로 시작</button>
+  <button id="btn-yes" data-action="pickTrue">네, 설정할게요</button>
+  <button id="btn-no" data-action="pickFalse">아니요, 바로 시작</button>
 </div>
 <div class="pw-area" id="pw-area">
   <label>비밀번호 (4자 이상)</label>
   <input type="password" id="pw1" placeholder="비밀번호 입력">
   <label>비밀번호 확인</label>
-  <input type="password" id="pw2" placeholder="다시 입력" onkeydown="if(event.key==='Enter')go()">
+  <input type="password" id="pw2" placeholder="다시 입력" data-enter-action="go">
 </div>
-<button class="go" id="go-btn" onclick="go()">다음 →</button>
+<button class="go" id="go-btn" data-action="go">다음 →</button>
 <div class="err" id="err"></div>
 <div class="hint" id="hint-yes" style="display:none">비밀번호를 설정하면 브라우저를 열 때마다 입력해야 합니다.<br>나중에 설정에서 변경하거나 해제할 수 있습니다.</div>
 <div class="hint" id="hint-no" style="display:none">비밀번호 없이 바로 사용합니다.<br>나중에 설정에서 비밀번호를 추가할 수 있습니다.</div>
@@ -1150,8 +1209,8 @@ button:hover{background:#4338ca}
 <div class="card">
 <h1>😈 SalmAlm</h1>
 <p>Personal AI Gateway v''' + VERSION + '''</p>
-<input type="password" id="pw" placeholder="Master password" onkeydown="if(event.key==='Enter')unlock()">
-<button onclick="unlock()">Unlock</button>
+<input type="password" id="pw" placeholder="Master password" data-enter-action="unlock">
+<button data-action="unlock">Unlock</button>
 <div class="error" id="err"></div>
 <div style="margin-top:24px;font-size:13px;color:#999;line-height:1.8;text-align:left;max-width:400px">
 <p style="color:#bbb;font-weight:600;margin-bottom:8px">🔑 처음이신가요?</p>
