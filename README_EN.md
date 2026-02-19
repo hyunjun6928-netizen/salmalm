@@ -1,4 +1,4 @@
-# 😈 SalmAlm v0.10.9
+# 😈 SalmAlm v0.11.0
 
 [![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)

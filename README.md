@@ -1,4 +1,4 @@
-# 😈 삶앎 (SalmAlm) v0.10.9
+# 😈 삶앎 (SalmAlm) v0.11.0
 
 [![Tests](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
@@ -177,8 +177,16 @@ Store in `.env` file or encrypted vault via Web UI:
 - [Changelog](CHANGELOG.md)
 - [API Docs](http://localhost:18800/docs) (서버 실행 후)
 
-## 📝 v0.10.9 Changelog
+## 📝 v0.11.0 Changelog
 
+- **👁️ image_analyze 비전 도구**: 이미지 분석 (URL/base64/파일 경로)
+- **🧠 프롬프트 v0.5.0**: 의도 분류 + 도구 선택 정확도 향상
+- **📡 SSE 청크 스트리밍**: 실시간 응답 스트리밍 지원
+- **📋 CI/CD**: GitHub Actions 매트릭스 (Ubuntu/macOS/Windows × Python 3.10-3.13)
+- **📛 배지**: PyPI + CI + License + Python 버전 배지
+- **📖 CONTRIBUTING + CHANGELOG + FAQ + use-cases + issue templates**
+
+### v0.10.9
 - **🔒 P0 보안 패치**: `/api/do-update`, `/api/restart`에 admin 인증 + loopback 강제
 - **🔒 정보 API 인증**: dashboard/cron/plugins/mcp/rag 전부 인증 적용
 - **🔒 경로 탐색 방어**: `/uploads/` basename 정규화 + resolve 이중 방어
