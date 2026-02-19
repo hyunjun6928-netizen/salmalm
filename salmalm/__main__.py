@@ -29,6 +29,21 @@ def _ensure_windows_shortcut():
         print(f"⚠️  Could not create desktop shortcut: {e}")
 
 
+def _run_update():
+    """Self-update via pip."""
+    import subprocess as _sp
+    print("⬆️  Updating SalmAlm...")
+    result = _sp.run(
+        [sys.executable, '-m', 'pip', 'install', '--upgrade', '--no-cache-dir',
+         '--force-reinstall', 'salmalm'],
+        capture_output=False)
+    if result.returncode == 0:
+        print("\n✅ Updated! Run 'salmalm' or 'python -m salmalm' to start.")
+    else:
+        print("\n❌ Update failed. Try manually: pip install --upgrade salmalm")
+    sys.exit(result.returncode)
+
+
 def _run_node_mode():
     """Run as a lightweight node that registers with a gateway."""
     import http.server, json, threading
@@ -117,7 +132,20 @@ def main() -> None:
     if sys.platform == 'win32' and not getattr(sys, 'frozen', False):
         _ensure_windows_shortcut()
 
-    # Node mode: lightweight tool executor that registers with a gateway
+    # CLI flags
+    if '--update' in sys.argv or 'update' in sys.argv[1:2]:
+        _run_update()
+        return
+    if '--shortcut' in sys.argv:
+        if sys.platform == 'win32':
+            _ensure_windows_shortcut()
+        else:
+            print("ℹ️  Desktop shortcuts are Windows-only.")
+        sys.exit(0)
+    if '--version' in sys.argv or '-v' in sys.argv:
+        from salmalm.constants import VERSION
+        print(f'SalmAlm v{VERSION}')
+        sys.exit(0)
     if '--node' in sys.argv:
         _run_node_mode()
         return
