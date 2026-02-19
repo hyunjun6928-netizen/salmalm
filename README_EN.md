@@ -1,4 +1,4 @@
-# 😈 SalmAlm v0.9.2
+# 😈 SalmAlm v0.10.0
 
 **Personal AI Gateway — Pure Python, Zero Dependencies**
 
@@ -14,9 +14,17 @@ The only optional dependency is `cryptography` for AES-256-GCM vault encryption.
 
 ```bash
 pip install salmalm
-salmalm
+python -m salmalm
 # → Opens http://localhost:18800
 # Add your API keys in Settings
+```
+
+### .env File (Simple Config)
+
+```bash
+cp .env.example .env
+# Edit .env — add your API keys
+python -m salmalm
 ```
 
 ### Docker
@@ -42,7 +50,7 @@ docker compose up -d
 
 ```bash
 ollama pull llama3.2
-salmalm
+python -m salmalm
 # In Settings, enter Ollama URL: http://localhost:11434/v1
 # Use: /model ollama/llama3.2
 ```
@@ -56,35 +64,57 @@ Think of it as your own local ChatGPT, but with superpowers:
 - **RAG search** — BM25 over your local files, no OpenAI embeddings needed
 - **MCP support** — connect to Cursor, VS Code, or any MCP-compatible client
 - **WebSocket** — real-time streaming via a from-scratch RFC 6455 implementation
-- **Telegram & Discord bots** — chat from your phone
+- **Gateway-Node** — distribute tool execution across multiple machines
+- **Telegram bot** — chat from your phone
 - **Plugin system** — drop a `.py` file in `plugins/` and it just works
+- **.env support** — configure API keys via `.env` file or encrypted vault
+- **EN/KO i18n** — switch language in Settings (English default)
 - **One-click update** — upgrade from Settings UI
 
-## 🏗️ Architecture (20 Modules, ~9,000 lines)
+## 🌍 Gateway-Node Architecture
+
+Scale tool execution across multiple machines:
+
+```bash
+# Main server (gateway)
+python -m salmalm
+
+# Remote worker (node)
+python -m salmalm --node --gateway-url http://gateway:18800
+```
+
+Nodes auto-register with the gateway. Tool calls are dispatched to remote nodes based on capabilities. Falls back to local execution on failure.
+
+## 🏗️ Architecture (23 Modules, ~9,900 lines)
 
 ```
 salmalm/
-├── constants.py      — config, costs, thresholds
-├── crypto.py         — AES-256-GCM vault (HMAC-CTR fallback)
-├── core.py           — audit, cache, sessions, cron, routing
-├── llm.py            — multi-provider LLM calls
-├── tools.py          — 30 tool definitions + executor
-├── prompt.py         — system prompt builder
-├── engine.py         — Intelligence Engine (classify → plan → execute → reflect)
-├── telegram.py       — async Telegram bot
-├── discord_bot.py    — Discord Gateway + HTTP API
-├── web.py            — Web UI + REST API + SSE streaming
-├── ws.py             — WebSocket server (RFC 6455)
-├── rag.py            — BM25 search engine (SQLite-backed)
-├── mcp.py            — Model Context Protocol server + client
-├── browser.py        — Chrome DevTools Protocol automation
-├── nodes.py          — SSH/HTTP remote node control
-├── stability.py      — circuit breaker, health monitor, watchdog
-├── auth.py           — JWT auth, RBAC, rate limiter, PBKDF2
-├── tls.py            — self-signed TLS cert generation
-├── logging_ext.py    — JSON structured logging, rotation
-├── container.py      — lightweight DI container
-└── docs.py           — auto-generated API documentation
+├── constants.py        — config, costs, thresholds
+├── crypto.py           — AES-256-GCM vault (HMAC-CTR fallback)
+├── core.py             — audit, cache, sessions, cron, routing
+├── agents.py           — SubAgent, SkillLoader, PluginLoader
+├── llm.py              — multi-provider LLM calls
+├── tools.py            — 30 tool definitions
+├── tool_handlers.py    — tool execution + gateway dispatch
+├── prompt.py           — system prompt builder
+├── engine.py           — Intelligence Engine (classify → plan → execute → reflect)
+├── templates.py        — HTML templates (Web UI)
+├── telegram.py         — async Telegram bot
+├── web.py              — Web UI + REST API + SSE streaming
+├── ws.py               — WebSocket server (RFC 6455)
+├── rag.py              — BM25 search engine (SQLite-backed)
+├── mcp.py              — Model Context Protocol server + client
+├── browser.py          — Chrome DevTools Protocol automation
+├── nodes.py            — Gateway-Node architecture (registry + remote dispatch)
+├── stability.py        — circuit breaker, health monitor, watchdog
+├── auth.py             — JWT auth, RBAC, rate limiter, PBKDF2
+├── tls.py              — self-signed TLS cert generation
+├── container.py        — lightweight DI container
+├── logging_ext.py      — JSON structured logging, rotation
+├── docs.py             — auto-generated API documentation
+├── search.py           — Brave Search API wrapper
+├── server_main.py      — server bootstrap
+└── plugins/            — Drop-in tool plugins
 ```
 
 ## 🔐 Security
@@ -113,6 +143,7 @@ salmalm/
 | `POST /api/vault` | Admin | Key CRUD |
 | `GET /api/dashboard` | Yes | Sessions, costs, cron |
 | `GET /api/rag/search?q=...` | Yes | BM25 search |
+| `GET /api/nodes` | Yes | List connected nodes |
 | `GET /docs` | No | Auto-generated API docs |
 | `ws://127.0.0.1:18801` | — | WebSocket |
 
@@ -141,11 +172,11 @@ Not just a chat proxy. Every message goes through:
 
 ## 📊 Stats
 
-- ~9,000 lines of Python across 20 modules
+- ~9,900 lines of Python across 23 modules
 - 30 built-in tools + plugin extensibility
 - 27 LLM models with cost tracking
 - 85 unit tests
-- 18/18 self-test on startup
+- 21/21 self-test on startup
 - 8-component health monitoring
 
 ## 📜 License

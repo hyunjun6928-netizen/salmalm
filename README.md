@@ -1,4 +1,4 @@
-# 😈 삶앎 (SalmAlm) v0.9.2
+# 😈 삶앎 (SalmAlm) v0.10.0
 
 **Personal AI Gateway — Pure Python**
 
@@ -16,22 +16,23 @@
 | ⚡ **WebSocket** | RFC 6455 직접 구현, 실시간 스트리밍, 도구 호출 알림 |
 | 🔌 **MCP** | Model Context Protocol 서버 + 클라이언트, Cursor/VS Code 연동 |
 | 🌐 **Browser** | Chrome DevTools Protocol (CDP), 스크린샷/JS실행/폼자동화 |
-| 📡 **Nodes** | SSH/HTTP 원격 노드 제어, Wake-on-LAN |
+| 🌍 **Gateway-Node** | 멀티머신 도구 디스패치 — 게이트웨이에서 원격 노드로 자동 위임 |
 | 🏥 **Stability** | Circuit Breaker, 8개 컴포넌트 헬스체크, 자동 복구, 셀프테스트 |
 | 💬 **Telegram** | 비동기 long-polling, 이미지/파일 처리 |
-| 🌐 **Web UI** | 다크/라이트 테마, 마크다운 렌더링, 파일 업로드, SSE 스트리밍 |
+| 🌐 **Web UI** | 다크/라이트 테마, 마크다운 렌더링, 파일 업로드, SSE 스트리밍, EN/KO 전환 |
 | 🔐 **Security** | AES-256-GCM 볼트, JWT 인증, RBAC, CORS 화이트리스트, 레이트 리밋, PBKDF2 |
 | 📊 **Cost Tracking** | 모델별 토큰/비용 실시간 추적 (27개 모델) |
 | ⏰ **Cron** | LLM 기반 스케줄 작업, cron 표현식/인터벌/원샷 지원 |
 | 🔧 **30 Tools** | exec, 파일 CRUD, 웹 검색, RAG, MCP, 브라우저, 노드, 헬스체크 등 |
 | 🧩 **Plugins** | `plugins/` 폴더에 .py 드롭 → 자동 도구 로딩 |
+| 📁 **.env 지원** | vault 대신 `.env` 파일로 API 키 관리 가능 (vault 폴백) |
 
 ## 📊 Stats
 
-- **20 modules** / ~9,000 lines of Python
+- **23 modules** / ~9,900 lines of Python
 - **30 built-in tools** + plugin extensibility
 - **27 LLM models** (Anthropic, OpenAI, xAI, Google, DeepSeek, Meta)
-- **85 unit tests** + **18/18 self-test** on startup
+- **85 unit tests** + **21/21 self-test** on startup
 - **1 optional dependency** (`cryptography` for AES-256-GCM — graceful fallback without it)
 
 ## 🏗️ Architecture
@@ -39,25 +40,32 @@
 ```
 salmalm/
 ├── __init__.py         — logging setup
+├── __main__.py         — entry point
 ├── constants.py        — paths, costs, thresholds
 ├── crypto.py           — AES-256-GCM vault (+ HMAC-CTR fallback)
 ├── core.py             — audit, cache, router, cron, sessions
+├── agents.py           — SubAgent, SkillLoader, PluginLoader
 ├── llm.py              — LLM API calls (4 providers)
-├── tools.py            — 30 tool definitions + executor
+├── tools.py            — 30 tool definitions
+├── tool_handlers.py    — tool execution + gateway dispatch
 ├── prompt.py           — system prompt builder
 ├── engine.py           — Intelligence Engine (Plan→Execute→Reflect)
+├── templates.py        — HTML templates (Web UI)
 ├── telegram.py         — Telegram bot
 ├── web.py              — Web UI + HTTP API + CORS + auth middleware
 ├── ws.py               — WebSocket server (RFC 6455)
 ├── rag.py              — BM25 RAG engine
 ├── mcp.py              — MCP server + client
 ├── browser.py          — Chrome CDP automation
-├── nodes.py            — Remote node control
+├── nodes.py            — Gateway-Node architecture (registry + remote dispatch)
 ├── stability.py        — Health monitor + auto-recovery
 ├── auth.py             — JWT auth, RBAC, rate limiter
 ├── tls.py              — Self-signed TLS cert generation
+├── container.py        — lightweight DI container
 ├── logging_ext.py      — JSON structured logging
 ├── docs.py             — Auto-generated API docs
+├── search.py           — Brave Search API wrapper
+├── server_main.py      — server bootstrap
 └── plugins/            — Drop-in tool plugins
 ```
 
@@ -67,9 +75,17 @@ salmalm/
 
 ```bash
 pip install salmalm
-salmalm
+python -m salmalm
 # → http://localhost:18800
 # Settings에서 API 키 입력
+```
+
+### .env 파일 (간편 설정)
+
+```bash
+cp .env.example .env
+# .env 편집 — API 키 입력
+python -m salmalm
 ```
 
 ### Docker
@@ -90,25 +106,37 @@ cd salmalm
 docker compose up -d
 ```
 
+## 🌍 Gateway-Node (멀티머신)
+
+```bash
+# 메인 서버 (게이트웨이)
+python -m salmalm
+
+# 원격 워커 (노드)
+python -m salmalm --node --gateway-url http://gateway:18800
+```
+
+노드는 게이트웨이에 자동 등록되고, 도구 호출 시 capability 기반으로 원격 노드에 자동 위임됩니다. 실패 시 로컬 폴백.
+
 ## 🦙 Ollama (로컬 LLM, API 키 불필요)
 
 ```bash
 # Ollama 설치 후
 ollama pull llama3.2
-python3 server.py
+python -m salmalm
 # 온보딩에서 Ollama URL 입력: http://localhost:11434/v1
 # /model ollama/llama3.2 로 사용
 ```
 
 ## 🔑 API Keys
 
-Store in the encrypted vault via Web UI:
-- `anthropic_api_key` — Claude (Opus, Sonnet, Haiku)
-- `openai_api_key` — GPT-5, o3, o4
-- `xai_api_key` — Grok-4, Grok-3
-- `google_api_key` — Gemini 3 Pro/Flash
-- `brave_api_key` — Web search
-- `telegram_token` + `telegram_owner_id` — Telegram bot
+Store in `.env` file or encrypted vault via Web UI:
+- `ANTHROPIC_API_KEY` — Claude (Opus, Sonnet, Haiku)
+- `OPENAI_API_KEY` — GPT-5, o3, o4
+- `XAI_API_KEY` — Grok-4, Grok-3
+- `GOOGLE_API_KEY` — Gemini 3 Pro/Flash
+- `BRAVE_API_KEY` — Web search
+- `TELEGRAM_TOKEN` + `TELEGRAM_OWNER_ID` — Telegram bot
 
 ## 🔐 Security
 
@@ -133,6 +161,7 @@ Store in the encrypted vault via Web UI:
 | `POST /api/vault` | 🔒 | Vault CRUD (admin/loopback) |
 | `GET /api/dashboard` | ✅ | Sessions, usage, cron |
 | `GET /api/rag/search?q=...` | ✅ | BM25 search |
+| `GET /api/nodes` | ✅ | List connected nodes |
 | `GET /docs` | ❌ | Auto-generated API docs |
 | `ws://127.0.0.1:18801` | — | WebSocket real-time |
 

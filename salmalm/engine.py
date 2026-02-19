@@ -46,26 +46,28 @@ class TaskClassifier:
 
     # Intent categories with weighted keywords
     INTENTS = {
-        'code': {'keywords': ['code', 'implement', 'function', 'function', 'class', 
-                               'bug', 'fix', 'refactor', 'refactor', 'debug',
-                               'API', 'server', 'deploy', 'deploy', 'build'],
+        'code': {'keywords': ['code', '코드', 'implement', '구현', 'function', 'class',
+                               'bug', '버그', 'fix', '수정', 'refactor', '리팩', 'debug', '디버그',
+                               'API', 'server', '서버', 'deploy', '배포', 'build', '빌드',
+                               '개발', '코딩', '프로그래밍'],
                  'tier': 3, 'thinking': True, 'max_tools': 200},
-        'analysis': {'keywords': ['analyze', 'compare', 'review',
-                                   'audit', 'security', 'performance'],
+        'analysis': {'keywords': ['analyze', '분석', 'compare', '비교', 'review', '리뷰',
+                                   'audit', '감사', 'security', '보안', 'performance', '성능',
+                                   '검토', '조사', '평가', '진단'],
                      'tier': 3, 'thinking': True, 'max_tools': 200},
-        'creative': {'keywords': ['write', 'story', 'poem',
-                                   'translate', 'summarize'],
+        'creative': {'keywords': ['write', '작성', 'story', '이야기', 'poem', '시',
+                                   'translate', '번역', 'summarize', '요약', '글'],
                      'tier': 2, 'thinking': False, 'max_tools': 50},
-        'search': {'keywords': ['search', 'find', 'news',
-                                 'latest', 'weather', 'price'],
+        'search': {'keywords': ['search', '검색', 'find', '찾', 'news', '뉴스',
+                                 'latest', '최신', 'weather', '날씨', 'price', '가격'],
                    'tier': 2, 'thinking': False, 'max_tools': 50},
-        'system': {'keywords': ['file', 'exec', 'run', 'install',
-                                 'process', 'disk', 'memory'],
+        'system': {'keywords': ['file', '파일', 'exec', 'run', '실행', 'install', '설치',
+                                 'process', '프로세스', 'disk', '디스크', 'memory', '메모리'],
                    'tier': 2, 'thinking': False, 'max_tools': 200},
-        'memory': {'keywords': ['remember', 'memo', 'record',
-                                 'diary', 'learn'],
+        'memory': {'keywords': ['remember', '기억', 'memo', '메모', 'record', '기록',
+                                 'diary', '일지', 'learn', '학습'],
                    'tier': 1, 'thinking': False, 'max_tools': 20},
-        'chat': {'keywords': [], 'tier': 1, 'thinking': False, 'max_tools': 10},
+        'chat': {'keywords': [], 'tier': 1, 'thinking': False, 'max_tools': 30},
     }
 
     @classmethod
@@ -76,6 +78,8 @@ class TaskClassifier:
         for intent, info in cls.INTENTS.items():
             score = sum(2 for kw in info['keywords'] if kw in msg)
             if intent == 'code' and any(c in message for c in ['```', 'def ', 'class ', '{', '}']):
+                score += 3
+            if intent in ('code', 'analysis') and 'github.com' in msg:
                 score += 3
             scores[intent] = score
 
