@@ -342,6 +342,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
 
+  /* Global error handlers — catch unhandled promise rejections silently */
+  window.addEventListener('unhandledrejection',function(e){e.preventDefault();console.warn('Unhandled:',e.reason)});
+
   /* --- Session Management --- */
   function _genId(){return 's_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6)}
   function _storageKey(sid){return 'salm_chat_'+sid}
@@ -434,7 +437,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- Export chat --- */
   window.exportChat=function(fmt){
     var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
-    if(!hist.length){alert('No chat to export.');return}
+    if(!hist.length){addMsg('assistant','No chat to export.');return}
     var content='';
     if(fmt==='json'){
       content=JSON.stringify(hist,null,2);
@@ -869,7 +872,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>';btn.disabled=false;btn.textContent='⬆️ Update'})};
   window.saveKey=function(vaultKey,inputId){
     var v=document.getElementById(inputId).value.trim();
-    if(!v){alert('Please enter a key');return}
+    if(!v){addMsg('assistant','Please enter a key');return}
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'set',key:vaultKey,value:v})})
     .then(function(r){return r.json()}).then(function(d){
@@ -989,7 +992,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='setPw')window.setPw();
     else if(a==='checkUpdate')window.checkUpdate();
     else if(a==='doUpdate')window.doUpdate();
-    else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){alert('Saved')})}
+    else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){addMsg('assistant','\u2705 Saved')})}
     else if(a==='switchSession'){e.stopPropagation();window.switchSession(el.getAttribute('data-sid'))}
     else if(a==='deleteSession'){e.stopPropagation();window.deleteSession(el.getAttribute('data-sid'))}
     else if(a==='copyCode'){var cid=el.getAttribute('data-copy-id');window.copyCode(cid)}
@@ -1051,7 +1054,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       };
       _mediaRec.start();
       btn.style.background='var(--red)';btn.style.color='#fff';
-    }).catch(function(){alert('Microphone access denied')});
+    }).catch(function(){addMsg('assistant','Microphone access denied')});
   };
 
   /* PWA Service Worker — standalone mode only */
