@@ -61,6 +61,7 @@ class Container:
             return old
 
     def has(self, name: str) -> bool:
+        """Check if a service is registered."""
         return name in self._services or name in self._factories
 
     def reset(self) -> None:
@@ -73,42 +74,52 @@ class Container:
 
     @property
     def vault(self) -> 'Vault':
+        """Get the Vault service instance."""
         return self.get('vault')
 
     @property
     def router(self) -> 'ModelRouter':
+        """Get the ModelRouter service instance."""
         return self.get('router')
 
     @property
     def auth_manager(self) -> 'AuthManager':
+        """Get the AuthManager service instance."""
         return self.get('auth_manager')
 
     @property
     def rate_limiter(self) -> 'RateLimiter':
+        """Get the RateLimiter service instance."""
         return self.get('rate_limiter')
 
     @property
     def rag_engine(self) -> 'RAGEngine':
+        """Get the RAGEngine service instance."""
         return self.get('rag_engine')
 
     @property
     def mcp_manager(self) -> 'MCPManager':
+        """Get the MCPManager service instance."""
         return self.get('mcp_manager')
 
     @property
     def node_manager(self) -> 'NodeManager':
+        """Get the NodeManager service instance."""
         return self.get('node_manager')
 
     @property
     def health_monitor(self) -> 'HealthMonitor':
+        """Get the HealthMonitor service instance."""
         return self.get('health_monitor')
 
     @property
     def telegram_bot(self) -> 'TelegramBot':
+        """Get the TelegramBot service instance."""
         return self.get('telegram_bot')
 
     @property
     def ws_server(self) -> 'WebSocketServer':
+        """Get the WebSocketServer service instance."""
         return self.get('ws_server')
 
     def validate(self) -> Dict[str, bool]:

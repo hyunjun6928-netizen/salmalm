@@ -57,6 +57,7 @@ class TaskClassifier:
 
     @classmethod
     def classify(cls, message: str, context_len: int = 0) -> Dict[str, Any]:
+        """Classify user message intent and determine processing tier."""
         msg = message.lower()
         msg_len = len(message)
         scores = {}

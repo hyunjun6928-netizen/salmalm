@@ -156,6 +156,7 @@ class RateLimiter:
             return True
 
     def get_remaining(self, key: str) -> int:
+        """Get remaining requests allowed in the current rate limit window."""
         with self._lock:
             bucket = self._buckets.get(key)
             return int(bucket['tokens']) if bucket else -1
@@ -348,6 +349,7 @@ class AuthManager:
                 for r in rows]
 
     def delete_user(self, username: str) -> bool:
+        """Delete a user account by username."""
         self._ensure_db()
         conn = sqlite3.connect(str(AUTH_DB))
         cursor = conn.execute('DELETE FROM users WHERE username=? AND role != ?', (username, 'admin'))
@@ -357,6 +359,7 @@ class AuthManager:
         return deleted
 
     def change_password(self, username: str, new_password: str) -> bool:
+        """Change a user password. Returns True on success."""
         if len(new_password) < 8:
             raise ValueError("Password must be at least 8 characters")
         self._ensure_db()

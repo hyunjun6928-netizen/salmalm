@@ -225,20 +225,24 @@ def execute_tool(name: str, args: dict) -> str:
                     self._skip_tags = {'script', 'style', 'noscript', 'svg'}
 
                 def handle_starttag(self, tag, attrs):
+                    """Process an HTML opening tag during text extraction."""
                     if tag.lower() in self._skip_tags:
                         self._skip = True
                     elif tag.lower() in ('br', 'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr'):
                         self._parts.append('\n')
 
                 def handle_endtag(self, tag):
+                    """Process an HTML closing tag during text extraction."""
                     if tag.lower() in self._skip_tags:
                         self._skip = False
 
                 def handle_data(self, data):
+                    """Process text content during HTML extraction."""
                     if not self._skip:
                         self._parts.append(data)
 
                 def get_text(self) -> str:
+                    """Return the extracted plain text from parsed HTML."""
                     return re.sub(r'\n{3,}', '\n\n', ''.join(self._parts)).strip()
 
             extractor = _TextExtractor()

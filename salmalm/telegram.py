@@ -19,6 +19,7 @@ class TelegramBot:
         self._running = False
 
     def configure(self, token: str, owner_id: str):
+        """Configure the Telegram bot with token and owner chat ID."""
         self.token = token
         self.owner_id = owner_id
 
@@ -30,6 +31,7 @@ class TelegramBot:
 
     def send_message(self, chat_id, text: str, parse_mode: str = None):
         # Split long messages
+        """Send a text message to a Telegram chat."""
         chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
         for chunk in chunks:
             data = {'chat_id': chat_id, 'text': chunk}
@@ -90,6 +92,7 @@ class TelegramBot:
             self.send_message(chat_id, f'🔊 Voice send failed: {e}')
 
     def send_typing(self, chat_id):
+        """Send a typing indicator to a Telegram chat."""
         try:
             self._api('sendChatAction', {'chat_id': chat_id, 'action': 'typing'})
         except Exception:
@@ -303,6 +306,7 @@ class TelegramBot:
             self.send_message(chat_id, f'❓ Unknown command: {cmd}\n/help See /help')
 
     def stop(self):
+        """Stop the Telegram polling loop."""
         self._running = False
 
 

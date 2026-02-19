@@ -19,6 +19,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     """HTTP handler for web UI and API."""
 
     def log_message(self, format, *args):
+        """Suppress default HTTP request logging."""
         pass  # Suppress default logging
 
     # Allowed origins for CORS (same-host only)
@@ -150,12 +151,14 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             return False
 
     def do_OPTIONS(self):
+        """Handle CORS preflight requests."""
         self.send_response(204)
         self._cors()
         self.send_header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
         self.end_headers()
 
     def do_GET(self):
+        """Handle HTTP GET requests."""
         _start = time.time()
         import uuid
         set_correlation_id(str(uuid.uuid4())[:8])
@@ -485,6 +488,7 @@ self.addEventListener('fetch',e=>{
         return False
 
     def do_POST(self):
+        """Handle HTTP POST requests."""
         _start = time.time()
         import uuid
         set_correlation_id(str(uuid.uuid4())[:8])

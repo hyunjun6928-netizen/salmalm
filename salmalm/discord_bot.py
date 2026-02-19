@@ -34,6 +34,7 @@ class DiscordBot:
         self._ws = None
 
     def configure(self, token: str, owner_id: str = None):
+        """Configure the Discord bot with token and channel settings."""
         self.token = token
         self.owner_id = owner_id
 
@@ -71,6 +72,7 @@ class DiscordBot:
         self._api('POST', f'/channels/{channel_id}/typing')
 
     def add_reaction(self, channel_id: str, message_id: str, emoji: str):
+        """Add an emoji reaction to a Discord message."""
         encoded = urllib.parse.quote(emoji)
         self._api('PUT', f'/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me')
 
@@ -299,6 +301,7 @@ class DiscordBot:
                 retry_delay = min(retry_delay * 2, 60)
 
     def stop(self):
+        """Stop the Discord bot."""
         self._running = False
         try:
             if self._ws_raw:

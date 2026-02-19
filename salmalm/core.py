@@ -48,6 +48,7 @@ def _init_audit_db():
 
 
 def audit_log(event: str, detail: str = ''):
+    """Write an audit event to the security log file."""
     with _audit_lock:
         conn = _get_db()
         row = conn.execute(
@@ -78,6 +79,7 @@ class ResponseCache:
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
     def get(self, model: str, messages: list, session_id: str = '') -> Optional[str]:
+        """Get a cached response by key, or None if expired/missing."""
         k = self._key(model, messages, session_id)
         if k in self._cache:
             entry = self._cache[k]
@@ -89,6 +91,7 @@ class ResponseCache:
         return None
 
     def put(self, model: str, messages: list, response: str, session_id: str = ''):
+        """Store a response in cache with TTL."""
         k = self._key(model, messages, session_id)
         self._cache[k] = {'response': response, 'ts': time.time()}
         if len(self._cache) > self._max_size:
@@ -120,6 +123,7 @@ def _restore_usage():
 
 
 def track_usage(model: str, input_tokens: int, output_tokens: int):
+    """Record token usage and cost for a model call."""
     with _usage_lock:
         short = model.split('/')[-1] if '/' in model else model
         cost_info = MODEL_COSTS.get(short, {'input': 1.0, 'output': 5.0})
@@ -144,6 +148,7 @@ def track_usage(model: str, input_tokens: int, output_tokens: int):
 
 
 def get_usage_report() -> dict:
+    """Generate a formatted usage report with token counts and costs."""
     with _usage_lock:
         elapsed = time.time() - _usage['session_start']
         return {**_usage, 'elapsed_hours': round(elapsed / 3600, 2)}
@@ -184,6 +189,7 @@ class ModelRouter:
 
     def route(self, user_message: str, has_tools: bool = False,
               iteration: int = 0) -> str:
+        """Route a message to the best model based on intent classification."""
         if self.force_model:
             return self.force_model
 
@@ -521,6 +527,7 @@ class LLMCronManager:
         return job
 
     def remove_job(self, job_id: str) -> bool:
+        """Remove a scheduled cron job by ID."""
         before = len(self.jobs)
         self.jobs = [j for j in self.jobs if j['id'] != job_id]
         if len(self.jobs) < before:
@@ -529,6 +536,7 @@ class LLMCronManager:
         return False
 
     def list_jobs(self) -> list:
+        """List all registered cron jobs with their schedules."""
         return [{'id': j['id'], 'name': j['name'], 'schedule': j['schedule'],
                  'enabled': j['enabled'], 'last_run': j['last_run'],
                  'run_count': j['run_count']} for j in self.jobs]
@@ -631,6 +639,7 @@ class Session:
 
     def add_system(self, content: str):
         # Replace existing system message
+        """Add a system message to the session."""
         self.messages = [m for m in self.messages if m['role'] != 'system']
         self.messages.insert(0, {'role': 'system', 'content': content})
 
@@ -655,10 +664,12 @@ class Session:
             log.warning(f"Session persist error: {e}")
 
     def add_user(self, content: str):
+        """Add a user message to the session."""
         self.messages.append({'role': 'user', 'content': content})
         self.last_active = time.time()
 
     def add_assistant(self, content: str):
+        """Add an assistant response to the session."""
         self.messages.append({'role': 'assistant', 'content': content})
         self.last_active = time.time()
         self._persist()
@@ -704,6 +715,7 @@ def _cleanup_sessions():
 
 
 def get_session(session_id: str) -> Session:
+    """Get or create a chat session by ID."""
     _cleanup_sessions()
     if session_id not in _sessions:
         _sessions[session_id] = Session(session_id)
@@ -736,6 +748,7 @@ class CronScheduler:
         self._running = False
 
     def add_job(self, name: str, interval_seconds: int, callback, **kwargs):
+        """Add a new cron job with the given schedule and callback."""
         self.jobs.append({
             'name': name, 'interval': interval_seconds,
             'callback': callback, 'kwargs': kwargs,
@@ -743,6 +756,7 @@ class CronScheduler:
         })
 
     async def run(self):
+        """Start the cron scheduler loop."""
         self._running = True
         log.info(f"[CRON] Cron scheduler started ({len(self.jobs)} jobs)")
         while self._running:
@@ -763,6 +777,7 @@ class CronScheduler:
             await asyncio.sleep(10)
 
     def stop(self):
+        """Stop the cron scheduler loop."""
         self._running = False
 
 

@@ -195,6 +195,7 @@ class HTTPNode:
             return {"error": str(e)}
 
     def run(self, command: str, timeout: int = 30) -> dict:
+        """Execute a command on a remote node."""
         result = self._request("/exec", "POST",
                                {"command": command, "timeout": timeout},
                                timeout=timeout + 5)
@@ -202,6 +203,7 @@ class HTTPNode:
         return result
 
     def status(self) -> dict:
+        """Get the status of a remote node."""
         result = self._request("/status")
         result["node"] = self.name
         return result
@@ -224,6 +226,7 @@ class HTTPNode:
             return {"success": False, "error": str(e)}
 
     def is_reachable(self) -> bool:
+        """Check if a remote node is reachable."""
         result = self._request("/ping", timeout=5)
         return "error" not in result
 
@@ -296,6 +299,7 @@ class NodeManager:
         return True
 
     def remove_node(self, name: str) -> bool:
+        """Remove a registered remote node."""
         if name in self._nodes:
             del self._nodes[name]
             self.save_config()
@@ -303,6 +307,7 @@ class NodeManager:
         return False
 
     def get_node(self, name: str):
+        """Get configuration for a specific node."""
         return self._nodes.get(name)
 
     def list_nodes(self) -> List[dict]:
@@ -545,6 +550,7 @@ class NodeAgent:
         self._heartbeat_thread.start()
 
     def stop(self):
+        """Stop the node manager and close connections."""
         self._running = False
 
 

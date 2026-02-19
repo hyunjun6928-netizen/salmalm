@@ -320,6 +320,7 @@ class RAGEngine:
         }
 
     def close(self):
+        """Close the RAG database connection."""
         if self._conn:
             self._conn.close()
             self._conn = None

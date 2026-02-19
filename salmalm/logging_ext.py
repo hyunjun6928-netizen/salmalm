@@ -29,6 +29,7 @@ class JSONFormatter(logging.Formatter):
     """Format log records as JSON lines."""
 
     def format(self, record: logging.LogRecord) -> str:
+        """Format a log record with correlation ID prefix."""
         log_entry = {
             'ts': datetime.now(KST).isoformat(),
             'level': record.levelname,
@@ -99,6 +100,7 @@ def get_correlation_id() -> str:
 
 
 def set_correlation_id(cid: str):
+    """Set the correlation ID for the current thread context."""
     _request_context.correlation_id = cid
 
 

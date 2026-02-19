@@ -97,6 +97,7 @@ class CDPConnection:
             return False
 
     async def disconnect(self):
+        """Disconnect from the browser WebSocket."""
         self._connected = False
         if self._read_task:
             self._read_task.cancel()
@@ -234,6 +235,7 @@ class BrowserController:
 
     @property
     def connected(self) -> bool:
+        """Check if the browser connection is active."""
         return self._cdp is not None and self._cdp._connected
 
     async def connect(self, tab_index: int = 0) -> bool:
@@ -279,6 +281,7 @@ class BrowserController:
             return False
 
     async def disconnect(self):
+        """Disconnect from the browser WebSocket."""
         if self._cdp:
             await self._cdp.disconnect()
             self._cdp = None
@@ -429,6 +432,7 @@ class BrowserController:
         return self._console_logs[-limit:]
 
     def get_status(self) -> dict:
+        """Get current browser connection status and page info."""
         return {
             "connected": self.connected,
             "host": f"{self.debug_host}:{self.debug_port}",

@@ -80,12 +80,14 @@ class SubAgent:
 
     @classmethod
     def list_agents(cls) -> list:
+        """List all running sub-agents with their status."""
         return [{'id': a['id'], 'task': a['task'][:60], 'status': a['status'],
                  'started': a['started'], 'completed': a['completed']}
                 for a in cls._agents.values()]
 
     @classmethod
     def get_result(cls, agent_id: str) -> dict:
+        """Get the result of a completed sub-agent run."""
         agent = cls._agents.get(agent_id)
         if not agent:
             return {'error': f'Agent {agent_id} not found'}

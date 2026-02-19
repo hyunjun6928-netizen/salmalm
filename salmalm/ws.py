@@ -60,6 +60,7 @@ class WSClient:
             self.connected = False
 
     async def send_text(self, text: str):
+        """Send a text message to a connected WebSocket client."""
         if not self.connected:
             return
         try:
@@ -141,14 +142,17 @@ class WebSocketServer:
         self._running = False
 
     def on_message(self, fn):
+        """Handle an incoming WebSocket message."""
         self._on_message = fn
         return fn
 
     def on_connect(self, fn):
+        """Handle a new WebSocket client connection."""
         self._on_connect = fn
         return fn
 
     def on_disconnect(self, fn):
+        """Handle a WebSocket client disconnection."""
         self._on_disconnect = fn
         return fn
 
@@ -162,6 +166,7 @@ class WebSocketServer:
         asyncio.create_task(self._keepalive_loop())
 
     async def stop(self):
+        """Stop the WebSocket server."""
         self._running = False
         for client in list(self.clients.values()):
             await client.close(1001, "Server shutdown")
@@ -179,6 +184,7 @@ class WebSocketServer:
 
     @property
     def client_count(self) -> int:
+        """Get the number of connected WebSocket clients."""
         return len(self.clients)
 
     async def _handle_connection(self, reader: asyncio.StreamReader,
@@ -376,6 +382,7 @@ class StreamingResponse:
         })
 
     async def send_error(self, error: str):
+        """Send an error message to a WebSocket client."""
         await self.client.send_json({
             "type": "error",
             "error": error,

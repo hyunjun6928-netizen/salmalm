@@ -356,6 +356,7 @@ class MCPClientConnection:
             return False
 
     def disconnect(self):
+        """Disconnect from an MCP server."""
         self._connected = False
         if self._process:
             try:
@@ -426,6 +427,7 @@ class MCPClientConnection:
 
     @property
     def tools(self) -> List[dict]:
+        """List all available tools from connected MCP servers."""
         return self._tools
 
     def call_tool(self, name: str, arguments: dict = None,
@@ -468,6 +470,7 @@ class MCPManager:
 
     @property
     def server(self) -> MCPServer:
+        """Get connection info for a specific MCP server."""
         return self._server
 
     def add_server(self, name: str, command: List[str],
@@ -581,6 +584,7 @@ async def _run_server_stdio():
     server = MCPServer()
 
     async def executor(name, args):
+        """Get the tool executor callable for MCP tools."""
         return execute_tool(name, args)
 
     server.set_tools(TOOL_DEFINITIONS, executor)
