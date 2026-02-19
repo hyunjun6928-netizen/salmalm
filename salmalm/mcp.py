@@ -384,7 +384,7 @@ class MCPClientConnection:
                         self._rpc_responses[msg["id"]] = msg
                 except json.JSONDecodeError:
                     continue
-        except Exception:
+        except Exception as e:
             log.debug(f"Suppressed: {e}")
         self._connected = False
 
@@ -421,7 +421,7 @@ class MCPClientConnection:
             data = (json.dumps(msg, ensure_ascii=False) + '\n').encode('utf-8')
             self._process.stdin.write(data)
             self._process.stdin.flush()
-        except Exception:
+        except Exception as e:
             log.debug(f"Suppressed: {e}")
 
     @property

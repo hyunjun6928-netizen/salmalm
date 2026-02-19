@@ -16,6 +16,8 @@ _usage_lock = threading.Lock()   # Usage tracking (separate to avoid contention)
 
 def _init_audit_db():
     conn = sqlite3.connect(str(AUDIT_DB))
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.execute('''CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ts TEXT NOT NULL, event TEXT NOT NULL,
@@ -130,7 +132,7 @@ def track_usage(model: str, input_tokens: int, output_tokens: int):
                          (datetime.now(KST).isoformat(), model, input_tokens, output_tokens, cost))
             conn.commit()
             conn.close()
-        except Exception:
+        except Exception as e:
             log.debug(f"Suppressed: {e}")
 
 
@@ -168,7 +170,7 @@ class ModelRouter:
                 if saved and saved != 'auto':
                     self.force_model = saved
                     log.info(f"🔧 Restored model preference: {saved}")
-        except Exception:
+        except Exception as e:
             log.debug(f"Suppressed: {e}")
 
     def set_force_model(self, model: Optional[str]):

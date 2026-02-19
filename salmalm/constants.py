@@ -110,8 +110,7 @@ MODEL_COSTS = {
 # Model routing thresholds
 SIMPLE_QUERY_MAX_CHARS = 200  # short queries → cheap model
 COMPLEX_INDICATORS = ['code', 'analyze', 'security', 'optimize', 'design', 'implement',
-                       'code', 'analyze', 'security', 'build', 'implement',
-                       'refactor', 'debug', 'architecture',
+                       'build', 'refactor', 'debug', 'architecture',
                        'migration', 'server', 'deploy',
                        'bug', 'fix', 'write',
                        'develop', 'test', 'audit',
