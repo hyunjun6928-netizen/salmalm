@@ -1,4 +1,4 @@
-# 😈 삶앎 (SalmAlm) v0.10.0
+# 😈 삶앎 (SalmAlm) v0.10.6
 
 **Personal AI Gateway — Pure Python**
 
@@ -29,9 +29,9 @@
 
 ## 📊 Stats
 
-- **23 modules** / ~9,900 lines of Python
+- **25 modules** / ~10,400 lines of Python
 - **30 built-in tools** + plugin extensibility
-- **27 LLM models** (Anthropic, OpenAI, xAI, Google, DeepSeek, Meta)
+- **27+ LLM models** (Anthropic, OpenAI, xAI, Google, DeepSeek, Meta, Ollama)
 - **85 unit tests** + **21/21 self-test** on startup
 - **1 optional dependency** (`cryptography` for AES-256-GCM — graceful fallback without it)
 
@@ -40,32 +40,31 @@
 ```
 salmalm/
 ├── __init__.py         — logging setup
-├── __main__.py         — entry point
-├── constants.py        — paths, costs, thresholds
+├── __main__.py         — entry point + .env loader
+├── constants.py        — paths, costs, model registry, thresholds
 ├── crypto.py           — AES-256-GCM vault (+ HMAC-CTR fallback)
 ├── core.py             — audit, cache, router, cron, sessions
 ├── agents.py           — SubAgent, SkillLoader, PluginLoader
-├── llm.py              — LLM API calls (4 providers)
+├── llm.py              — LLM API calls (6 providers + auto-fallback)
 ├── tools.py            — 30 tool definitions
 ├── tool_handlers.py    — tool execution + gateway dispatch
 ├── prompt.py           — system prompt builder
-├── engine.py           — Intelligence Engine (Plan→Execute→Reflect)
+├── engine.py           — Intelligence Engine (Classify→Plan→Execute→Reflect)
 ├── templates.py        — HTML templates (Web UI)
-├── telegram.py         — Telegram bot
-├── web.py              — Web UI + HTTP API + CORS + auth middleware
+├── telegram.py         — Telegram bot (async long-polling)
+├── discord_bot.py      — Discord Gateway (raw WebSocket)
+├── web.py              — Web UI + HTTP API + CORS + CSRF + auth middleware
 ├── ws.py               — WebSocket server (RFC 6455)
-├── rag.py              — BM25 RAG engine
+├── rag.py              — BM25 RAG engine (SQLite-backed)
 ├── mcp.py              — MCP server + client
 ├── browser.py          — Chrome CDP automation
 ├── nodes.py            — Gateway-Node architecture (registry + remote dispatch)
-├── stability.py        — Health monitor + auto-recovery
-├── auth.py             — JWT auth, RBAC, rate limiter
+├── stability.py        — Health monitor + Circuit Breaker + auto-recovery
+├── auth.py             — JWT auth, RBAC, rate limiter, PBKDF2
 ├── tls.py              — Self-signed TLS cert generation
 ├── container.py        — lightweight DI container
 ├── logging_ext.py      — JSON structured logging
 ├── docs.py             — Auto-generated API docs
-├── search.py           — Brave Search API wrapper
-├── server_main.py      — server bootstrap
 └── plugins/            — Drop-in tool plugins
 ```
 

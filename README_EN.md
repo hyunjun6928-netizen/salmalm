@@ -1,4 +1,4 @@
-# 😈 SalmAlm v0.10.0
+# 😈 SalmAlm v0.10.6
 
 **Personal AI Gateway — Pure Python, Zero Dependencies**
 
@@ -85,22 +85,25 @@ python -m salmalm --node --gateway-url http://gateway:18800
 
 Nodes auto-register with the gateway. Tool calls are dispatched to remote nodes based on capabilities. Falls back to local execution on failure.
 
-## 🏗️ Architecture (23 Modules, ~9,900 lines)
+## 🏗️ Architecture (25 Modules, ~10,400 lines)
 
 ```
 salmalm/
-├── constants.py        — config, costs, thresholds
+├── __init__.py         — logging setup
+├── __main__.py         — entry point + .env loader
+├── constants.py        — config, costs, model registry, thresholds
 ├── crypto.py           — AES-256-GCM vault (HMAC-CTR fallback)
 ├── core.py             — audit, cache, sessions, cron, routing
 ├── agents.py           — SubAgent, SkillLoader, PluginLoader
-├── llm.py              — multi-provider LLM calls
+├── llm.py              — multi-provider LLM calls (6 providers + auto-fallback)
 ├── tools.py            — 30 tool definitions
 ├── tool_handlers.py    — tool execution + gateway dispatch
 ├── prompt.py           — system prompt builder
 ├── engine.py           — Intelligence Engine (classify → plan → execute → reflect)
 ├── templates.py        — HTML templates (Web UI)
 ├── telegram.py         — async Telegram bot
-├── web.py              — Web UI + REST API + SSE streaming
+├── discord_bot.py      — Discord Gateway (raw WebSocket)
+├── web.py              — Web UI + REST API + SSE streaming + CSRF
 ├── ws.py               — WebSocket server (RFC 6455)
 ├── rag.py              — BM25 search engine (SQLite-backed)
 ├── mcp.py              — Model Context Protocol server + client
@@ -112,8 +115,6 @@ salmalm/
 ├── container.py        — lightweight DI container
 ├── logging_ext.py      — JSON structured logging, rotation
 ├── docs.py             — auto-generated API documentation
-├── search.py           — Brave Search API wrapper
-├── server_main.py      — server bootstrap
 └── plugins/            — Drop-in tool plugins
 ```
 
@@ -172,9 +173,9 @@ Not just a chat proxy. Every message goes through:
 
 ## 📊 Stats
 
-- ~9,900 lines of Python across 23 modules
+- ~10,400 lines of Python across 25 modules
 - 30 built-in tools + plugin extensibility
-- 27 LLM models with cost tracking
+- 27+ LLM models with cost tracking (including Ollama local models)
 - 85 unit tests
 - 21/21 self-test on startup
 - 8-component health monitoring
