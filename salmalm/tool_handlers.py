@@ -14,6 +14,12 @@ from .crypto import vault, log
 from .core import audit_log
 from .llm import _http_post, _http_get
 
+# Re-export symbols that tests and other modules import from here
+from .tools_misc import (  # noqa: F401 — re-export for tests and other modules
+    _reminders, _reminder_lock, _send_notification_impl,
+    _parse_relative_time, _parse_rss,
+)
+
 # clipboard lock (used by tools_util.py)
 _clipboard_lock = threading.Lock()
 telegram_bot = None
