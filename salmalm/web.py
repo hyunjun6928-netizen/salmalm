@@ -508,6 +508,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             entries = query_audit_log(limit=limit, event_type=event_type, session_id=sid)
             self._json({'entries': entries, 'count': len(entries)})
 
+        elif self.path == '/api/security/report':
+            if not self._require_auth('admin'): return
+            from .security import security_auditor
+            self._json(security_auditor.audit())
         elif self.path == '/api/ws/status':
             from .ws import ws_server
             self._json({
@@ -593,6 +597,23 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json(detect_paste_type(text))
             else:
                 self._json({'error': 'Missing text parameter'}, 400)
+        elif self.path == '/api/uptime':
+            from .sla import uptime_monitor
+            self._json(uptime_monitor.get_stats())
+        elif self.path == '/api/latency':
+            from .sla import latency_tracker
+            self._json(latency_tracker.get_stats())
+        elif self.path == '/api/sla':
+            from .sla import uptime_monitor, latency_tracker, watchdog, sla_config
+            self._json({
+                'uptime': uptime_monitor.get_stats(),
+                'latency': latency_tracker.get_stats(),
+                'health': watchdog.get_last_report(),
+                'config': sla_config.get_all(),
+            })
+        elif self.path == '/api/sla/config':
+            from .sla import sla_config
+            self._json(sla_config.get_all())
         elif self.path == '/api/health':
             from .stability import health_monitor
             base_health = health_monitor.check_health()
@@ -1817,6 +1838,13 @@ self.addEventListener('fetch',e=>{{
             except Exception as e:
                 log.error(f"Webhook handler error: {e}")
                 self._json({'ok': True})  # Always return 200 to Telegram
+
+        elif self.path == '/api/sla/config':
+            # Update SLA config (SLA 설정 업데이트)
+            if not self._require_auth('admin'): return
+            from .sla import sla_config
+            sla_config.update(body)
+            self._json({'ok': True, 'config': sla_config.get_all()})
 
         elif self.path == '/api/node/execute':
             # Node endpoint: execute a tool locally (called by gateway)

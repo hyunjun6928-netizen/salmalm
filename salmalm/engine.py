@@ -1055,6 +1055,10 @@ async def _process_message_inner(session_id: str, user_message: str,
 /plan <question> — 📋 Plan → Execute
 /status — Usage + Cost
 /tools — Tool list
+/uptime — Uptime stats (업타임)
+/latency — Latency stats (레이턴시)
+/health detail — Detailed health report (상세 헬스)
+/security — 🛡️ Security audit report
 
 🤖 **Model Aliases** (27)
 claude, sonnet, opus, haiku, gpt, gpt5, o3, o4mini,
@@ -1097,6 +1101,68 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
                           'thinking_budget': 10000, 'score': 5}
         return await _engine.run(session, plan_msg, model_override=model_override,
                                   on_tool=on_tool, classification=classification)
+    # --- SLA Commands (SLA 명령) ---
+    if cmd == '/uptime':
+        from .sla import uptime_monitor, sla_config
+        stats = uptime_monitor.get_stats()
+        target = stats['target_pct']
+        pct = stats['monthly_uptime_pct']
+        status_icon = '🟢' if pct >= target else ('🟡' if pct >= 99.0 else '🔴')
+        lines = [
+            f'📊 **SalmAlm Uptime** / 업타임 현황\n',
+            f'{status_icon} Current uptime: **{stats["uptime_human"]}**',
+            f'📅 Month ({stats["month"]}): **{pct}%** (target: {target}%)',
+            f'📅 Today: **{stats["daily_uptime_pct"]}%**',
+            f'🕐 Started: {stats["start_time"][:19]}',
+        ]
+        incidents = stats.get('recent_incidents', [])
+        if incidents:
+            lines.append(f'\n⚠️ Recent incidents ({len(incidents)}):')
+            for inc in incidents[:5]:
+                dur = f'{inc["duration_sec"]:.0f}s' if inc['duration_sec'] else '?'
+                lines.append(f'  • {inc["start"][:19]} — {inc["reason"]} ({dur})')
+        return '\n'.join(lines)
+
+    if cmd == '/latency':
+        from .sla import latency_tracker
+        stats = latency_tracker.get_stats()
+        if stats['count'] == 0:
+            return '📊 No latency data yet. / 레이턴시 데이터가 없습니다.'
+        t = stats['targets']
+        ttft = stats['ttft']
+        total = stats['total']
+        ttft_ok = '✅' if ttft['p95'] <= t['ttft_ms'] else '⚠️'
+        total_ok = '✅' if total['p95'] <= t['response_ms'] else '⚠️'
+        lines = [
+            f'📊 **Latency Stats** / 레이턴시 통계 ({stats["count"]} requests)\n',
+            f'{ttft_ok} **TTFT** (Time To First Token):',
+            f'  P50={ttft["p50"]:.0f}ms  P95={ttft["p95"]:.0f}ms  P99={ttft["p99"]:.0f}ms  (target: <{t["ttft_ms"]}ms)',
+            f'{total_ok} **Total Response Time**:',
+            f'  P50={total["p50"]:.0f}ms  P95={total["p95"]:.0f}ms  P99={total["p99"]:.0f}ms  (target: <{t["response_ms"]}ms)',
+        ]
+        if stats['consecutive_timeouts'] > 0:
+            lines.append(f'⚠️ Consecutive timeouts: {stats["consecutive_timeouts"]}')
+        return '\n'.join(lines)
+
+    if cmd == '/health detail' or cmd == '/health_detail':
+        from .sla import watchdog
+        report = watchdog.get_detailed_health()
+        status = report.get('status', 'unknown')
+        icon = {'healthy': '🟢', 'degraded': '🟡', 'unhealthy': '🔴'}.get(status, '⚪')
+        lines = [f'{icon} **Health Report** / 상세 헬스 리포트\n', f'Status: **{status}**\n']
+        for name, check in report.get('checks', {}).items():
+            s = check.get('status', '?')
+            ci = {'ok': '✅', 'warning': '⚠️', 'error': '❌'}.get(s, '❔')
+            extra = ''
+            if 'usage_mb' in check:
+                extra = f' ({check["usage_mb"]}MB/{check["limit_mb"]}MB)'
+            elif 'usage_pct' in check:
+                extra = f' ({check["usage_pct"]}%/{check["limit_pct"]}%)'
+            elif 'error' in check:
+                extra = f' ({check["error"][:50]})'
+            lines.append(f'{ci} {name}: {s}{extra}')
+        return '\n'.join(lines)
+
     if cmd == '/prune':
         _, stats = prune_context(session.messages)
         total = stats['soft_trimmed'] + stats['hard_cleared'] + stats['unchanged']
@@ -1161,6 +1227,9 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
             else:
                 lines.append(f"### 🤖 {model_name} ({r['time_ms']}ms)\n{r['response'][:500]}\n")
         return '\n'.join(lines)
+    if cmd == '/security':
+        from .security import security_auditor
+        return security_auditor.format_report()
     if cmd == '/soul':
         from .prompt import get_user_soul, USER_SOUL_FILE
         content = get_user_soul()
@@ -1346,12 +1415,43 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
         selected_model, complexity = _select_model(user_message, session)
         log.info(f"[ROUTE] Multi-model: {complexity} → {selected_model}")
 
+    # ── SLA: Measure latency (레이턴시 측정) ──
+    _sla_start = _time.time()
+    _sla_first_token_time = [0.0]  # mutable for closure
+    _orig_on_token = on_token
+
+    def _sla_on_token(event):
+        if _sla_first_token_time[0] == 0.0:
+            _sla_first_token_time[0] = _time.time()
+        if _orig_on_token:
+            _orig_on_token(event)
+
     response = await _engine.run(session, user_message,
                               model_override=selected_model,
                               on_tool=on_tool,
                               classification=classification,
-                              on_token=on_token,
+                              on_token=_sla_on_token,
                               on_status=on_status)
+
+    # ── SLA: Record latency (레이턴시 기록) ──
+    try:
+        from .sla import latency_tracker
+        _sla_end = _time.time()
+        _ttft_ms = ((_sla_first_token_time[0] - _sla_start) * 1000
+                    if _sla_first_token_time[0] > 0 else (_sla_end - _sla_start) * 1000)
+        _total_ms = (_sla_end - _sla_start) * 1000
+        from .sla import sla_config as _sla_cfg
+        _timed_out = _total_ms > _sla_cfg.get('response_target_ms', 30000)
+        latency_tracker.record(
+            ttft_ms=_ttft_ms, total_ms=_total_ms,
+            model=selected_model or 'auto',
+            timed_out=_timed_out, session_id=session_id)
+        # Check failover trigger
+        if latency_tracker.should_failover():
+            log.warning("[SLA] Consecutive timeout threshold reached — failover recommended")
+            latency_tracker.reset_timeout_counter()
+    except Exception as _sla_err:
+        log.debug(f"[SLA] Latency tracking error: {_sla_err}")
 
     # Store model metadata on session for API consumers
     session.last_model = selected_model or 'auto'
