@@ -53,3 +53,7 @@ build/
 .coverage
 audit.db*
 certs/
+
+reminders.json
+workflows.json
+tts_output/

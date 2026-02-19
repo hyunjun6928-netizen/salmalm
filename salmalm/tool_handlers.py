@@ -1,4 +1,4 @@
-"""SalmAlm tool handlers — execution logic for all 32 tools."""
+"""SalmAlm tool handlers — execution logic for all 39 tools."""
 import subprocess, sys, os, re, time, json, traceback, uuid, secrets
 import urllib.request, base64, mimetypes, difflib, threading
 from datetime import datetime
@@ -1208,6 +1208,28 @@ else:
             lines.append(f"\n📊 Index: {stats['total_chunks']}chunks, {stats['unique_terms']}terms, {stats['db_size_kb']}KB")
             return '\n'.join(lines)
 
+        # ── v0.12 New Tools ──────────────────────────────────────
+        elif name == 'google_calendar':
+            return _handle_google_calendar(args)
+
+        elif name == 'gmail':
+            return _handle_gmail(args)
+
+        elif name == 'reminder':
+            return _handle_reminder(args)
+
+        elif name == 'tts_generate':
+            return _handle_tts_generate(args)
+
+        elif name == 'workflow':
+            return _handle_workflow(args)
+
+        elif name == 'file_index':
+            return _handle_file_index(args)
+
+        elif name == 'notification':
+            return _handle_notification(args)
+
         else:
             # Try plugin tools as fallback
             from .core import PluginLoader
@@ -1227,3 +1249,711 @@ else:
     except Exception as e:
         log.error(f"Tool error ({name}): {e}")
         return f'❌ Tool error: {str(e)[:200]}'
+
+
+# ══════════════════════════════════════════════════════════════
+#  v0.12 Tool Handlers
+# ══════════════════════════════════════════════════════════════
+
+def _google_oauth_headers() -> dict:
+    """Get OAuth2 headers for Google APIs. Uses refresh token from vault."""
+    token = vault.get('google_access_token') or ''
+    refresh = vault.get('google_refresh_token') or ''
+    client_id = vault.get('google_client_id') or ''
+    client_secret = vault.get('google_client_secret') or ''
+
+    if not token and not refresh:
+        raise ValueError(
+            'Google API credentials not configured. '
+            'Set google_refresh_token, google_client_id, google_client_secret in vault. '
+            'Get credentials at https://console.cloud.google.com/apis/credentials')
+
+    # Try existing token first
+    if token:
+        return {'Authorization': f'Bearer {token}'}
+
+    # Refresh the token
+    if refresh and client_id and client_secret:
+        data = json.dumps({
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'refresh_token': refresh,
+            'grant_type': 'refresh_token',
+        }).encode()
+        req = urllib.request.Request(
+            'https://oauth2.googleapis.com/token',
+            data=data,
+            headers={'Content-Type': 'application/json'},
+            method='POST')
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read())
+                new_token = result.get('access_token', '')
+                if new_token:
+                    vault.set('google_access_token', new_token)
+                    return {'Authorization': f'Bearer {new_token}'}
+        except Exception as e:
+            raise ValueError(f'OAuth2 refresh failed: {e}')
+
+    raise ValueError('Cannot authenticate with Google. Check vault credentials.')
+
+
+def _handle_google_calendar(args: dict) -> str:
+    """Google Calendar tool handler."""
+    action = args.get('action', 'list')
+    cal_id = args.get('calendar_id', 'primary')
+    base = f'https://www.googleapis.com/calendar/v3/calendars/{cal_id}'
+    headers = _google_oauth_headers()
+
+    if action == 'list':
+        days = args.get('days', 7)
+        now = datetime.utcnow()
+        from datetime import timedelta
+        time_min = now.isoformat() + 'Z'
+        time_max = (now + timedelta(days=days)).isoformat() + 'Z'
+        url = f'{base}/events?timeMin={time_min}&timeMax={time_max}&maxResults=20&singleEvents=true&orderBy=startTime'
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+        events = data.get('items', [])
+        if not events:
+            return f'📅 No events in the next {days} days.'
+        lines = [f'📅 **Upcoming Events ({len(events)}):**']
+        for e in events:
+            start = e.get('start', {}).get('dateTime', e.get('start', {}).get('date', '?'))
+            end = e.get('end', {}).get('dateTime', e.get('end', {}).get('date', ''))
+            summary = e.get('summary', '(no title)')
+            loc = e.get('location', '')
+            line = f"  • **{summary}** — {start[:16]}"
+            if loc:
+                line += f" 📍{loc}"
+            lines.append(line)
+        return '\n'.join(lines)
+
+    elif action == 'create':
+        title = args.get('title', '')
+        start = args.get('start', '')
+        end = args.get('end', '')
+        desc = args.get('description', '')
+        if not title or not start:
+            return '❌ title and start are required for create'
+        event = {
+            'summary': title,
+            'start': {'dateTime': start, 'timeZone': 'Asia/Seoul'},
+            'end': {'dateTime': end or start, 'timeZone': 'Asia/Seoul'},
+        }
+        if desc:
+            event['description'] = desc
+        body = json.dumps(event).encode()
+        req = urllib.request.Request(
+            f'{base}/events', data=body,
+            headers={**headers, 'Content-Type': 'application/json'},
+            method='POST')
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
+        return f"📅 Event created: **{result.get('summary')}** ({result.get('htmlLink', '')})"
+
+    elif action == 'delete':
+        event_id = args.get('event_id', '')
+        if not event_id:
+            return '❌ event_id is required for delete'
+        req = urllib.request.Request(
+            f'{base}/events/{event_id}', headers=headers, method='DELETE')
+        urllib.request.urlopen(req, timeout=15)
+        return f'📅 Event deleted: {event_id}'
+
+    return f'❌ Unknown calendar action: {action}'
+
+
+def _handle_gmail(args: dict) -> str:
+    """Gmail tool handler."""
+    action = args.get('action', 'list')
+    base = 'https://www.googleapis.com/gmail/v1/users/me'
+    headers = _google_oauth_headers()
+
+    if action == 'list' or action == 'search':
+        count = min(args.get('count', 10), 50)
+        query = args.get('query', '')
+        label = args.get('label', 'INBOX')
+        params = f'maxResults={count}'
+        if query:
+            import urllib.parse
+            params += f'&q={urllib.parse.quote(query)}'
+        elif label:
+            params += f'&labelIds={label}'
+        url = f'{base}/messages?{params}'
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+        messages = data.get('messages', [])
+        if not messages:
+            return '📧 No messages found.'
+
+        # Fetch headers for each message (batch would be better but keeping it simple)
+        lines = [f'📧 **Messages ({len(messages)}):**']
+        for msg_ref in messages[:count]:
+            msg_url = f'{base}/messages/{msg_ref["id"]}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date'
+            req = urllib.request.Request(msg_url, headers=headers)
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    msg = json.loads(resp.read())
+                hdrs = {h['name']: h['value'] for h in msg.get('payload', {}).get('headers', [])}
+                subj = hdrs.get('Subject', '(no subject)')
+                frm = hdrs.get('From', '?')
+                date = hdrs.get('Date', '')[:22]
+                snippet = msg.get('snippet', '')[:80]
+                lines.append(f"  📩 **{subj}** — {frm[:30]}")
+                lines.append(f"     {date} | {snippet}")
+                lines.append(f"     ID: `{msg_ref['id']}`")
+            except Exception:
+                lines.append(f"  📩 ID: {msg_ref['id']} (failed to fetch)")
+        return '\n'.join(lines)
+
+    elif action == 'read':
+        msg_id = args.get('message_id', '')
+        if not msg_id:
+            return '❌ message_id is required for read'
+        url = f'{base}/messages/{msg_id}?format=full'
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            msg = json.loads(resp.read())
+        hdrs = {h['name']: h['value'] for h in msg.get('payload', {}).get('headers', [])}
+        subj = hdrs.get('Subject', '(no subject)')
+        frm = hdrs.get('From', '?')
+        date = hdrs.get('Date', '')
+
+        # Extract body
+        body_text = ''
+        payload = msg.get('payload', {})
+
+        def _extract_body(part: dict) -> str:
+            """Extract email body text recursively."""
+            if part.get('mimeType', '').startswith('text/plain'):
+                data = part.get('body', {}).get('data', '')
+                if data:
+                    return base64.urlsafe_b64decode(data).decode('utf-8', errors='replace')
+            for sub in part.get('parts', []):
+                result = _extract_body(sub)
+                if result:
+                    return result
+            return ''
+
+        body_text = _extract_body(payload)
+        if not body_text and payload.get('body', {}).get('data'):
+            body_text = base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8', errors='replace')
+
+        return f"📧 **{subj}**\nFrom: {frm}\nDate: {date}\n\n{body_text[:3000]}"
+
+    elif action == 'send':
+        to = args.get('to', '')
+        subject = args.get('subject', '')
+        body = args.get('body', '')
+        if not to or not subject:
+            return '❌ to and subject are required for send'
+        import email.mime.text
+        msg = email.mime.text.MIMEText(body, 'plain', 'utf-8')
+        msg['To'] = to
+        msg['Subject'] = subject
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        send_body = json.dumps({'raw': raw}).encode()
+        req = urllib.request.Request(
+            f'{base}/messages/send', data=send_body,
+            headers={**headers, 'Content-Type': 'application/json'},
+            method='POST')
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
+        return f"📧 Email sent to {to} (ID: {result.get('id', '?')})"
+
+    return f'❌ Unknown gmail action: {action}'
+
+
+# ── Reminder System ──────────────────────────────────────────
+
+_reminders: list = []  # In-memory; persisted to reminders.json
+_reminder_lock = threading.Lock()
+_reminder_thread_started = False
+
+def _parse_relative_time(s: str) -> datetime:
+    """Parse relative time string like '30m', '2h', '1d' into datetime."""
+    import re as _re
+    now = datetime.now()
+    from datetime import timedelta
+    m = _re.match(r'^(\d+)\s*(m|min|h|hr|hour|d|day|w|week)s?$', s.strip().lower())
+    if m:
+        val = int(m.group(1))
+        unit = m.group(2)[0]
+        delta = {'m': timedelta(minutes=val), 'h': timedelta(hours=val),
+                 'd': timedelta(days=val), 'w': timedelta(weeks=val)}
+        return now + delta.get(unit, timedelta(minutes=val))
+    # Try ISO format
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        pass
+    raise ValueError(f'Cannot parse time: {s}. Use ISO8601 or relative (30m, 2h, 1d)')
+
+
+def _reminders_file() -> Path:
+    """Get reminders file path."""
+    return WORKSPACE_DIR / 'reminders.json'
+
+
+def _load_reminders():
+    """Load reminders from disk."""
+    global _reminders
+    fp = _reminders_file()
+    if fp.exists():
+        try:
+            _reminders = json.loads(fp.read_text(encoding='utf-8'))
+        except Exception:
+            _reminders = []
+
+
+def _save_reminders():
+    """Save reminders to disk."""
+    fp = _reminders_file()
+    fp.write_text(json.dumps(_reminders, ensure_ascii=False, indent=2, default=str),
+                  encoding='utf-8')
+
+
+def _reminder_check_loop():
+    """Background thread that checks for due reminders."""
+    while True:
+        time.sleep(30)  # Check every 30 seconds
+        now = datetime.now()
+        with _reminder_lock:
+            due = []
+            remaining = []
+            for r in _reminders:
+                try:
+                    trigger_time = datetime.fromisoformat(r['time'])
+                    if trigger_time <= now:
+                        due.append(r)
+                    else:
+                        remaining.append(r)
+                except Exception:
+                    remaining.append(r)
+            if due:
+                _reminders.clear()
+                _reminders.extend(remaining)
+                _save_reminders()
+        # Send notifications for due reminders
+        for r in due:
+            try:
+                _send_notification_impl(
+                    f"⏰ Reminder: {r['message']}",
+                    title='Reminder',
+                    channel='all')
+            except Exception as e:
+                log.error(f"Reminder notification failed: {e}")
+            # Handle repeating reminders
+            if r.get('repeat'):
+                try:
+                    from datetime import timedelta
+                    repeat = r['repeat']
+                    deltas = {'daily': timedelta(days=1), 'weekly': timedelta(weeks=1),
+                              'monthly': timedelta(days=30)}
+                    if repeat in deltas:
+                        r['time'] = (datetime.fromisoformat(r['time']) + deltas[repeat]).isoformat()
+                        with _reminder_lock:
+                            _reminders.append(r)
+                            _save_reminders()
+                except Exception:
+                    pass
+
+
+def _ensure_reminder_thread():
+    """Start the reminder background thread if not already running."""
+    global _reminder_thread_started
+    if not _reminder_thread_started:
+        _reminder_thread_started = True
+        _load_reminders()
+        t = threading.Thread(target=_reminder_check_loop, daemon=True)
+        t.start()
+
+
+def _handle_reminder(args: dict) -> str:
+    """Reminder tool handler."""
+    _ensure_reminder_thread()
+    action = args.get('action', 'set')
+
+    if action == 'set':
+        message = args.get('message', '')
+        time_str = args.get('time', '')
+        if not message or not time_str:
+            return '❌ message and time are required'
+        trigger_time = _parse_relative_time(time_str)
+        reminder = {
+            'id': secrets.token_hex(4),
+            'message': message,
+            'time': trigger_time.isoformat(),
+            'repeat': args.get('repeat'),
+            'created': datetime.now().isoformat(),
+        }
+        with _reminder_lock:
+            _reminders.append(reminder)
+            _save_reminders()
+        return f"⏰ Reminder set: **{message}** at {trigger_time.strftime('%Y-%m-%d %H:%M')}" + \
+               (f" (repeat: {args['repeat']})" if args.get('repeat') else '')
+
+    elif action == 'list':
+        _load_reminders()
+        if not _reminders:
+            return '⏰ No active reminders.'
+        lines = [f'⏰ **Active Reminders ({len(_reminders)}):**']
+        for r in sorted(_reminders, key=lambda x: x.get('time', '')):
+            repeat_str = f" 🔁{r['repeat']}" if r.get('repeat') else ''
+            lines.append(f"  • [{r['id']}] **{r['message']}** — {r['time'][:16]}{repeat_str}")
+        return '\n'.join(lines)
+
+    elif action == 'delete':
+        rid = args.get('reminder_id', '')
+        if not rid:
+            return '❌ reminder_id is required'
+        with _reminder_lock:
+            before = len(_reminders)
+            _reminders[:] = [r for r in _reminders if r.get('id') != rid]
+            _save_reminders()
+            if len(_reminders) < before:
+                return f'⏰ Reminder deleted: {rid}'
+        return f'❌ Reminder not found: {rid}'
+
+    return f'❌ Unknown reminder action: {action}'
+
+
+# ── TTS Generate ─────────────────────────────────────────────
+
+def _handle_tts_generate(args: dict) -> str:
+    """TTS generation handler — Google TTS (free) or OpenAI TTS."""
+    text = args.get('text', '')
+    if not text:
+        return '❌ text is required'
+    provider = args.get('provider', 'google')
+    language = args.get('language', 'ko-KR')
+    output_path = args.get('output', '')
+
+    if not output_path:
+        fname = f"tts_{secrets.token_hex(4)}.mp3"
+        output_dir = WORKSPACE_DIR / 'tts_output'
+        output_dir.mkdir(exist_ok=True)
+        output_path = str(output_dir / fname)
+
+    import urllib.parse  # noqa: must be at function-top to avoid shadowing urllib.request
+
+    if provider == 'google':
+        # Google Translate TTS (free, no API key needed)
+        # Split long text into chunks (Google TTS limit ~200 chars)
+        chunks = []
+        while text:
+            chunk = text[:200]
+            text = text[200:]
+            chunks.append(chunk)
+
+        audio_data = b''
+        for chunk in chunks:
+            encoded = urllib.parse.quote(chunk)
+            url = f'https://translate.google.com/translate_tts?ie=UTF-8&q={encoded}&tl={language}&client=tw-ob'
+            req = urllib.request.Request(url, headers={
+                'User-Agent': 'Mozilla/5.0',
+                'Referer': 'https://translate.google.com/',
+            })
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    audio_data += resp.read()
+            except Exception as e:
+                return f'❌ Google TTS failed: {e}'
+
+        Path(output_path).write_bytes(audio_data)
+        return f'🔊 TTS generated: {output_path} ({len(audio_data)} bytes, {len(chunks)} chunks)'
+
+    elif provider == 'openai':
+        api_key = vault.get('openai_api_key') or ''
+        if not api_key:
+            return '❌ OpenAI API key not configured in vault'
+        voice = args.get('voice', 'alloy')
+        body = json.dumps({'model': 'tts-1', 'input': text[:4096], 'voice': voice}).encode()
+        req = urllib.request.Request(
+            'https://api.openai.com/v1/audio/speech',
+            data=body,
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+            method='POST')
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                audio = resp.read()
+            Path(output_path).write_bytes(audio)
+            return f'🔊 TTS generated: {output_path} ({len(audio)} bytes, voice={voice})'
+        except Exception as e:
+            return f'❌ OpenAI TTS failed: {e}'
+
+    return f'❌ Unknown TTS provider: {provider}'
+
+
+# ── Workflow Engine ──────────────────────────────────────────
+
+_workflows_file = WORKSPACE_DIR / 'workflows.json'
+
+def _load_workflows() -> dict:
+    """Load saved workflows."""
+    if _workflows_file.exists():
+        try:
+            return json.loads(_workflows_file.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+    return {}
+
+def _save_workflows(wf: dict):
+    """Save workflows."""
+    _workflows_file.write_text(json.dumps(wf, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+def _handle_workflow(args: dict) -> str:
+    """Workflow tool handler — chain multiple tools together."""
+    action = args.get('action', 'list')
+
+    if action == 'list':
+        wf = _load_workflows()
+        if not wf:
+            return '🔄 No saved workflows.'
+        lines = ['🔄 **Saved Workflows:**']
+        for name, data in wf.items():
+            steps = data.get('steps', [])
+            lines.append(f"  • **{name}** — {len(steps)} steps")
+        return '\n'.join(lines)
+
+    elif action == 'save':
+        name = args.get('name', '')
+        steps = args.get('steps', [])
+        if not name or not steps:
+            return '❌ name and steps are required for save'
+        wf = _load_workflows()
+        wf[name] = {'steps': steps, 'created': datetime.now().isoformat()}
+        _save_workflows(wf)
+        return f'🔄 Workflow saved: **{name}** ({len(steps)} steps)'
+
+    elif action == 'delete':
+        name = args.get('name', '')
+        wf = _load_workflows()
+        if name in wf:
+            del wf[name]
+            _save_workflows(wf)
+            return f'🔄 Workflow deleted: {name}'
+        return f'❌ Workflow not found: {name}'
+
+    elif action == 'run':
+        name = args.get('name', '')
+        steps = args.get('steps', [])
+        variables = args.get('variables', {})
+
+        # Load from saved if name provided
+        if name and not steps:
+            wf = _load_workflows()
+            if name not in wf:
+                return f'❌ Workflow not found: {name}'
+            steps = wf[name].get('steps', [])
+
+        if not steps:
+            return '❌ No steps defined'
+
+        # Execute steps sequentially
+        context = dict(variables)
+        results = []
+        for i, step in enumerate(steps):
+            tool_name = step.get('tool', '')
+            step_args = dict(step.get('args', {}))
+
+            # Variable substitution in args
+            for k, v in step_args.items():
+                if isinstance(v, str) and v.startswith('$'):
+                    var_name = v[1:]
+                    if var_name in context:
+                        step_args[k] = context[var_name]
+
+            result = execute_tool(tool_name, step_args)
+            results.append(f"Step {i+1} ({tool_name}): {result[:200]}")
+
+            # Store output in context
+            output_var = step.get('output_var', f'step_{i+1}')
+            context[output_var] = result
+
+        return '🔄 **Workflow Complete:**\n' + '\n'.join(results)
+
+    return f'❌ Unknown workflow action: {action}'
+
+
+# ── File Index ───────────────────────────────────────────────
+
+_file_index: dict = {}  # path -> {mtime, words}
+_file_index_lock = threading.Lock()
+
+def _handle_file_index(args: dict) -> str:
+    """File index and search handler."""
+    action = args.get('action', 'search')
+
+    if action == 'index' or action == 'status':
+        target_dir = Path(args.get('path', str(WORKSPACE_DIR)))
+        if not target_dir.exists():
+            return f'❌ Directory not found: {target_dir}'
+        exts = args.get('extensions', 'py,md,txt,json,yaml,yml,toml,cfg,ini,sh,bat,js,ts,html,css')
+        ext_set = set(f'.{e.strip()}' for e in exts.split(','))
+
+        count = 0
+        with _file_index_lock:
+            for fp in target_dir.rglob('*'):
+                if fp.is_file() and fp.suffix in ext_set and fp.stat().st_size < 500_000:
+                    try:
+                        # Skip hidden dirs
+                        if any(p.startswith('.') for p in fp.relative_to(target_dir).parts[:-1]):
+                            continue
+                        content = fp.read_text(encoding='utf-8', errors='replace')[:50000]
+                        words = set(re.findall(r'\w+', content.lower()))
+                        _file_index[str(fp)] = {
+                            'mtime': fp.stat().st_mtime,
+                            'words': words,
+                            'size': fp.stat().st_size,
+                            'preview': content[:200],
+                        }
+                        count += 1
+                    except Exception:
+                        pass
+
+        if action == 'status':
+            return f'📂 File index: {len(_file_index)} files indexed'
+        return f'📂 Indexed {count} files from {target_dir}'
+
+    elif action == 'search':
+        query = args.get('query', '')
+        if not query:
+            return '❌ query is required'
+        limit = args.get('limit', 10)
+
+        # Build index if empty
+        if not _file_index:
+            _handle_file_index({'action': 'index'})
+
+        query_words = set(re.findall(r'\w+', query.lower()))
+        if not query_words:
+            return '❌ No searchable terms in query'
+
+        # Score files by word overlap
+        scored = []
+        with _file_index_lock:
+            for path, info in _file_index.items():
+                overlap = len(query_words & info['words'])
+                if overlap > 0:
+                    score = overlap / len(query_words)
+                    scored.append((score, path, info))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        results = scored[:limit]
+
+        if not results:
+            return f'🔍 No files matching: {query}'
+
+        lines = [f'🔍 **File Search: "{query}" ({len(results)} results):**']
+        for score, path, info in results:
+            rel = Path(path).relative_to(WORKSPACE_DIR) if path.startswith(str(WORKSPACE_DIR)) else Path(path)
+            lines.append(f"  📄 **{rel}** (score: {score:.1%}, {info['size']}B)")
+            lines.append(f"     {info['preview'][:100]}...")
+        return '\n'.join(lines)
+
+    return f'❌ Unknown file_index action: {action}'
+
+
+# ── Notification ─────────────────────────────────────────────
+
+def _send_notification_impl(message: str, title: str = '', channel: str = 'all',
+                            url: str = '', priority: str = 'normal'):
+    """Send notification via available channels."""
+    results = []
+
+    # Telegram
+    if channel in ('telegram', 'all'):
+        try:
+            tg = _tg_bot
+            if tg:
+                owner = vault.get('telegram_owner_id') or ''
+                if owner:
+                    text = f"🔔 {title}\n{message}" if title else f"🔔 {message}"
+                    tg_url = f"https://api.telegram.org/bot{vault.get('telegram_bot_token')}/sendMessage"
+                    body = json.dumps({'chat_id': owner, 'text': text}).encode()
+                    req = urllib.request.Request(
+                        tg_url, data=body,
+                        headers={'Content-Type': 'application/json'},
+                        method='POST')
+                    urllib.request.urlopen(req, timeout=10)
+                    results.append('telegram: ✅')
+                else:
+                    results.append('telegram: ⚠️ no owner_id')
+            else:
+                results.append('telegram: ⚠️ not configured')
+        except Exception as e:
+            results.append(f'telegram: ❌ {e}')
+
+    # Desktop notification (cross-platform)
+    if channel in ('desktop', 'all'):
+        try:
+            if sys.platform == 'darwin':
+                subprocess.run(['osascript', '-e',
+                    f'display notification "{message}" with title "{title or "SalmAlm"}"'],
+                    timeout=5, capture_output=True)
+                results.append('desktop: ✅')
+            elif sys.platform == 'linux':
+                subprocess.run(['notify-send', title or 'SalmAlm', message],
+                    timeout=5, capture_output=True)
+                results.append('desktop: ✅')
+            elif sys.platform == 'win32':
+                # PowerShell toast notification
+                ps_cmd = f'''
+                [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+                $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+                $template.GetElementsByTagName("text")[0].AppendChild($template.CreateTextNode("{title or 'SalmAlm'}")) | Out-Null
+                $template.GetElementsByTagName("text")[1].AppendChild($template.CreateTextNode("{message}")) | Out-Null
+                $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
+                [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("SalmAlm").Show($toast)
+                '''
+                subprocess.run(['powershell', '-Command', ps_cmd],
+                    timeout=10, capture_output=True)
+                results.append('desktop: ✅')
+            else:
+                results.append('desktop: ⚠️ unsupported platform')
+        except FileNotFoundError:
+            results.append('desktop: ⚠️ notification tool not found')
+        except Exception as e:
+            results.append(f'desktop: ❌ {e}')
+
+    # Webhook
+    if channel == 'webhook' and url:
+        try:
+            body = json.dumps({
+                'title': title or 'SalmAlm',
+                'message': message,
+                'priority': priority,
+                'timestamp': datetime.now().isoformat(),
+            }).encode()
+            req = urllib.request.Request(
+                url, data=body,
+                headers={'Content-Type': 'application/json'},
+                method='POST')
+            urllib.request.urlopen(req, timeout=10)
+            results.append('webhook: ✅')
+        except Exception as e:
+            results.append(f'webhook: ❌ {e}')
+
+    return results
+
+
+def _handle_notification(args: dict) -> str:
+    """Notification tool handler."""
+    message = args.get('message', '')
+    if not message:
+        return '❌ message is required'
+    title = args.get('title', '')
+    channel = args.get('channel', 'all')
+    url = args.get('url', '')
+    priority = args.get('priority', 'normal')
+
+    results = _send_notification_impl(message, title, channel, url, priority)
+    return '🔔 Notification sent:\n  ' + '\n  '.join(results)

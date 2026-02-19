@@ -408,6 +408,118 @@ TOOL_DEFINITIONS = [
             },
         }
     },
+    # ── v0.12 New Tools ──────────────────────────────────────────
+    {
+        'name': 'google_calendar',
+        'description': 'Google Calendar: list upcoming events, create/delete events. Requires Google API credentials in vault.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'list, create, delete', 'enum': ['list', 'create', 'delete']},
+                'days': {'type': 'integer', 'description': 'Days ahead to list (default: 7)'},
+                'title': {'type': 'string', 'description': 'Event title (for create)'},
+                'start': {'type': 'string', 'description': 'Start time ISO8601 (for create)'},
+                'end': {'type': 'string', 'description': 'End time ISO8601 (for create)'},
+                'description': {'type': 'string', 'description': 'Event description'},
+                'event_id': {'type': 'string', 'description': 'Event ID (for delete)'},
+                'calendar_id': {'type': 'string', 'description': 'Calendar ID (default: primary)'},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'gmail',
+        'description': 'Gmail: list recent emails, read specific email, send email. Requires Google API credentials in vault.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'list, read, send, search', 'enum': ['list', 'read', 'send', 'search']},
+                'count': {'type': 'integer', 'description': 'Number of emails to list (default: 10)'},
+                'message_id': {'type': 'string', 'description': 'Message ID (for read)'},
+                'to': {'type': 'string', 'description': 'Recipient email (for send)'},
+                'subject': {'type': 'string', 'description': 'Email subject (for send)'},
+                'body': {'type': 'string', 'description': 'Email body (for send)'},
+                'query': {'type': 'string', 'description': 'Search query (Gmail search syntax)'},
+                'label': {'type': 'string', 'description': 'Label filter (default: INBOX)'},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'reminder',
+        'description': 'Set a reminder. Triggers notification via configured channel (Telegram/desktop) at specified time.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'set, list, delete', 'enum': ['set', 'list', 'delete']},
+                'message': {'type': 'string', 'description': 'Reminder message'},
+                'time': {'type': 'string', 'description': 'When to remind: ISO8601, relative (e.g. "30m", "2h", "1d"), or natural language'},
+                'reminder_id': {'type': 'string', 'description': 'Reminder ID (for delete)'},
+                'repeat': {'type': 'string', 'description': 'Repeat interval: daily, weekly, monthly, or cron expression'},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'tts_generate',
+        'description': 'Text-to-Speech: generate audio from text. Returns audio file path. Supports Google TTS (free) and OpenAI TTS.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'text': {'type': 'string', 'description': 'Text to convert to speech'},
+                'provider': {'type': 'string', 'description': 'TTS provider: google, openai (default: google)', 'enum': ['google', 'openai']},
+                'language': {'type': 'string', 'description': 'Language code (default: ko-KR)'},
+                'voice': {'type': 'string', 'description': 'Voice name (provider-specific)'},
+                'output': {'type': 'string', 'description': 'Output file path (default: auto-generated)'},
+            },
+            'required': ['text']
+        }
+    },
+    {
+        'name': 'workflow',
+        'description': 'Execute a predefined workflow (tool chain). Define workflows with steps that pipe outputs.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'run, list, save, delete', 'enum': ['run', 'list', 'save', 'delete']},
+                'name': {'type': 'string', 'description': 'Workflow name'},
+                'steps': {'type': 'array', 'description': 'Workflow steps: [{tool, args, output_var}]',
+                          'items': {'type': 'object'}},
+                'variables': {'type': 'object', 'description': 'Input variables for the workflow'},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'file_index',
+        'description': 'Index and search local files. Builds searchable index of workspace files for fast retrieval.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'search, index, status', 'enum': ['search', 'index', 'status']},
+                'query': {'type': 'string', 'description': 'Search query'},
+                'path': {'type': 'string', 'description': 'Directory to index (default: workspace)'},
+                'extensions': {'type': 'string', 'description': 'File extensions to include (comma-separated, e.g. "py,md,txt")'},
+                'limit': {'type': 'integer', 'description': 'Max results (default: 10)'},
+            },
+            'required': ['action']
+        }
+    },
+    {
+        'name': 'notification',
+        'description': 'Send notification via configured channels (Telegram, desktop, webhook).',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'message': {'type': 'string', 'description': 'Notification message'},
+                'title': {'type': 'string', 'description': 'Notification title'},
+                'channel': {'type': 'string', 'description': 'Channel: telegram, desktop, webhook, all', 'enum': ['telegram', 'desktop', 'webhook', 'all']},
+                'url': {'type': 'string', 'description': 'Webhook URL (for webhook channel)'},
+                'priority': {'type': 'string', 'description': 'Priority: low, normal, high', 'enum': ['low', 'normal', 'high']},
+            },
+            'required': ['message']
+        }
+    },
 ]
 
 
