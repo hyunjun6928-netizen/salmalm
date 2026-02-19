@@ -5,6 +5,10 @@ WEB_HTML = '''<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SalmAlm — Personal AI Gateway</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#6366f1">
+<link rel="icon" href="/icon-192.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-192.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -168,6 +172,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div class="nav-section" data-i18n="sec-admin">Admin</div>
     <div class="nav-item" onclick="showSettings()"data-i18n="nav-settings">⚙️ Settings</div>
     <div class="nav-item" onclick="showUsage()">📊 Usage</div>
+    <div class="nav-item" onclick="window.open('/dashboard','_blank')">📈 Dashboard</div>
   </div>
   <div class="side-footer">
     <div class="status"><span class="dot"></span> Running</div>
@@ -302,6 +307,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 <div id="input-area">
   <div class="input-box">
     <textarea id="input" rows="1" placeholder="Type a message..." data-i18n="input-ph"></textarea>
+    <button id="mic-btn" onclick="window.toggleMic()" title="Voice input" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🎤</button>
     <button id="send-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
     </button>
@@ -896,6 +902,49 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     }catch(e){}
   },30000);
   applyLang();
+  /* STT — Voice Input */
+  var _mediaRec=null,_audioChunks=[];
+  window.toggleMic=function(){
+    var btn=document.getElementById('mic-btn');
+    if(_mediaRec&&_mediaRec.state==='recording'){
+      _mediaRec.stop();
+      btn.style.background='var(--bg3)';btn.style.color='var(--text2)';
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      _audioChunks=[];
+      _mediaRec=new MediaRecorder(stream,{mimeType:'audio/webm'});
+      _mediaRec.ondataavailable=function(e){if(e.data.size>0)_audioChunks.push(e.data)};
+      _mediaRec.onstop=function(){
+        stream.getTracks().forEach(function(t){t.stop()});
+        var blob=new Blob(_audioChunks,{type:'audio/webm'});
+        var reader=new FileReader();
+        reader.onload=function(){
+          var b64=reader.result.split(',')[1];
+          btn.textContent='⏳';
+          fetch('/api/stt',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+            body:JSON.stringify({audio_base64:b64,language:'ko'})})
+          .then(function(r){return r.json()})
+          .then(function(d){
+            if(d.text){
+              var inp=document.getElementById('input');
+              inp.value=(inp.value?inp.value+' ':'')+d.text;
+              inp.focus();inp.dispatchEvent(new Event('input'));
+            }
+            btn.textContent='🎤';
+          }).catch(function(){btn.textContent='🎤'});
+        };
+        reader.readAsDataURL(blob);
+      };
+      _mediaRec.start();
+      btn.style.background='var(--red)';btn.style.color='#fff';
+    }).catch(function(){alert('Microphone access denied')});
+  };
+
+  /* PWA Service Worker — standalone mode only */
+  if(window.matchMedia('(display-mode:standalone)').matches&&'serviceWorker' in navigator){
+    navigator.serviceWorker.register('/sw.js').catch(function(){});
+  }
 })();
 </script></body></html>'''
 
@@ -1124,4 +1173,151 @@ async function unlock(){
   if(d.ok){sessionStorage.setItem('tok',d.token||'');location.reload()}
   else{const e=document.getElementById('err');e.textContent=d.error;e.style.display='block'}
 }
+</script></body></html>'''
+
+
+DASHBOARD_HTML = '''<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SalmAlm Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0f172a;--bg2:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--accent:#6366f1;--border:#334155;--green:#22c55e;--red:#ef4444;--yellow:#eab308}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px}
+h1{font-size:24px;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:24px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card h3{font-size:14px;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px}
+.big-num{font-size:36px;font-weight:700;color:var(--accent)}
+.stat-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.stat-row:last-child{border:none}
+.stat-label{color:var(--text2)}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+.badge-green{background:#22c55e22;color:var(--green)}
+.badge-yellow{background:#eab30822;color:var(--yellow)}
+.badge-red{background:#ef444422;color:var(--red)}
+.chart-wrap{height:200px;position:relative}
+a.back{color:var(--accent);text-decoration:none;font-size:13px}
+.model-table{width:100%;border-collapse:collapse;font-size:13px}
+.model-table th{text-align:left;color:var(--text2);padding:6px 8px;border-bottom:1px solid var(--border)}
+.model-table td{padding:6px 8px;border-bottom:1px solid var(--border)}
+@media(max-width:600px){body{padding:12px}.grid{grid-template-columns:1fr}}
+</style></head><body>
+<a class="back" href="/">← Back to Chat</a>
+<h1>😈 SalmAlm Dashboard</h1>
+
+<div class="grid" id="stats-grid">
+  <div class="card"><h3>💰 Total Cost</h3><div class="big-num" id="total-cost">$0.00</div></div>
+  <div class="card"><h3>💬 Sessions</h3><div class="big-num" id="total-sessions">0</div></div>
+  <div class="card"><h3>🔧 Tool Calls (24h)</h3><div class="big-num" id="total-tools">0</div></div>
+  <div class="card"><h3>📡 Status</h3><div class="big-num" style="font-size:20px" id="status-text">Loading...</div></div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>📊 Tool Usage (24h)</h3>
+    <div class="chart-wrap"><canvas id="toolChart"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>💸 Cost by Model</h3>
+    <div class="chart-wrap"><canvas id="costChart"></canvas></div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h3>🧠 Model Usage</h3>
+  <table class="model-table">
+    <thead><tr><th>Model</th><th>Calls</th><th>Tokens In</th><th>Tokens Out</th><th>Cost</th></tr></thead>
+    <tbody id="model-tbody"></tbody>
+  </table>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>⏰ Cron Jobs</h3>
+    <div id="cron-list" style="font-size:13px">None</div>
+  </div>
+  <div class="card">
+    <h3>🧩 Plugins</h3>
+    <div id="plugin-list" style="font-size:13px">None</div>
+  </div>
+</div>
+
+<script>
+const tok=sessionStorage.getItem('tok')||'';
+const hdr={'X-Session-Token':tok};
+
+async function load(){
+  try{
+    const [dashRes,sessRes]=await Promise.all([
+      fetch('/api/dashboard',{headers:hdr}),
+      fetch('/api/sessions',{headers:hdr})
+    ]);
+    const dash=await dashRes.json();
+    const sess=await sessRes.json();
+
+    /* Stats */
+    const u=dash.usage||{};
+    document.getElementById('total-cost').textContent='$'+(u.total_cost||0).toFixed(4);
+    document.getElementById('total-sessions').textContent=(sess.sessions||[]).length;
+    const toolTotal=(dash.cost_timeline||[]).reduce((a,b)=>a+b.count,0);
+    document.getElementById('total-tools').textContent=toolTotal;
+
+    const statParts=[];
+    statParts.push('<span class="badge badge-green">Engine OK</span>');
+    if(dash.cron_jobs&&dash.cron_jobs.length)statParts.push('<span class="badge badge-yellow">'+dash.cron_jobs.length+' crons</span>');
+    if(dash.plugins&&dash.plugins.length)statParts.push('<span class="badge badge-green">'+dash.plugins.length+' plugins</span>');
+    if(dash.subagents&&dash.subagents.length)statParts.push('<span class="badge badge-yellow">'+dash.subagents.length+' agents</span>');
+    document.getElementById('status-text').innerHTML=statParts.join(' ');
+
+    /* Tool chart */
+    const timeline=dash.cost_timeline||[];
+    if(timeline.length){
+      const labels=timeline.map(t=>t.hour.slice(-5)).reverse();
+      const data=timeline.map(t=>t.count).reverse();
+      new Chart(document.getElementById('toolChart'),{
+        type:'bar',
+        data:{labels,datasets:[{label:'Tool calls',data,backgroundColor:'#6366f1',borderRadius:4}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+          scales:{x:{ticks:{color:'#94a3b8',font:{size:10}},grid:{display:false}},
+                  y:{ticks:{color:'#94a3b8'},grid:{color:'#334155'}}}}
+      });
+    }
+
+    /* Cost by model chart */
+    const models=u.by_model||{};
+    const mNames=Object.keys(models);
+    if(mNames.length){
+      const costs=mNames.map(m=>models[m].cost||0);
+      const colors=['#6366f1','#22c55e','#eab308','#ef4444','#06b6d4','#f97316','#ec4899','#8b5cf6'];
+      new Chart(document.getElementById('costChart'),{
+        type:'doughnut',
+        data:{labels:mNames.map(m=>m.split('/').pop()),datasets:[{data:costs,backgroundColor:colors.slice(0,mNames.length)}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#e2e8f0',font:{size:11}}}}}
+      });
+
+      /* Model table */
+      let html='';
+      mNames.sort((a,b)=>(models[b].cost||0)-(models[a].cost||0));
+      mNames.forEach(m=>{
+        const d=models[m];
+        html+='<tr><td>'+m.split('/').pop()+'</td><td>'+(d.calls||0)+'</td><td>'+(d.input_tokens||0).toLocaleString()+'</td><td>'+(d.output_tokens||0).toLocaleString()+'</td><td>$'+(d.cost||0).toFixed(4)+'</td></tr>';
+      });
+      document.getElementById('model-tbody').innerHTML=html;
+    }
+
+    /* Cron */
+    if(dash.cron_jobs&&dash.cron_jobs.length){
+      document.getElementById('cron-list').innerHTML=dash.cron_jobs.map(j=>'<div class="stat-row"><span>'+j.name+'</span><span class="badge badge-'+(j.enabled?'green':'red')+'">'+(j.enabled?'ON':'OFF')+'</span></div>').join('');
+    }
+
+    /* Plugins */
+    if(dash.plugins&&dash.plugins.length){
+      document.getElementById('plugin-list').innerHTML=dash.plugins.map(p=>'<div class="stat-row"><span>'+p.name+'</span><span>'+p.tools+' tools</span></div>').join('');
+    }
+  }catch(e){console.error(e)}
+}
+load();
+setInterval(load,60000);
 </script></body></html>'''

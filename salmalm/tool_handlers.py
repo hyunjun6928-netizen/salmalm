@@ -1,5 +1,5 @@
 """SalmAlm tool handlers — execution logic for all 30 tools."""
-import subprocess, sys, os, re, time, json, traceback, uuid
+import subprocess, sys, os, re, time, json, traceback, uuid, secrets
 import urllib.request, base64, mimetypes, difflib, threading
 from datetime import datetime
 from pathlib import Path
@@ -476,6 +476,45 @@ def execute_tool(name: str, args: dict) -> str:
             size_kb = len(audio) / 1024
             log.info(f"🔊 TTS generated: {fname} ({size_kb:.1f}KB)")
             return f'✅ TTS generated: uploads/{fname} ({size_kb:.1f}KB)\nText: {text[:100]}'
+
+        elif name == 'stt':
+            api_key = vault.get('openai_api_key')
+            if not api_key:
+                return '❌ OpenAI API key not found'
+            audio_path = args.get('audio_path', '')
+            audio_b64 = args.get('audio_base64', '')
+            lang = args.get('language', 'ko')
+            if audio_path:
+                fpath = Path(audio_path).expanduser()
+                if not fpath.exists():
+                    return f'❌ File not found: {audio_path}'
+                audio_data = fpath.read_bytes()
+                fname = fpath.name
+            elif audio_b64:
+                audio_data = base64.b64decode(audio_b64)
+                fname = 'audio.webm'
+            else:
+                return '❌ Provide audio_path or audio_base64'
+            # Build multipart form
+            boundary = secrets.token_hex(16)
+            body = b''
+            body += f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{fname}"\r\nContent-Type: application/octet-stream\r\n\r\n'.encode()
+            body += audio_data
+            body += f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1'.encode()
+            body += f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n{lang}'.encode()
+            body += f'\r\n--{boundary}--\r\n'.encode()
+            req = urllib.request.Request(
+                'https://api.openai.com/v1/audio/transcriptions',
+                data=body,
+                headers={'Authorization': f'Bearer {api_key}',
+                         'Content-Type': f'multipart/form-data; boundary={boundary}'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read())
+            text = result.get('text', '')
+            log.info(f"🎤 STT transcribed: {len(text)} chars")
+            return f'🎤 Transcription:\n{text}'
 
         elif name == 'python_eval':
             code = args.get('code', '')

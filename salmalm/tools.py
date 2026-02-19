@@ -153,6 +153,18 @@ TOOL_DEFINITIONS = [
         }
     },
     {
+        'name': 'stt',
+        'description': 'Transcribe audio to text (OpenAI Whisper). Accepts file path or base64 audio.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'audio_path': {'type': 'string', 'description': 'Path to audio file'},
+                'audio_base64': {'type': 'string', 'description': 'Base64-encoded audio data'},
+                'language': {'type': 'string', 'description': 'Language code (e.g. ko, en, ja)', 'default': 'ko'}
+            }
+        }
+    },
+    {
         'name': 'python_eval',
         'description': 'Execute Python code. Useful for math, data processing, analysis. Set _result to return output.',
         'input_schema': {

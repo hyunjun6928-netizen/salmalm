@@ -381,6 +381,57 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': 'Admin access required'}, 403)
             else:
                 self._json({'users': auth_manager.list_users()})
+        elif self.path == '/manifest.json':
+            manifest = {
+                "name": "SalmAlm — Personal AI Gateway",
+                "short_name": "SalmAlm",
+                "description": "Your personal AI gateway. 31 tools, 6 providers, zero dependencies.",
+                "start_url": "/",
+                "display": "standalone",
+                "background_color": "#0f172a",
+                "theme_color": "#6366f1",
+                "icons": [
+                    {"src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml"},
+                    {"src": "/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml"}
+                ]
+            }
+            self.send_response(200)
+            self._cors()
+            self.send_header('Content-Type', 'application/manifest+json')
+            self.end_headers()
+            self.wfile.write(json.dumps(manifest).encode())
+
+        elif self.path in ('/icon-192.svg', '/icon-512.svg'):
+            size = 192 if '192' in self.path else 512
+            svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}">
+<rect width="{size}" height="{size}" rx="{size//6}" fill="#6366f1"/>
+<text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="{size//2}">😈</text>
+</svg>'''
+            self.send_response(200)
+            self._cors()
+            self.send_header('Content-Type', 'image/svg+xml')
+            self.end_headers()
+            self.wfile.write(svg.encode())
+
+        elif self.path == '/sw.js':
+            sw_js = '''const CACHE='salmalm-v1';
+self.addEventListener('install',e=>{self.skipWaiting()});
+self.addEventListener('activate',e=>{e.waitUntil(clients.claim())});
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET')return;
+  e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))
+});'''
+            self.send_response(200)
+            self._cors()
+            self.send_header('Content-Type', 'application/javascript')
+            self.end_headers()
+            self.wfile.write(sw_js.encode())
+
+        elif self.path == '/dashboard':
+            if not self._require_auth('user'): return
+            from .templates import DASHBOARD_HTML
+            self._html(DASHBOARD_HTML)
+
         elif self.path == '/docs':
             from .docs import generate_api_docs_html
             self._html(generate_api_docs_html())
@@ -600,6 +651,21 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             else:
                 audit_log('unlock_fail', 'wrong password')
                 self._json({'ok': False, 'error': 'Wrong password'}, 401)
+
+        elif self.path == '/api/stt':
+            if not self._require_auth('user'): return
+            audio_b64 = body.get('audio_base64', '')
+            lang = body.get('language', 'ko')
+            if not audio_b64:
+                self._json({'error': 'No audio data'}, 400)
+                return
+            try:
+                from .tool_handlers import execute_tool
+                result = execute_tool('stt', {'audio_base64': audio_b64, 'language': lang})
+                text = result.replace('🎤 Transcription:\n', '') if isinstance(result, str) else ''
+                self._json({'ok': True, 'text': text})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)}, 500)
 
         elif self.path == '/api/sessions/delete':
             if not self._require_auth('user'): return
