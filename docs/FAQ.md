@@ -89,6 +89,18 @@ Settings → Token Usage에서 실시간 확인 가능합니다.
 
 ---
 
+## 이미지
+
+### Q: 이미지 생성은 어떻게 하나요?
+채팅에서 자연스럽게 요청하면 됩니다: "고양이 그림 그려줘"
+DALL-E 또는 xAI Aurora를 사용합니다. OpenAI API 키가 필요합니다.
+
+### Q: 이미지 분석은?
+이미지 파일을 업로드하거나 URL을 보내면 `image_analyze` 도구로 분석합니다.
+GPT-4o 또는 Claude Vision을 사용합니다.
+
+---
+
 ## 문제 해결
 
 ### Q: "Connection refused" 에러

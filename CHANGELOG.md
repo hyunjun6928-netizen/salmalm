@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.0 (2026-02-19)
+
+### ✨ Features
+- **`image_analyze` vision tool** — analyze images via GPT-4o/Claude Vision (URL, base64, local file, OCR)
+- **Prompt v0.5.0** — improved intent classification + tool selection accuracy
+- **SSE chunk streaming** — real-time response streaming with tool counters and status messages
+- **CI/CD** — GitHub Actions matrix (Ubuntu/macOS/Windows × Python 3.10–3.13)
+- **Badges** — PyPI, CI, License, Python version
+- **Docs** — CONTRIBUTING, CHANGELOG, FAQ (KR+EN), use-cases (KR+EN), issue templates
+
 ## v0.10.9 (2026-02-19)
 
 ### 🔒 Security

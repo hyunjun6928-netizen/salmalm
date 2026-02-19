@@ -185,6 +185,23 @@ Not just a chat proxy. Every message goes through:
 - 21/21 self-test on startup
 - 8-component health monitoring
 
+## 📝 v0.11.0 Changelog
+
+- **👁️ `image_analyze` vision tool**: image analysis (URL/base64/local file/OCR)
+- **🧠 Prompt v0.5.0**: improved intent classification + tool selection accuracy
+- **📡 SSE chunk streaming**: real-time response streaming with tool counters
+- **📋 CI/CD**: GitHub Actions matrix (Ubuntu/macOS/Windows × Python 3.10–3.13)
+- **📛 Badges**: PyPI + CI + License + Python version
+- **📖 CONTRIBUTING + CHANGELOG + FAQ (KR+EN) + use-cases (KR+EN) + issue templates**
+
+### v0.10.9
+- **🔒 P0 Security**: admin auth + loopback enforcement on sensitive endpoints
+- **🔓 Setup Wizard**: first-run password setup/skip screen
+- **🔑 Password Management**: change/remove/set password anytime from Settings
+- **♾️ Unlimited tool loop**: no artificial cap (OpenClaw-style)
+
+Full history: [CHANGELOG.md](CHANGELOG.md)
+
 ## 📜 License
 
 MIT
