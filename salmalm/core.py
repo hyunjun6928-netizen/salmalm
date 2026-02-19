@@ -840,6 +840,17 @@ class Session:
 
 
 _tg_bot = None  # Set during startup by telegram module
+
+
+def get_telegram_bot():
+    """Accessor for the Telegram bot instance (avoids direct global access)."""
+    return _tg_bot
+
+
+def set_telegram_bot(bot):
+    """Set the Telegram bot instance (called during startup)."""
+    global _tg_bot
+    _tg_bot = bot
 _sessions = {}  # type: ignore[var-annotated]
 _session_lock = threading.Lock()  # Protects _sessions dict
 _session_cleanup_ts = 0.0
@@ -1067,6 +1078,7 @@ __all__ = [
     'audit_log', 'response_cache', 'router', 'track_usage', 'get_usage_report',
     'compact_messages', 'get_session', 'write_daily_log', 'cron',
     'memory_manager', 'heartbeat',
+    'get_telegram_bot', 'set_telegram_bot',
     'Session', 'MemoryManager', 'HeartbeatManager', 'LLMCronManager',
     'SubAgent', 'SkillLoader', 'PluginLoader',
 ]

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from .constants import *
 from .crypto import vault, log
-from .core import router, get_session, _sessions, audit_log, compact_messages
+from .core import router, get_session, _sessions, audit_log, compact_messages, set_telegram_bot
 from .llm import _http_post, _http_get
 from .prompt import build_system_prompt
 from .tools import execute_tool
@@ -312,4 +312,5 @@ class TelegramBot:
 
 telegram_bot = TelegramBot()
 _tg_bot = telegram_bot  # Reference for sub-agent notifications
+set_telegram_bot(telegram_bot)  # Register with core accessor
 

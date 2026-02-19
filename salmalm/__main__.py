@@ -232,7 +232,7 @@ def main() -> None:
                 if vault.unlock(vault_pw):
                     log.info("[UNLOCK] Vault auto-unlocked from env")
 
-            _core._tg_bot = telegram_bot  # type: ignore[assignment]
+            _core.set_telegram_bot(telegram_bot)
 
             ws_port = int(os.environ.get('SALMALM_WS_PORT', 18801))
             try:

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SalmAlm — Setup Wizard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.wizard{background:#1a1d27;padding:40px;border-radius:16px;border:1px solid #2a2d37;max-width:520px;width:100%}
+h1{color:#a78bfa;margin-bottom:4px;font-size:24px}
+.sub{color:#888;font-size:13px;margin-bottom:32px}
+.step{margin-bottom:20px}
+.step label{display:block;font-size:13px;color:#aaa;margin-bottom:6px;font-weight:500}
+.step input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f1117;color:#e0e0e0;font-size:14px;font-family:monospace}
+.step input:focus{border-color:#7c5cfc;outline:none}
+.step .hint{font-size:11px;color:#666;margin-top:4px}
+.required::after{content:" *";color:#f87171}
+.divider{border-top:1px solid #2a2d37;margin:24px 0}
+button{width:100%;padding:14px;border-radius:8px;border:none;background:#4f46e5;color:#fff;font-size:16px;cursor:pointer;font-weight:500;margin-top:8px}
+button:hover{background:#4338ca}
+button:disabled{opacity:0.5;cursor:not-allowed}
+.skip{text-align:center;margin-top:16px}
+.skip a{color:#666;font-size:13px;cursor:pointer;text-decoration:underline}
+.skip a:hover{color:#aaa}
+.result{margin-top:16px;padding:12px;border-radius:8px;font-size:14px;display:none}
+.result.ok{background:#0f2a1f;border:1px solid #34d399;color:#34d399;display:block}
+.result.err{background:#2a0f0f;border:1px solid #f87171;color:#f87171;display:block}
+.progress{display:flex;gap:8px;margin-bottom:24px}
+.progress .dot{width:10px;height:10px;border-radius:50%;background:#333}
+.progress .dot.active{background:#7c5cfc}
+.progress .dot.done{background:#34d399}
+</style></head><body>
+<div class="wizard">
+<h1>😈 SalmAlm Setup Wizard</h1>
+<p class="sub">You need at least 1 API key to use the AI Gateway</p>
+<div class="progress"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
+
+<div class="step">
+<label class="required">Anthropic API Key (Claude)</label>
+<input type="password" id="anthropic" placeholder="sk-ant-...">
+<div class="hint">Recommended. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
+</div>
+<div class="step">
+<label>OpenAI API Key (GPT)</label>
+<input type="password" id="openai" placeholder="sk-...">
+<div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
+</div>
+<div class="step">
+<labeldata-i18n="lbl-xai">xAI API Key (Grok)</label>
+<input type="password" id="xai" placeholder="xai-...">
+</div>
+<div class="step">
+<labeldata-i18n="lbl-google">Google API Key (Gemini)</label>
+<input type="password" id="google" placeholder="AIza...">
+</div>
+<div class="divider"></div>
+<div class="step">
+<label>Brave Search API Key (Web Search)</label>
+<input type="password" id="brave" placeholder="BSA...">
+<div class="hint">Optional. <a href="https://brave.com/search/api/" target="_blank" style="color:#7c5cfc">Get Free Key →</a></div>
+</div>
+<div class="divider"></div>
+<div class="step">
+<label>🎮 Discord Bot Token (Optional)</label>
+<input type="password" id="discord" placeholder="MTIz...">
+<div class="hint">Optional. <a href="https://discord.com/developers/applications" target="_blank" style="color:#7c5cfc">Create Bot →</a> MESSAGE CONTENT intent required</div>
+</div>
+<div class="divider"></div>
+<div class="step">
+<label>🦙 Ollama (Local LLM — No API key needed)</label>
+<input type="text" id="ollama" placeholder="http://localhost:11434/v1" value="">
+<div class="hint">If Ollama is installed, enter URL. Free without API keys! <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">Install →</a></div>
+</div>
+
+<button id="btn" data-action="save">Save & Test</button>
+<div class="result" id="result"></div>
+<div class="skip"><a data-action="reload">Skip (configure later)</a></div>
+</div>
+<script>
+async function save(){
+  const btn=document.getElementById('btn');
+  btn.disabled=true; btn.textContent='Testing...';
+  const body={};
+  ['anthropic','openai','xai','google','brave'].forEach(k=>{
+    const v=document.getElementById(k).value.trim();
+    if(v) body[k+'_api_key']=v;
+  });
+  const dc=document.getElementById('discord').value.trim();
+  if(dc) body.discord_token=dc;
+  const ollama=document.getElementById('ollama').value.trim();
+  if(ollama) body.ollama_url=ollama;
+  if(!Object.keys(body).length){
+    show('Enter at least 1 API key or Ollama URL','err');
+    btn.disabled=false; btn.textContent='Save & Test'; return;
+  }
+  try{
+    const r=await fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(d.ok){
+      const isTestFail=d.test_result&&d.test_result.includes('fail');
+      show(d.test_result+' ('+d.saved.join(', ')+' Saved)',isTestFail?'err':'ok');
+      if(!isTestFail){btn.textContent='✅ Done! Redirecting in 3s...';setTimeout(()=>location.reload(),3000);}
+      else{btn.textContent='⚠️ Saved (verify key)';btn.disabled=false;}
+    }else{show(d.error,'err');btn.disabled=false;btn.textContent='Save & Test';}
+  }catch(e){show('Network error: '+e,'err');btn.disabled=false;btn.textContent='Save & Test';}
+}
+function show(msg,type){const el=document.getElementById('result');el.textContent=msg;el.className='result '+type;}
+document.addEventListener('click',function(e){
+  var el=e.target.closest('[data-action]');if(!el)return;
+  var a=el.getAttribute('data-action');
+  if(a==='save')save();
+  else if(a==='reload')location.reload();
+});
+</script></body></html>

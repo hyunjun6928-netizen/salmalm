@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SalmAlm — Unlock</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e0e0e0;height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#1a1d27;padding:40px;border-radius:16px;border:1px solid #2a2d37;text-align:center;min-width:320px}
+h1{color:#a78bfa;margin-bottom:8px}
+p{color:#888;margin-bottom:24px;font-size:14px}
+input{width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#0f1117;color:#e0e0e0;font-size:16px;margin-bottom:16px;text-align:center}
+button{width:100%;padding:12px;border-radius:8px;border:none;background:#4f46e5;color:#fff;font-size:16px;cursor:pointer}
+button:hover{background:#4338ca}
+.error{color:#ef4444;margin-top:12px;font-size:14px;display:none}
+</style></head><body>
+<div class="card">
+<h1>😈 SalmAlm</h1>
+<p>Personal AI Gateway v0.12.6</p>
+<input type="password" id="pw" placeholder="Master password" data-enter-action="unlock">
+<button data-action="unlock">Unlock</button>
+<div class="error" id="err"></div>
+<div id="unlock-help" style="margin-top:24px;font-size:13px;color:#999;line-height:1.8;text-align:left;max-width:400px"></div>
+<script>
+(function(){
+  var L=localStorage.getItem('salmalm-lang')||'en';
+  var h=L==='ko'?
+    '<p style="color:#bbb;font-weight:600;margin-bottom:8px">🔑 처음이신가요?</p><p>서버를 시작할 때 설정한 마스터 비밀번호를 입력하세요.</p><p style="margin-top:12px;color:#bbb;font-weight:600">비밀번호를 모르겠다면:</p><p>서버를 실행한 <b>cmd/터미널 창</b>을 확인하세요.</p><code style="display:block;background:#252838;padding:8px 12px;border-radius:6px;font-size:12px;color:#7c83ff;margin:8px 0">Password: salmalm_local</code><p style="margin-top:12px;color:#bbb;font-weight:600">비밀번호를 잊으셨다면:</p><p>vault를 초기화하고 다시 시작하세요:</p><code style="display:block;background:#252838;padding:6px 10px;border-radius:4px;font-size:11px;color:#aaa;margin:4px 0">del %USERPROFILE%\\.salmalm\\vault.enc</code><span style="font-size:11px;color:#666">(Linux/Mac: rm ~/.salmalm/vault.enc)</span>':
+    '<p style="color:#bbb;font-weight:600;margin-bottom:8px">🔑 First time?</p><p>Enter the master password you set when starting the server.</p><p style="margin-top:12px;color:#bbb;font-weight:600">Don\x27t know the password?</p><p>Check the <b>cmd/terminal window</b> where you started the server.</p><code style="display:block;background:#252838;padding:8px 12px;border-radius:6px;font-size:12px;color:#7c83ff;margin:8px 0">Password: salmalm_local</code><p style="margin-top:12px;color:#bbb;font-weight:600">Forgot your password?</p><p>Reset the vault and restart:</p><code style="display:block;background:#252838;padding:6px 10px;border-radius:4px;font-size:11px;color:#aaa;margin:4px 0">del %USERPROFILE%\\.salmalm\\vault.enc</code><span style="font-size:11px;color:#666">(Linux/Mac: rm ~/.salmalm/vault.enc)</span>';
+  document.getElementById('unlock-help').innerHTML=h;
+})();
+</script>
+</div>
+<script>
+async function unlock(){
+  const pw=document.getElementById('pw').value;
+  const r=await fetch('/api/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+  const d=await r.json();
+  if(d.ok){sessionStorage.setItem('tok',d.token||'');location.reload()}
+  else{const e=document.getElementById('err');e.textContent=d.error;e.style.display='block'}
+}
+</script></body></html>
