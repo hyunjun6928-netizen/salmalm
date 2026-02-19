@@ -146,6 +146,42 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 .tts-btn{background:none;border:none;cursor:pointer;font-size:14px;opacity:0.5;transition:opacity 0.15s;padding:2px 4px}
 .tts-btn:hover{opacity:1}
 
+/* MESSAGE EDIT/DELETE ACTIONS */
+.msg-edit-actions{opacity:0;transition:opacity 0.15s;display:inline-flex;gap:2px;margin-left:4px}
+.msg-row.user:hover .msg-edit-actions{opacity:1}
+.msg-edit-actions button{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;border-radius:4px;opacity:0.6;transition:opacity 0.15s}
+.msg-edit-actions button:hover{opacity:1;background:var(--accent-dim)}
+.edit-textarea{width:100%;min-height:60px;padding:10px 12px;border-radius:10px;border:1px solid var(--accent);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;resize:vertical;outline:none;line-height:1.5}
+.edit-textarea:focus{border-color:var(--accent2);box-shadow:0 0 0 2px var(--accent-dim)}
+.edit-bar{display:flex;gap:6px;margin-top:6px;font-size:12px}
+.edit-bar button{padding:4px 12px;border-radius:6px;border:none;cursor:pointer;font-size:12px}
+.edit-bar .save-btn{background:var(--accent);color:#fff}
+.edit-bar .cancel-btn{background:var(--bg3);color:var(--text2)}
+/* EXPORT DROPDOWN */
+.export-dropdown{position:relative;display:inline-block}
+.export-menu{display:none;position:absolute;top:100%;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:4px;min-width:150px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.3);margin-top:4px}
+.export-menu.open{display:block}
+.export-menu button{display:block;width:100%;text-align:left;padding:8px 12px;border:none;background:none;color:var(--text);font-size:13px;cursor:pointer;border-radius:6px}
+.export-menu button:hover{background:var(--accent-dim);color:var(--accent2)}
+/* COMMAND PALETTE */
+#cmd-palette{position:fixed;top:15vh;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:520px;max-width:92vw;max-height:60vh;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.5);z-index:10001;display:none}
+#cmd-palette.open{display:flex}
+#cmd-input{padding:14px 18px;border:none;background:transparent;color:var(--text);font-size:15px;outline:none;border-bottom:1px solid var(--border)}
+#cmd-input::placeholder{color:var(--text2)}
+#cmd-results{overflow-y:auto;padding:6px;flex:1;max-height:50vh}
+.cmd-item{padding:10px 14px;border-radius:8px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:10px;transition:background 0.1s}
+.cmd-item:hover,.cmd-item.selected{background:var(--accent-dim);color:var(--accent2)}
+.cmd-item .cmd-icon{font-size:16px;width:24px;text-align:center}
+.cmd-item .cmd-label{flex:1}
+.cmd-item .cmd-shortcut{font-size:11px;color:var(--text2)}
+#cmd-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000}
+#cmd-overlay.open{display:block}
+/* PWA INSTALL BANNER */
+#pwa-install{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--accent);border-radius:12px;padding:12px 20px;z-index:500;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-size:13px;align-items:center;gap:12px;display:none}
+#pwa-install.show{display:flex}
+#pwa-install button{padding:6px 14px;border-radius:8px;border:none;cursor:pointer;font-size:12px}
+#pwa-install .install-btn{background:var(--accent);color:#fff}
+#pwa-install .dismiss-btn{background:var(--bg3);color:var(--text2)}
 /* MOBILE */
 @media(max-width:768px){
   body{grid-template-columns:1fr;grid-template-areas:"head" "chat" "input"}
@@ -159,6 +195,17 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   #header{padding:10px 12px}
   .side-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999}
   .side-overlay.open{display:block}
+  .nav-item{min-height:44px;padding:12px}
+  .session-item{min-height:40px}
+  #send-btn{width:44px;height:44px}
+  #input{font-size:16px}
+  #cmd-palette{width:100%;max-width:100%;top:0;left:0;transform:none;border-radius:0;max-height:100vh;height:100vh}
+  #search-box{width:100%;max-width:100%;border-radius:0;max-height:100vh}
+  #search-modal.open{padding-top:0}
+  .msg-edit-actions{opacity:1}
+  .bubble pre{max-width:calc(100vw - 80px);overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #filter-modal{width:100%;max-width:100%;left:0;transform:none;border-radius:0;top:0;height:100vh;max-height:100vh}
+  input,textarea,select{font-size:16px!important}
 }
 </style></head><body>
 
@@ -206,7 +253,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div class="spacer"></div>
   <div class="cost">Cost: <b id="cost-display">$0.0000</b></div>
   <button id="theme-toggle" data-action="toggleTheme" title="Toggle theme">🌙</button>
-  <button id="export-btn" data-action="exportChat" title="Export chat" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer"data-i18n="btn-export">📥 Export</button>
+  <div class="export-dropdown"><button id="export-btn" data-action="toggleExportMenu" title="Export chat" style="background:var(--accent-dim);color:var(--accent2);border:none;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer"data-i18n="btn-export">📥 Export</button><div id="export-menu" class="export-menu"><button data-action="exportMd">📝 Markdown</button><button data-action="exportJson">📋 JSON</button><button data-action="exportServerMd">📥 Download MD</button><button data-action="exportServerJson">📥 Download JSON</button></div></div>
   <button id="new-chat-btn" data-action="newSession" title="New Chat">✨ New</button>
 </div>
 
@@ -698,6 +745,63 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       };
       mt.appendChild(regenBtn);
     }
+    /* Edit/Delete buttons for user messages */
+    if(role==='user'&&text&&!text.startsWith('<img ')){
+      var editActions=document.createElement('span');editActions.className='msg-edit-actions';
+      var editBtn=document.createElement('button');editBtn.textContent='✏️';editBtn.title=t('btn-edit');
+      editBtn.onclick=function(){
+        var origText=text;
+        var ta=document.createElement('textarea');ta.className='edit-textarea';ta.value=origText.replace(/<[^>]*>/g,'');
+        var bar=document.createElement('div');bar.className='edit-bar';
+        var saveB=document.createElement('button');saveB.className='save-btn';saveB.textContent=t('edit-save');
+        var cancelB=document.createElement('button');cancelB.className='cancel-btn';cancelB.textContent=t('edit-cancel');
+        bar.appendChild(saveB);bar.appendChild(cancelB);
+        bubble.innerHTML='';bubble.appendChild(ta);bubble.appendChild(bar);
+        ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
+        cancelB.onclick=function(){bubble.innerHTML=renderMd(origText)};
+        saveB.onclick=function(){
+          var newText=ta.value.trim();if(!newText)return;
+          var allMsgs=chat.querySelectorAll('.msg-row');
+          var idx=-1;for(var ei=0;ei<allMsgs.length;ei++){if(allMsgs[ei]===row){idx=ei;break;}}
+          fetch('/api/messages/edit',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+            body:JSON.stringify({session_id:_currentSession,message_index:idx,content:newText})})
+          .then(function(r){return r.json()}).then(function(d){
+            if(d.ok){
+              bubble.innerHTML=renderMd(newText);text=newText;
+              var allAfter=chat.querySelectorAll('.msg-row');
+              for(var ri=allAfter.length-1;ri>idx;ri--){allAfter[ri].remove();}
+              var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
+              hist=hist.slice(0,idx+1);hist[idx]={role:'user',text:newText,model:null};
+              localStorage.setItem('salm_chat',JSON.stringify(hist));
+              localStorage.setItem(_storageKey(_currentSession),JSON.stringify(hist));
+              if(confirm(t('confirm-regen-after-edit'))){input.value=newText;doSend();}
+            }else{bubble.innerHTML=renderMd(origText);alert(d.error||'Edit failed');}
+          }).catch(function(){bubble.innerHTML=renderMd(origText)});
+        };
+        ta.addEventListener('keydown',function(ev){if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();saveB.click();}if(ev.key==='Escape'){cancelB.click();}});
+      };
+      var delBtn=document.createElement('button');delBtn.textContent='🗑️';delBtn.title=t('btn-delete');
+      delBtn.onclick=function(){
+        if(!confirm(t('confirm-delete-msg')))return;
+        var allMsgs=chat.querySelectorAll('.msg-row');
+        var idx=-1;for(var di=0;di<allMsgs.length;di++){if(allMsgs[di]===row){idx=di;break;}}
+        fetch('/api/messages/delete',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+          body:JSON.stringify({session_id:_currentSession,message_index:idx})})
+        .then(function(r){return r.json()}).then(function(d){
+          if(d.ok){
+            row.remove();
+            var nextRow=chat.querySelectorAll('.msg-row')[idx];
+            if(nextRow&&nextRow.classList.contains('assistant'))nextRow.remove();
+            var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
+            hist.splice(idx,d.removed||1);
+            localStorage.setItem('salm_chat',JSON.stringify(hist));
+            localStorage.setItem(_storageKey(_currentSession),JSON.stringify(hist));
+          }else{alert(d.error||'Delete failed');}
+        });
+      };
+      editActions.appendChild(editBtn);editActions.appendChild(delBtn);
+      mt.appendChild(editActions);
+    }
     var branchBtn=document.createElement('span');
     branchBtn.textContent=' 🌿';branchBtn.style.cssText='cursor:pointer;opacity:0;transition:opacity 0.15s;font-size:12px';
     branchBtn.title=t('btn-branch-title');
@@ -1076,6 +1180,17 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'rollback-done':'⏪ Rolled back','rollback-pairs':'message pair(s).',
       'rollback-fail':'❌ Rollback failed:','branch-fail':'❌ Branch failed:',
       'upload-fail':'❌ Upload failed:','upload-error':'❌ Upload error:',
+      'btn-edit':'Edit','btn-delete':'Delete',
+      'confirm-delete-msg':'Delete this message and its response?',
+      'confirm-regen-after-edit':'Regenerate response after edit?',
+      'edit-save':'Save','edit-cancel':'Cancel',
+      'msg-edited':'✏️ Message edited','msg-deleted':'🗑️ Message deleted',
+      'cmd-placeholder':'Type a command...',
+      'cmd-new-chat':'New Chat','cmd-export':'Export Chat','cmd-settings':'Settings',
+      'cmd-search':'Search','cmd-theme':'Toggle Theme','cmd-sidebar':'Toggle Sidebar',
+      'cmd-dashboard':'Dashboard',
+      'shortcut-cmdpalette':'Command palette',
+      'pwa-install-text':'Install SalmAlm as an app','pwa-install-btn':'Install','pwa-dismiss':'Later',
     },
     ko:{
       'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정',
@@ -1165,6 +1280,17 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'rollback-done':'⏪ 되돌리기 완료:','rollback-pairs':'개의 메시지 쌍',
       'rollback-fail':'❌ 되돌리기 실패:','branch-fail':'❌ 분기 실패:',
       'upload-fail':'❌ 업로드 실패:','upload-error':'❌ 업로드 오류:',
+      'btn-edit':'편집','btn-delete':'삭제',
+      'confirm-delete-msg':'이 메시지와 응답을 삭제하시겠습니까?',
+      'confirm-regen-after-edit':'편집 후 응답을 재생성하시겠습니까?',
+      'edit-save':'저장','edit-cancel':'취소',
+      'msg-edited':'✏️ 메시지가 편집되었습니다','msg-deleted':'🗑️ 메시지가 삭제되었습니다',
+      'cmd-placeholder':'명령어 입력...',
+      'cmd-new-chat':'새 대화','cmd-export':'대화 내보내기','cmd-settings':'설정',
+      'cmd-search':'검색','cmd-theme':'테마 전환','cmd-sidebar':'사이드바 전환',
+      'cmd-dashboard':'대시보드',
+      'shortcut-cmdpalette':'커맨드 팔레트',
+      'pwa-install-text':'SalmAlm을 앱으로 설치','pwa-install-btn':'설치','pwa-dismiss':'나중에',
     }
   };
   var _lang=localStorage.getItem('salmalm-lang')||'en';
@@ -1396,7 +1522,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- Keyboard shortcuts + modals --- */
   var _shortcutModal=document.createElement('div');_shortcutModal.id='shortcut-modal';
   _shortcutModal.style.cssText='display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;z-index:10000;min-width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
-  _shortcutModal.innerHTML='<h3 style="margin-bottom:12px;color:var(--accent2)" data-i18n="shortcut-title">\u2328\ufe0f Keyboard Shortcuts</h3><div style="font-size:13px;line-height:2.2;color:var(--text)"><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+K</kbd> <span data-i18n="shortcut-search">Search sessions</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+N</kbd> <span data-i18n="shortcut-newchat">New chat</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+S</kbd> <span data-i18n="shortcut-sidebar">Toggle sidebar</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Escape</kbd> <span data-i18n="shortcut-escape">Close modal / settings</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+P</kbd> <span data-i18n="shortcut-cmdpalette">Command palette</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+/</kbd> <span data-i18n="shortcut-help">This help</span></div></div><button data-action="closeShortcutModal" style="margin-top:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px" data-i18n="btn-close">Close</button>';
+  _shortcutModal.innerHTML='<h3 style="margin-bottom:12px;color:var(--accent2)" data-i18n="shortcut-title">\u2328\ufe0f Keyboard Shortcuts</h3><div style="font-size:13px;line-height:2.2;color:var(--text)"><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+K</kbd> <span data-i18n="shortcut-search">Search sessions</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+N</kbd> <span data-i18n="shortcut-newchat">New chat</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+S</kbd> <span data-i18n="shortcut-sidebar">Toggle sidebar</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Escape</kbd> <span data-i18n="shortcut-escape">Close modal / settings</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+P</kbd> <span data-i18n="shortcut-cmdpalette">Command palette</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+P</kbd> <span data-i18n="shortcut-cmdpalette">Command palette</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+/</kbd> <span data-i18n="shortcut-help">This help</span></div></div><button data-action="closeShortcutModal" style="margin-top:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px" data-i18n="btn-close">Close</button>';
   document.body.appendChild(_shortcutModal);
   var _shortcutOv=document.createElement('div');_shortcutOv.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999';_shortcutOv.setAttribute('data-action','closeShortcutModal');document.body.appendChild(_shortcutOv);
 
@@ -1428,11 +1554,13 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     var isFilterInput=document.activeElement&&document.activeElement.id==='session-filter-input';
     var isTyping=(tag==='INPUT'||tag==='TEXTAREA')&&!isFilterInput;
     if(e.key==='Escape'){e.preventDefault();
+      if(typeof _cmdPalette!=='undefined'&&_cmdPalette&&_cmdPalette.classList.contains&&_cmdPalette.classList.contains('open')){_closeCmdPalette();return}
       if(_searchModal&&_searchModal.classList.contains('open')){_closeSearchModal();return}
       if(_shortcutModal.style.display!=='none'||_filterModal.style.display!=='none'){_closeAllModals();return}
       if(settingsEl.style.display==='block'){showChat();return}return}
     if(isTyping)return;
     var mod=e.ctrlKey||e.metaKey;
+    if(mod&&e.shiftKey&&(e.key==='P'||e.key==='p')){e.preventDefault();if(typeof _openCmdPalette==='function')_openCmdPalette();return}
     if(mod&&e.key==='k'){e.preventDefault();_openSearchModal();return}
     if(mod&&e.key==='n'){e.preventDefault();window.newSession();return}
     if(mod&&e.shiftKey&&(e.key==='S'||e.key==='s')){e.preventDefault();toggleSidebar();return}
@@ -1503,6 +1631,77 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       }
     }catch(e){}
   },30000);
+  /* --- Export menu toggle --- */
+  window.toggleExportMenu=function(){var m=document.getElementById('export-menu');m.classList.toggle('open')};
+  document.addEventListener('click',function(e){if(!e.target.closest('.export-dropdown')){var m=document.getElementById('export-menu');if(m)m.classList.remove('open')}});
+  window.exportMd=function(){document.getElementById('export-menu').classList.remove('open');window.exportChat('md')};
+  window.exportJson=function(){document.getElementById('export-menu').classList.remove('open');window.exportChat('json')};
+  window.exportServerMd=function(){document.getElementById('export-menu').classList.remove('open');window.open('/api/sessions/'+encodeURIComponent(_currentSession)+'/export?format=md')};
+  window.exportServerJson=function(){document.getElementById('export-menu').classList.remove('open');window.open('/api/sessions/'+encodeURIComponent(_currentSession)+'/export?format=json')};
+
+  /* --- Command Palette (Ctrl+Shift+P) --- */
+  var _cmdPalette=document.createElement('div');_cmdPalette.id='cmd-palette';
+  _cmdPalette.innerHTML='<input id="cmd-input" type="text" placeholder="'+t('cmd-placeholder')+'" autocomplete="off"><div id="cmd-results"></div>';
+  document.body.appendChild(_cmdPalette);
+  var _cmdOv=document.createElement('div');_cmdOv.id='cmd-overlay';document.body.appendChild(_cmdOv);
+  var _cmdCommands=[
+    {icon:'🗨',label:'cmd-new-chat',action:function(){window.newSession()},shortcut:'Ctrl+N'},
+    {icon:'📥',label:'cmd-export',action:function(){window.exportChat('md')}},
+    {icon:'⚙️',label:'cmd-settings',action:function(){window.showSettings()}},
+    {icon:'🔍',label:'cmd-search',action:function(){_openSearchModal()},shortcut:'Ctrl+K'},
+    {icon:'🎨',label:'cmd-theme',action:function(){window.toggleTheme()}},
+    {icon:'☰',label:'cmd-sidebar',action:function(){window.toggleSidebar()}},
+    {icon:'📈',label:'cmd-dashboard',action:function(){window.showDashboard()}},
+    {icon:'🤖',label:'/model',action:function(){input.value='/model ';input.focus()},raw:true},
+    {icon:'🧠',label:'/thinking',action:function(){window.toggleThinking()},raw:true},
+    {icon:'📦',label:'/compact',action:function(){input.value='/compact';doSend()},raw:true},
+    {icon:'⏪',label:'/rollback',action:function(){input.value='/rollback';doSend()},raw:true},
+    {icon:'🌿',label:'/branch',action:function(){input.value='/branch';doSend()},raw:true},
+    {icon:'📜',label:'/soul',action:function(){input.value='/soul';doSend()},raw:true},
+    {icon:'🔊',label:'/tts',action:function(){input.value='/tts ';input.focus()},raw:true},
+    {icon:'🎤',label:'/voice',action:function(){window.toggleMic()},raw:true},
+    {icon:'❓',label:'/help',action:function(){input.value='/help';doSend()},raw:true},
+  ];
+  var _cmdSel=0;
+  function _fuzzyMatch(query,text){query=query.toLowerCase();text=text.toLowerCase();if(!query)return true;var qi=0;for(var ti=0;ti<text.length&&qi<query.length;ti++){if(text[ti]===query[qi])qi++}return qi===query.length}
+  function _renderCmdResults(q){
+    var el=document.getElementById('cmd-results');
+    var filtered=_cmdCommands.filter(function(c){var label=c.raw?c.label:t(c.label);return _fuzzyMatch(q,label)||_fuzzyMatch(q,c.icon+' '+label)});
+    _cmdSel=0;
+    el.innerHTML=filtered.map(function(c,i){
+      var label=c.raw?c.label:t(c.label);
+      var sc=c.shortcut?'<span class="cmd-shortcut">'+c.shortcut+'</span>':'';
+      return '<div class="cmd-item'+(i===0?' selected':'')+'" data-cmd-idx="'+i+'"><span class="cmd-icon">'+c.icon+'</span><span class="cmd-label">'+label+'</span>'+sc+'</div>';
+    }).join('');
+    el._filtered=filtered;
+  }
+  function _openCmdPalette(){_cmdPalette.classList.add('open');_cmdOv.classList.add('open');var ci=document.getElementById('cmd-input');ci.value='';ci.focus();_renderCmdResults('');ci.oninput=function(){_renderCmdResults(ci.value)}}
+  function _closeCmdPalette(){_cmdPalette.classList.remove('open');_cmdOv.classList.remove('open')}
+  _cmdOv.addEventListener('click',_closeCmdPalette);
+  document.addEventListener('keydown',function(e){
+    if(!_cmdPalette||!_cmdPalette.classList.contains('open'))return;
+    var el=document.getElementById('cmd-results');var filtered=el._filtered||[];
+    var items=el.querySelectorAll('.cmd-item');
+    if(e.key==='ArrowDown'){e.preventDefault();_cmdSel=Math.min(_cmdSel+1,items.length-1);items.forEach(function(it,i){it.classList.toggle('selected',i===_cmdSel)})}
+    else if(e.key==='ArrowUp'){e.preventDefault();_cmdSel=Math.max(_cmdSel-1,0);items.forEach(function(it,i){it.classList.toggle('selected',i===_cmdSel)})}
+    else if(e.key==='Enter'){e.preventDefault();if(filtered[_cmdSel]){_closeCmdPalette();filtered[_cmdSel].action()}}
+  });
+  document.getElementById('cmd-results').addEventListener('click',function(e){
+    var item=e.target.closest('.cmd-item');if(!item)return;
+    var idx=parseInt(item.getAttribute('data-cmd-idx'));
+    var el=document.getElementById('cmd-results');var filtered=el._filtered||[];
+    if(filtered[idx]){_closeCmdPalette();filtered[idx].action();}
+  });
+
+  /* --- PWA Install Prompt --- */
+  var _deferredPrompt=null;
+  var _pwaBanner=document.createElement('div');_pwaBanner.id='pwa-install';
+  _pwaBanner.innerHTML='<span>😈 '+t('pwa-install-text')+'</span><button class="install-btn" data-action="pwaInstall">'+t('pwa-install-btn')+'</button><button class="dismiss-btn" data-action="pwaDismiss">'+t('pwa-dismiss')+'</button>';
+  document.body.appendChild(_pwaBanner);
+  window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();_deferredPrompt=e;if(!localStorage.getItem('pwa-dismissed'))_pwaBanner.classList.add('show')});
+  window.pwaInstall=function(){if(_deferredPrompt){_deferredPrompt.prompt();_deferredPrompt.userChoice.then(function(){_deferredPrompt=null;_pwaBanner.classList.remove('show')})}};
+  window.pwaDismiss=function(){_pwaBanner.classList.remove('show');localStorage.setItem('pwa-dismissed','1')};
+
   applyLang();
 
   /* --- CSP-safe event delegation --- */
@@ -1521,6 +1720,13 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='toggleTheme')window.toggleTheme();
     else if(a==='openDashboard')window.showDashboard();
     else if(a==='exportChat')window.exportChat('md');
+    else if(a==='toggleExportMenu')window.toggleExportMenu();
+    else if(a==='exportMd')window.exportMd();
+    else if(a==='exportJson')window.exportJson();
+    else if(a==='exportServerMd')window.exportServerMd();
+    else if(a==='exportServerJson')window.exportServerJson();
+    else if(a==='pwaInstall')window.pwaInstall();
+    else if(a==='pwaDismiss')window.pwaDismiss();
     else if(a==='toggleThinking')window.toggleThinking();
     else if(a==='toggleMic')window.toggleMic();
     else if(a==='clearFile')window.clearFile();

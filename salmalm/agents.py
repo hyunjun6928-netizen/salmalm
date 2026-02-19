@@ -494,6 +494,228 @@ def execute(name: str, args: dict) -> str:
         return cls.scan()
 
 
+# ============================================================
+# Multi-Agent Routing (다중 에이전트 라우팅)
+# ============================================================
+
+AGENTS_DIR = Path.home() / '.salmalm' / 'agents'
+BINDINGS_FILE = AGENTS_DIR / 'bindings.json'
+
+
+class AgentConfig:
+    """Configuration and paths for a single agent (에이전트 설정)."""
+
+    def __init__(self, agent_id: str):
+        self.agent_id = agent_id
+        self.base_dir = AGENTS_DIR / agent_id
+        self.workspace_dir = self.base_dir / 'workspace'
+        self.sessions_dir = self.base_dir / 'sessions'
+        self.config_file = self.base_dir / 'config.json'
+        self._config: dict = {}
+        self._load()
+
+    def _load(self):
+        try:
+            if self.config_file.exists():
+                self._config = json.loads(self.config_file.read_text(encoding='utf-8'))
+        except Exception:
+            self._config = {}
+
+    def save(self):
+        try:
+            self.config_file.parent.mkdir(parents=True, exist_ok=True)
+            self.config_file.write_text(
+                json.dumps(self._config, indent=2, ensure_ascii=False), encoding='utf-8')
+        except Exception as e:
+            log.error(f"[AGENT] Config save error ({self.agent_id}): {e}")
+
+    @property
+    def display_name(self) -> str:
+        return self._config.get('display_name', self.agent_id)
+
+    @property
+    def model(self) -> Optional[str]:
+        return self._config.get('model')
+
+    @property
+    def soul_file(self) -> Path:
+        return self.workspace_dir / 'SOUL.md'
+
+    @property
+    def api_key(self) -> Optional[str]:
+        return self._config.get('api_key')
+
+    @property
+    def allowed_tools(self) -> Optional[list]:
+        """None means all tools allowed."""
+        return self._config.get('allowed_tools')
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.agent_id,
+            'display_name': self.display_name,
+            'model': self.model,
+            'has_soul': self.soul_file.exists(),
+            'workspace': str(self.workspace_dir),
+            'allowed_tools': self.allowed_tools,
+        }
+
+
+class AgentManager:
+    """Manages multiple agents with routing by Telegram chat/user.
+
+    다중 에이전트 관리 — Telegram 채팅/사용자별 라우팅 지원.
+    """
+
+    def __init__(self):
+        self._agents: dict = {}  # agent_id -> AgentConfig
+        self._bindings: dict = {}  # "telegram:chatid" -> agent_id
+        self._lock = threading.Lock()
+        self._ensure_main()
+        self._load_bindings()
+
+    def _ensure_main(self):
+        """Ensure 'main' agent exists (기본 에이전트)."""
+        main_dir = AGENTS_DIR / 'main'
+        if not main_dir.exists():
+            main_dir.mkdir(parents=True, exist_ok=True)
+            (main_dir / 'workspace').mkdir(exist_ok=True)
+            (main_dir / 'sessions').mkdir(exist_ok=True)
+            config = {'display_name': 'Main', 'model': None, 'allowed_tools': None}
+            (main_dir / 'config.json').write_text(
+                json.dumps(config, indent=2), encoding='utf-8')
+        self._agents['main'] = AgentConfig('main')
+
+    def _load_bindings(self):
+        """Load chat→agent bindings from bindings.json."""
+        try:
+            if BINDINGS_FILE.exists():
+                self._bindings = json.loads(BINDINGS_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            self._bindings = {}
+
+    def _save_bindings(self):
+        try:
+            BINDINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            BINDINGS_FILE.write_text(
+                json.dumps(self._bindings, indent=2, ensure_ascii=False), encoding='utf-8')
+        except Exception as e:
+            log.error(f"[AGENT] Bindings save error: {e}")
+
+    def scan(self):
+        """Scan agents directory and load all agent configs."""
+        AGENTS_DIR.mkdir(parents=True, exist_ok=True)
+        with self._lock:
+            self._agents.clear()
+            for agent_dir in sorted(AGENTS_DIR.iterdir()):
+                if not agent_dir.is_dir() or agent_dir.name.startswith('.'):
+                    continue
+                if agent_dir.name == 'bindings.json':
+                    continue
+                config_file = agent_dir / 'config.json'
+                if not config_file.exists():
+                    continue
+                self._agents[agent_dir.name] = AgentConfig(agent_dir.name)
+            if 'main' not in self._agents:
+                self._ensure_main()
+        log.info(f"[AGENT] Scanned {len(self._agents)} agents")
+
+    def resolve(self, chat_key: str) -> str:
+        """Resolve which agent handles a given chat key (e.g. 'telegram:12345').
+
+        Returns agent_id (defaults to 'main').
+        라우팅: 채팅 키에 해당하는 에이전트 ID 반환.
+        """
+        return self._bindings.get(chat_key, 'main')
+
+    def get_agent(self, agent_id: str) -> Optional[AgentConfig]:
+        """Get agent config by ID."""
+        if agent_id not in self._agents:
+            self.scan()
+        return self._agents.get(agent_id)
+
+    def get_session_id(self, agent_id: str, base_session_id: str) -> str:
+        """Get agent-scoped session ID.
+
+        에이전트별 세션 ID 생성 (격리).
+        """
+        if agent_id == 'main':
+            return base_session_id  # backward compatible
+        return f'{agent_id}:{base_session_id}'
+
+    def create(self, agent_id: str, display_name: str = '', model: str = None) -> str:
+        """Create a new agent. 새 에이전트 생성."""
+        if not agent_id or not agent_id.replace('-', '').replace('_', '').isalnum():
+            return '❌ Invalid agent ID (alphanumeric, hyphens, underscores only)'
+        agent_dir = AGENTS_DIR / agent_id
+        if agent_dir.exists():
+            return f'❌ Agent already exists: {agent_id}'
+
+        agent_dir.mkdir(parents=True)
+        (agent_dir / 'workspace').mkdir()
+        (agent_dir / 'sessions').mkdir()
+        config = {
+            'display_name': display_name or agent_id,
+            'model': model,
+            'allowed_tools': None,
+        }
+        (agent_dir / 'config.json').write_text(
+            json.dumps(config, indent=2, ensure_ascii=False), encoding='utf-8')
+
+        self._agents[agent_id] = AgentConfig(agent_id)
+        log.info(f"[AGENT] Created agent: {agent_id}")
+        return f'✅ Agent created: {agent_id}'
+
+    def delete(self, agent_id: str) -> str:
+        """Delete an agent (cannot delete 'main')."""
+        if agent_id == 'main':
+            return '❌ Cannot delete the main agent'
+        agent_dir = AGENTS_DIR / agent_id
+        if not agent_dir.exists():
+            return f'❌ Agent not found: {agent_id}'
+        shutil.rmtree(str(agent_dir), ignore_errors=True)
+        self._agents.pop(agent_id, None)
+        # Remove bindings pointing to this agent
+        self._bindings = {k: v for k, v in self._bindings.items() if v != agent_id}
+        self._save_bindings()
+        return f'🗑️ Agent deleted: {agent_id}'
+
+    def bind(self, chat_key: str, agent_id: str) -> str:
+        """Bind a chat to an agent. 채팅을 에이전트에 바인딩."""
+        if agent_id not in self._agents:
+            self.scan()
+        if agent_id not in self._agents:
+            return f'❌ Agent not found: {agent_id}'
+        self._bindings[chat_key] = agent_id
+        self._save_bindings()
+        return f'✅ Bound {chat_key} → {agent_id}'
+
+    def unbind(self, chat_key: str) -> str:
+        """Remove a chat binding."""
+        if chat_key in self._bindings:
+            del self._bindings[chat_key]
+            self._save_bindings()
+            return f'✅ Unbound {chat_key} (will use main)'
+        return f'⚠️ No binding found for {chat_key}'
+
+    def list_agents(self) -> list:
+        """List all agents. 전체 에이전트 목록."""
+        self.scan()
+        return [a.to_dict() for a in self._agents.values()]
+
+    def list_bindings(self) -> dict:
+        """Return all chat→agent bindings."""
+        return dict(self._bindings)
+
+    def switch(self, chat_key: str, agent_id: str) -> str:
+        """Switch the agent for a chat. /agent switch 명령 처리."""
+        return self.bind(chat_key, agent_id)
+
+
+# Singleton
+agent_manager = AgentManager()
+
+
 # Global telegram bot reference (set during startup)
 _llm_cron = None
 

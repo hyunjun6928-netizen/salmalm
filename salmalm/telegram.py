@@ -19,6 +19,10 @@ class TelegramBot:
         self._running = False
         self._webhook_secret: Optional[str] = None
         self._webhook_mode = False
+        # Block streaming state per chat
+        self._draft_messages: Dict[str, Dict[str, Any]] = {}  # chat_id -> {msg_id, text, last_edit}
+        # Typing indicator config: instant|message|never
+        self.typing_mode = 'instant'
 
     def configure(self, token: str, owner_id: str):
         """Configure the Telegram bot with token and owner chat ID."""
@@ -172,6 +176,95 @@ class TelegramBot:
             self._api('sendChatAction', {'chat_id': chat_id, 'action': 'typing'})
         except Exception:
             pass
+
+    def _start_typing_loop(self, chat_id) -> asyncio.Task:
+        """Start an async typing indicator loop that refreshes every 5 seconds.
+
+        Returns a task that can be cancelled when the response is ready.
+        """
+        async def _loop():
+            try:
+                while True:
+                    await asyncio.to_thread(self.send_typing, chat_id)
+                    await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                pass
+        return asyncio.create_task(_loop())
+
+    def edit_message(self, chat_id, message_id, text: str, parse_mode: Optional[str] = None):
+        """Edit an existing Telegram message."""
+        data: Dict[str, Any] = {
+            'chat_id': chat_id,
+            'message_id': message_id,
+            'text': text[:4000],
+        }
+        if parse_mode:
+            data['parse_mode'] = parse_mode
+        try:
+            self._api('editMessageText', data)
+        except Exception:
+            # Fallback without parse_mode
+            if parse_mode:
+                data2 = {k: v for k, v in data.items() if k != 'parse_mode'}
+                try:
+                    self._api('editMessageText', data2)
+                except Exception:
+                    pass
+
+    def _send_draft(self, chat_id, text: str) -> Optional[int]:
+        """Send initial draft message for block streaming. Returns message_id."""
+        data = {'chat_id': chat_id, 'text': text[:4000]}
+        try:
+            resp = self._api('sendMessage', data)
+            msg_id = resp.get('result', {}).get('message_id')
+            if msg_id:
+                self._draft_messages[str(chat_id)] = {
+                    'msg_id': msg_id,
+                    'text': text,
+                    'last_edit': time.time(),
+                }
+            return msg_id
+        except Exception:
+            return None
+
+    def _update_draft(self, chat_id, text: str, force: bool = False):
+        """Update draft message with new text (block streaming).
+
+        Respects minimum 2-second edit interval.
+        Skips updates if inside an unclosed code block.
+        """
+        key = str(chat_id)
+        draft = self._draft_messages.get(key)
+        if not draft:
+            return
+
+        now = time.time()
+        # Min 2s between edits unless forced
+        if not force and (now - draft['last_edit']) < 2.0:
+            return
+
+        # Don't edit in the middle of a code block (odd number of ```)
+        fence_count = text.count('```')
+        if not force and fence_count % 2 != 0:
+            return
+
+        draft['text'] = text
+        draft['last_edit'] = now
+        self.edit_message(chat_id, draft['msg_id'], text)
+
+    def _finalize_draft(self, chat_id, text: str, suffix: str = ''):
+        """Finalize draft message with complete text + suffix."""
+        key = str(chat_id)
+        draft = self._draft_messages.get(key)
+        final = f'{text}{suffix}' if suffix else text
+        if draft:
+            self.edit_message(chat_id, draft['msg_id'], final)
+            del self._draft_messages[key]
+            return draft['msg_id']
+        else:
+            # No draft — send as new message
+            self.send_message(chat_id, final)
+            return None
 
     # ── Webhook support ──────────────────────────────────────────
 
