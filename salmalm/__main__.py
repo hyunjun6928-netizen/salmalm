@@ -6,25 +6,29 @@ import sys
 
 
 def _ensure_windows_shortcut():
-    """Create a Windows shortcut (.lnk) on Desktop via PowerShell."""
+    """Create a .bat launcher on Desktop (works everywhere, no PowerShell needed)."""
     try:
-        import subprocess as _sp
+        desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
+        if not os.path.isdir(desktop):
+            # Try Windows-specific Desktop path
+            desktop = os.path.join(os.environ.get('USERPROFILE', os.path.expanduser('~')), 'Desktop')
+        if not os.path.isdir(desktop):
+            return
+
+        bat_path = os.path.join(desktop, 'SalmAlm.bat')
+        if os.path.exists(bat_path):
+            return  # Already created
+
         python_exe = sys.executable
-        work_dir = os.path.join(os.path.expanduser('~'), 'SalmAlm')
-        cmd = (
-            "$ws = New-Object -ComObject WScript.Shell; "
-            "$lnk = $ws.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\\SalmAlm.lnk'); "
-            f"$lnk.TargetPath = '{python_exe}'; "
-            "$lnk.Arguments = '-m salmalm'; "
-            f"$lnk.WorkingDirectory = '{work_dir}'; "
-            "$lnk.Description = 'SalmAlm - Personal AI Gateway'; "
-            "$lnk.Save(); "
-            "Write-Host 'Created SalmAlm shortcut on Desktop'"
-        )
-        result = _sp.run(['powershell', '-Command', cmd],
-                        capture_output=True, text=True, timeout=10)
-        if result.stdout.strip():
-            print(f"📌 {result.stdout.strip()}")
+        bat_content = f'''@echo off
+title SalmAlm - Personal AI Gateway
+echo Starting SalmAlm...
+"{python_exe}" -m salmalm
+pause
+'''
+        with open(bat_path, 'w', encoding='utf-8') as f:
+            f.write(bat_content)
+        print(f"📌 Created SalmAlm.bat on Desktop — double-click to start!")
     except Exception as e:
         print(f"⚠️  Could not create desktop shortcut: {e}")
 
@@ -311,6 +315,14 @@ def main() -> None:
 """)
             if update_msg:
                 print(f"  {update_msg}\n")
+
+            # Auto-open browser on first start
+            try:
+                import webbrowser
+                webbrowser.open(f'http://127.0.0.1:{port}')
+            except Exception:
+                pass
+
             try:
                 while True:
                     await asyncio.sleep(1)
