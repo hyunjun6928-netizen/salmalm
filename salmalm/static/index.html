@@ -210,6 +210,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <button id="new-chat-btn" data-action="newSession" title="New Chat">✨ New</button>
 </div>
 
+<div id="update-banner" style="display:none;background:linear-gradient(135deg,#1e3a5f,#2d1b69);border:1px solid #3b82f6;border-radius:12px;padding:12px 16px;margin:8px 16px;display:none;align-items:center;justify-content:space-between;font-size:13px">
+  <span>⬆️ <b>Update Available</b> — <span id="banner-ver"></span></span>
+  <button onclick="window.doUpdate()" style="background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:6px 16px;cursor:pointer;font-size:12px">Update Now</button>
+</div>
 <div id="chat"></div>
 
 <div id="settings">
@@ -1050,7 +1054,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-title':'⌨️ Keyboard Shortcuts',
       'shortcut-search':'Search sessions',
       'shortcut-newchat':'New chat','shortcut-sidebar':'Toggle sidebar',
-      'shortcut-escape':'Close modal / settings','shortcut-help':'This help',
+      'shortcut-escape':'Close modal / settings','shortcut-cmdpalette':'Command palette','shortcut-help':'This help',
       'btn-close':'Close',
       'drop-overlay':'📎 Drop image or file here',
       'input-hint':'Enter to send · Shift+Enter newline · Ctrl+V paste · Drag&Drop files',
@@ -1139,7 +1143,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-title':'⌨️ 키보드 단축키',
       'shortcut-search':'세션 검색',
       'shortcut-newchat':'새 대화','shortcut-sidebar':'사이드바 토글',
-      'shortcut-escape':'모달 / 설정 닫기','shortcut-help':'이 도움말',
+      'shortcut-escape':'모달 / 설정 닫기','shortcut-cmdpalette':'커맨드 팔레트','shortcut-help':'이 도움말',
       'btn-close':'닫기',
       'drop-overlay':'📎 이미지 또는 파일을 놓으세요',
       'input-hint':'Enter 전송 · Shift+Enter 줄바꿈 · Ctrl+V 붙여넣기 · 파일 드래그&드롭',
@@ -1188,6 +1192,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var dashView=document.getElementById('dashboard-view');
   window.showChat=function(){settingsEl.style.display='none';dashView.style.display='none';chat.style.display='flex';inputArea.style.display='block'};
   window.showSettings=function(){chat.style.display='none';inputArea.style.display='none';dashView.style.display='none';settingsEl.style.display='block';
+    /* Load personas */
+    if(window.loadPersonas)window.loadPersonas();
     /* Load routing config */
     fetch('/api/routing',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
       var cfg=d.config||{};var models=d.available_models||{};
@@ -1390,7 +1396,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- Keyboard shortcuts + modals --- */
   var _shortcutModal=document.createElement('div');_shortcutModal.id='shortcut-modal';
   _shortcutModal.style.cssText='display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;z-index:10000;min-width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
-  _shortcutModal.innerHTML='<h3 style="margin-bottom:12px;color:var(--accent2)" data-i18n="shortcut-title">\u2328\ufe0f Keyboard Shortcuts</h3><div style="font-size:13px;line-height:2.2;color:var(--text)"><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+K</kbd> <span data-i18n="shortcut-search">Search sessions</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+N</kbd> <span data-i18n="shortcut-newchat">New chat</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+S</kbd> <span data-i18n="shortcut-sidebar">Toggle sidebar</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Escape</kbd> <span data-i18n="shortcut-escape">Close modal / settings</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+/</kbd> <span data-i18n="shortcut-help">This help</span></div></div><button data-action="closeShortcutModal" style="margin-top:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px" data-i18n="btn-close">Close</button>';
+  _shortcutModal.innerHTML='<h3 style="margin-bottom:12px;color:var(--accent2)" data-i18n="shortcut-title">\u2328\ufe0f Keyboard Shortcuts</h3><div style="font-size:13px;line-height:2.2;color:var(--text)"><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+K</kbd> <span data-i18n="shortcut-search">Search sessions</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+N</kbd> <span data-i18n="shortcut-newchat">New chat</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+S</kbd> <span data-i18n="shortcut-sidebar">Toggle sidebar</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Escape</kbd> <span data-i18n="shortcut-escape">Close modal / settings</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+Shift+P</kbd> <span data-i18n="shortcut-cmdpalette">Command palette</span></div><div><kbd style="background:var(--bg3);padding:2px 8px;border-radius:4px;border:1px solid var(--border);font-size:12px">Ctrl+/</kbd> <span data-i18n="shortcut-help">This help</span></div></div><button data-action="closeShortcutModal" style="margin-top:12px;padding:6px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px" data-i18n="btn-close">Close</button>';
   document.body.appendChild(_shortcutModal);
   var _shortcutOv=document.createElement('div');_shortcutOv.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999';_shortcutOv.setAttribute('data-action','closeShortcutModal');document.body.appendChild(_shortcutOv);
 
@@ -1657,8 +1663,18 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     inp.addEventListener('keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();inp.blur()}if(ev.key==='Escape'){inp.value=oldTitle;inp.blur()}});
   });
 
-  /* PWA Service Worker — standalone mode only */
-  if(window.matchMedia('(display-mode:standalone)').matches&&'serviceWorker' in navigator){
+  /* Auto-check for updates on load */
+  setTimeout(function(){
+    fetch('/api/update/check').then(function(r){return r.json()}).then(function(d){
+      if(d.update_available&&d.latest){
+        var banner=document.getElementById('update-banner');
+        if(banner){banner.style.display='flex';document.getElementById('banner-ver').textContent='v'+d.latest+' available';}
+      }
+    }).catch(function(){});
+  },3000);
+
+  /* PWA Service Worker */
+  if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/sw.js').catch(function(){});
   }
 })();

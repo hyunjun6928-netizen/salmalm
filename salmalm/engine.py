@@ -25,6 +25,196 @@ from .prompt import build_system_prompt
 from .tool_handlers import execute_tool
 from .llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic
 
+# ============================================================
+# Session Pruning — soft-trim / hard-clear old tool results
+# ============================================================
+_PRUNE_KEEP_LAST_ASSISTANTS = 3
+_PRUNE_SOFT_LIMIT = 4000
+_PRUNE_HARD_LIMIT = 50_000
+_PRUNE_HEAD = 1500
+_PRUNE_TAIL = 1500
+
+
+def _has_image_block(content) -> bool:
+    """Check if a content block list contains image data."""
+    if not isinstance(content, list):
+        return False
+    return any(
+        (isinstance(b, dict) and b.get('type') in ('image', 'image_url'))
+        or (isinstance(b, dict) and b.get('source', {}).get('type') == 'base64')
+        for b in content
+    )
+
+
+def _soft_trim(text: str) -> str:
+    """Trim long text to head + ... + tail."""
+    if len(text) <= _PRUNE_SOFT_LIMIT:
+        return text
+    return text[:_PRUNE_HEAD] + f"\n\n... [{len(text)} chars, trimmed] ...\n\n" + text[-_PRUNE_TAIL:]
+
+
+def prune_context(messages: list) -> tuple:
+    """Prune old tool_result messages before LLM call.
+
+    Returns (pruned_messages, stats_dict).
+    Does NOT modify the original list — returns a deep copy.
+    """
+    import copy
+    pruned = copy.deepcopy(messages)
+    stats = {'soft_trimmed': 0, 'hard_cleared': 0, 'unchanged': 0}
+
+    # Find the index of the Nth-last assistant message
+    assistant_indices = [i for i, m in enumerate(pruned) if m.get('role') == 'assistant']
+    if len(assistant_indices) <= _PRUNE_KEEP_LAST_ASSISTANTS:
+        return pruned, stats  # Not enough history to prune
+    cutoff_idx = assistant_indices[-_PRUNE_KEEP_LAST_ASSISTANTS]
+
+    for i in range(cutoff_idx):
+        m = pruned[i]
+        # Anthropic-style tool results in user messages
+        if m.get('role') == 'user' and isinstance(m.get('content'), list):
+            if _has_image_block(m['content']):
+                stats['unchanged'] += 1
+                continue
+            for j, block in enumerate(m['content']):
+                if not isinstance(block, dict):
+                    continue
+                if block.get('type') != 'tool_result':
+                    continue
+                text = block.get('content', '')
+                if not isinstance(text, str):
+                    continue
+                if len(text) >= _PRUNE_HARD_LIMIT:
+                    m['content'][j] = {**block, 'content': '[Tool result cleared]'}
+                    stats['hard_cleared'] += 1
+                elif len(text) > _PRUNE_SOFT_LIMIT:
+                    m['content'][j] = {**block, 'content': _soft_trim(text)}
+                    stats['soft_trimmed'] += 1
+                else:
+                    stats['unchanged'] += 1
+        # OpenAI-style tool messages
+        elif m.get('role') == 'tool':
+            text = m.get('content', '')
+            if not isinstance(text, str):
+                continue
+            if len(text) >= _PRUNE_HARD_LIMIT:
+                pruned[i] = {**m, 'content': '[Tool result cleared]'}
+                stats['hard_cleared'] += 1
+            elif len(text) > _PRUNE_SOFT_LIMIT:
+                pruned[i] = {**m, 'content': _soft_trim(text)}
+                stats['soft_trimmed'] += 1
+            else:
+                stats['unchanged'] += 1
+
+    return pruned, stats
+
+
+# ============================================================
+# Model Failover — exponential backoff cooldown + fallback chain
+# ============================================================
+_FAILOVER_CONFIG_FILE = __import__('pathlib').Path.home() / '.salmalm' / 'failover.json'
+_COOLDOWN_FILE = __import__('pathlib').Path.home() / '.salmalm' / 'cooldowns.json'
+_cooldown_lock = _threading.Lock()
+
+# Default fallback chains (no config needed)
+_DEFAULT_FALLBACKS = {
+    'anthropic/claude-opus-4-6': ['anthropic/claude-sonnet-4-20250514', 'anthropic/claude-haiku-3.5-20241022'],
+    'anthropic/claude-sonnet-4-20250514': ['anthropic/claude-haiku-3.5-20241022', 'anthropic/claude-opus-4-6'],
+    'anthropic/claude-haiku-3.5-20241022': ['anthropic/claude-sonnet-4-20250514'],
+}
+_COOLDOWN_STEPS = [60, 300, 1500, 3600]  # 1m, 5m, 25m, 1h
+
+
+def _load_failover_config() -> dict:
+    """Load user failover chain config, falling back to defaults."""
+    try:
+        if _FAILOVER_CONFIG_FILE.exists():
+            cfg = json.loads(_FAILOVER_CONFIG_FILE.read_text(encoding='utf-8'))
+            if isinstance(cfg, dict):
+                merged = dict(_DEFAULT_FALLBACKS)
+                merged.update(cfg)
+                return merged
+    except Exception:
+        pass
+    return dict(_DEFAULT_FALLBACKS)
+
+
+def _load_cooldowns() -> dict:
+    """Load cooldown state: {model: {until: float, failures: int}}."""
+    try:
+        if _COOLDOWN_FILE.exists():
+            data = json.loads(_COOLDOWN_FILE.read_text(encoding='utf-8'))
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def _save_cooldowns(cd: dict):
+    try:
+        _COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _COOLDOWN_FILE.write_text(json.dumps(cd), encoding='utf-8')
+    except Exception:
+        pass
+
+
+def _is_model_cooled_down(model: str) -> bool:
+    """Check if a model is in cooldown."""
+    with _cooldown_lock:
+        cd = _load_cooldowns()
+        entry = cd.get(model)
+        if not entry:
+            return False
+        return _time.time() < entry.get('until', 0)
+
+
+def _record_model_failure(model: str):
+    """Record a model failure and set cooldown."""
+    with _cooldown_lock:
+        cd = _load_cooldowns()
+        entry = cd.get(model, {'until': 0, 'failures': 0})
+        failures = entry.get('failures', 0)
+        step = min(failures, len(_COOLDOWN_STEPS) - 1)
+        cooldown_secs = _COOLDOWN_STEPS[step]
+        cd[model] = {
+            'until': _time.time() + cooldown_secs,
+            'failures': failures + 1,
+        }
+        _save_cooldowns(cd)
+        log.warning(f"[FAILOVER] {model} cooled down for {cooldown_secs}s (failure #{failures+1})")
+
+
+def _clear_model_cooldown(model: str):
+    """Clear cooldown on successful call."""
+    with _cooldown_lock:
+        cd = _load_cooldowns()
+        if model in cd:
+            del cd[model]
+            _save_cooldowns(cd)
+
+
+def get_failover_config() -> dict:
+    """Public getter for failover config (used by web API / settings)."""
+    return _load_failover_config()
+
+
+def save_failover_config(config: dict):
+    """Save user's failover chain config."""
+    try:
+        _FAILOVER_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _FAILOVER_CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding='utf-8')
+    except Exception:
+        pass
+
+
+# ============================================================
+# Status callback types for typing indicators
+# ============================================================
+STATUS_TYPING = 'typing'
+STATUS_THINKING = 'thinking'
+STATUS_TOOL_RUNNING = 'tool_running'
+
 
 async def _call_llm_async(*args, **kwargs):
     """Non-blocking LLM call — runs urllib in a thread to avoid blocking the event loop."""
@@ -393,10 +583,81 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             return True
         return False
 
+    async def _call_with_failover(self, messages, model, tools=None,
+                                   max_tokens=4096, thinking=False,
+                                   on_token=None, on_status=None):
+        """LLM call with automatic failover on failure.
+
+        on_status: optional callback(status_type, detail_str) for typing indicators.
+        Returns (result_dict, failover_warning_or_None).
+        """
+        provider = model.split('/')[0] if '/' in model else 'anthropic'
+
+        # Check if primary model is cooled down
+        if _is_model_cooled_down(model):
+            log.info(f"[FAILOVER] {model} is in cooldown, trying fallbacks")
+            chain = _load_failover_config().get(model, [])
+            for fb in chain:
+                if not _is_model_cooled_down(fb):
+                    warn = f"⚠️ {model.split('/')[-1]} in cooldown, using {fb.split('/')[-1]}"
+                    result = await self._try_llm_call(messages, fb, tools, max_tokens, thinking, on_token)
+                    if not result.get('_failed'):
+                        _clear_model_cooldown(fb)
+                        return result, warn
+                    _record_model_failure(fb)
+            # All in cooldown — try primary anyway
+            pass
+
+        # Try primary model
+        result = await self._try_llm_call(messages, model, tools, max_tokens, thinking, on_token)
+        if not result.get('_failed'):
+            _clear_model_cooldown(model)
+            return result, None
+
+        # Primary failed — record and try fallbacks
+        _record_model_failure(model)
+        chain = _load_failover_config().get(model, [])
+        for fb in chain:
+            if _is_model_cooled_down(fb):
+                continue
+            log.info(f"[FAILOVER] {model} failed, trying {fb}")
+            if on_status:
+                on_status(STATUS_TYPING, f"⚠️ {model.split('/')[-1]} failed, falling back to {fb.split('/')[-1]}")
+            result = await self._try_llm_call(messages, fb, tools, max_tokens, thinking, on_token)
+            if not result.get('_failed'):
+                _clear_model_cooldown(fb)
+                warn = f"⚠️ {model.split('/')[-1]} failed, fell back to {fb.split('/')[-1]}"
+                return result, warn
+            _record_model_failure(fb)
+
+        # All failed — return the last error
+        return result, f"⚠️ All models failed"
+
+    async def _try_llm_call(self, messages, model, tools, max_tokens, thinking, on_token):
+        """Single LLM call attempt. Sets _failed=True on exception."""
+        provider = model.split('/')[0] if '/' in model else 'anthropic'
+        try:
+            if on_token and provider == 'anthropic':
+                result = await _call_llm_streaming(
+                    messages, model=model, tools=tools,
+                    thinking=thinking, on_token=on_token)
+            else:
+                result = await _call_llm_async(messages, model=model, tools=tools,
+                                               thinking=thinking)
+            # Check for error responses that indicate API failure
+            content = result.get('content', '')
+            if isinstance(content, str) and content.startswith('❌') and 'API key' not in content:
+                result['_failed'] = True
+            return result
+        except Exception as e:
+            log.error(f"[FAILOVER] {model} call error: {e}")
+            return {'content': f'❌ {e}', 'tool_calls': [], '_failed': True,
+                    'usage': {'input': 0, 'output': 0}, 'model': model}
+
     async def run(self, session, user_message: str,
                   model_override: Optional[str] = None, on_tool=None,
                   classification: Optional[dict] = None,
-                  on_token=None) -> str:
+                  on_token=None, on_status=None) -> str:
         """Main execution loop — Plan → Execute → Reflect."""
 
         if not classification:
@@ -429,7 +690,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         try:
           return await self._execute_loop(session, user_message, model_override,  # type: ignore[no-any-return]
                                            on_tool, classification, tier,
-                                           on_token=on_token)
+                                           on_token=on_token, on_status=on_status)
         except Exception as e:
             log.error(f"Engine.run error: {e}")
             import traceback; traceback.print_exc()
@@ -442,7 +703,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     MAX_CONSECUTIVE_ERRORS = 3
 
     async def _execute_loop(self, session, user_message, model_override,
-                             on_tool, classification, tier, on_token=None):
+                             on_tool, classification, tier, on_token=None,
+                             on_status=None):
         use_thinking = classification['thinking'] or getattr(session, 'thinking_enabled', False)
         thinking_budget = classification['thinking_budget'] or (10000 if use_thinking else 0)
         iteration = 0
@@ -471,14 +733,26 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                                and provider == 'anthropic'
                                and ('opus' in model or 'sonnet' in model))
 
-            # Use streaming for Anthropic when on_token callback is provided
-            if on_token and provider == 'anthropic':
-                result = await _call_llm_streaming(
-                    session.messages, model=model, tools=tools,
-                    thinking=think_this_call, on_token=on_token)
-            else:
-                result = await _call_llm_async(session.messages, model=model, tools=tools,
-                                  thinking=think_this_call)
+            # Session pruning — trim old tool results before LLM call
+            pruned_messages, prune_stats = prune_context(session.messages)
+            if prune_stats['soft_trimmed'] or prune_stats['hard_cleared']:
+                log.info(f"[PRUNE] soft={prune_stats['soft_trimmed']} hard={prune_stats['hard_cleared']}")
+
+            # Status callback: typing/thinking
+            if on_status:
+                if think_this_call:
+                    on_status(STATUS_THINKING, '🧠 Thinking...')
+                else:
+                    on_status(STATUS_TYPING, 'typing')
+
+            # LLM call with failover
+            _failover_warn = None
+            result, _failover_warn = await self._call_with_failover(
+                pruned_messages, model=model, tools=tools,
+                max_tokens=4096, thinking=think_this_call,
+                on_token=on_token, on_status=on_status)
+            # Clean internal flag
+            result.pop('_failed', None)
 
             # ── Token overflow: aggressive truncation + retry once ──
             if result.get('error') == 'token_overflow':
@@ -526,6 +800,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 log.info(f"[AI] Thinking: {len(result['thinking'])} chars")
 
             if result.get('tool_calls'):
+                # Status: tool running
+                if on_status:
+                    tool_names = ', '.join(tc['name'] for tc in result['tool_calls'][:3])
+                    on_status(STATUS_TOOL_RUNNING, f'🔧 Running {tool_names}...')
+
                 tool_outputs = await asyncio.to_thread(
                     self._execute_tools_parallel,
                     result['tool_calls'], on_tool)
@@ -580,6 +859,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                         response = improved
                     log.info(f"[SEARCH] Reflection improved: {len(response)} chars")
 
+            # Prepend failover warning if applicable
+            if _failover_warn:
+                response = f"{_failover_warn}\n\n{response}"
+
             session.add_assistant(response)
             log.info(f"[CHAT] Response ({result.get('model', '?')}): {len(response)} chars, "
                      f"iteration {iteration + 1}, intent={classification['intent']}")
@@ -616,7 +899,8 @@ async def process_message(session_id: str, user_message: str,
                           model_override: Optional[str] = None,
                           image_data: Optional[Tuple[str, str]] = None,
                           on_tool: Optional[Callable[[str, Any], None]] = None,
-                          on_token: Optional[Callable] = None) -> str:
+                          on_token: Optional[Callable] = None,
+                          on_status: Optional[Callable] = None) -> str:
     """Process a user message through the Intelligence Engine pipeline."""
     # Reject new requests during shutdown
     if _shutting_down:
@@ -632,7 +916,8 @@ async def process_message(session_id: str, user_message: str,
                                              model_override=model_override,
                                              image_data=image_data,
                                              on_tool=on_tool,
-                                             on_token=on_token)
+                                             on_token=on_token,
+                                             on_status=on_status)
     finally:
         with _active_requests_lock:
             _active_requests -= 1
@@ -644,7 +929,8 @@ async def _process_message_inner(session_id: str, user_message: str,
                                   model_override: Optional[str] = None,
                                   image_data: Optional[Tuple[str, str]] = None,
                                   on_tool: Optional[Callable[[str, Any], None]] = None,
-                                  on_token: Optional[Callable] = None) -> str:
+                                  on_token: Optional[Callable] = None,
+                                  on_status: Optional[Callable] = None) -> str:
     """Inner implementation of process_message."""
     # Input sanitization
     if not _SESSION_ID_RE.match(session_id):
@@ -715,6 +1001,14 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
                           'thinking_budget': 10000, 'score': 5}
         return await _engine.run(session, plan_msg, model_override=model_override,
                                   on_tool=on_tool, classification=classification)
+    if cmd == '/prune':
+        _, stats = prune_context(session.messages)
+        total = stats['soft_trimmed'] + stats['hard_cleared'] + stats['unchanged']
+        return (f"🧹 **Session Pruning Results**\n"
+                f"• Soft-trimmed: {stats['soft_trimmed']}\n"
+                f"• Hard-cleared: {stats['hard_cleared']}\n"
+                f"• Unchanged: {stats['unchanged']}\n"
+                f"• Total tool results scanned: {total}")
     if cmd == '/soul':
         from .prompt import get_user_soul, USER_SOUL_FILE
         content = get_user_soul()
@@ -819,7 +1113,8 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
                               model_override=selected_model,
                               on_tool=on_tool,
                               classification=classification,
-                              on_token=on_token)
+                              on_token=on_token,
+                              on_status=on_status)
 
     # Store model metadata on session for API consumers
     session.last_model = selected_model or 'auto'

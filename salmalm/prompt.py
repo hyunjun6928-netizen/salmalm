@@ -11,6 +11,85 @@ from . import log
 # User-customizable SOUL.md (takes priority over project SOUL.md)
 USER_SOUL_FILE = Path.home() / '.salmalm' / 'SOUL.md'
 
+# ── Multi-Persona System ──
+PERSONAS_DIR = Path.home() / '.salmalm' / 'personas'
+
+_BUILTIN_PERSONAS = {
+    'default': "# Default AI Assistant\nYou are a helpful, knowledgeable AI assistant.\nRespond clearly and concisely. Use appropriate formality based on context.\nYou can handle a wide range of tasks: coding, writing, analysis, research, and more.\nBe proactive in suggesting better approaches when you see them.\n",
+    'coding': "# Coding Expert 🧑‍💻\nYou are a senior software engineer and coding expert.\nFocus on: code review, debugging, architecture, and best practices.\n- Always provide working, tested code\n- Explain trade-offs and alternatives\n- Follow language-specific conventions\n- Prioritize readability, performance, and security\n- Use type hints, docstrings, and proper error handling\nRespond concisely. Code speaks louder than words.\n",
+    'casual': "# 캐주얼 친구 😎\n넌 친한 친구처럼 대화해! 반말 쓰고, 이모지 많이 써 ✨\n- 편하게 말해~ 격식 없이!\n- 재밌는 표현, 유머 환영 😂\n- 공감 잘 해주고, 리액션 활발하게!\n- 근데 정보는 정확하게 👍\n- 한국어가 기본, 영어 섞어도 OK\n",
+    'professional': "# Business Professional 💼\nYou are a professional business consultant.\n- Use formal, polished language\n- Structure responses with clear headings and bullet points\n- Provide data-driven insights and recommendations\n- Format reports with executive summaries\n- Maintain objectivity and cite sources when possible\n- Use professional terminology appropriate to the domain\n",
+}
+
+_active_personas: dict = {}
+
+
+def ensure_personas_dir():
+    """Create personas directory and install built-in presets if missing."""
+    PERSONAS_DIR.mkdir(parents=True, exist_ok=True)
+    for name, content in _BUILTIN_PERSONAS.items():
+        path = PERSONAS_DIR / f'{name}.md'
+        if not path.exists():
+            path.write_text(content, encoding='utf-8')
+
+
+def list_personas() -> list:
+    """List all available personas."""
+    ensure_personas_dir()
+    personas = []
+    for f in sorted(PERSONAS_DIR.glob('*.md')):
+        name = f.stem
+        content = f.read_text(encoding='utf-8')
+        title = content.strip().split('\n')[0].lstrip('#').strip() if content.strip() else name
+        personas.append({'name': name, 'title': title, 'builtin': name in _BUILTIN_PERSONAS, 'path': str(f)})
+    return personas
+
+
+def get_persona(name: str):
+    """Get persona content by name."""
+    ensure_personas_dir()
+    path = PERSONAS_DIR / f'{name}.md'
+    if path.exists():
+        return path.read_text(encoding='utf-8')
+    return None
+
+
+def create_persona(name: str, content: str) -> bool:
+    """Create or update a custom persona."""
+    ensure_personas_dir()
+    safe_name = ''.join(c for c in name if c.isalnum() or c in '-_').lower()
+    if not safe_name:
+        return False
+    path = PERSONAS_DIR / f'{safe_name}.md'
+    path.write_text(content, encoding='utf-8')
+    return True
+
+
+def delete_persona(name: str) -> bool:
+    """Delete a custom persona (cannot delete built-in ones)."""
+    if name in _BUILTIN_PERSONAS:
+        return False
+    path = PERSONAS_DIR / f'{name}.md'
+    if path.exists():
+        path.unlink()
+        return True
+    return False
+
+
+def switch_persona(session_id: str, name: str):
+    """Switch active persona for a session. Returns persona content or None."""
+    content = get_persona(name)
+    if content is None:
+        return None
+    _active_personas[session_id] = name
+    set_user_soul(content)
+    return content
+
+
+def get_active_persona(session_id: str) -> str:
+    """Get the active persona name for a session."""
+    return _active_personas.get(session_id, 'default')
+
 
 def get_user_soul() -> str:
     """Read user SOUL.md from ~/.salmalm/SOUL.md. Returns empty string if not found."""

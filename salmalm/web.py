@@ -666,11 +666,13 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 "description": "Your personal AI gateway. 43 tools, 6 providers, zero dependencies.",
                 "start_url": "/",
                 "display": "standalone",
-                "background_color": "#0f172a",
+                "background_color": "#0b0d14",
                 "theme_color": "#6366f1",
+                "orientation": "any",
+                "categories": ["productivity", "utilities"],
                 "icons": [
-                    {"src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml"},
-                    {"src": "/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml"}
+                    {"src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any"},
+                    {"src": "/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable"}
                 ]
             }
             self.send_response(200)
@@ -694,15 +696,22 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/sw.js':
             _ver = VERSION  # already imported via wildcard at module level
             sw_js = f'''const CACHE='salmalm-v{_ver}';
-self.addEventListener('install',e=>{{self.skipWaiting()}});
+const STATIC_URLS=['/','/manifest.json','/icon-192.svg','/icon-512.svg'];
+self.addEventListener('install',e=>{{
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC_URLS)).then(()=>self.skipWaiting()))
+}});
 self.addEventListener('activate',e=>{{
   e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim()))
 }});
 self.addEventListener('fetch',e=>{{
   if(e.request.method!=='GET')return;
-  e.respondWith(fetch(e.request).then(r=>{{
-    if(r.ok){{const c=r.clone();caches.open(CACHE).then(ca=>ca.put(e.request,c))}}return r
-  }}).catch(()=>caches.match(e.request)))
+  const url=new URL(e.request.url);
+  if(url.pathname.startsWith('/api/')||url.pathname==='/sw.js'){{
+    e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));return
+  }}
+  e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request).then(r=>{{
+    if(r.ok){{const cl=r.clone();caches.open(CACHE).then(ca=>ca.put(e.request,cl))}}return r
+  }})))
 }});'''
             self.send_response(200)
             self._cors()
