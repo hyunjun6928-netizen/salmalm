@@ -10,6 +10,7 @@ from .core import router, get_session, _sessions, audit_log, compact_messages, s
 from .llm import _http_post, _http_get
 from .prompt import build_system_prompt
 from .tools import execute_tool
+from .chunker import EmbeddedBlockChunker, ChunkerConfig, CHANNEL_TELEGRAM, load_config_from_file
 
 class TelegramBot:
     def __init__(self):
@@ -28,6 +29,14 @@ class TelegramBot:
         """Configure the Telegram bot with token and owner chat ID."""
         self.token = token
         self.owner_id = owner_id
+        self._bot_username: Optional[str] = None
+        # Try to fetch bot username
+        try:
+            me = self._api('getMe')
+            if me.get('ok') and me.get('result'):
+                self._bot_username = me['result'].get('username')
+        except Exception:
+            pass
 
     def _api(self, method: str, data: Optional[dict] = None) -> dict:
         url = f'https://api.telegram.org/bot{self.token}/{method}'
@@ -49,8 +58,22 @@ class TelegramBot:
         clean = _re2.sub(r'<!--buttons:(\[.*?\])-->', _repl, text)
         return clean.strip(), buttons
 
+    def set_message_reaction(self, chat_id, message_id: int, emoji: str = '👍') -> dict:
+        """React to a message with an emoji via setMessageReaction API."""
+        try:
+            return self._api('setMessageReaction', {
+                'chat_id': chat_id,
+                'message_id': message_id,
+                'reaction': [{'type': 'emoji', 'emoji': emoji}],
+                'is_big': False,
+            })
+        except Exception as e:
+            log.error(f'[TG] Reaction error: {e}')
+            return {}
+
     def send_message(self, chat_id, text: str, parse_mode: Optional[str] = None,
-                     reply_markup: Optional[dict] = None):
+                     reply_markup: Optional[dict] = None,
+                     message_thread_id: Optional[int] = None):
         """Send a text message to a Telegram chat, with optional inline keyboard.
 
         Edge cases handled:
@@ -82,6 +105,8 @@ class TelegramBot:
             if not chunk.strip():
                 continue
             data = {'chat_id': chat_id, 'text': chunk}
+            if message_thread_id:
+                data['message_thread_id'] = message_thread_id
             if parse_mode:
                 data['parse_mode'] = parse_mode
             if reply_markup and idx == len(chunks) - 1:
@@ -127,42 +152,14 @@ class TelegramBot:
     def _smart_split(self, text: str, max_len: int = 4096) -> list:
         """Split text respecting paragraph boundaries and code blocks.
 
-        Preserves code block integrity (```...```) when possible.
-        Falls back to hard split if a single block exceeds max_len.
+        Uses EmbeddedBlockChunker for code-fence-aware, smart-breakpoint splitting.
         """
         if len(text) <= max_len:
             return [text]
 
-        chunks = []
-        remaining = text
-
-        while remaining:
-            if len(remaining) <= max_len:
-                chunks.append(remaining)
-                break
-
-            # Try to split at paragraph boundary
-            split_pos = remaining.rfind('\n\n', 0, max_len)
-            if split_pos < max_len // 4:
-                # No good paragraph break, try single newline
-                split_pos = remaining.rfind('\n', 0, max_len)
-            if split_pos < max_len // 4:
-                # Hard split
-                split_pos = max_len
-
-            chunk = remaining[:split_pos]
-            remaining = remaining[split_pos:].lstrip('\n')
-
-            # Check for unclosed code blocks
-            code_blocks = chunk.count('```')
-            if code_blocks % 2 != 0:
-                # Unclosed code block — close it in this chunk, reopen in next
-                chunk += '\n```'
-                remaining = '```\n' + remaining
-
-            chunks.append(chunk)
-
-        return chunks
+        config = ChunkerConfig(channel=CHANNEL_TELEGRAM, hardCap=max_len)
+        chunker = EmbeddedBlockChunker(config)
+        return chunker.split_for_channel(text)
 
     @staticmethod
     def _extract_retry_after(error) -> float:
@@ -510,6 +507,25 @@ class TelegramBot:
         chat_id = msg['chat']['id']
         user_id = str(msg['from']['id'])
         tg_username = msg.get('from', {}).get('username', '')
+        chat_type = msg.get('chat', {}).get('type', 'private')
+        message_thread_id = msg.get('message_thread_id')
+
+        # Group chat: only respond to mentions or replies to bot
+        if chat_type in ('group', 'supergroup'):
+            _msg_text = msg.get('text', '') or ''
+            _bot_info = getattr(self, '_bot_username', None)
+            _is_mention = _bot_info and f'@{_bot_info}' in _msg_text
+            _is_reply_to_bot = False
+            if msg.get('reply_to_message', {}).get('from', {}).get('is_bot'):
+                _is_reply_to_bot = True
+            # Also check entities for bot_command or mention
+            for ent in msg.get('entities', []):
+                if ent.get('type') == 'mention':
+                    mention_text = _msg_text[ent['offset']:ent['offset'] + ent['length']]
+                    if _bot_info and mention_text.lower() == f'@{_bot_info}'.lower():
+                        _is_mention = True
+            if not _is_mention and not _is_reply_to_bot and not _msg_text.startswith('/'):
+                return  # Silent: no mention, no reply to bot
 
         # Multi-tenant auth check
         from .users import user_manager
@@ -660,7 +676,12 @@ class TelegramBot:
         # Block streaming: accumulate streamed text and periodically edit
         _stream_buf = []
         _draft_sent = [False]
-        _BLOCK_STREAM_THRESHOLD = 500  # chars before first draft send
+        _streaming_config = load_config_from_file()
+        _streaming_config.channel = CHANNEL_TELEGRAM
+        _BLOCK_STREAM_THRESHOLD = _streaming_config.minChars or 500
+
+        # Streaming mode: 'partial' (every token) or 'block' (chunk-based)
+        _stream_mode = getattr(_streaming_config, 'streamingMode', 'block')
 
         def _on_stream_token(event):
             """Handle streaming tokens for block streaming in Telegram."""
