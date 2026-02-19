@@ -192,23 +192,37 @@ class AuthManager:
         count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
         if count == 0:
             default_pw = base64.urlsafe_b64encode(os.urandom(18)).decode().rstrip('=')
-            self._create_user_db(conn, 'admin', default_pw, 'admin')
-            log.info(f"👤 Default admin created: admin / {default_pw}")
-            log.warning("⚠️ Save this password! It won't be shown again.")
+            _, raw_api_key = self._create_user_db(conn, 'admin', default_pw, 'admin')
+            # SECURITY: Never log passwords to file — console only via stderr
+            import sys
+            print(f"\n{'='*50}", file=sys.stderr)
+            print(f"👤 Default admin created", file=sys.stderr)
+            print(f"   Username: admin", file=sys.stderr)
+            print(f"   Password: {default_pw}", file=sys.stderr)
+            print(f"⚠️  Save this password! It won't be shown again.", file=sys.stderr)
+            print(f"{'='*50}\n", file=sys.stderr)
+            log.info("👤 Default admin user created (password shown in console only)")
         conn.close()
         self._initialized = True
 
-    def _create_user_db(self, conn, username: str, password: str, role: str) -> int:
+    @staticmethod
+    def _hash_api_key(api_key: str) -> str:
+        """Hash API key for storage (SHA-256). Original key is never stored."""
+        return hashlib.sha256(api_key.encode()).hexdigest()
+
+    def _create_user_db(self, conn, username: str, password: str, role: str) -> tuple:
+        """Create user, return (lastrowid, raw_api_key). Raw key is shown once only."""
         pw_hash, salt = _hash_password(password)
         api_key = f"sk_{base64.urlsafe_b64encode(os.urandom(24)).decode().rstrip('=')}"
+        api_key_hash = self._hash_api_key(api_key)
         from datetime import datetime
         now = datetime.now(KST).isoformat()
         cursor = conn.execute(
             'INSERT INTO users (username, password_hash, password_salt, role, api_key, created_at) VALUES (?,?,?,?,?,?)',
-            (username, pw_hash, salt, role, api_key, now)
+            (username, pw_hash, salt, role, api_key_hash, now)
         )
         conn.commit()
-        return cursor.lastrowid
+        return cursor.lastrowid, api_key
 
     def create_user(self, username: str, password: str, role: str = 'user') -> dict:
         """Create a new user. Returns user info."""
@@ -220,10 +234,10 @@ class AuthManager:
 
         conn = sqlite3.connect(str(AUTH_DB))
         try:
-            uid = self._create_user_db(conn, username, password, role)
-            user = conn.execute('SELECT id, username, role, api_key FROM users WHERE id=?', (uid,)).fetchone()
+            uid, raw_api_key = self._create_user_db(conn, username, password, role)
             conn.close()
-            return {'id': user[0], 'username': user[1], 'role': user[2], 'api_key': user[3]}
+            # Return raw API key only at creation time — it's hashed in DB
+            return {'id': uid, 'username': username, 'role': role, 'api_key': raw_api_key}
         except sqlite3.IntegrityError:
             conn.close()
             raise ValueError(f"Username already exists: {username}")
@@ -267,15 +281,16 @@ class AuthManager:
         conn.commit()
         conn.close()
 
-        return {'id': row[0], 'username': row[1], 'role': row[4], 'api_key': row[5]}
+        return {'id': row[0], 'username': row[1], 'role': row[4]}
 
     def authenticate_api_key(self, api_key: str) -> Optional[dict]:
-        """Authenticate via API key."""
+        """Authenticate via API key (constant-time hash comparison)."""
         self._ensure_db()
+        key_hash = self._hash_api_key(api_key)
         conn = sqlite3.connect(str(AUTH_DB))
         row = conn.execute(
             'SELECT id, username, role, enabled FROM users WHERE api_key=? AND enabled=1',
-            (api_key,)
+            (key_hash,)
         ).fetchone()
         conn.close()
         if not row:

@@ -356,10 +356,31 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         else:
             self.send_error(404)
 
+    def _check_origin(self) -> bool:
+        """CSRF protection: reject cross-origin state-changing requests.
+        CORS blocks response reading, but the request still executes.
+        This blocks the request itself for non-whitelisted origins."""
+        origin = self.headers.get('Origin', '')
+        if not origin:
+            # No Origin header = same-origin, curl, etc. → allow
+            return True
+        if origin in self._ALLOWED_ORIGINS:
+            return True
+        log.warning(f"🚫 CSRF blocked: Origin={origin} on {self.path}")
+        self.send_response(403)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(b'{"error":"Forbidden: cross-origin request"}')
+        return False
+
     def do_POST(self):
         _start = time.time()
         import uuid
         set_correlation_id(str(uuid.uuid4())[:8])
+
+        # CSRF protection: block cross-origin POST requests
+        if self.path.startswith('/api/') and not self._check_origin():
+            return
 
         if self.path.startswith('/api/') and not self._check_rate_limit():
             return
