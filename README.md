@@ -1,4 +1,4 @@
-# 😈 삶앎 (SalmAlm) v0.10.6
+# 😈 삶앎 (SalmAlm) v0.10.9
 
 **Personal AI Gateway — Pure Python**
 
@@ -163,6 +163,17 @@ Store in `.env` file or encrypted vault via Web UI:
 | `GET /api/nodes` | ✅ | List connected nodes |
 | `GET /docs` | ❌ | Auto-generated API docs |
 | `ws://127.0.0.1:18801` | — | WebSocket real-time |
+
+## 📝 v0.10.9 Changelog
+
+- **🔒 P0 보안 패치**: `/api/do-update`, `/api/restart`에 admin 인증 + loopback 강제
+- **🔒 정보 API 인증**: dashboard/cron/plugins/mcp/rag 전부 인증 적용
+- **🔒 경로 탐색 방어**: `/uploads/` basename 정규화 + resolve 이중 방어
+- **🔓 Setup Wizard**: 첫 실행 시 비밀번호 설정/스킵 선택 화면
+- **🔑 비밀번호 관리**: Settings에서 변경/해제/재설정 가능
+- **♾️ 무제한 도구 루프**: max_tools 제한 제거 (OpenClaw 스타일)
+- **📄 문서 간격 축소**: docs 페이지 마진/패딩 30~40% 압축
+- **🔑 Unlock 가이드**: 비밀번호 분실 시 안내 문구 추가
 
 ## 📜 License
 

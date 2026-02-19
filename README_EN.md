@@ -1,4 +1,4 @@
-# 😈 SalmAlm v0.10.6
+# 😈 SalmAlm v0.10.9
 
 **Personal AI Gateway — Pure Python, Zero Dependencies**
 
