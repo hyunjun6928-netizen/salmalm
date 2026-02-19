@@ -894,7 +894,17 @@ button:hover{background:#4338ca}
 <input type="password" id="pw" placeholder="Master password" onkeydown="if(event.key==='Enter')unlock()">
 <button onclick="unlock()">Unlock</button>
 <div class="error" id="err"></div>
-<p style="margin-top:20px;font-size:12px;color:#888;line-height:1.5">비밀번호를 잊으셨나요?<br>vault 파일을 삭제하면 초기화됩니다:<br><code style="background:#252838;padding:2px 6px;border-radius:3px;font-size:11px;color:#aaa">rm ~/.salmalm/vault.enc</code> (Linux/Mac)<br><code style="background:#252838;padding:2px 6px;border-radius:3px;font-size:11px;color:#aaa">del %USERPROFILE%\\.salmalm\\vault.enc</code> (Windows)</p>
+<div style="margin-top:24px;font-size:13px;color:#999;line-height:1.8;text-align:left;max-width:400px">
+<p style="color:#bbb;font-weight:600;margin-bottom:8px">🔑 처음이신가요?</p>
+<p>서버를 시작할 때 설정한 마스터 비밀번호를 입력하세요.</p>
+<p style="margin-top:12px;color:#bbb;font-weight:600">비밀번호를 모르겠다면:</p>
+<p>서버를 실행한 <b>cmd/터미널 창</b>을 확인하세요.<br>아래와 같이 비밀번호가 표시되어 있습니다:</p>
+<code style="display:block;background:#252838;padding:8px 12px;border-radius:6px;font-size:12px;color:#7c83ff;margin:8px 0">Password: salmalm_local</code>
+<p style="margin-top:12px;color:#bbb;font-weight:600">비밀번호를 잊으셨다면:</p>
+<p>vault를 초기화하고 다시 시작하세요:</p>
+<code style="display:block;background:#252838;padding:6px 10px;border-radius:4px;font-size:11px;color:#aaa;margin:4px 0">del %USERPROFILE%\\.salmalm\\vault.enc</code>
+<span style="font-size:11px;color:#666">(Linux/Mac: rm ~/.salmalm/vault.enc)</span>
+</div>
 </div>
 <script>
 async function unlock(){
