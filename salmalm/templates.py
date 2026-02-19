@@ -354,9 +354,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         var active=s.id===_currentSession?' style="background:var(--accent-dim);border-radius:8px"':'';
         var title=s.title||s.id;
         if(title.length>40)title=title.slice(0,40)+'...';
-        html+='<div class="nav-item session-item"'+active+' onclick="window.switchSession(\''+s.id+'\')" data-sid="'+s.id+'">'
+        html+='<div class="nav-item session-item"'+active+' onclick="window.switchSession(\\x27'+s.id+'\\x27)" data-sid="'+s.id+'">'
           +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</span>'
-          +'<span class="session-del" onclick="event.stopPropagation();window.deleteSession(\''+s.id+'\')" title="Delete" style="opacity:0.4;cursor:pointer;padding:2px 4px;font-size:11px">✕</span>'
+          +'<span class="session-del" onclick="event.stopPropagation();window.deleteSession(\\x27'+s.id+'\\x27)" title="Delete" style="opacity:0.4;cursor:pointer;padding:2px 4px;font-size:11px">✕</span>'
           +'</div>';
       });
       el.innerHTML=html;
