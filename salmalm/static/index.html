@@ -1585,7 +1585,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     brave_news:{icon:'📰',en:'Brave News',kr:'Brave 뉴스 검색',cmd:'Search news',req:'brave'},
     brave_search:{icon:'🔎',en:'Brave Search',kr:'Brave 웹 검색',cmd:'Search the web for',req:'brave'},
     briefing:{icon:'📋',en:'Briefing',kr:'브리핑',cmd:'/briefing'},
-    browser:{icon:'🌐',en:'Browser',kr:'브라우저 자동화',cmd:'Open browser'},
+    browser:{icon:'🌐',en:'Browser',kr:'브라우저 자동화',cmd:'Open browser',req:'browser'},
     calendar_add:{icon:'📅',en:'Add Calendar',kr:'일정 추가',cmd:'Add calendar event',req:'google'},
     calendar_delete:{icon:'🗑️',en:'Delete Calendar',kr:'일정 삭제',cmd:'Delete calendar event',req:'google'},
     calendar_list:{icon:'📆',en:'List Calendar',kr:'일정 목록',cmd:'Show calendar',req:'google'},
@@ -1606,8 +1606,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     hash_text:{icon:'#️⃣',en:'Hash Text',kr:'해시 생성',cmd:'Hash text'},
     health_check:{icon:'🏥',en:'Health Check',kr:'상태 점검',cmd:'/health'},
     http_request:{icon:'🌐',en:'HTTP Request',kr:'HTTP 요청',cmd:'Make HTTP request'},
-    image_analyze:{icon:'🔬',en:'Image Analyze',kr:'이미지 분석',cmd:'Analyze image'},
-    image_generate:{icon:'🎨',en:'Image Generate',kr:'이미지 생성',cmd:'Generate image:'},
+    image_analyze:{icon:'🔬',en:'Image Analyze',kr:'이미지 분석',cmd:'Analyze image',req:'openai'},
+    image_generate:{icon:'🎨',en:'Image Generate',kr:'이미지 생성',cmd:'Generate image:',req:'openai'},
     json_query:{icon:'📦',en:'JSON Query',kr:'JSON 쿼리',cmd:'Query JSON'},
     mcp_manage:{icon:'🔌',en:'MCP Manager',kr:'MCP 관리',cmd:'/mcp list'},
     memory_read:{icon:'🧠',en:'Memory Read',kr:'기억 읽기',cmd:'/memory'},
@@ -1627,14 +1627,14 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     routine:{icon:'🔁',en:'Routine',kr:'루틴 관리',cmd:'/routine list'},
     rss_reader:{icon:'📡',en:'RSS Reader',kr:'RSS 리더',cmd:'Read RSS feed'},
     save_link:{icon:'🔗',en:'Save Link',kr:'링크 저장',cmd:'Save link:'},
-    screenshot:{icon:'📸',en:'Screenshot',kr:'스크린샷',cmd:'Take screenshot'},
+    screenshot:{icon:'📸',en:'Screenshot',kr:'스크린샷',cmd:'Take screenshot',req:'browser'},
     skill_manage:{icon:'🎓',en:'Skill Manager',kr:'스킬 관리',cmd:'/skill list'},
-    stt:{icon:'🎙️',en:'Speech to Text',kr:'음성→텍스트',cmd:'Transcribe audio'},
+    stt:{icon:'🎙️',en:'Speech to Text',kr:'음성→텍스트',cmd:'Transcribe audio',req:'openai'},
     sub_agent:{icon:'🤖',en:'Sub Agent',kr:'서브 에이전트',cmd:'/agent list'},
     system_monitor:{icon:'🖥️',en:'System Monitor',kr:'시스템 모니터',cmd:'Check system status'},
     translate:{icon:'🌍',en:'Translate',kr:'번역',cmd:'Translate to Korean:'},
-    tts:{icon:'🔊',en:'TTS',kr:'텍스트→음성',cmd:'Convert to speech:'},
-    tts_generate:{icon:'🗣️',en:'TTS Generate',kr:'음성 생성',cmd:'Generate speech:'},
+    tts:{icon:'🔊',en:'TTS',kr:'텍스트→음성',cmd:'Convert to speech:',req:'openai'},
+    tts_generate:{icon:'🗣️',en:'TTS Generate',kr:'음성 생성',cmd:'Generate speech:',req:'openai'},
     usage_report:{icon:'📊',en:'Usage Report',kr:'사용량 리포트',cmd:'/usage'},
     weather:{icon:'🌤️',en:'Weather',kr:'날씨',cmd:'Check weather in'},
     web_fetch:{icon:'📥',en:'Web Fetch',kr:'웹 페이지 가져오기',cmd:'Fetch URL:'},
@@ -1657,8 +1657,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     c.innerHTML=filtered.map(function(t){
       var label=_lang==='ko'?t.kr:t.en;
       var reqAttr=t.req?' data-tool-req="'+t.req+'"':'';
-      var reqBadge=t.req?' <span style="font-size:9px;color:var(--text2);margin-left:auto">🔗</span>':'';
-      return '<div class="nav-item" data-action="tool-run" data-tool-cmd="'+t.cmd.replace(/"/g,'&quot;')+'" data-tool-name="'+t.name+'"'+reqAttr+' title="'+t.name+'">'+t.icon+' '+label+reqBadge+'</div>';
+      var reqLabels={google:'Google',brave:'Brave',openai:'OpenAI',browser:'Browser'};
+      var reqBadge=t.req?' <span style="font-size:9px;color:#f59e0b;margin-left:auto;background:#fef3c7;padding:1px 6px;border-radius:8px">🔗 '+reqLabels[t.req]+'</span>':'';
+      return '<div class="nav-item" data-action="tool-run" data-tool-cmd="'+t.cmd.replace(/"/g,'&quot;')+'" data-tool-name="'+t.name+'"'+reqAttr+' title="'+(t.req?(_lang==='ko'?'설정 필요: ':'Setup required: ')+reqLabels[t.req]:t.name)+'">'+t.icon+' '+label+reqBadge+'</div>';
     }).join('');
     if(!filtered.length)c.innerHTML='<div style="padding:8px 12px;color:var(--text2);font-size:12px">'+(_lang==='ko'?'검색 결과 없음':'No results')+'</div>';
   }
@@ -2460,7 +2461,16 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='toggleMic')window.toggleMic();
     else if(a==='clearFile')window.clearFile();
     else if(a==='toggleTools'){var tl=document.getElementById('tools-list');tl.style.display=tl.style.display==='none'?'block':'none'}
-    else if(a==='tool-run'){var treq=el.getAttribute('data-tool-req');if(treq){var reqMap={google:_lang==='ko'?'⚠️ Google OAuth 연동이 필요합니다. 설정에서 연결하세요.':'⚠️ Google OAuth required. Connect in Settings.',brave:_lang==='ko'?'⚠️ Brave API 키가 필요합니다. 설정에서 입력하세요.':'⚠️ Brave API key required. Enter in Settings.'};alert(reqMap[treq]||(_lang==='ko'?'⚠️ 추가 설정이 필요합니다':'⚠️ Additional setup required'))}else{var tcmd=el.getAttribute('data-tool-cmd');if(tcmd)window.quickCmd(tcmd)}}
+    else if(a==='tool-run'){var treq=el.getAttribute('data-tool-req');if(treq){var kr2=_lang==='ko';var reqMap={
+      google:{title:kr2?'🔗 Google OAuth 연동 필요':'🔗 Google OAuth Required',
+        msg:kr2?'이 도구는 Google 계정 연동이 필요합니다.\n\n설정 방법:\n1. Settings → Google Integration\n2. Google Cloud Console에서 OAuth Client ID 생성\n3. Client ID와 Secret 입력\n4. "Connect Google Account" 클릭\n\n연동 후 Gmail, Calendar 도구를 사용할 수 있습니다.':'This tool requires Google account connection.\n\nSetup:\n1. Settings → Google Integration\n2. Create OAuth Client ID at Google Cloud Console\n3. Enter Client ID and Secret\n4. Click "Connect Google Account"\n\nAfter connecting, Gmail and Calendar tools will work.'},
+      brave:{title:kr2?'🔑 Brave API 키 필요':'🔑 Brave API Key Required',
+        msg:kr2?'이 도구는 Brave Search API 키가 필요합니다.\n\n설정 방법:\n1. https://brave.com/search/api/ 에서 API 키 발급\n2. Settings → Model 탭 → Brave API Key 입력\n\n입력 후 웹 검색, 이미지 검색, 뉴스 검색을 사용할 수 있습니다.':'This tool requires a Brave Search API key.\n\nSetup:\n1. Get an API key at https://brave.com/search/api/\n2. Settings → Model tab → Enter Brave API Key\n\nAfter setup, web search, image search, and news search will work.'},
+      openai:{title:kr2?'🔑 OpenAI API 키 필요':'🔑 OpenAI API Key Required',
+        msg:kr2?'이 도구는 OpenAI API 키가 필요합니다.\n\n설정 방법:\n1. https://platform.openai.com/api-keys 에서 키 발급\n2. Settings → Model 탭 → OpenAI API Key 입력\n\n입력 후 이미지 생성(DALL-E), 음성 변환(TTS/STT) 등을 사용할 수 있습니다.':'This tool requires an OpenAI API key.\n\nSetup:\n1. Get a key at https://platform.openai.com/api-keys\n2. Settings → Model tab → Enter OpenAI API Key\n\nAfter setup, image generation (DALL-E), TTS/STT will work.'},
+      browser:{title:kr2?'🌐 브라우저 환경 필요':'🌐 Browser Environment Required',
+        msg:kr2?'이 도구는 Playwright 또는 Selenium이 설치된 환경에서만 작동합니다.\n\n현재는 서버 환경(headless)에서 제한적으로 지원됩니다.\n로컬 데스크톱 환경에서 사용하세요.':'This tool requires Playwright or Selenium.\n\nCurrently limited support in server (headless) environments.\nUse on a local desktop environment.'}
+    };var info=reqMap[treq]||{title:'⚠️',msg:kr2?'추가 설정이 필요합니다':'Additional setup required'};alert(info.title+'\n\n'+info.msg)}else{var tcmd=el.getAttribute('data-tool-cmd');if(tcmd)window.quickCmd(tcmd)}}
     else if(a.startsWith('qc-'))window.quickCmd(_qcMap[a]);
     else if(a==='save-anthropic')window.saveKey('anthropic_api_key','sk-anthropic');
     else if(a==='test-anthropic')window.testKey('anthropic');
