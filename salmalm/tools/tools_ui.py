@@ -1,5 +1,4 @@
 """UI control tool — lets AI change UI settings via WebSocket commands."""
-import json
 import logging
 from salmalm.tool_registry import register
 

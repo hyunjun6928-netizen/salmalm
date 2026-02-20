@@ -11,7 +11,10 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from salmalm.constants import *  # noqa: F403
+from salmalm.constants import (  # noqa: F401
+    APP_NAME, AUDIT_DB, BASE_DIR, MODELS,
+    TEST_MODELS, VAULT_FILE, VERSION, WORKSPACE_DIR,
+)
 from salmalm.crypto import vault, log
 from salmalm.core import get_usage_report, router, audit_log
 from salmalm.auth import auth_manager, rate_limiter, extract_auth, RateLimitExceeded
@@ -301,7 +304,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         """Real-time debug diagnostics panel data."""
         if not self._require_auth('user'):
             return
-        import sys, platform, gc
+        import sys
+        import platform
+        import gc
         from salmalm.core import _metrics, get_session
         from salmalm.core.engine import _active_requests, _shutting_down
         from salmalm.tools.tool_registry import _HANDLERS, _ensure_modules, _DYNAMIC_TOOLS
@@ -435,7 +440,6 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         if not self._require_auth('user'):
             return
         from salmalm.engine import get_routing_config
-        from salmalm.constants import MODELS
         self._json({'config': get_routing_config(), 'available_models': MODELS})
 
     def _get_failover(self):
@@ -447,7 +451,6 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     def _get_memory_files(self):
         if not self._require_auth('user'):
             return
-        from salmalm.constants import BASE_DIR
         mem_dir = BASE_DIR / 'memory'
         files = []
         # Main memory file
@@ -590,7 +593,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         if not tools:
             # Fallback: list all known tools from INTENT_TOOLS
             try:
-                from salmalm.constants import INTENT_TOOLS
+                from salmalm.core.engine import INTENT_TOOLS
                 seen = set()
                 for cat_tools in INTENT_TOOLS.values():
                     for t in cat_tools:
@@ -1005,7 +1008,6 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         elif self.path.startswith('/api/memory/read?'):
             if not self._require_auth('user'):
                 return
-            from salmalm.constants import BASE_DIR
             import urllib.parse as _up
             qs = _up.parse_qs(_up.urlparse(self.path).query)
             fpath = qs.get('file', [''])[0]
@@ -1239,7 +1241,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             inc_sessions = qs.get('sessions', ['1'])[0] == '1'
             inc_data = qs.get('data', ['1'])[0] == '1'
             inc_vault = qs.get('vault', ['0'])[0] == '1'
-            import zipfile, io, json as _json, datetime
+            import zipfile
+            import io
+            import json as _json
+            import datetime
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
                 # Soul / personality
@@ -1784,7 +1789,9 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             if not self._require_auth('user'):
                 return
             # Read multipart file
-            import zipfile, io, json as _json
+            import zipfile
+            import io
+            import json as _json
             content_type = self.headers.get('Content-Type', '')
             if 'multipart' not in content_type:
                 self._json({'ok': False, 'error': 'Expected multipart upload'}, 400)
@@ -2509,8 +2516,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             }
             template = persona_templates.get(persona, persona_templates['expert'])
             try:
-                from salmalm.constants import DATA_DIR
-                soul_path = os.path.join(DATA_DIR, 'SOUL.md')
+                soul_path = os.path.join(str(BASE_DIR), 'SOUL.md')
                 if not os.path.exists(soul_path):
                     os.makedirs(os.path.dirname(soul_path), exist_ok=True)
                     with open(soul_path, 'w', encoding='utf-8') as f:

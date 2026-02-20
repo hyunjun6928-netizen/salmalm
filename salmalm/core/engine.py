@@ -82,6 +82,7 @@ def _fix_model_name(model: str) -> str:
     """Correct outdated model names to actual API IDs."""
     return _MODEL_NAME_FIXES.get(model, model)
 
+
 # Routing config: user can override which model to use for each complexity level
 _ROUTING_CONFIG_FILE = _Path.home() / '.salmalm' / 'routing.json'
 
