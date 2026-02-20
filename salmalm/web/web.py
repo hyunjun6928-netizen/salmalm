@@ -74,7 +74,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('X-Frame-Options', 'DENY')
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()')
-        script_src = f"'nonce-{nonce}'" if nonce else "'self'"
+        script_src = f"'nonce-{nonce}' 'unsafe-inline'" if nonce else "'self'"
         self.send_header('Content-Security-Policy',
                          f"default-src 'self'; "
                          f"script-src {script_src}; "

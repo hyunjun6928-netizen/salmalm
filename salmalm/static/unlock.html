@@ -19,13 +19,13 @@ button:hover{background:#4338ca}
 <div id="login-mode" style="display:none;margin-bottom:16px">
 <input type="text" id="login-user" placeholder="Username" style="margin-bottom:8px">
 <input type="password" id="login-pw" placeholder="Password">
-<button onclick="loginUser()" style="margin-top:8px">Login</button>
-<div style="margin-top:8px"><a href="#" onclick="toggleLoginMode(false);return false" style="color:#a78bfa;font-size:13px">← Vault unlock</a></div>
+<button id="login-btn" style="margin-top:8px">Login</button>
+<div style="margin-top:8px"><a href="#" id="back-vault-link" style="color:#a78bfa;font-size:13px">← Vault unlock</a></div>
 </div>
 <div id="vault-mode">
 <input type="password" id="pw" placeholder="Master password" data-enter-action="unlock">
-<button data-action="unlock" onclick="unlock()">Unlock</button>
-<div style="margin-top:8px"><a href="#" onclick="toggleLoginMode(true);return false" style="color:#a78bfa;font-size:13px">User login →</a></div>
+<button data-action="unlock" id="unlock-btn">Unlock</button>
+<div style="margin-top:8px"><a href="#" id="to-login-link" style="color:#a78bfa;font-size:13px">User login →</a></div>
 </div>
 <div class="error" id="err"></div>
 <div id="unlock-help" style="margin-top:24px;font-size:13px;color:#999;line-height:1.8;text-align:left;max-width:400px"></div>
@@ -61,4 +61,8 @@ async function unlock(){
   if(d.ok){sessionStorage.setItem('tok',d.token||'');location.reload()}
   else{const e=document.getElementById('err');e.textContent=d.error;e.style.display='block'}
 }
+document.getElementById('unlock-btn').addEventListener('click',()=>unlock());
+document.getElementById('login-btn').addEventListener('click',()=>loginUser());
+document.getElementById('to-login-link').addEventListener('click',(e)=>{e.preventDefault();toggleLoginMode(true)});
+document.getElementById('back-vault-link').addEventListener('click',(e)=>{e.preventDefault();toggleLoginMode(false)});
 </script></body></html>

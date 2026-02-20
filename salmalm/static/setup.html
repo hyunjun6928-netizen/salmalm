@@ -26,8 +26,8 @@ h1{color:#a78bfa;font-size:26px;margin-bottom:8px}
 <p class="sub" id="t-sub"></p>
 <p style="font-size:15px;color:#ccc;margin-bottom:20px;font-weight:500" id="t-ask"></p>
 <div class="choice">
-  <button id="btn-yes" onclick="pick(true)"></button>
-  <button id="btn-no" onclick="pick(false)"></button>
+  <button id="btn-yes"></button>
+  <button id="btn-no"></button>
 </div>
 <div class="pw-area" id="pw-area">
   <label id="t-pw-label"></label>
@@ -35,7 +35,7 @@ h1{color:#a78bfa;font-size:26px;margin-bottom:8px}
   <label id="t-pw-confirm"></label>
   <input type="password" id="pw2" data-enter-action="go">
 </div>
-<button class="go" id="go-btn" onclick="go()"></button>
+<button class="go" id="go-btn"></button>
 <div class="err" id="err"></div>
 <div class="hint" id="hint-yes" style="display:none"></div>
 <div class="hint" id="hint-no" style="display:none"></div>
@@ -103,4 +103,7 @@ async function go(){
     else{err.textContent=d.error||T.e4;err.style.display='block'}
   }catch(e){err.textContent=T.e5;err.style.display='block'}
 }
+document.getElementById('btn-yes').addEventListener('click',()=>pick(true));
+document.getElementById('btn-no').addEventListener('click',()=>pick(false));
+document.getElementById('go-btn').addEventListener('click',()=>go());
 </script></body></html>
