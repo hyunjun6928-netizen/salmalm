@@ -74,7 +74,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('X-Frame-Options', 'DENY')
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()')
-        script_src = f"'nonce-{nonce}' 'unsafe-inline'" if nonce else "'self'"
+        script_src = "'self' 'unsafe-inline'"
         self.send_header('Content-Security-Policy',
                          f"default-src 'self'; "
                          f"script-src {script_src}; "
@@ -88,15 +88,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                          )
 
     def _html(self, content: str):
-        import secrets as _sec
-        nonce = _sec.token_hex(16)
-        # Inject nonce into all <script> tags
-        content = content.replace('<script>', f'<script nonce="{nonce}">')
         body = content.encode('utf-8')
         self.send_response(200)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
         self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
-        self._security_headers(nonce=nonce)
+        self._security_headers()
         body = self._maybe_gzip(body)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()

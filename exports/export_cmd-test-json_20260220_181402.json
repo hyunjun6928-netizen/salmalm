@@ -1,0 +1,16 @@
+{
+  "session_id": "cmd-test-json",
+  "exported_at": "2026-02-20T18:14:02.549024+09:00",
+  "version": "0.16.0",
+  "message_count": 2,
+  "messages": [
+    {
+      "role": "user",
+      "content": "test"
+    },
+    {
+      "role": "assistant",
+      "content": "reply"
+    }
+  ]
+}
