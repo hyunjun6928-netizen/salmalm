@@ -44,11 +44,13 @@ PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
     'google': {
         'env_key': 'GOOGLE_API_KEY',
+        'alt_env_key': 'GEMINI_API_KEY',
         'base_url': 'https://generativelanguage.googleapis.com/v1beta',
         'chat_endpoint': '/chat/completions',  # OpenAI-compat
         'models': [
             'gemini-3-pro-preview', 'gemini-3-flash-preview',
             'gemini-2.5-pro', 'gemini-2.5-flash',
+            'gemini-2.0-flash',
         ],
     },
     'groq': {
@@ -105,10 +107,16 @@ def detect_provider(model: str) -> Tuple[str, str]:
 
 def get_api_key(provider: str) -> Optional[str]:
     """Get API key for provider from environment."""
-    env_key = PROVIDERS.get(provider, {}).get('env_key', '')
+    prov_cfg = PROVIDERS.get(provider, {})
+    env_key = prov_cfg.get('env_key', '')
     if not env_key:
         return None  # ollama doesn't need key
-    return os.environ.get(env_key)
+    key = os.environ.get(env_key)
+    if not key:
+        alt_key = prov_cfg.get('alt_env_key', '')
+        if alt_key:
+            key = os.environ.get(alt_key)
+    return key
 
 
 def is_provider_available(provider: str) -> bool:

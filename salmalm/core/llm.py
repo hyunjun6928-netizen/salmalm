@@ -86,6 +86,8 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
         api_key = vault.get('openrouter_api_key')
     elif provider == 'ollama':
         api_key = 'ollama'  # Ollama doesn't need real API key
+    elif provider == 'google':
+        api_key = vault.get('google_api_key') or vault.get('gemini_api_key')
     else:
         api_key = vault.get(f'{provider}_api_key')
     if not api_key:
@@ -325,36 +327,14 @@ def _call_openai(api_key: str, model_id: str, messages: List[Dict[str, Any]],
 def _call_google(api_key: str, model_id: str, messages: List[Dict[str, Any]],
                   max_tokens: int, tools: Optional[List[dict]] = None) -> Dict[str, Any]:
     # Gemini API — with optional tool support
-    parts = []
-    for m in messages:
-        content = m.get('content', '')
-        if isinstance(content, list):
-            # Multimodal — extract text only for Google
-            text_parts = [b.get('text', '') for b in content if isinstance(b, dict) and b.get('type') == 'text']
-            content = ' '.join(text_parts)
-        role = 'user' if m['role'] in ('user', 'system') else 'model'
-        parts.append({'role': role, 'parts': [{'text': str(content)}]})
-    # Merge consecutive same-role messages
-    merged = []  # type: ignore[var-annotated]
-    for p in parts:
-        if merged and merged[-1]['role'] == p['role']:
-            merged[-1]['parts'].extend(p['parts'])  # type: ignore[attr-defined]
-        else:
-            merged.append(p)
-    body = {
+    merged = _build_gemini_contents(messages)
+    body: dict = {
         'contents': merged,
         'generationConfig': {'maxOutputTokens': max_tokens}
     }
-    # Add tools if provided
-    if tools:
-        gemini_tools = []
-        for t in tools:
-            fn_decl = {'name': t['name'], 'description': t.get('description', '')}
-            params = t.get('parameters', t.get('input_schema', {}))
-            if params and params.get('properties'):
-                fn_decl['parameters'] = params
-            gemini_tools.append(fn_decl)
-        body['tools'] = [{'functionDeclarations': gemini_tools}]
+    gemini_tools = _build_gemini_tools(tools)
+    if gemini_tools:
+        body['tools'] = gemini_tools
     resp = _http_post(
         f'https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}',
         {'Content-Type': 'application/json'}, body
@@ -378,6 +358,149 @@ def _call_google(api_key: str, model_id: str, messages: List[Dict[str, Any]],
         'usage': {'input': usage_meta.get('promptTokenCount', 0),
                   'output': usage_meta.get('candidatesTokenCount', 0)}
     }
+
+
+def _build_gemini_contents(messages: List[Dict[str, Any]]) -> list:
+    """Convert messages list to Gemini contents format, merging consecutive same-role."""
+    parts = []
+    for m in messages:
+        content = m.get('content', '')
+        if isinstance(content, list):
+            text_parts = [b.get('text', '') for b in content
+                          if isinstance(b, dict) and b.get('type') == 'text']
+            content = ' '.join(text_parts)
+        role = 'user' if m['role'] in ('user', 'system') else 'model'
+        parts.append({'role': role, 'parts': [{'text': str(content)}]})
+    merged: list = []
+    for p in parts:
+        if merged and merged[-1]['role'] == p['role']:
+            merged[-1]['parts'].extend(p['parts'])
+        else:
+            merged.append(p)
+    return merged
+
+
+def _build_gemini_tools(tools: Optional[List[dict]]) -> Optional[list]:
+    """Convert tool definitions to Gemini functionDeclarations format."""
+    if not tools:
+        return None
+    gemini_tools = []
+    for t in tools:
+        fn_decl: Dict[str, Any] = {'name': t['name'], 'description': t.get('description', '')}
+        params = t.get('parameters', t.get('input_schema', {}))
+        if params and params.get('properties'):
+            fn_decl['parameters'] = params
+        gemini_tools.append(fn_decl)
+    return [{'functionDeclarations': gemini_tools}]
+
+
+def stream_google(messages: List[Dict[str, Any]], model: Optional[str] = None,
+                  tools: Optional[List[dict]] = None,
+                  max_tokens: int = DEFAULT_MAX_TOKENS) -> Generator[Dict[str, Any], None, None]:
+    """Stream Google Gemini API responses using streamGenerateContent SSE.
+
+    Yields events compatible with the Anthropic streaming interface:
+        {'type': 'text_delta', 'text': '...'}
+        {'type': 'tool_use_start', 'id': '...', 'name': '...'}
+        {'type': 'tool_use_end', 'id': '...', 'name': '...', 'arguments': {...}}
+        {'type': 'message_end', 'content': '...', 'tool_calls': [...], 'usage': {...}, 'model': '...'}
+        {'type': 'error', 'error': '...'}
+    """
+    if not model:
+        model = 'google/gemini-2.5-flash'
+
+    provider, model_id = model.split('/', 1) if '/' in model else ('google', model)
+
+    try:
+        check_cost_cap()
+    except CostCapExceeded as e:
+        yield {'type': 'error', 'error': str(e)}
+        return
+
+    api_key = vault.get('google_api_key') or vault.get('gemini_api_key')
+    if not api_key:
+        yield {'type': 'error', 'error': '❌ Google API key not configured. Set GOOGLE_API_KEY or GEMINI_API_KEY.'}
+        return
+
+    contents = _build_gemini_contents(messages)
+    body: dict = {
+        'contents': contents,
+        'generationConfig': {'maxOutputTokens': max_tokens},
+    }
+    gemini_tools = _build_gemini_tools(tools)
+    if gemini_tools:
+        body['tools'] = gemini_tools
+
+    data = json.dumps(body).encode('utf-8')
+    url = (f'https://generativelanguage.googleapis.com/v1beta/models/'
+           f'{model_id}:streamGenerateContent?alt=sse&key={api_key}')
+    headers = {'Content-Type': 'application/json', 'User-Agent': _UA}
+    req = urllib.request.Request(url, data=data, headers=headers, method='POST')
+
+    content_text = ''
+    tool_calls: List[dict] = []
+    usage = {'input': 0, 'output': 0}
+
+    try:
+        resp = urllib.request.urlopen(req, timeout=180)
+        buffer = ''
+        for raw_chunk in _iter_chunks(resp):
+            buffer += raw_chunk
+            while '\n' in buffer:
+                line, buffer = buffer.split('\n', 1)
+                line = line.strip()
+                if not line or not line.startswith('data: '):
+                    continue
+                json_str = line[6:]
+                if json_str.strip() == '[DONE]':
+                    continue
+                try:
+                    event = json.loads(json_str)
+                except json.JSONDecodeError:
+                    continue
+
+                # Process candidates
+                for cand in event.get('candidates', []):
+                    for part in cand.get('content', {}).get('parts', []):
+                        if 'text' in part:
+                            text = part['text']
+                            content_text += text
+                            yield {'type': 'text_delta', 'text': text}
+                        elif 'functionCall' in part:
+                            fc = part['functionCall']
+                            tc_id = f"google_{fc['name']}_{int(time.time()*1000)}"
+                            args = fc.get('args', {})
+                            tool_calls.append({
+                                'id': tc_id, 'name': fc['name'],
+                                'arguments': args,
+                            })
+                            yield {'type': 'tool_use_start', 'id': tc_id, 'name': fc['name']}
+                            yield {'type': 'tool_use_end', 'id': tc_id,
+                                   'name': fc['name'], 'arguments': args}
+
+                # Update usage from metadata
+                usage_meta = event.get('usageMetadata', {})
+                if usage_meta:
+                    usage['input'] = usage_meta.get('promptTokenCount', usage['input'])
+                    usage['output'] = usage_meta.get('candidatesTokenCount', usage['output'])
+
+        track_usage(model, usage['input'], usage['output'])
+
+        yield {
+            'type': 'message_end',
+            'content': content_text,
+            'tool_calls': tool_calls,
+            'usage': usage,
+            'model': model,
+        }
+
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode('utf-8', errors='replace')
+        log.error(f"[STREAM-GOOGLE] HTTP {e.code}: {err_body[:300]}")
+        yield {'type': 'error', 'error': f'HTTP {e.code}: {err_body[:200]}'}
+    except Exception as e:
+        log.error(f"[STREAM-GOOGLE] Error: {e}")
+        yield {'type': 'error', 'error': str(e)[:200]}
 
 
 # ============================================================

@@ -12,7 +12,7 @@ from pathlib import Path as _Path
 from typing import Any, Dict, Optional, Tuple
 
 from salmalm.crypto import log
-from salmalm.llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic
+from salmalm.llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic, stream_google as _stream_google
 
 # ============================================================
 # Model Failover — exponential backoff cooldown + fallback chain
@@ -26,6 +26,11 @@ _DEFAULT_FALLBACKS = {
     'anthropic/claude-opus-4-6': ['anthropic/claude-sonnet-4-20250514', 'anthropic/claude-haiku-3.5-20241022'],
     'anthropic/claude-sonnet-4-20250514': ['anthropic/claude-haiku-3.5-20241022', 'anthropic/claude-opus-4-6'],
     'anthropic/claude-haiku-3.5-20241022': ['anthropic/claude-sonnet-4-20250514'],
+    'google/gemini-2.5-pro': ['google/gemini-2.5-flash', 'google/gemini-2.0-flash'],
+    'google/gemini-2.5-flash': ['google/gemini-2.0-flash', 'google/gemini-2.5-pro'],
+    'google/gemini-2.0-flash': ['google/gemini-2.5-flash'],
+    'google/gemini-3-pro-preview': ['google/gemini-2.5-pro', 'google/gemini-3-flash-preview'],
+    'google/gemini-3-flash-preview': ['google/gemini-2.0-flash', 'google/gemini-2.5-flash'],
 }
 _COOLDOWN_STEPS = [60, 300, 1500, 3600]  # 1m, 5m, 25m, 1h
 
@@ -130,6 +135,27 @@ async def _call_llm_async(*args, **kwargs):
     return await asyncio.to_thread(_call_llm_sync, *args, **kwargs)
 
 
+async def _call_google_streaming(messages, model=None, tools=None,
+                                  max_tokens=4096, on_token=None):
+    """Streaming Google Gemini call — yields tokens via on_token callback, returns final result."""
+    def _run():
+        final_result = None
+        for event in _stream_google(messages, model=model, tools=tools,
+                                     max_tokens=max_tokens):
+            if on_token:
+                on_token(event)
+            if event.get('type') == 'message_end':
+                final_result = event
+            elif event.get('type') == 'error':
+                return {'content': event.get('error', '❌ Google streaming error'),
+                        'tool_calls': [], 'usage': {'input': 0, 'output': 0},
+                        'model': model or '?'}
+        return final_result or {'content': '', 'tool_calls': [],
+                                 'usage': {'input': 0, 'output': 0},
+                                 'model': model or '?'}
+    return await asyncio.to_thread(_run)
+
+
 async def _call_llm_streaming(messages, model=None, tools=None,
                                max_tokens=4096, thinking=False,
                                on_token=None):
@@ -220,6 +246,10 @@ async def try_llm_call(messages: list, model: str, tools: Optional[list],
             result = await _call_llm_streaming(
                 messages, model=model, tools=tools,
                 thinking=thinking, on_token=on_token)
+        elif on_token and provider == 'google':
+            result = await _call_google_streaming(
+                messages, model=model, tools=tools,
+                max_tokens=max_tokens, on_token=on_token)
         else:
             result = await _call_llm_async(messages, model=model, tools=tools,
                                            thinking=thinking)

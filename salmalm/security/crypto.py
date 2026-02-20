@@ -146,6 +146,7 @@ class Vault:
         'openai_api_key': 'OPENAI_API_KEY',
         'xai_api_key': 'XAI_API_KEY',
         'google_api_key': 'GOOGLE_API_KEY',
+        'gemini_api_key': 'GEMINI_API_KEY',
         'brave_api_key': 'BRAVE_SEARCH_API_KEY',
         'openrouter_api_key': 'OPENROUTER_API_KEY',
         'ollama_url': 'OLLAMA_URL',
