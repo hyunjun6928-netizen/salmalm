@@ -2087,7 +2087,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_users_register(self):
         body = self._body
-        length = self._content_length
         # Register new user (admin or open registration)
         from salmalm.users import user_manager
 
@@ -2116,7 +2115,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_users_delete(self):
         body = self._body
-        length = self._content_length
         requester = extract_auth(dict(self.headers))
         if not requester or requester.get("role") != "admin":
             self._json({"error": "Admin access required"}, 403)
@@ -2138,7 +2136,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_users_toggle(self):
         body = self._body
-        length = self._content_length
         # Enable/disable user (admin only)
         requester = extract_auth(dict(self.headers))
         if not requester or requester.get("role") != "admin":
@@ -2157,7 +2154,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_users_quota_set(self):
         body = self._body
-        length = self._content_length
         # Set user quota (admin only)
         requester = extract_auth(dict(self.headers))
         if not requester or requester.get("role") != "admin":
@@ -2179,7 +2175,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_users_settings(self):
         body = self._body
-        length = self._content_length
         # Update own settings
         user = extract_auth(dict(self.headers))
         if not user:
@@ -2197,7 +2192,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_tenant_config(self):
         body = self._body
-        length = self._content_length
         # Admin: update multi-tenant config
         requester = extract_auth(dict(self.headers))
         if not requester or requester.get("role") != "admin":
@@ -2216,7 +2210,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_auth_login(self):
         body = self._body
-        length = self._content_length
         username = body.get("username", "")
         password = body.get("password", "")
         user = auth_manager.authenticate(username, password)
@@ -2239,7 +2232,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_auth_register(self):
         body = self._body
-        length = self._content_length
         requester = extract_auth(dict(self.headers))
         if not requester or requester.get("role") != "admin":
             self._json({"error": "Admin access required"}, 403)
@@ -2257,7 +2249,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_setup(self):
         body = self._body
-        length = self._content_length
         # First-run setup — create vault with or without password
         if VAULT_FILE.exists():  # noqa: F405
             self._json({"error": "Already set up"}, 400)
@@ -2278,8 +2269,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_do_update(self):
-        body = self._body
-        length = self._content_length
         if not self._require_auth("admin"):
             return
         if self._get_client_ip() not in ("127.0.0.1", "::1", "localhost"):
@@ -2327,15 +2316,12 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_restart(self):
-        body = self._body
-        length = self._content_length
         if not self._require_auth("admin"):
             return
         if self._get_client_ip() not in ("127.0.0.1", "::1", "localhost"):
             self._json({"error": "Restart only allowed from localhost"}, 403)
             return
         import sys
-        import subprocess
 
         audit_log("restart", "user-initiated restart")
         self._json({"ok": True, "message": "Restarting..."})
@@ -2344,8 +2330,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_update(self):
-        body = self._body
-        length = self._content_length
         # Alias for /api/do-update with WebSocket progress
         if not self._require_auth("admin"):
             return
@@ -2407,7 +2391,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_persona_switch(self):
         body = self._body
-        length = self._content_length
         session_id = body.get("session_id", self.headers.get("X-Session-Id", "web"))
         name = body.get("name", "")
         if not name:
@@ -2424,7 +2407,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_persona_create(self):
         body = self._body
-        length = self._content_length
         name = body.get("name", "")
         content = body.get("content", "")
         if not name or not content:
@@ -2441,7 +2423,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_persona_delete(self):
         body = self._body
-        length = self._content_length
         name = body.get("name", "")
         if not name:
             self._json({"error": "name required"}, 400)
@@ -2457,7 +2438,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_test_key(self):
         body = self._body
-        length = self._content_length
         provider = body.get("provider", "")
         from salmalm.llm import _http_post
 
@@ -2544,7 +2524,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_unlock(self):
         body = self._body
-        length = self._content_length
         password = body.get("password", "")
         if VAULT_FILE.exists():  # noqa: F405
             ok = vault.unlock(password)
@@ -2561,7 +2540,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_stt(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         audio_b64 = body.get("audio_base64", "")
@@ -2584,7 +2562,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_agent_sync(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         action = body.get("action", "export")
@@ -2617,8 +2594,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"ok": False, "error": "Unknown action"}, 400)
 
     def _post_api_agent_import_preview(self):
-        body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         # Read multipart file
@@ -2669,7 +2644,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_queue_mode(self):
         body = self._body
-        length = self._content_length
         from salmalm.features.queue import set_queue_mode
 
         mode = body.get("mode", "collect")
@@ -2682,7 +2656,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_cron_add(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         from salmalm.core import _llm_cron
@@ -2713,7 +2686,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_cron_delete(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         from salmalm.core import _llm_cron
@@ -2726,7 +2698,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_cron_toggle(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         from salmalm.core import _llm_cron
@@ -2743,7 +2714,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_sessions_create(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         sid = body.get("session_id", "")
@@ -2765,7 +2735,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_sessions_delete(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         sid = body.get("session_id", "")
@@ -2786,7 +2755,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_soul(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         content = body.get("content", "")
@@ -2802,7 +2770,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_routing(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         from salmalm.engine import _save_routing_config, get_routing_config
@@ -2817,7 +2784,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_failover(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         from salmalm.engine import save_failover_config, get_failover_config
@@ -2828,7 +2794,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_sessions_rename(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         sid = body.get("session_id", "")
@@ -2853,7 +2818,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_sessions_rollback(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         sid = body.get("session_id", "")
@@ -2868,7 +2832,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_messages_edit(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         sid = body.get("session_id", "")
@@ -2890,7 +2853,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_messages_delete(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         sid = body.get("session_id", "")
@@ -2907,7 +2869,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_sessions_branch(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         sid = body.get("session_id", "")
@@ -2924,7 +2885,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_agents(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         from salmalm.agents import agent_manager
@@ -2955,7 +2915,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_hooks(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         from salmalm.hooks import hook_manager
@@ -2982,7 +2941,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_plugins_manage(self):
         body = self._body
-        length = self._content_length
         if not self._require_auth("user"):
             return
         from salmalm.plugin_manager import plugin_manager
@@ -3002,7 +2960,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_chat_abort(self):
         body = self._body
-        length = self._content_length
         # Abort generation — LibreChat style (생성 중지)
         if not self._require_auth("user"):
             return
@@ -3015,7 +2972,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_chat_regenerate(self):
         body = self._body
-        length = self._content_length
         # Regenerate response — LibreChat style (응답 재생성)
         if not self._require_auth("user"):
             return
@@ -3042,7 +2998,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_chat_compare(self):
         body = self._body
-        length = self._content_length
         # Compare models — BIG-AGI style (응답 비교)
         if not self._require_auth("user"):
             return
@@ -3067,7 +3022,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_alternatives_switch(self):
         body = self._body
-        length = self._content_length
         # Switch alternative — LibreChat style (대안 전환)
         if not self._require_auth("user"):
             return
@@ -3106,7 +3060,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_bookmarks(self):
         body = self._body
-        length = self._content_length
         # Add/remove bookmark — LobeChat style (북마크 추가/제거)
         if not self._require_auth("user"):
             return
@@ -3136,7 +3089,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_groups(self):
         body = self._body
-        length = self._content_length
         # Session group CRUD — LobeChat style (그룹 관리)
         if not self._require_auth("user"):
             return
@@ -3180,7 +3132,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_paste_detect(self):
         body = self._body
-        length = self._content_length
         # Smart paste detection — BIG-AGI style (스마트 붙여넣기 감지)
         if not self._require_auth("user"):
             return
@@ -3195,7 +3146,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_vault(self):
         body = self._body
-        length = self._content_length
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
             return
@@ -3231,7 +3181,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"error": "Unknown action"}, 400)
 
     def _post_api_upload(self):
-        body = self._body
         length = self._content_length
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
@@ -3357,7 +3306,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_onboarding(self):
         body = self._body
-        length = self._content_length
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
             return
@@ -3464,7 +3412,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_onboarding_preferences(self):
         body = self._body
-        length = self._content_length
         # Save model + persona preferences from setup wizard
         model = body.get("model", "auto")
         persona = body.get("persona", "expert")
@@ -3491,7 +3438,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_config_telegram(self):
         body = self._body
-        length = self._content_length
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
             return
@@ -3501,7 +3447,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_gateway_register(self):
         body = self._body
-        length = self._content_length
         from salmalm.nodes import gateway
 
         node_id = body.get("node_id", "")
@@ -3520,7 +3465,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_gateway_heartbeat(self):
         body = self._body
-        length = self._content_length
         from salmalm.nodes import gateway
 
         node_id = body.get("node_id", "")
@@ -3528,7 +3472,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_gateway_unregister(self):
         body = self._body
-        length = self._content_length
         from salmalm.nodes import gateway
 
         node_id = body.get("node_id", "")
@@ -3536,7 +3479,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_gateway_dispatch(self):
         body = self._body
-        length = self._content_length
         from salmalm.nodes import gateway
 
         node_id = body.get("node_id", "")
@@ -3552,7 +3494,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_webhook_slack(self):
         body = self._body
-        length = self._content_length
         # Slack Event API webhook
         from salmalm.slack_bot import slack_bot
 
@@ -3574,7 +3515,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_presence(self):
         body = self._body
-        length = self._content_length
         # Register/heartbeat presence
         instance_id = body.get("instanceId", "")
         if not instance_id:
@@ -3593,7 +3533,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_webhook_telegram(self):
         body = self._body
-        length = self._content_length
         # Telegram webhook endpoint
         from salmalm.telegram import telegram_bot
 
@@ -3630,7 +3569,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_sla_config(self):
         body = self._body
-        length = self._content_length
         # Update SLA config (SLA 설정 업데이트)
         if not self._require_auth("admin"):
             return
@@ -3641,7 +3579,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_node_execute(self):
         body = self._body
-        length = self._content_length
         # Node endpoint: execute a tool locally (called by gateway)
         from salmalm.tool_handlers import execute_tool
 
@@ -3658,7 +3595,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_thoughts(self):
         body = self._body
-        length = self._content_length
         from salmalm.thoughts import thought_stream
 
         content = body.get("content", "").strip()

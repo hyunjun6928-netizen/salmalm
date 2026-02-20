@@ -310,5 +310,8 @@ async def run_server():
     except Exception as e:
         log.warning(f"[SHUTDOWN] SLA cleanup error: {e}")
 
-    audit_log('shutdown', f'{APP_NAME} v{VERSION} graceful shutdown')
+    try:
+        audit_log('shutdown', f'{APP_NAME} v{VERSION} graceful shutdown')
+    except Exception:
+        pass  # DB may already be closed
     log.info("[SHUTDOWN] Complete. Goodbye! 😈")
