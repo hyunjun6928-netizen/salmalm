@@ -291,78 +291,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       <option value="ko">한국어</option>
     </select>
   </div>
-  <div class="settings-card">
-    <h3 data-i18n="h-model">🤖 Model Settings</h3>
-    <labeldata-i18n="lbl-model">Default Model</label>
-    <select id="s-model" data-action="setModel">
-      <optgroup label="🔄 Auto">
-        <option value="auto">Auto Routing (Recommended)</option>
-      </optgroup>
-      <optgroup label="🟣 Anthropic">
-        <option value="anthropic/claude-opus-4-6">Claude Opus 4.6 💎</option>
-        <option value="anthropic/claude-sonnet-4-20250514">Claude Sonnet 4</option>
-        <option value="anthropic/claude-haiku-3.5-20241022">Claude Haiku 3.5 ⚡</option>
-      </optgroup>
-      <optgroup label="🟢 OpenAI">
-        <option value="openai/gpt-5.3-codex">GPT-5.3 Codex</option>
-        <option value="openai/gpt-5.1-codex">GPT-5.1 Codex</option>
-        <option value="openai/gpt-4.1">GPT-4.1</option>
-        <option value="openai/gpt-4.1-mini">GPT-4.1 Mini ⚡</option>
-        <option value="openai/gpt-4.1-nano">GPT-4.1 Nano 💨</option>
-        <option value="openai/o3">o3 🧠</option>
-        <option value="openai/o3-mini">o3-mini</option>
-        <option value="openai/o4-mini">o4-mini</option>
-      </optgroup>
-      <optgroup label="🔵 xAI">
-        <option value="xai/grok-4">Grok 4</option>
-        <option value="xai/grok-3">Grok 3</option>
-        <option value="xai/grok-3-mini">Grok 3 Mini ⚡</option>
-      </optgroup>
-      <optgroup label="🟡 Google">
-        <option value="google/gemini-3-pro-preview">Gemini 3 Pro</option>
-        <option value="google/gemini-3-flash-preview">Gemini 3 Flash ⚡</option>
-      </optgroup>
-      <optgroup label="🔷 OpenRouter">
-        <option value="deepseek/deepseek-r1">DeepSeek R1 🧠</option>
-        <option value="deepseek/deepseek-chat">DeepSeek Chat</option>
-        <option value="meta-llama/llama-4-maverick">Llama 4 Maverick</option>
-        <option value="meta-llama/llama-4-scout">Llama 4 Scout ⚡</option>
-      </optgroup>
-      <optgroup label="🦙 Ollama (Local)">
-        <option value="ollama/llama3.3">Llama 3.3</option>
-        <option value="ollama/qwen3">Qwen 3</option>
-        <option value="ollama/gemma3">Gemma 3</option>
-      </optgroup>
-    </select>
-    <label style="margin-top:8px"data-i18n="lbl-ollama">Ollama URL (Local LLM)</label>
-    <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
-    <button data-action="saveOllama" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px"data-i18n="btn-save-ollama">Save Ollama URL</button>
-    <h3 style="margin-top:20px" data-i18n="h-routing">🔀 Auto Routing Models</h3>
-    <p style="font-size:12px;color:var(--text2);margin:4px 0 8px" data-i18n="routing-desc">When "Auto Routing" is selected, messages are classified by complexity and routed to these models:</p>
-    <label style="font-size:12px" data-i18n="lbl-route-simple">⚡ Simple (greetings, short questions)</label>
-    <select id="route-simple" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
-    <label style="font-size:12px" data-i18n="lbl-route-moderate">🔧 Moderate (code, analysis, summaries)</label>
-    <select id="route-moderate" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
-    <label style="font-size:12px" data-i18n="lbl-route-complex">💎 Complex (architecture, long reasoning)</label>
-    <select id="route-complex" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
-    <button data-action="saveRouting" style="padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px" data-i18n="btn-save-routing">Save Routing</button>
-    <span id="route-status" style="font-size:11px;color:var(--text2);margin-left:8px"></span>
-  </div>
-  <div class="settings-card">
-    <h3 data-i18n="h-keys">🔑 API Key Management</h3>
-    <labeldata-i18n="lbl-anthropic">Anthropic API Key</label>
-    <div style="display:flex;gap:6px"><input id="sk-anthropic" type="password" placeholder="sk-ant-..."><button class="btn" data-action="save-anthropic">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-anthropic">Test</button></div>
-    <labeldata-i18n="lbl-openai">OpenAI API Key</label>
-    <div style="display:flex;gap:6px"><input id="sk-openai" type="password" placeholder="sk-..."><button class="btn" data-action="save-openai">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-openai">Test</button></div>
-    <labeldata-i18n="lbl-xai">xAI API Key (Grok)</label>
-    <div style="display:flex;gap:6px"><input id="sk-xai" type="password" placeholder="xai-..."><button class="btn" data-action="save-xai">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-xai">Test</button></div>
-    <labeldata-i18n="lbl-google">Google API Key (Gemini)</label>
-    <div style="display:flex;gap:6px"><input id="sk-google" type="password" placeholder="AIza..."><button class="btn" data-action="save-google">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-google">Test</button></div>
-    <labeldata-i18n="lbl-brave">Brave Search API Key</label>
-    <div style="display:flex;gap:6px"><input id="sk-brave" type="password" placeholder="BSA..."><button class="btn" data-action="save-brave">Save</button></div>
-    <div id="key-test-result" style="margin-top:8px;font-size:12px"></div>
-    <div id="vault-keys" style="margin-top:12px"></div>
-  </div>
+  <!-- Model & API Key settings moved to Model tab -->
   <div class="settings-card" id="google-oauth-card">
     <h3 data-i18n="h-google-oauth">🔗 Google Integration (Calendar & Gmail)</h3>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
@@ -501,22 +430,61 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="features-empty" style="display:none;text-align:center;padding:40px;color:var(--text2);font-size:14px" data-i18n="features-empty">No features found.</div>
   </div>
   <div id="settings-model-router" style="display:none">
+    <!-- Active Model -->
     <div class="settings-card">
-      <h3>🤖 Model Router</h3>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Select a model with one click. Active model is highlighted.</p>
-      <div id="mr-current" style="margin-bottom:16px;padding:12px;border-radius:8px;background:var(--accent-dim);display:flex;align-items:center;gap:10px">
-        <span style="font-size:20px">🎯</span>
-        <div>
-          <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px">Active Model</div>
-          <div id="mr-current-name" style="font-size:15px;font-weight:600;color:var(--accent2)">Auto</div>
+      <div id="mr-current" style="padding:16px;border-radius:10px;background:var(--accent-dim);display:flex;align-items:center;gap:12px;margin-bottom:0">
+        <span style="font-size:28px">🎯</span>
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px" data-i18n="mr-active">Active Model</div>
+          <div id="mr-current-name" style="font-size:18px;font-weight:700;color:var(--accent2)">Auto</div>
         </div>
+        <select id="s-model" data-action="setModel" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;max-width:220px">
+          <option value="auto">🔄 Auto Routing</option>
+        </select>
       </div>
-      <div id="mr-providers"></div>
     </div>
+    <!-- Provider Cards -->
     <div class="settings-card">
-      <h3>🔑 API Keys</h3>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Enter API keys to enable providers. Keys are tested in real-time.</p>
-      <div id="mr-keys"></div>
+      <h3 data-i18n="mr-providers-title">📦 Models by Provider</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px" data-i18n="mr-providers-desc">Click a model to switch. Pricing per 1M tokens (input / output).</p>
+      <div id="mr-provider-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px"></div>
+    </div>
+    <!-- Auto Routing -->
+    <div class="settings-card">
+      <h3 data-i18n="h-routing">🔀 Auto Routing Models</h3>
+      <p style="font-size:12px;color:var(--text2);margin:4px 0 8px" data-i18n="routing-desc">When "Auto Routing" is selected, messages are classified by complexity and routed to these models:</p>
+      <label style="font-size:12px" data-i18n="lbl-route-simple">⚡ Simple (greetings, short questions)</label>
+      <select id="route-simple" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
+      <label style="font-size:12px" data-i18n="lbl-route-moderate">🔧 Moderate (code, analysis, summaries)</label>
+      <select id="route-moderate" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
+      <label style="font-size:12px" data-i18n="lbl-route-complex">💎 Complex (architecture, long reasoning)</label>
+      <select id="route-complex" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
+      <button data-action="saveRouting" style="padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px" data-i18n="btn-save-routing">Save Routing</button>
+      <span id="route-status" style="font-size:11px;color:var(--text2);margin-left:8px"></span>
+    </div>
+    <!-- Ollama -->
+    <div class="settings-card">
+      <h3>🦙 Ollama (Local LLM)</h3>
+      <label data-i18n="lbl-ollama">Ollama URL</label>
+      <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      <button data-action="saveOllama" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px" data-i18n="btn-save-ollama">Save Ollama URL</button>
+    </div>
+    <!-- API Keys -->
+    <div class="settings-card">
+      <h3 data-i18n="h-keys">🔑 API Keys</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px" data-i18n="mr-keys-desc">Enter API keys to enable providers. Keys are tested in real-time.</p>
+      <label data-i18n="lbl-anthropic">Anthropic API Key</label>
+      <div style="display:flex;gap:6px"><input id="sk-anthropic" type="password" placeholder="sk-ant-..."><button class="btn" data-action="save-anthropic">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-anthropic">Test</button></div>
+      <label data-i18n="lbl-openai">OpenAI API Key</label>
+      <div style="display:flex;gap:6px"><input id="sk-openai" type="password" placeholder="sk-..."><button class="btn" data-action="save-openai">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-openai">Test</button></div>
+      <label data-i18n="lbl-xai">xAI API Key (Grok)</label>
+      <div style="display:flex;gap:6px"><input id="sk-xai" type="password" placeholder="xai-..."><button class="btn" data-action="save-xai">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-xai">Test</button></div>
+      <label data-i18n="lbl-google">Google API Key (Gemini)</label>
+      <div style="display:flex;gap:6px"><input id="sk-google" type="password" placeholder="AIza..."><button class="btn" data-action="save-google">Save</button><button class="btn" style="background:var(--bg3);color:var(--text2)" data-action="test-google">Test</button></div>
+      <label data-i18n="lbl-brave">Brave Search API Key</label>
+      <div style="display:flex;gap:6px"><input id="sk-brave" type="password" placeholder="BSA..."><button class="btn" data-action="save-brave">Save</button></div>
+      <div id="key-test-result" style="margin-top:8px;font-size:12px"></div>
+      <div id="vault-keys" style="margin-top:12px"></div>
     </div>
   </div>
 </div>
@@ -525,8 +493,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div class="input-box">
     <textarea id="input" rows="1" placeholder="Type a message..." data-i18n="input-ph"></textarea>
     <button id="thinking-btn" data-action="toggleThinking" title="Extended Thinking" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🧠</button>
-    <button id="attach-btn" title="Attach file" onclick="document.getElementById('file-input-hidden').click()" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">📎</button>
-    <input type="file" id="file-input-hidden" accept="image/png,image/jpeg,image/gif,image/webp,.txt,.md,.py,.js,.json,.csv,.html,.css,.pdf" style="display:none" onchange="if(this.files[0])window.setFile(this.files[0]);this.value=''">
+    <button id="attach-btn" title="Attach file" data-action="attachFile" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">📎</button>
+    <input type="file" id="file-input-hidden" accept="image/png,image/jpeg,image/gif,image/webp,.txt,.md,.py,.js,.json,.csv,.html,.css,.pdf" style="display:none">
     <button id="mic-btn" data-action="toggleMic" title="Voice input" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🎤</button>
     <button id="send-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
@@ -1331,6 +1299,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'cmd-dashboard':'Dashboard',
       'shortcut-cmdpalette':'Command palette',
       'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.',
+      'mr-active':'Active Model','mr-providers-title':'📦 Models by Provider','mr-providers-desc':'Click a model to switch. Pricing per 1M tokens (input / output).','mr-keys-desc':'Enter API keys to enable providers. Keys are tested in real-time.',
       'pwa-install-text':'Install SalmAlm as an app','pwa-install-btn':'Install','pwa-dismiss':'Later',
     },
     ko:{
@@ -1434,6 +1403,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'cmd-dashboard':'대시보드',
       'shortcut-cmdpalette':'커맨드 팔레트',
       'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.',
+      'mr-active':'활성 모델','mr-providers-title':'📦 프로바이더별 모델','mr-providers-desc':'모델을 클릭하면 전환됩니다. 가격: 1M 토큰당 (입력 / 출력).','mr-keys-desc':'API 키를 입력하면 프로바이더가 활성화됩니다. 키는 실시간으로 테스트됩니다.',
       'pwa-install-text':'SalmAlm을 앱으로 설치','pwa-install-btn':'설치','pwa-dismiss':'나중에',
     }
   };
@@ -1441,6 +1411,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   function t(k){return (_i18n[_lang]||_i18n.en)[k]||(_i18n.en[k]||k)}
   /* Now that t() is defined, restore deferred chat history */
   if(window._pendingRestore){try{window._pendingRestore()}catch(e){console.warn('Chat restore failed:',e);localStorage.removeItem('salm_chat')}delete window._pendingRestore;}
+  /* File input change handler */
+  var _fileInput=document.getElementById('file-input-hidden');
+  if(_fileInput)_fileInput.addEventListener('change',function(){if(this.files[0])window.setFile(this.files[0]);this.value=''});
   /* Load dynamic tool count */
   fetch('/api/tools/list',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
     var cnt=(d.tools||[]).length;var th=document.getElementById('tools-header');
@@ -1516,84 +1489,65 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   });
 
   /* --- Model Router Tab --- */
+  /* Model pricing data (per 1M tokens: input/output) */
+  var _MODEL_PRICES={
+    'claude-opus-4-6':{i:5,o:25},'claude-sonnet-4-6':{i:3,o:15},'claude-haiku-4-5-20251001':{i:1,o:5},
+    'gpt-5.2-codex':{i:2,o:8},'gpt-5.1-codex':{i:1.5,o:6},'gpt-4.1':{i:2,o:8},'gpt-4.1-mini':{i:0.4,o:1.6},'gpt-4.1-nano':{i:0.1,o:0.4},
+    'o3':{i:10,o:40},'o3-mini':{i:1.1,o:4.4},'o4-mini':{i:1.1,o:4.4},
+    'grok-4-0709':{i:3,o:15},'grok-3':{i:3,o:15},'grok-3-mini':{i:0.3,o:0.5},
+    'gemini-3-pro-preview':{i:1.25,o:10},'gemini-3-flash-preview':{i:0.15,o:0.6},'gemini-2.5-pro':{i:1.25,o:10},'gemini-2.5-flash':{i:0.15,o:0.6}
+  };
+  function _getPrice(modelId){
+    var short=modelId.split('/').pop();
+    return _MODEL_PRICES[short]||null;
+  }
   window._loadModelRouter=function(){
     var hdr={'X-Session-Token':_tok};
     fetch('/api/llm-router/providers',{headers:hdr}).then(function(r){return r.json()}).then(function(d){
-      var cur=d.current_model||'(auto)';
-      document.getElementById('mr-current-name').textContent=cur;
-      /* Providers + models */
-      var provEl=document.getElementById('mr-providers');
-      var keysEl=document.getElementById('mr-keys');
-      var provHtml='';var keysHtml='';
+      var cur=d.current_model||'auto';
+      document.getElementById('mr-current-name').textContent=cur==='auto'?'🔄 Auto Routing':cur;
+      /* Update s-model dropdown */
+      var sel=document.getElementById('s-model');
+      if(sel){
+        sel.innerHTML='<option value="auto">🔄 Auto Routing</option>';
+        d.providers.forEach(function(p){
+          p.models.forEach(function(m){
+            var opt=document.createElement('option');opt.value=m.full;opt.textContent=m.name;
+            if(cur===m.full)opt.selected=true;
+            sel.appendChild(opt);
+          });
+        });
+        if(cur==='auto')sel.value='auto';
+      }
+      /* Provider grid */
+      var gridEl=document.getElementById('mr-provider-grid');
+      var kr=_lang==='ko';
+      var provIcons={anthropic:'🟣',openai:'🟢',xai:'🔵',google:'🟡',openrouter:'🔷',ollama:'🦙'};
+      var h='';
       d.providers.forEach(function(p){
-        var icon=p.available?'✅':'❌';
-        provHtml+='<div style="margin-bottom:20px"><div style="font-size:14px;font-weight:600;margin-bottom:8px">'+icon+' '+p.name+'</div>';
-        provHtml+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+        var icon=provIcons[p.name]||'📦';
+        var status=p.available?'<span style="color:var(--green,#4ade80)">●</span>':'<span style="color:var(--red,#f87171)">●</span>';
+        h+='<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg)">';
+        h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+        h+='<span style="font-size:18px">'+icon+'</span>';
+        h+='<span style="font-weight:600;font-size:14px">'+p.name.charAt(0).toUpperCase()+p.name.slice(1)+'</span>';
+        h+=status;
+        h+='<span style="font-size:11px;color:var(--text2);margin-left:auto">'+(p.available?(kr?'연결됨':'Connected'):(kr?'키 없음':'No key'))+'</span>';
+        h+='</div>';
         p.models.forEach(function(m){
-          var isActive=cur&&(cur===m.full||cur===m.name||cur.indexOf(m.name)!==-1);
-          var bg=isActive?'var(--accent)':'var(--bg3)';
-          var clr=isActive?'#fff':'var(--text)';
-          var badge=isActive?' 🟢':'';
-          var disabled=p.available?'':'opacity:0.4;pointer-events:none;';
-          provHtml+='<button class="mr-model-btn" data-model="'+m.full+'" style="'+disabled+'padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:'+bg+';color:'+clr+';cursor:pointer;font-size:13px;transition:all 0.15s">'+m.name+badge+'</button>';
+          var isActive=cur&&(cur===m.full||cur===m.name);
+          var price=_getPrice(m.full);
+          var priceStr=price?'$'+price.i+' / $'+price.o:'';
+          h+='<div data-action="switchModel" data-model="'+m.full+'" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;margin-bottom:4px;border:1px solid '+(isActive?'var(--accent)':'transparent')+';background:'+(isActive?'var(--accent-dim)':'transparent')+';transition:all 0.12s"'+(p.available?'':' class="disabled-model"')+'>';
+          h+='<div style="flex:1"><div style="font-size:13px;font-weight:500;color:'+(isActive?'var(--accent2)':'var(--text)')+'">'+m.name+(isActive?' ●':'')+'</div>';
+          if(priceStr)h+='<div style="font-size:10px;color:var(--text2)">'+priceStr+' '+(kr?'/ 1M 토큰':'/ 1M tok')+'</div>';
+          h+='</div></div>';
         });
-        provHtml+='</div></div>';
-        /* API key input */
-        if(p.env_key){
-          keysHtml+='<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">';
-          keysHtml+='<span style="min-width:80px;font-size:13px;font-weight:600">'+p.name+'</span>';
-          keysHtml+='<span>'+icon+'</span>';
-          keysHtml+='<input type="password" id="mr-key-'+p.name+'" placeholder="'+p.env_key+'" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:13px">';
-          keysHtml+='<button class="mr-test-btn" data-provider="'+p.name+'" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:12px;white-space:nowrap">Test</button>';
-          keysHtml+='<button class="mr-save-btn" data-provider="'+p.name+'" data-env-key="'+p.env_key+'" style="padding:6px 12px;border-radius:6px;border:1px solid var(--accent);background:var(--accent-dim);color:var(--accent2);cursor:pointer;font-size:12px;white-space:nowrap">Save</button>';
-          keysHtml+='</div>';
-        }
+        h+='</div>';
       });
-      provEl.innerHTML=provHtml;
-      keysEl.innerHTML=keysHtml;
-      /* Model click → switch */
-      provEl.querySelectorAll('.mr-model-btn').forEach(function(btn){
-        btn.addEventListener('click',function(){
-          var model=btn.getAttribute('data-model');
-          btn.textContent='⏳';
-          fetch('/api/model/switch',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr),body:JSON.stringify({model:model})})
-            .then(function(r){return r.json()}).then(function(res){
-              if(res.ok)window._loadModelRouter();
-              else btn.textContent='❌ '+res.message;
-            }).catch(function(){btn.textContent='❌ Error'});
-        });
-      });
-      /* Test key */
-      keysEl.querySelectorAll('.mr-test-btn').forEach(function(btn){
-        btn.addEventListener('click',function(){
-          var prov=btn.getAttribute('data-provider');
-          var key=document.getElementById('mr-key-'+prov).value.trim();
-          if(!key){btn.textContent='❌ Empty';setTimeout(function(){btn.textContent='Test'},1500);return}
-          btn.textContent='⏳';
-          fetch('/api/test-provider',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr),body:JSON.stringify({provider:prov,api_key:key})})
-            .then(function(r){return r.json()}).then(function(res){
-              btn.textContent=res.ok?'✅':'❌';btn.title=res.message||'';
-              setTimeout(function(){btn.textContent='Test'},3000);
-            }).catch(function(){btn.textContent='❌';setTimeout(function(){btn.textContent='Test'},2000)});
-        });
-      });
-      /* Save key to vault */
-      keysEl.querySelectorAll('.mr-save-btn').forEach(function(btn){
-        btn.addEventListener('click',function(){
-          var prov=btn.getAttribute('data-provider');
-          var envKey=btn.getAttribute('data-env-key');
-          var key=document.getElementById('mr-key-'+prov).value.trim();
-          if(!key){btn.textContent='❌ Empty';setTimeout(function(){btn.textContent='Save'},1500);return}
-          btn.textContent='⏳';
-          fetch('/api/vault',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr),body:JSON.stringify({action:'set',key:envKey.toLowerCase(),value:key})})
-            .then(function(r){return r.json()}).then(function(res){
-              btn.textContent=res.ok?'✅ Saved':'❌';
-              setTimeout(function(){btn.textContent='Save';window._loadModelRouter()},1500);
-            }).catch(function(){btn.textContent='❌';setTimeout(function(){btn.textContent='Save'},2000)});
-        });
-      });
+      gridEl.innerHTML=h;
     }).catch(function(e){
-      document.getElementById('mr-providers').innerHTML='<div style="color:var(--red)">Failed to load providers</div>';
+      document.getElementById('mr-provider-grid').innerHTML='<div style="color:var(--red)">Failed to load: '+e+'</div>';
     });
   };
 
@@ -2169,6 +2123,14 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='exportAgent')window.exportAgent();
     else if(a==='importAgent')window.importAgent();
     else if(a==='quickSyncExport')window.quickSyncExport();
+    else if(a==='attachFile'){document.getElementById('file-input-hidden').click()}
+    else if(a==='switchModel'){
+      var model=el.getAttribute('data-model');
+      el.style.opacity='0.5';
+      fetch('/api/model/switch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({model:model})})
+      .then(function(r){return r.json()}).then(function(res){if(res.ok)window._loadModelRouter();else alert(res.message||'Failed')})
+      .catch(function(){el.style.opacity='1'});
+    }
     else if(a==='toggleFeatCat'){el.parentElement.classList.toggle('open')}
     else if(a==='fillCommand'){var inp=document.getElementById('input');inp.value=el.getAttribute('data-cmd');inp.focus()}
     else if(a==='toggleUser'){var uid=parseInt(el.getAttribute('data-uid'));var en=el.getAttribute('data-enabled')==='true';window.toggleUser(uid,en)}
@@ -2370,85 +2332,5 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   }
 })();
 
-  /* ── Model Router Tab ── */
-  window._loadModelRouter=function(){
-    fetch('/api/llm-router/providers',{headers:{'X-Session-Token':_tok}})
-    .then(function(r){return r.json()})
-    .then(function(d){
-      var cur=d.current_model||'auto';
-      document.getElementById('mr-current-name').textContent=cur;
-      var provEl=document.getElementById('mr-providers');
-      var keysEl=document.getElementById('mr-keys');
-      provEl.innerHTML='';keysEl.innerHTML='';
-      d.providers.forEach(function(p){
-        var sec=document.createElement('div');
-        sec.style.cssText='margin-bottom:20px';
-        var hdr=document.createElement('div');
-        hdr.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px';
-        hdr.innerHTML='<span style="font-size:16px">'+(p.available?'✅':'❌')+'</span>'+
-          '<span style="font-size:14px;font-weight:600">'+p.name.charAt(0).toUpperCase()+p.name.slice(1)+'</span>'+
-          '<span style="font-size:11px;color:var(--text2)">'+(p.available?'Connected':'No API key')+'</span>';
-        sec.appendChild(hdr);
-        var grid=document.createElement('div');
-        grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px';
-        p.models.forEach(function(m){
-          var btn=document.createElement('button');
-          var isActive=cur&&(cur===m.full||cur===m.name||cur.indexOf(m.name)!==-1);
-          btn.style.cssText='padding:10px 14px;border-radius:8px;border:1px solid '+(isActive?'var(--accent)':'var(--border)')+
-            ';background:'+(isActive?'var(--accent-dim)':'var(--bg)')+
-            ';color:'+(isActive?'var(--accent2)':'var(--text)')+
-            ';cursor:pointer;font-size:13px;text-align:left;transition:all 0.15s;position:relative';
-          btn.innerHTML='<div style="font-weight:500">'+m.name+'</div>'+
-            '<div style="font-size:11px;color:var(--text2)">'+m.full+'</div>'+
-            (isActive?'<div style="position:absolute;top:6px;right:8px;font-size:10px;color:var(--accent2)">● active</div>':'');
-          btn.onmouseover=function(){if(!isActive)this.style.borderColor='var(--accent)';this.style.background='var(--accent-dim)'};
-          btn.onmouseout=function(){if(!isActive){this.style.borderColor='var(--border)';this.style.background='var(--bg)'}};
-          btn.onclick=function(){
-            fetch('/api/llm-router/switch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
-              body:JSON.stringify({model:m.full})})
-            .then(function(r){return r.json()})
-            .then(function(res){
-              if(res.ok){window._loadModelRouter()}
-              else{alert(res.message)}
-            });
-          };
-          grid.appendChild(btn);
-        });
-        sec.appendChild(grid);
-        provEl.appendChild(sec);
-        /* Key input */
-        if(p.env_key){
-          var row=document.createElement('div');
-          row.style.cssText='margin-bottom:12px';
-          row.innerHTML='<label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;margin-bottom:4px">'+
-            (p.available?'✅':'❌')+' '+p.name.charAt(0).toUpperCase()+p.name.slice(1)+' ('+p.env_key+')</label>'+
-            '<div style="display:flex;gap:6px">'+
-            '<input type="password" id="mr-key-'+p.name+'" placeholder="Enter API key..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">'+
-            '<button class="btn" style="white-space:nowrap" data-mr-test="'+p.name+'">Test</button>'+
-            '</div><div id="mr-key-result-'+p.name+'" style="font-size:12px;margin-top:4px"></div>';
-          keysEl.appendChild(row);
-        }
-      });
-      /* Test key buttons */
-      document.querySelectorAll('[data-mr-test]').forEach(function(btn){
-        btn.onclick=function(){
-          var prov=this.getAttribute('data-mr-test');
-          var keyInput=document.getElementById('mr-key-'+prov);
-          var resultEl=document.getElementById('mr-key-result-'+prov);
-          if(!keyInput.value){resultEl.innerHTML='<span style="color:var(--red)">Enter a key first</span>';return}
-          resultEl.innerHTML='<span style="color:var(--text2)">Testing...</span>';
-          fetch('/api/llm-router/test-key',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
-            body:JSON.stringify({provider:prov,api_key:keyInput.value})})
-          .then(function(r){return r.json()})
-          .then(function(res){
-            resultEl.innerHTML='<span style="color:'+(res.ok?'var(--green)':'var(--red)')+'">'+res.message+'</span>';
-          })
-          .catch(function(){resultEl.innerHTML='<span style="color:var(--red)">Network error</span>'});
-        };
-      });
-    })
-    .catch(function(e){
-      document.getElementById('mr-providers').innerHTML='<p style="color:var(--red)">Failed to load: '+e+'</p>';
-    });
-  };
+  /* ── Model Router Tab (v2) ── */
 </script></body></html>
