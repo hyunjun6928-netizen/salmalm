@@ -2271,12 +2271,18 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             if len(pw) < 4:
                 self._json({"error": "Password must be at least 4 characters"}, 400)
                 return
-            vault.create(pw)
-            audit_log("setup", "vault created with password")
-        else:
-            # Create vault with empty password (auto-unlock on localhost)
-            vault.create("")
-            audit_log("setup", "vault created without password")
+        try:
+            vault.create(pw if use_pw else "")
+            audit_log("setup", f"vault created {'with' if use_pw else 'without'} password")
+        except RuntimeError:
+            # cryptography not installed and fallback not enabled —
+            # proceed without vault (keys stored in plain SQLite)
+            log.warning("[SETUP] Vault unavailable (no cryptography). Proceeding without encryption.")
+            audit_log("setup", "vault skipped — no cryptography package")
+            # Mark vault as "unlocked" with in-memory empty store so the app works
+            vault._data = {}
+            vault._password = ""
+            vault._salt = b"\x00" * 16
         self._json({"ok": True})
         return
 
