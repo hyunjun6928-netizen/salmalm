@@ -1,196 +1,262 @@
 <div align="center">
 
-# 😈 SalmAlm
+# 😈 SalmAlm (삶앎)
 
-### Personal AI Gateway — Your AI Assistant in One Command
-### 개인 AI 게이트웨이 — 한 줄로 시작하는 AI 비서
+### Your Entire AI Life in One `pip install`
 
 [![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
-[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://pypi.org/project/salmalm/)
+[![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-586%20passing-brightgreen)]()
-[![Tools](https://img.shields.io/badge/tools-56%20built--in-blue)]()
+[![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
+[![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
+[![Commands](https://img.shields.io/badge/commands-32-orange)]()
+
+**[한국어 README](README_KR.md)**
 
 </div>
+
+---
+
+## What is SalmAlm?
+
+SalmAlm is a **personal AI gateway** — one Python package that gives you a full-featured AI assistant with a web UI, Telegram/Discord bots, 62 tools, and 10 features you won't find anywhere else.
+
+No Docker. No Node.js. No config files. Just:
+
+```bash
+pip install salmalm
+salmalm start
+# → http://localhost:18800
+```
+
+First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
+
+---
+
+## Why SalmAlm?
+
+| | Feature | SalmAlm | ChatGPT | OpenClaw | Open WebUI |
+|---|---|:---:|:---:|:---:|:---:|
+| 🔧 | Install complexity | `pip install` | N/A | npm + config | Docker |
+| 🤖 | Multi-provider routing | ✅ | ❌ | ✅ | ✅ |
+| 🧠 | Self-Evolving Prompt | ✅ | ❌ | ❌ | ❌ |
+| 👻 | Shadow Mode | ✅ | ❌ | ❌ | ❌ |
+| 💀 | Dead Man's Switch | ✅ | ❌ | ❌ | ❌ |
+| 🔐 | Encrypted Vault | ✅ | ❌ | ❌ | ❌ |
+| 📱 | Telegram + Discord | ✅ | ❌ | ✅ | ❌ |
+| 🧩 | MCP Marketplace | ✅ | ❌ | ❌ | ✅ |
+| 📦 | Zero dependencies* | ✅ | N/A | ❌ | ❌ |
+
+*\*stdlib-only core; optional integrations use standard protocols*
 
 ---
 
 ## ⚡ Quick Start
 
 ```bash
+# Install
 pip install salmalm
-python -m salmalm start
-# → Open http://localhost:18800
+
+# Start (opens web UI automatically)
+salmalm start
+
+# Or with options
+salmalm start --port 8080 --no-browser
 ```
 
-First run launches the **Setup Wizard** automatically — enter an API key, pick a model, and start chatting!
+### Supported Providers
 
----
-
-## 🌟 Feature Highlights
-
-| | Feature | Description |
+| Provider | Models | Env Variable |
 |---|---|---|
-| 🤖 | **Multi-Model Routing** | Auto-selects Opus/Sonnet/Haiku/GPT/Gemini per task |
-| 🧠 | **Extended Thinking** | Deep reasoning mode for complex problems |
-| 🎭 | **Setup Wizard** | Guided onboarding with API key test, model & persona selection |
-| 💬 | **Real-time Streaming** | WebSocket-native with inline buttons & code highlighting |
-| 🔌 | **Plugin Architecture** | Extend with custom tools, hooks, and commands |
-| 📱 | **Telegram + Discord** | Full bot integration with polling & webhook |
-| 🔐 | **Vault Encryption** | AES-256-GCM encrypted secrets storage |
-| 📊 | **SLA Dashboard** | Uptime, response time P50/P95/P99, self-healing watchdog |
-| 🧩 | **MCP Marketplace** | Install Model Context Protocol servers with one command |
-| 🎯 | **56 Built-in Tools** | Web search, email, calendar, file ops, exec, and more |
+| Anthropic | Claude Opus 4, Sonnet 4, Haiku 4.5 | `ANTHROPIC_API_KEY` |
+| OpenAI | GPT-5.2, GPT-4.1, o3, o4-mini | `OPENAI_API_KEY` |
+| Google | Gemini 2.5 Pro/Flash | `GOOGLE_API_KEY` |
+| xAI | Grok-4, Grok-3 | `XAI_API_KEY` |
+| Ollama | Any local model | `OLLAMA_URL` |
+
+Set keys via environment variables or the web UI Settings → API Keys.
 
 ---
 
-## ✨ Features (v0.16.0)
+## 🎯 Feature Overview
 
-### 🤖 AI Engine
+### Core AI
+- **Multi-model auto-routing** — routes simple→Haiku, moderate→Sonnet, complex→Opus
+- **Extended Thinking** — deep reasoning mode with budget control
+- **Context compaction** — auto-summarizes at 80K tokens
+- **Prompt caching** — Anthropic cache_control for 90% cost reduction on system prompts
+- **Model failover** — exponential backoff across providers
 
-- **Multi-model routing** — Opus/Sonnet/Haiku auto-select / 멀티모델 자동 라우팅
-- **Extended thinking mode** / 확장 사고 모드
-- **Context compaction** — auto at 80K tokens / 컨텍스트 자동 압축
-- **Session pruning** — tool result cleanup / 세션 프루닝
-- **Model failover** — exponential backoff / 모델 자동 전환
-- **56 built-in tools** / 56개 내장 도구
+### 62 Built-in Tools
+Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Python eval, image generation (DALL-E), TTS/STT, browser automation, RAG search, QR codes, system monitor, and more.
 
-### 💬 Chat & UI
+### Web UI
+- Real-time streaming (WebSocket + SSE fallback)
+- Session branching, rollback, search (`Ctrl+K`)
+- Command palette (`Ctrl+Shift+P`)
+- Message edit/delete/regenerate
+- Image paste/drag-drop with vision
+- Code syntax highlighting
+- Dark/Light themes, EN/KR i18n
+- PWA installable
 
-- **WebSocket real-time streaming** / 웹소켓 실시간 스트리밍
-- **Image drag & drop + Vision** / 이미지 드래그앤드롭 + 비전
-- **Inline buttons** (web + Telegram) / 인라인 버튼
-- **Session branching & rollback** / 세션 분기 및 롤백
-- **Message edit/delete** / 메시지 편집/삭제
-- **Conversation search** (`Ctrl+K`) / 대화 검색
-- **Command palette** (`Ctrl+Shift+P`) / 커맨드 팔레트
-- **Code syntax highlighting** / 코드 구문 강조
-- **PWA installable + Mobile responsive** / PWA + 모바일 반응형
-- **Dark/Light theme** / 다크/라이트 테마
-- **Export** (JSON/Markdown/HTML) / 내보내기
-- **TTS** (Web Speech + OpenAI) / 음성 합성
-- **Session groups & bookmarks** / 세션 그룹 및 북마크
+### Channels
+- **Web** — full-featured SPA at `localhost:18800`
+- **Telegram** — polling + webhook with inline buttons
+- **Discord** — bot with thread support
 
-### 🔗 Integrations
+### Admin Panels
+- **📈 Dashboard** — token usage, cost tracking, daily trends with date filters
+- **📋 Sessions** — full session management with search, delete, branch indicators
+- **⏰ Cron Jobs** — scheduled AI tasks with CRUD management
+- **🧠 Memory** — file browser for agent memory/personality files
+- **🔬 Debug** — real-time system diagnostics (5 cards, auto-refresh)
+- **📋 Logs** — server log viewer with level filter
+- **📖 Docs** — built-in reference for all 32 commands and 10 unique features
 
-- **Telegram** (polling + webhook) / 텔레그램
-- **Discord** / 디스코드
-- **Google Calendar & Gmail** / 구글 캘린더 & 지메일
-- **Google OAuth** / 구글 OAuth
-- **MCP Marketplace** / MCP 마켓플레이스
+---
 
-### 🆕 New in v0.16.0
+## ✨ 10 Unique Features
 
-- 🎭 **Setup Wizard** — Guided multi-step onboarding with API test & persona selection
-- 🧩 **MCP Marketplace** — Browse & install MCP servers (`/mcp catalog`)
-- 📊 **Provider Health Monitor** — Real-time API provider status tracking
-- 🔀 **Response Comparison** — Compare outputs from different models side-by-side
-- 📋 **Summary Cards** — Auto-generated conversation summaries
-- 🎯 **Quick Actions** — Context-aware suggested actions
-- 📎 **Smart Paste** — Intelligent paste handling for code, URLs, images
-- 🗂️ **Session Groups** — Organize conversations into folders
-- 🕰️ **Time Capsule** — Schedule messages to your future self
-- 🔍 **Web Clip** — Save & summarize web pages with one command
+These are SalmAlm-only — not found in ChatGPT, OpenClaw, Open WebUI, or any other gateway:
 
-### 🔒 Security & Reliability
+| # | Feature | What it does |
+|---|---|---|
+| 1 | **Self-Evolving Prompt** | AI auto-generates personality rules from your conversations (FIFO, max 20) |
+| 2 | **Dead Man's Switch** | Automated emergency actions if you go inactive for N days |
+| 3 | **Shadow Mode** | AI silently learns your communication style, replies as you when away |
+| 4 | **Life Dashboard** | Unified view of health, finance, habits, calendar in one command |
+| 5 | **Mood-Aware Response** | Detects emotional state and adjusts tone automatically |
+| 6 | **Encrypted Vault** | PBKDF2-600K + HMAC-authenticated stream cipher for private conversations |
+| 7 | **Agent-to-Agent Protocol** | HMAC-SHA256 signed communication between SalmAlm instances |
+| 8 | **A/B Split Response** | Get two different model perspectives on the same question |
+| 9 | **Time Capsule** | Schedule messages to your future self |
+| 10 | **Thought Stream** | Private journaling timeline with hashtag search and mood tracking |
 
-- **OWASP Top 10 compliant** / OWASP Top 10 준수
-- **Rate limiting** (IP-based) / 요청 빈도 제한
-- **AES-256-GCM vault encryption** / AES-256-GCM 볼트 암호화
-- **SSRF protection** / SSRF 방지
-- **Audit logging** / 감사 로깅
-- **Graceful shutdown** / 안전한 종료
+---
 
-### 🏢 Enterprise Ready
+## 📋 Commands (32)
 
-- **Multi-tenant with user isolation** / 멀티테넌트 사용자 격리
-- **Per-user quotas** (daily/monthly) / 사용자별 쿼터
-- **Multi-agent routing** / 다중 에이전트 라우팅
-- **Plugin architecture** / 플러그인 아키텍처
-- **Event hooks system** / 이벤트 훅 시스템
+<details>
+<summary>Click to expand full command list</summary>
+
+| Command | Description |
+|---|---|
+| `/help` | Show all commands |
+| `/status` | Session status |
+| `/model <name>` | Switch model (opus/sonnet/haiku/gpt/auto) |
+| `/think [level]` | Extended thinking (low/medium/high) |
+| `/compact` | Compress context |
+| `/context` | Token count breakdown |
+| `/usage` | Token & cost tracking |
+| `/persona <name>` | Switch persona |
+| `/branch` | Branch conversation |
+| `/rollback [n]` | Undo last n messages |
+| `/remind <time> <msg>` | Set reminder |
+| `/expense <amt> <desc>` | Track expense |
+| `/pomodoro` | Focus timer |
+| `/note <text>` | Quick note |
+| `/link <url>` | Save link |
+| `/routine` | Daily routines |
+| `/shadow` | Shadow mode |
+| `/vault` | Encrypted vault |
+| `/capsule` | Time capsule |
+| `/deadman` | Dead man's switch |
+| `/a2a` | Agent-to-agent |
+| `/workflow` | Workflow engine |
+| `/mcp` | MCP management |
+| `/subagents` | Sub-agents |
+| `/evolve` | Self-evolving prompt |
+| `/mood` | Mood detection |
+| `/split` | A/B split response |
+| `/cron` | Cron jobs |
+| `/bash <cmd>` | Shell command |
+| `/screen` | Browser control |
+| `/life` | Life dashboard |
+| `/briefing` | Daily briefing |
+
+</details>
 
 ---
 
 ## 🔧 Configuration
 
-### Environment Variables
-
 ```bash
-SALMALM_PORT=18800            # Server port
-SALMALM_BIND=127.0.0.1        # Bind address
-SALMALM_WS_PORT=18801          # WebSocket port
-SALMALM_LLM_TIMEOUT=30         # LLM timeout (seconds)
-SALMALM_COST_CAP=0             # Cost cap (0=disabled)
-SALMALM_VAULT_PW=...           # Auto-unlock vault
+# Environment variables (all optional)
+SALMALM_PORT=18800         # Web server port
+SALMALM_BIND=127.0.0.1    # Bind address
+SALMALM_WS_PORT=18801     # WebSocket port
+SALMALM_LLM_TIMEOUT=30    # LLM request timeout
+SALMALM_COST_CAP=0        # Monthly cost cap (0=unlimited)
+SALMALM_VAULT_PW=...      # Auto-unlock vault on start
 ```
 
----
-
-## 📋 Commands
-
-| Command | Description |
-|---|---|
-| `/help` | Show all commands |
-| `/setup` | Re-run setup wizard |
-| `/model <name>` | Switch model |
-| `/think` | Toggle extended thinking |
-| `/export` | Export conversation |
-| `/mcp catalog` | Browse MCP marketplace |
-| `/remind <text>` | Set a reminder |
-| `/briefing` | Daily briefing |
-| `/vault` | Manage vault |
-| `/status` | Server status |
-
----
-
-## 🐳 Docker
-
-```bash
-git clone https://github.com/hyunjun6928-netizen/salmalm.git
-cd salmalm
-export ANTHROPIC_API_KEY=sk-ant-...
-docker compose up -d
-curl http://localhost:18800/api/health
-```
+All configuration is also available through the web UI.
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-Browser ──WebSocket──► SalmAlm Server ──► Anthropic / OpenAI / Google / xAI
-   │                        │
-   └──HTTP/SSE──►          ├── SQLite DB
-                            ├── Plugin System
-Telegram ──►                ├── Cron Scheduler
-Discord  ──►                ├── RAG Engine
-                            └── Tool Registry (56 tools)
+Browser ──WebSocket──► SalmAlm ──► Anthropic / OpenAI / Google / xAI / Ollama
+   │                     │
+   └──HTTP/SSE──►       ├── SQLite (sessions, usage, memory)
+                         ├── Tool Registry (62 tools)
+Telegram ──►             ├── Cron Scheduler
+Discord  ──►             ├── RAG Engine (TF-IDF + cosine similarity)
+                         ├── Plugin System
+                         └── Vault (PBKDF2 encrypted)
+```
+
+- **216 modules**, **43K+ lines**, **78 test files**, **1,598 tests**
+- Pure Python 3.10+ stdlib — no frameworks, no heavy dependencies
+- Single `pip install`, runs anywhere Python runs
+
+---
+
+## 🐳 Docker (Optional)
+
+```bash
+git clone https://github.com/hyunjun6928-netizen/salmalm.git
+cd salmalm
+docker compose up -d
 ```
 
 ---
 
 ## 🔌 Plugins
 
+```python
+# plugins/my_plugin/__init__.py
+def register(app):
+    @app.tool("my_tool")
+    def my_tool(args):
+        return "Hello from my plugin!"
 ```
-plugins/
-  my_plugin/
-    __init__.py    # Plugin entry point
-    manifest.json  # Plugin metadata
-```
-
-Plugins can register tools, event hooks, and custom commands.
 
 ---
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Write tests: `python -m pytest tests/`
-4. Submit a PR
+```bash
+git clone https://github.com/hyunjun6928-netizen/salmalm.git
+cd salmalm
+pip install -e ".[dev]"
+python -m pytest tests/ --timeout=30
+```
 
 ---
 
 ## 📄 License
 
 [MIT](LICENSE)
+
+---
+
+<div align="center">
+
+**SalmAlm** = 삶(Life) + 앎(Knowledge)
+
+*Your life, understood by AI.*
+
+</div>
