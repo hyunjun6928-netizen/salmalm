@@ -10,13 +10,13 @@ import time
 import urllib.request
 from typing import Any, Dict, Optional
 
-from salmalm.constants import *  # noqa: F403
-from salmalm.crypto import vault, log
+from salmalm.constants import APP_NAME, WORKSPACE_DIR
+from salmalm.security.crypto import vault, log
 from salmalm.core import router, get_session, audit_log, compact_messages, set_telegram_bot
-from salmalm.llm import _http_post, _http_get
-from salmalm.prompt import build_system_prompt
+from salmalm.core.llm import _http_post, _http_get
+from salmalm.core.prompt import build_system_prompt
 from salmalm.tools import execute_tool
-from salmalm.chunker import EmbeddedBlockChunker, ChunkerConfig, CHANNEL_TELEGRAM, load_config_from_file
+from salmalm.utils.chunker import EmbeddedBlockChunker, ChunkerConfig, CHANNEL_TELEGRAM, load_config_from_file
 
 
 class TelegramBot:
@@ -490,7 +490,7 @@ class TelegramBot:
             except Exception:
                 pass
             # Multi-tenant: allow registered users; legacy: owner only
-            from salmalm.users import user_manager as _um_cb
+            from salmalm.features.users import user_manager as _um_cb
             _cb_allowed = False
             if _um_cb.multi_tenant_enabled:
                 _cb_tenant = _um_cb.get_user_by_telegram(str(cb_chat_id))
@@ -502,7 +502,7 @@ class TelegramBot:
                 self.send_typing(cb_chat_id)
                 session_id = f'telegram_{cb_chat_id}'
                 _start = time.time()
-                from salmalm.engine import process_message
+                from salmalm.core.engine import process_message
                 response = await process_message(session_id, btn_text)
                 _elapsed = time.time() - _start
                 self.send_message(cb_chat_id, f"{response}\n\n⏱️ {_elapsed:.1f}s")
@@ -536,7 +536,7 @@ class TelegramBot:
                 return  # Silent: no mention, no reply to bot
 
         # Multi-tenant auth check
-        from salmalm.users import user_manager
+        from salmalm.features.users import user_manager
         _tenant_user = None  # Resolved multi-tenant user dict
         if user_manager.multi_tenant_enabled:
             _tenant_user = user_manager.get_user_by_telegram(str(chat_id))
@@ -553,7 +553,7 @@ class TelegramBot:
             # Check quota
             if _tenant_user:
                 try:
-                    from salmalm.users import QuotaExceeded
+                    from salmalm.features.users import QuotaExceeded
                     user_manager.check_quota(_tenant_user['id'])
                 except QuotaExceeded as e:
                     self.send_message(chat_id, f"⚠️ {e.message}")
@@ -594,7 +594,7 @@ class TelegramBot:
                 # Auto-detect agent import ZIP
                 if doc_fname.endswith('.zip') and 'agent-export' in doc_fname.lower():
                     self.send_typing(chat_id)
-                    from salmalm.migration import import_agent
+                    from salmalm.utils.migration import import_agent
                     result = import_agent(data)
                     self.send_message(chat_id,
                                       f'📦 **Agent Import / 에이전트 가져오기**\n\n{result.summary()}')
@@ -711,7 +711,7 @@ class TelegramBot:
             pass
 
         _start = time.time()
-        from salmalm.engine import process_message
+        from salmalm.core.engine import process_message
         response = await process_message(
             session_id, text, image_data=_image_data,
             on_token=_on_stream_token,
@@ -779,7 +779,7 @@ class TelegramBot:
 
         # Multi-tenant commands (available even when not registered)
         if cmd == '/register':
-            from salmalm.users import user_manager
+            from salmalm.features.users import user_manager
             if not user_manager.multi_tenant_enabled:
                 self.send_message(chat_id, "멀티테넌트 모드가 비활성화되어 있습니다. / Multi-tenant mode is disabled.")
                 return
@@ -799,7 +799,7 @@ class TelegramBot:
             return
 
         if cmd == '/quota':
-            from salmalm.users import user_manager
+            from salmalm.features.users import user_manager
             if not user_manager.multi_tenant_enabled or not tenant_user:
                 self.send_message(chat_id, "멀티테넌트 모드가 비활성화되어 있습니다.")
                 return
@@ -829,8 +829,8 @@ class TelegramBot:
             return
 
         if cmd == '/user' and tenant_user and tenant_user.get('role') == 'admin':
-            from salmalm.users import user_manager
-            from salmalm.auth import auth_manager
+            from salmalm.features.users import user_manager
+            from salmalm.web.auth import auth_manager
             parts = text.split()
             if len(parts) >= 3 and parts[1] == 'create':
                 username = parts[2]
@@ -970,7 +970,7 @@ class TelegramBot:
         elif cmd in ('/cal', '/calendar'):
             parts = text.split(maxsplit=3)
             sub = parts[1] if len(parts) > 1 else 'today'
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             if sub == 'today':
                 result = _exec_tool('calendar_list', {'period': 'today'})
             elif sub == 'week':
@@ -1009,7 +1009,7 @@ class TelegramBot:
         elif cmd in ('/mail', '/email'):
             parts = text.split(maxsplit=4)
             sub = parts[1] if len(parts) > 1 else 'inbox'
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             if sub == 'inbox':
                 result = _exec_tool('email_inbox', {})
             elif sub == 'read':
@@ -1045,14 +1045,14 @@ class TelegramBot:
             self.send_message(chat_id, result)
 
         elif cmd == '/briefing':
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             sections = text.split(maxsplit=1)[1] if len(text.split(maxsplit=1)) > 1 else None
             args = {'sections': sections} if sections else {}
             result = _exec_tool('briefing', args)
             self.send_message(chat_id, result)
 
         elif cmd == '/note':
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             parts = text.split(maxsplit=2)
             sub = parts[1] if len(parts) > 1 else ''
             if sub == 'search':
@@ -1076,7 +1076,7 @@ class TelegramBot:
             self.send_message(chat_id, result)
 
         elif cmd == '/expense':
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             parts = text.split(maxsplit=3)
             sub = parts[1] if len(parts) > 1 else 'today'
             if sub == 'add':
@@ -1106,7 +1106,7 @@ class TelegramBot:
             self.send_message(chat_id, result)
 
         elif cmd == '/save':
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             url = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ''
             if url:
                 result = _exec_tool('save_link', {'action': 'save', 'url': url})
@@ -1115,7 +1115,7 @@ class TelegramBot:
             self.send_message(chat_id, result)
 
         elif cmd == '/saved':
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             parts = text.split(maxsplit=2)
             sub = parts[1] if len(parts) > 1 else 'list'
             if sub == 'list':
@@ -1131,7 +1131,7 @@ class TelegramBot:
             self.send_message(chat_id, result)
 
         elif cmd == '/pomodoro':
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             parts = text.split(maxsplit=2)
             sub = parts[1] if len(parts) > 1 else 'status'
             if sub == 'start':
@@ -1147,14 +1147,14 @@ class TelegramBot:
             self.send_message(chat_id, result)
 
         elif cmd == '/routine':
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             parts = text.split(maxsplit=1)
             sub = parts[1].strip() if len(parts) > 1 else 'list'
             result = _exec_tool('routine', {'action': sub})
             self.send_message(chat_id, result)
 
         elif cmd == '/remind':
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             parts = text.split(maxsplit=2)
             sub = parts[1] if len(parts) > 1 else 'list'
             if sub == 'list':
@@ -1167,7 +1167,7 @@ class TelegramBot:
             self.send_message(chat_id, result)
 
         elif cmd == '/tr':
-            from salmalm.tool_registry import execute_tool as _exec_tool
+            from salmalm.tools.tool_registry import execute_tool as _exec_tool
             parts = text.split(maxsplit=2)
             if len(parts) >= 3:
                 target_lang = parts[1]
@@ -1180,7 +1180,7 @@ class TelegramBot:
         elif cmd == '/export':
             self.send_typing(chat_id)
             try:
-                from salmalm.migration import export_agent, export_filename
+                from salmalm.utils.migration import export_agent, export_filename
                 parts = text.split()
                 include_vault = '--vault' in parts
                 zip_bytes = export_agent(include_vault=include_vault)
@@ -1201,7 +1201,7 @@ class TelegramBot:
             parts = text.split(maxsplit=1)
             sub = parts[1].strip() if len(parts) > 1 else 'export'
             if sub == 'export':
-                from salmalm.migration import quick_sync_export
+                from salmalm.utils.migration import quick_sync_export
                 data = quick_sync_export()
                 sync_json = json.dumps(data, ensure_ascii=False, indent=2)
                 self.send_message(chat_id,
@@ -1213,7 +1213,7 @@ class TelegramBot:
                     return
                 try:
                     data = json.loads(json_str)
-                    from salmalm.migration import quick_sync_import
+                    from salmalm.utils.migration import quick_sync_import
                     quick_sync_import(data)
                     self.send_message(chat_id, '✅ Quick sync imported / 빠른 동기화 완료')
                 except json.JSONDecodeError:
@@ -1227,7 +1227,7 @@ class TelegramBot:
             # Route unknown /commands through engine (handles /model auto/opus/sonnet/haiku etc.)
             self.send_typing(chat_id)
             session_id = f'telegram_{chat_id}'
-            from salmalm.engine import process_message
+            from salmalm.core.engine import process_message
             response = await process_message(session_id, text)
             self.send_message(chat_id, response)
 

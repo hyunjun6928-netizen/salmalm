@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from salmalm.timecapsule import TimeCapsule, _parse_capsule_date, _split_date_message
+from salmalm.features.timecapsule import TimeCapsule, _parse_capsule_date, _split_date_message
 from salmalm.constants import KST
 
 

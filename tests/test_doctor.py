@@ -3,7 +3,7 @@ import json
 import tempfile
 from pathlib import Path
 import pytest
-from salmalm.doctor import Doctor, doctor, _status
+from salmalm.features.doctor import Doctor, doctor, _status
 
 
 def test_status_ok():

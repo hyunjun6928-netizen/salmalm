@@ -1,5 +1,5 @@
 """Memory tools: memory_read, memory_write, memory_search, usage_report."""
-from salmalm.tool_registry import register
+from salmalm.tools.tool_registry import register
 from salmalm.constants import MEMORY_FILE, MEMORY_DIR
 from salmalm.core import _tfidf, get_usage_report
 

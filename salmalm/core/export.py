@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 from salmalm.constants import VERSION, KST, BASE_DIR
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 EXPORT_DIR = BASE_DIR / 'exports'
 

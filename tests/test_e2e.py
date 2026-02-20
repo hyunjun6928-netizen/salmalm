@@ -93,13 +93,13 @@ class TestE2EToolExecution(unittest.TestCase):
 
     def test_tool_execution_flow(self):
         """execute_tool dispatches and returns string result."""
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         with patch('salmalm.tool_registry.execute_tool', return_value='result: ok'):
             result = execute_tool('exec', {'command': 'echo hello'})
             self.assertIn('ok', result.lower() if 'ok' in result.lower() else result)
 
     def test_tool_path_traversal_blocked(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('read_file', {'path': '../../etc/passwd'})
         self.assertIn('차단', result)
 
@@ -108,7 +108,7 @@ class TestE2ECommandRouting(unittest.TestCase):
     """3. /status → CommandRouter → 결과."""
 
     def test_command_routing(self):
-        from salmalm.commands import CommandRouter
+        from salmalm.features.commands import CommandRouter
         router = CommandRouter()
         # /help should return help text
         result = _run(router.dispatch('/help'))
@@ -116,13 +116,13 @@ class TestE2ECommandRouting(unittest.TestCase):
         self.assertIn('help', result.lower() if result else '')
 
     def test_unknown_command_returns_none(self):
-        from salmalm.commands import CommandRouter
+        from salmalm.features.commands import CommandRouter
         router = CommandRouter()
         result = _run(router.dispatch('hello'))  # not a command
         self.assertIsNone(result)
 
     def test_restart_command(self):
-        from salmalm.commands import CommandRouter
+        from salmalm.features.commands import CommandRouter
         router = CommandRouter()
         result = _run(router.dispatch('/restart'))
         self.assertIsNotNone(result)
@@ -164,7 +164,7 @@ class TestE2EMultiModelFailover(unittest.TestCase):
         self.assertEqual(sess.model_override, 'anthropic/claude-haiku-3')
 
         # Verify IntelligenceEngine has failover method
-        from salmalm.engine import IntelligenceEngine
+        from salmalm.core.engine import IntelligenceEngine
         engine = IntelligenceEngine()
         self.assertTrue(hasattr(engine, '_call_with_failover'))
 
@@ -173,7 +173,7 @@ class TestE2EStreamingToChannel(unittest.TestCase):
     """6. 스트리밍 → chunker → 채널."""
 
     def test_streaming_to_channel(self):
-        from salmalm.chunker import EmbeddedBlockChunker
+        from salmalm.utils.chunker import EmbeddedBlockChunker
         chunker = EmbeddedBlockChunker()
         chunks = []
         for token in ['Hello', ' world', '! How', ' are', ' you?']:

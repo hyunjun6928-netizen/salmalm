@@ -15,7 +15,7 @@ class TestEngineSlashCommands(unittest.TestCase):
     """Test all slash commands in engine."""
 
     def _run(self, sid, msg):
-        from salmalm.engine import process_message
+        from salmalm.core.engine import process_message
         loop = asyncio.new_event_loop()
         try:
             return loop.run_until_complete(process_message(sid, msg))
@@ -67,12 +67,12 @@ class TestEngineClassifierExtended(unittest.TestCase):
     """Extended classifier tests."""
 
     def test_classify_file(self):
-        from salmalm.engine import TaskClassifier
+        from salmalm.core.engine import TaskClassifier
         r = TaskClassifier.classify("read the file config.json")
         self.assertIn(r['intent'], ('code', 'system', 'file', 'analysis'))
 
     def test_classify_long_text(self):
-        from salmalm.engine import TaskClassifier
+        from salmalm.core.engine import TaskClassifier
         text = "Explain the theory of relativity in great detail " * 10
         r = TaskClassifier.classify(text)
         self.assertIn('tier', r)
@@ -84,7 +84,7 @@ class TestLLMModule(unittest.TestCase):
 
     @patch('salmalm.llm.urllib.request.urlopen')
     def test_call_openai_mock(self, mock_urlopen):
-        from salmalm.llm import call_llm
+        from salmalm.core.llm import call_llm
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps({
             'choices': [{'message': {'content': 'Hello!'}}],
@@ -110,18 +110,18 @@ class TestMCPModule(unittest.TestCase):
     """Test MCP manager."""
 
     def test_mcp_manager_init(self):
-        from salmalm.mcp import MCPManager
+        from salmalm.features.mcp import MCPManager
         mgr = MCPManager()
         self.assertIsNotNone(mgr)
 
     def test_mcp_list_servers(self):
-        from salmalm.mcp import MCPManager
+        from salmalm.features.mcp import MCPManager
         mgr = MCPManager()
         servers = mgr.list_servers()
         self.assertIsInstance(servers, (list, dict))
 
     def test_mcp_get_all_tools(self):
-        from salmalm.mcp import MCPManager
+        from salmalm.features.mcp import MCPManager
         mgr = MCPManager()
         tools = mgr.get_all_tools()
         self.assertIsInstance(tools, list)
@@ -131,18 +131,18 @@ class TestNodesModule(unittest.TestCase):
     """Test node manager."""
 
     def test_node_manager_init(self):
-        from salmalm.nodes import NodeManager
+        from salmalm.features.nodes import NodeManager
         mgr = NodeManager()
         self.assertIsNotNone(mgr)
 
     def test_node_list(self):
-        from salmalm.nodes import NodeManager
+        from salmalm.features.nodes import NodeManager
         mgr = NodeManager()
         nodes = mgr.list_nodes()
         self.assertIsInstance(nodes, (list, dict))
 
     def test_node_status_all(self):
-        from salmalm.nodes import NodeManager
+        from salmalm.features.nodes import NodeManager
         mgr = NodeManager()
         status = mgr.status_all()
         self.assertIsInstance(status, (list, dict))
@@ -152,13 +152,13 @@ class TestBrowserModule(unittest.TestCase):
     """Test browser controller."""
 
     def test_browser_status(self):
-        from salmalm.browser import BrowserController
+        from salmalm.utils.browser import BrowserController
         bc = BrowserController()
         status = bc.get_status()
         self.assertIsInstance(status, dict)
 
     def test_browser_not_connected(self):
-        from salmalm.browser import BrowserController
+        from salmalm.utils.browser import BrowserController
         bc = BrowserController()
         self.assertFalse(bc.connected)
 
@@ -167,19 +167,19 @@ class TestAgentsModule(unittest.TestCase):
     """Test skill/plugin loaders."""
 
     def test_skill_scan(self):
-        from salmalm.agents import SkillLoader
+        from salmalm.features.agents import SkillLoader
         sl = SkillLoader()
         skills = sl.scan()
         self.assertIsInstance(skills, list)
 
     def test_plugin_scan(self):
-        from salmalm.agents import PluginLoader
+        from salmalm.features.agents import PluginLoader
         pl = PluginLoader()
         plugins = pl.scan()
         self.assertIsInstance(plugins, (list, int))
 
     def test_plugin_get_all_tools(self):
-        from salmalm.agents import PluginLoader
+        from salmalm.features.agents import PluginLoader
         pl = PluginLoader()
         tools = pl.get_all_tools()
         self.assertIsInstance(tools, list)
@@ -189,14 +189,14 @@ class TestStabilityMore(unittest.TestCase):
     """Extended stability tests."""
 
     def test_circuit_breaker_get_status(self):
-        from salmalm.stability import CircuitBreaker
+        from salmalm.features.stability import CircuitBreaker
         cb = CircuitBreaker(threshold=3, window_sec=60)
         cb.record_error('svc', 'err')
         status = cb.get_status()
         self.assertIsInstance(status, dict)
 
     def test_health_check_status(self):
-        from salmalm.stability import HealthMonitor
+        from salmalm.features.stability import HealthMonitor
         hm = HealthMonitor()
         status = hm.check_health()
         self.assertIn('status', status)
@@ -207,13 +207,13 @@ class TestContainerMore(unittest.TestCase):
     """Extended container tests."""
 
     def test_validate(self):
-        from salmalm.container import Container
+        from salmalm.security.container import Container
         c = Container()
         c.register('a', lambda: 'hello')
         c.validate()
 
     def test_reset(self):
-        from salmalm.container import Container
+        from salmalm.security.container import Container
         c = Container()
         c.register('svc', lambda: 1)
         c.reset()
@@ -224,7 +224,7 @@ class TestCryptoModule(unittest.TestCase):
     """Test crypto/vault operations."""
 
     def test_vault_set_get(self):
-        from salmalm.crypto import Vault
+        from salmalm.security.crypto import Vault
         v = Vault()
         # Use internal _data directly for testing (no password needed)
         v._data = {}
@@ -232,7 +232,7 @@ class TestCryptoModule(unittest.TestCase):
         self.assertEqual(v._data.get('test_key'), 'test_value')
 
     def test_vault_is_unlocked(self):
-        from salmalm.crypto import Vault
+        from salmalm.security.crypto import Vault
         v = Vault()
         # Default state check
         self.assertIsInstance(v.is_unlocked, bool)
@@ -242,13 +242,13 @@ class TestWSModule(unittest.TestCase):
     """WebSocket tests."""
 
     def test_ws_server_init(self):
-        from salmalm.ws import WebSocketServer
+        from salmalm.web.ws import WebSocketServer
         ws = WebSocketServer(host='127.0.0.1', port=0)
         self.assertIsNotNone(ws)
         self.assertEqual(ws.host, '127.0.0.1')
 
     def test_streaming_response(self):
-        from salmalm.ws import StreamingResponse
+        from salmalm.web.ws import StreamingResponse
         sr = StreamingResponse.__new__(StreamingResponse)
         sr.chunks = []
         sr.chunks.append('hello')
@@ -260,12 +260,12 @@ class TestTLSModule(unittest.TestCase):
     """TLS certificate tests."""
 
     def test_ensure_cert(self):
-        from salmalm.tls import ensure_cert
+        from salmalm.utils.tls import ensure_cert
         result = ensure_cert()
         self.assertIsInstance(result, bool)
 
     def test_cert_info(self):
-        from salmalm.tls import get_cert_info
+        from salmalm.utils.tls import get_cert_info
         info = get_cert_info()
         self.assertIsInstance(info, dict)
 
@@ -274,18 +274,18 @@ class TestAuthModule(unittest.TestCase):
     """Test auth manager."""
 
     def test_auth_manager_init(self):
-        from salmalm.auth import AuthManager
+        from salmalm.web.auth import AuthManager
         mgr = AuthManager()
         self.assertIsNotNone(mgr)
 
     def test_auth_manager_list_users(self):
-        from salmalm.auth import AuthManager
+        from salmalm.web.auth import AuthManager
         mgr = AuthManager()
         users = mgr.list_users()
         self.assertIsInstance(users, list)
 
     def test_rate_limiter_init(self):
-        from salmalm.auth import RateLimiter
+        from salmalm.web.auth import RateLimiter
         rl = RateLimiter()
         self.assertIsNotNone(rl)
 
@@ -399,13 +399,13 @@ class TestLoggingExtMore(unittest.TestCase):
     """Extended logging tests."""
 
     def test_set_clear_correlation(self):
-        from salmalm.logging_ext import set_correlation_id, get_correlation_id
+        from salmalm.utils.logging_ext import set_correlation_id, get_correlation_id
         set_correlation_id('abc-123')
         self.assertEqual(get_correlation_id(), 'abc-123')
         set_correlation_id(None)
 
     def test_request_logger(self):
-        from salmalm.logging_ext import RequestLogger
+        from salmalm.utils.logging_ext import RequestLogger
         rl = RequestLogger()
         self.assertIsNotNone(rl)
 

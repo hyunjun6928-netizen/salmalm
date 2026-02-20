@@ -30,56 +30,56 @@ def _make_msgs(texts, role='user', with_ts=False):
 
 class TestPatternAnalyzer:
     def test_length_preference_concise(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         msgs = _make_msgs(['짧게 해줘'] * 3 + ['ok'] * 5)
         assert PatternAnalyzer.analyze_length_preference(msgs) == 'concise'
 
     def test_length_preference_detailed(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         msgs = _make_msgs(['자세히 설명해줘'] * 3 + ['x' * 200] * 5)
         assert PatternAnalyzer.analyze_length_preference(msgs) == 'detailed'
 
     def test_length_preference_mixed(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         msgs = _make_msgs(['hello this is a medium length message okay', 'another medium message here for testing'])
         assert PatternAnalyzer.analyze_length_preference(msgs) == 'mixed'
 
     def test_length_preference_empty(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         assert PatternAnalyzer.analyze_length_preference([]) == 'mixed'
 
     def test_topic_frequency(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         msgs = _make_msgs(['python code fix', 'debug this function', 'write code'])
         topics = PatternAnalyzer.analyze_topic_frequency(msgs)
         assert topics['coding'] >= 3
 
     def test_language_ratio_korean(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         msgs = _make_msgs(['안녕하세요 코드 작성해주세요', '감사합니다 잘됐어요'])
         ratio = PatternAnalyzer.analyze_language_ratio(msgs)
         assert ratio > 0.5
 
     def test_language_ratio_english(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         msgs = _make_msgs(['please write some code for me', 'thank you very much'])
         ratio = PatternAnalyzer.analyze_language_ratio(msgs)
         assert ratio < 0.3
 
     def test_feedback_signals(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         msgs = _make_msgs(['고마워 완벽해', '아니 틀렸어', 'perfect thanks'])
         fb = PatternAnalyzer.analyze_feedback_signals(msgs)
         assert fb['positive'] >= 2
         assert fb['negative'] >= 1
 
     def test_code_comment_preference(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         msgs = _make_msgs(['주석 없이 작성해줘', '주석 빼줘', '주석 제거'])
         assert PatternAnalyzer.analyze_code_comment_preference(msgs) == 'dislike'
 
     def test_time_patterns(self):
-        from salmalm.self_evolve import PatternAnalyzer
+        from salmalm.features.self_evolve import PatternAnalyzer
         import time
         # Create messages with afternoon timestamps and work content
         now = time.time()
@@ -97,12 +97,12 @@ class TestPatternAnalyzer:
 
 class TestPromptEvolver:
     def test_init_and_save(self):
-        from salmalm.self_evolve import PromptEvolver
+        from salmalm.features.self_evolve import PromptEvolver
         pe = PromptEvolver()
         assert pe.state['conversation_count'] == 0
 
     def test_record_conversation(self):
-        from salmalm.self_evolve import PromptEvolver
+        from salmalm.features.self_evolve import PromptEvolver
         pe = PromptEvolver()
         msgs = _make_msgs(['hello', 'code python', '감사합니다'])
         pe.record_conversation(msgs)
@@ -110,7 +110,7 @@ class TestPromptEvolver:
         assert 'preferences' in pe.state
 
     def test_generate_rules_concise(self):
-        from salmalm.self_evolve import PromptEvolver
+        from salmalm.features.self_evolve import PromptEvolver
         pe = PromptEvolver()
         pe.state['preferences'] = {'length_preference': 'concise', 'language_ratio': 0.9}
         rules = pe.generate_rules()
@@ -118,7 +118,7 @@ class TestPromptEvolver:
         assert any('한국어' in r for r in rules)
 
     def test_apply_to_soul(self, tmp_path):
-        from salmalm.self_evolve import PromptEvolver
+        from salmalm.features.self_evolve import PromptEvolver
         pe = PromptEvolver()
         pe.state['preferences'] = {
             'length_preference': 'detailed',
@@ -134,7 +134,7 @@ class TestPromptEvolver:
         assert '<!-- auto-evolved-end -->' in content
 
     def test_apply_replaces_old_section(self, tmp_path):
-        from salmalm.self_evolve import PromptEvolver
+        from salmalm.features.self_evolve import PromptEvolver
         pe = PromptEvolver()
         pe.state['preferences'] = {'length_preference': 'concise'}
         soul_file = tmp_path / 'SOUL.md'
@@ -145,26 +145,26 @@ class TestPromptEvolver:
         assert content.count('auto-evolved-begin') == 1
 
     def test_get_status(self):
-        from salmalm.self_evolve import PromptEvolver
+        from salmalm.features.self_evolve import PromptEvolver
         pe = PromptEvolver()
         status = pe.get_status()
         assert '🧬' in status
 
     def test_reset(self):
-        from salmalm.self_evolve import PromptEvolver
+        from salmalm.features.self_evolve import PromptEvolver
         pe = PromptEvolver()
         pe.state['conversation_count'] = 50
         pe.reset()
         assert pe.state['conversation_count'] == 0
 
     def test_get_history_empty(self):
-        from salmalm.self_evolve import PromptEvolver
+        from salmalm.features.self_evolve import PromptEvolver
         pe = PromptEvolver()
         result = pe.get_history()
         assert '없습니다' in result
 
     def test_should_suggest_evolution(self):
-        from salmalm.self_evolve import PromptEvolver, EVOLVE_INTERVAL
+        from salmalm.features.self_evolve import PromptEvolver, EVOLVE_INTERVAL
         pe = PromptEvolver()
         pe.state['conversation_count'] = EVOLVE_INTERVAL
         assert pe.should_suggest_evolution()

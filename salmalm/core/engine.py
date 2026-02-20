@@ -13,7 +13,7 @@ from salmalm.constants import (VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG,
 import re as _re
 import threading as _threading
 import time as _time
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # Graceful shutdown state
 _shutting_down = False
@@ -21,16 +21,16 @@ _active_requests = 0
 _active_requests_lock = _threading.Lock()
 _active_requests_event = _threading.Event()  # signaled when _active_requests == 0
 from salmalm.core import router, compact_messages, get_session, _sessions, _metrics, compact_session, auto_compact_if_needed, audit_log  # noqa: F401
-from salmalm.prompt import build_system_prompt
-from salmalm.tool_handlers import execute_tool
+from salmalm.core.prompt import build_system_prompt
+from salmalm.tools.tool_handlers import execute_tool
 
 # ── Imports from extracted modules ──
-from salmalm.session_manager import (  # noqa: F401
+from salmalm.core.session_manager import (  # noqa: F401
     _should_prune_for_cache, _record_api_call_time, prune_context,
     _has_image_block, _soft_trim,
     _PRUNE_KEEP_LAST_ASSISTANTS, _PRUNE_SOFT_LIMIT, _PRUNE_HARD_LIMIT, _PRUNE_HEAD,
 )
-from salmalm.llm_loop import (  # noqa: F401
+from salmalm.core.llm_loop import (  # noqa: F401
     _call_llm_async, _call_llm_streaming,
     _load_failover_config, _load_cooldowns, _save_cooldowns,
     _is_model_cooled_down, _record_model_failure, _clear_model_cooldown,
@@ -364,7 +364,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                                 user_message: str = '') -> list:
         from salmalm.tools import TOOL_DEFINITIONS
         from salmalm.core import PluginLoader
-        from salmalm.mcp import mcp_manager
+        from salmalm.features.mcp import mcp_manager
         # Merge built-in + plugin + MCP tools (deduplicate by name)
         all_tools = list(TOOL_DEFINITIONS)
         seen = {t['name'] for t in all_tools}
@@ -428,7 +428,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         # Fire on_tool_call hook for each tool (도구 호출 훅)
         try:
-            from salmalm.hooks import hook_manager
+            from salmalm.features.hooks import hook_manager
             for tc in tool_calls:
                 hook_manager.fire('on_tool_call', {
                     'session_id': '', 'message': f"{tc['name']}: {str(tc.get('arguments', ''))[:200]}"
@@ -582,7 +582,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             session.add_assistant(error_msg)
             # Fire on_error hook (에러 발생 훅)
             try:
-                from salmalm.hooks import hook_manager
+                from salmalm.features.hooks import hook_manager
                 hook_manager.fire('on_error', {'session_id': getattr(session, 'id', ''), 'message': error_msg})
             except Exception:
                 pass
@@ -602,7 +602,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         _session_id = getattr(session, 'id', '')
         while iteration < self.MAX_TOOL_ITERATIONS:
             # Abort check (생성 중지 체크) — LibreChat style
-            from salmalm.edge_cases import abort_controller
+            from salmalm.features.edge_cases import abort_controller
             if abort_controller.is_aborted(_session_id):
                 partial = abort_controller.get_partial(_session_id) or ''
                 abort_controller.clear(_session_id)
@@ -715,7 +715,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                           detail_dict=api_detail)
                 # Detailed usage tracking (LibreChat style)
                 try:
-                    from salmalm.edge_cases import usage_tracker
+                    from salmalm.features.edge_cases import usage_tracker
                     # Estimate cost (rough: Opus=$15/M, Sonnet=$3/M, Haiku=$0.25/M input)
                     _inp, _out = usage.get('input', 0), usage.get('output', 0)
                     _model_lower = model.lower()
@@ -998,7 +998,7 @@ async def _cmd_plan(cmd, session, *, model_override=None, on_tool=None, **_):
 
 
 def _cmd_uptime(cmd, session, **_):
-    from salmalm.sla import uptime_monitor, sla_config  # noqa: F401
+    from salmalm.features.sla import uptime_monitor, sla_config  # noqa: F401
     stats = uptime_monitor.get_stats()
     target = stats['target_pct']
     pct = stats['monthly_uptime_pct']
@@ -1020,7 +1020,7 @@ def _cmd_uptime(cmd, session, **_):
 
 
 def _cmd_latency(cmd, session, **_):
-    from salmalm.sla import latency_tracker
+    from salmalm.features.sla import latency_tracker
     stats = latency_tracker.get_stats()
     if stats['count'] == 0:
         return '📊 No latency data yet. / 레이턴시 데이터가 없습니다.'
@@ -1042,7 +1042,7 @@ def _cmd_latency(cmd, session, **_):
 
 
 def _cmd_health_detail(cmd, session, **_):
-    from salmalm.sla import watchdog
+    from salmalm.features.sla import watchdog
     report = watchdog.get_detailed_health()
     status = report.get('status', 'unknown')
     icon = {'healthy': '🟢', 'degraded': '🟡', 'unhealthy': '🔴'}.get(status, '⚪')
@@ -1072,7 +1072,7 @@ def _cmd_prune(cmd, session, **_):
 
 
 def _cmd_usage_daily(cmd, session, **_):
-    from salmalm.edge_cases import usage_tracker
+    from salmalm.features.edge_cases import usage_tracker
     report = usage_tracker.daily_report()
     if not report:
         return '📊 No usage data yet. / 아직 사용량 데이터가 없습니다.'
@@ -1085,7 +1085,7 @@ def _cmd_usage_daily(cmd, session, **_):
 
 
 def _cmd_usage_monthly(cmd, session, **_):
-    from salmalm.edge_cases import usage_tracker
+    from salmalm.features.edge_cases import usage_tracker
     report = usage_tracker.monthly_report()
     if not report:
         return '📊 No usage data yet. / 아직 사용량 데이터가 없습니다.'
@@ -1098,7 +1098,7 @@ def _cmd_usage_monthly(cmd, session, **_):
 
 
 def _cmd_bookmarks(cmd, session, **_):
-    from salmalm.edge_cases import bookmark_manager
+    from salmalm.features.edge_cases import bookmark_manager
     bms = bookmark_manager.list_all(limit=20)
     if not bms:
         return '⭐ No bookmarks yet. / 아직 북마크가 없습니다.'
@@ -1113,7 +1113,7 @@ def _cmd_compare(cmd, session, *, session_id='', **_):
     compare_msg = cmd[9:].strip()
     if not compare_msg:
         return 'Usage: /compare <message> — Compare responses from multiple models'
-    from salmalm.edge_cases import compare_models
+    from salmalm.features.edge_cases import compare_models
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
@@ -1230,7 +1230,7 @@ def _cmd_context(cmd, session, **_):
     sub = cmd.strip().split()
     detail_mode = len(sub) > 1 and sub[1] == 'detail'
 
-    from salmalm.prompt import build_system_prompt
+    from salmalm.core.prompt import build_system_prompt
     sys_prompt = build_system_prompt(full=False)
     sys_tokens = estimate_tokens(sys_prompt)
 
@@ -1252,7 +1252,7 @@ def _cmd_context(cmd, session, **_):
 
     # Injected files breakdown
     from salmalm.constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, BASE_DIR
-    from salmalm.prompt import USER_SOUL_FILE
+    from salmalm.core.prompt import USER_SOUL_FILE
     file_details = []
     for label, path in [('SOUL.md', SOUL_FILE), ('USER_SOUL.md', USER_SOUL_FILE),
                         ('AGENTS.md', AGENTS_FILE), ('MEMORY.md', MEMORY_FILE),
@@ -1349,7 +1349,7 @@ def _cmd_usage(cmd, session, *, session_id='', **_):
 
 
 def _cmd_soul(cmd, session, **_):
-    from salmalm.prompt import get_user_soul, USER_SOUL_FILE
+    from salmalm.core.prompt import get_user_soul, USER_SOUL_FILE
     content = get_user_soul()
     if content:
         return f'📜 **SOUL.md** (`{USER_SOUL_FILE}`)\n\n{content}'
@@ -1357,7 +1357,7 @@ def _cmd_soul(cmd, session, **_):
 
 
 def _cmd_soul_reset(cmd, session, **_):
-    from salmalm.prompt import reset_user_soul
+    from salmalm.core.prompt import reset_user_soul
     reset_user_soul()
     session.add_system(build_system_prompt(full=True))
     return '📜 SOUL.md reset to default.'
@@ -1409,7 +1409,7 @@ def _cmd_voice(cmd, session, **_):
 
 def _cmd_subagents(cmd, session, **_):
     """Handle /subagents commands: list, stop, log, info."""
-    from salmalm.agents import SubAgent
+    from salmalm.features.agents import SubAgent
     parts = cmd.split(maxsplit=2)
     sub = parts[1] if len(parts) > 1 else 'list'
     arg = parts[2] if len(parts) > 2 else ''
@@ -1447,7 +1447,7 @@ def _cmd_subagents(cmd, session, **_):
 
 
 def _cmd_agent(cmd, session, *, session_id='', **_):
-    from salmalm.agents import agent_manager
+    from salmalm.features.agents import agent_manager
     parts = cmd.split(maxsplit=2)
     sub = parts[1] if len(parts) > 1 else 'list'
     if sub == 'list':
@@ -1477,7 +1477,7 @@ def _cmd_agent(cmd, session, *, session_id='', **_):
 
 
 def _cmd_hooks(cmd, session, **_):
-    from salmalm.hooks import hook_manager
+    from salmalm.features.hooks import hook_manager
     parts = cmd.split(maxsplit=2)
     sub = parts[1] if len(parts) > 1 else 'list'
     if sub == 'list':
@@ -1506,7 +1506,7 @@ def _cmd_hooks(cmd, session, **_):
 
 
 def _cmd_plugins(cmd, session, **_):
-    from salmalm.plugin_manager import plugin_manager
+    from salmalm.features.plugin_manager import plugin_manager
     parts = cmd.split(maxsplit=2)
     sub = parts[1] if len(parts) > 1 else 'list'
     if sub == 'list':
@@ -1534,11 +1534,11 @@ def _cmd_plugins(cmd, session, **_):
 def _cmd_evolve(cmd, session, **_):
     parts = cmd.strip().split(None, 2)
     sub = parts[1] if len(parts) > 1 else 'status'
-    from salmalm.self_evolve import prompt_evolver
+    from salmalm.features.self_evolve import prompt_evolver
     if sub == 'status':
         return prompt_evolver.get_status()
     elif sub == 'apply':
-        from salmalm.prompt import USER_SOUL_FILE
+        from salmalm.core.prompt import USER_SOUL_FILE
         return prompt_evolver.apply_to_soul(USER_SOUL_FILE)
     elif sub == 'reset':
         return prompt_evolver.reset()
@@ -1552,7 +1552,7 @@ def _cmd_evolve(cmd, session, **_):
 def _cmd_mood(cmd, session, **_):
     parts = cmd.strip().split(None, 2)
     sub = parts[1] if len(parts) > 1 else 'status'
-    from salmalm.mood import mood_detector
+    from salmalm.features.mood import mood_detector
     if sub == 'status':
         # Use last user message for context
         last_msg = ''
@@ -1572,7 +1572,7 @@ def _cmd_mood(cmd, session, **_):
 
 
 def _cmd_thought(cmd, session, **_):
-    from salmalm.thoughts import thought_stream, _format_thoughts, _format_stats
+    from salmalm.features.thoughts import thought_stream, _format_thoughts, _format_stats
     text = cmd.strip()
     # Remove /think prefix
     if text.startswith('/thought'):
@@ -1616,7 +1616,7 @@ def _cmd_thought(cmd, session, **_):
         thought_text = text
         mood = 'neutral'
         try:
-            from salmalm.mood import mood_detector
+            from salmalm.features.mood import mood_detector
             mood, _ = mood_detector.detect(thought_text)
         except Exception:
             pass
@@ -1737,14 +1737,14 @@ async def _process_message_inner(session_id: str, user_message: str,
     # Multi-tenant quota check
     if session.user_id:
         try:
-            from salmalm.users import user_manager, QuotaExceeded
+            from salmalm.features.users import user_manager, QuotaExceeded
             user_manager.check_quota(session.user_id)
         except QuotaExceeded as e:
             return f'⚠️ {e.message}'
 
     # Fire on_message hook (메시지 수신 훅)
     try:
-        from salmalm.hooks import hook_manager
+        from salmalm.features.hooks import hook_manager
         hook_manager.fire('on_message', {'session_id': session_id, 'message': user_message})
     except Exception:
         pass
@@ -1788,7 +1788,7 @@ async def _process_message_inner(session_id: str, user_message: str,
 
     # RAG context injection — augment with relevant memory/docs
     try:
-        from salmalm.rag import inject_rag_context
+        from salmalm.features.rag import inject_rag_context
         for i, m in enumerate(session.messages):
             if m.get('role') == 'system':
                 session.messages[i] = dict(m)
@@ -1800,7 +1800,7 @@ async def _process_message_inner(session_id: str, user_message: str,
 
     # Mood-aware tone injection
     try:
-        from salmalm.mood import mood_detector
+        from salmalm.features.mood import mood_detector
         if mood_detector.enabled:
             _detected_mood, _mood_conf = mood_detector.detect(user_message)
             if _detected_mood != 'neutral' and _mood_conf > 0.3:
@@ -1817,7 +1817,7 @@ async def _process_message_inner(session_id: str, user_message: str,
 
     # Self-evolving prompt — record conversation periodically
     try:
-        from salmalm.self_evolve import prompt_evolver
+        from salmalm.features.self_evolve import prompt_evolver
         if len(session.messages) > 4 and len(session.messages) % 10 == 0:
             prompt_evolver.record_conversation(session.messages)
     except Exception:
@@ -1861,12 +1861,12 @@ async def _process_message_inner(session_id: str, user_message: str,
 
     # ── SLA: Record latency (레이턴시 기록) ──
     try:
-        from salmalm.sla import latency_tracker
+        from salmalm.features.sla import latency_tracker
         _sla_end = _time.time()
         _ttft_ms = ((_sla_first_token_time[0] - _sla_start) * 1000
                     if _sla_first_token_time[0] > 0 else (_sla_end - _sla_start) * 1000)
         _total_ms = (_sla_end - _sla_start) * 1000
-        from salmalm.sla import sla_config as _sla_cfg
+        from salmalm.features.sla import sla_config as _sla_cfg
         _timed_out = _total_ms > _sla_cfg.get('response_target_ms', 30000)
         latency_tracker.record(
             ttft_ms=_ttft_ms, total_ms=_total_ms,
@@ -1902,7 +1902,7 @@ async def _process_message_inner(session_id: str, user_message: str,
 
     # Fire on_response hook (응답 완료 훅)
     try:
-        from salmalm.hooks import hook_manager
+        from salmalm.features.hooks import hook_manager
         hook_manager.fire('on_response', {
             'session_id': session_id, 'message': response,
         })
@@ -1915,7 +1915,7 @@ async def _process_message_inner(session_id: str, user_message: str,
 def _notify_completion(session_id: str, user_message: str, response: str, classification: dict):
     """Send completion notifications to Telegram + Web chat."""
     from salmalm.core import _tg_bot
-    from salmalm.crypto import vault
+    from salmalm.security.crypto import vault
 
     # Only notify for complex tasks (tier 3 or high-score tool-using)
     tier = classification.get('tier', 1)

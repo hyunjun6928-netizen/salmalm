@@ -5,7 +5,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from salmalm.markdown_ir import (
+from salmalm.utils.markdown_ir import (
     parse, render_telegram, render_discord, render_slack, render_plain,
     chunk_ir, MarkdownIR, StyleSpan, LinkSpan, CodeBlock
 )

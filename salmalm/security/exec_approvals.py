@@ -4,7 +4,7 @@ import threading
 import time
 import os
 from pathlib import Path
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 _APPROVALS_FILE = Path.home() / '.salmalm' / 'exec_approvals.json'
 _lock = threading.Lock()

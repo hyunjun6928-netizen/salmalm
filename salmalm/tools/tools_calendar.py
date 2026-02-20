@@ -2,8 +2,8 @@
 import json
 import urllib.request
 from datetime import datetime, timedelta
-from salmalm.tool_registry import register
-from salmalm.tools_google import _google_oauth_headers
+from salmalm.tools.tool_registry import register
+from salmalm.tools.tools_google import _google_oauth_headers
 
 
 @register('calendar_list')

@@ -14,7 +14,7 @@ Usage:
   python -m salmalm.mcp --server --stdio
 
   # As client — connect to external MCP server:
-  from salmalm.mcp import mcp_manager
+  from salmalm.features.mcp import mcp_manager
   mcp_manager.add_server("filesystem", command=["npx", "@modelcontextprotocol/server-filesystem", "/tmp"])
   tools = mcp_manager.list_tools()
 """
@@ -30,7 +30,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from salmalm.constants import VERSION, BASE_DIR
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # ── JSON-RPC helpers ──────────────────────────────────────────
 

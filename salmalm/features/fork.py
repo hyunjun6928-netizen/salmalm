@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from salmalm.constants import KST
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 
 class ConversationFork:
@@ -123,7 +123,7 @@ class ConversationFork:
 
         session.messages = msgs[:real_idx]
 
-        from salmalm.engine import process_message
+        from salmalm.core.engine import process_message
         response = await process_message(session_id, user_msg)
 
         self.save_alternative(session_id, message_index, response, active=True)

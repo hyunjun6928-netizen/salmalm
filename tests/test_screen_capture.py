@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from salmalm.screen_capture import (
+from salmalm.features.screen_capture import (
     ScreenCapture, ScreenHistory, ScreenManager, DEFAULT_CONFIG,
 )
 

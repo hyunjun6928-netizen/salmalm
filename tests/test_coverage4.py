@@ -237,72 +237,72 @@ class TestToolHandlersMoreEdgeCases(unittest.TestCase):
     """Even more tool edge cases for coverage."""
 
     def test_list_dir(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('read_file', {'path': '.', 'list_dir': True})
         self.assertIsInstance(result, str)
 
     def test_system_info(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('system_monitor', {})
         self.assertIn('cpu', result.lower())
 
     def test_cron_list(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('cron_manage', {'action': 'list'})
         self.assertIsInstance(result, str)
 
     def test_cron_add_invalid(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('cron_manage', {'action': 'add'})
         self.assertIsInstance(result, str)
 
     def test_skill_list(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('skill_manage', {'action': 'list'})
         self.assertIsInstance(result, str)
 
     def test_mcp_list(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('mcp_manage', {'action': 'list'})
         self.assertIsInstance(result, str)
 
     def test_plugin_list(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('plugin_manage', {'action': 'list'})
         self.assertIsInstance(result, str)
 
     def test_node_list(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('node_manage', {'action': 'list'})
         self.assertIsInstance(result, str)
 
     def test_rag_search(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('rag_search', {'query': 'test'})
         self.assertIsInstance(result, str)
 
     def test_memory_search_empty(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('memory_search', {'query': ''})
         self.assertIsInstance(result, str)
 
     def test_screenshot(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('screenshot', {})
         self.assertIsInstance(result, str)
 
     def test_browser_status(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('browser', {'action': 'status'})
         self.assertIsInstance(result, str)
 
     def test_tts_no_key(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('tts', {'text': 'hello'})
         self.assertIsInstance(result, str)
 
     def test_stt_no_audio(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('stt', {})
         self.assertIsInstance(result, str)
 
@@ -315,82 +315,82 @@ class TestToolHandlersFinal(unittest.TestCase):
     """Final push for tool coverage."""
 
     def test_web_search_no_key(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('web_search', {'query': 'test'})
         self.assertIsInstance(result, str)
 
     def test_web_fetch_invalid_url(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('web_fetch', {'url': 'http://localhost:1/nonexist'})
         self.assertIsInstance(result, str)
 
     def test_image_generate(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('image_generate', {'prompt': 'cat'})
         self.assertIsInstance(result, str)
 
     def test_image_analyze(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('image_analyze', {'image_path': '/nonexist.png'})
         self.assertIsInstance(result, str)
 
     def test_tts(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('tts', {'text': 'hi'})
         self.assertIsInstance(result, str)
 
     def test_stt(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('stt', {'audio_path': '/nonexist.wav'})
         self.assertIsInstance(result, str)
 
     def test_sub_agent(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('sub_agent', {'task': 'test'})
         self.assertIsInstance(result, str)
 
     def test_http_request_invalid(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('http_request', {'url': 'http://localhost:1/x', 'method': 'GET'})
         self.assertIsInstance(result, str)
 
     def test_cron_manage_status(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('cron_manage', {'action': 'status'})
         self.assertIsInstance(result, str)
 
     def test_plugin_manage_reload(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('plugin_manage', {'action': 'reload'})
         self.assertIsInstance(result, str)
 
     def test_mcp_manage_status(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('mcp_manage', {'action': 'status'})
         self.assertIsInstance(result, str)
 
     def test_node_manage_status(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('node_manage', {'action': 'status'})
         self.assertIsInstance(result, str)
 
     def test_rag_search_long(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('rag_search', {'query': 'very long search query about Python programming'})
         self.assertIsInstance(result, str)
 
     def test_browser_navigate(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('browser', {'action': 'navigate', 'url': 'http://example.com'})
         self.assertIsInstance(result, str)
 
     def test_browser_click(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('browser', {'action': 'click', 'selector': '#test'})
         self.assertIsInstance(result, str)
 
     def test_screenshot_fullpage(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('screenshot', {'fullpage': True})
         self.assertIsInstance(result, str)
 
@@ -402,7 +402,7 @@ class TestEngineFinal(unittest.TestCase):
 
     def _run(self, sid, msg):
         import asyncio
-        from salmalm.engine import process_message
+        from salmalm.core.engine import process_message
         loop = asyncio.new_event_loop()
         try:
             return loop.run_until_complete(process_message(sid, msg))
@@ -463,13 +463,13 @@ class TestAgentsFinal(unittest.TestCase):
     """Final agents coverage."""
 
     def test_skill_match_none(self):
-        from salmalm.agents import SkillLoader
+        from salmalm.features.agents import SkillLoader
         sl = SkillLoader()
         r = sl.match("random gibberish xyz123")
         # Should return None (no matching skill)
 
     def test_plugin_execute_unknown(self):
-        from salmalm.agents import PluginLoader
+        from salmalm.features.agents import PluginLoader
         pl = PluginLoader()
         try:
             result = pl.execute('nonexistent_plugin_tool', {})
@@ -477,7 +477,7 @@ class TestAgentsFinal(unittest.TestCase):
             result = None
 
     def test_skill_install_nonexistent(self):
-        from salmalm.agents import SkillLoader
+        from salmalm.features.agents import SkillLoader
         sl = SkillLoader()
         try:
             result = sl.install('https://example.com/nonexistent.zip')
@@ -516,7 +516,7 @@ class TestWSFinal(unittest.TestCase):
     """WS module final coverage."""
 
     def test_ws_frame_handshake(self):
-        from salmalm.ws import WS_MAGIC
+        from salmalm.web.ws import WS_MAGIC
         import hashlib, base64
         key = base64.b64encode(b'test1234test1234').decode()
         accept = base64.b64encode(

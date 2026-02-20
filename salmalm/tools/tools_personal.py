@@ -12,9 +12,9 @@ import secrets
 import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
-from salmalm.tool_registry import register
+from salmalm.tools.tool_registry import register
 from salmalm.constants import KST, BASE_DIR
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 from salmalm.utils.db import connect as _connect_db
 
 # ── Database ─────────────────────────────────────────────────
@@ -370,7 +370,7 @@ def _pomodoro_timer_func(session_id: str, duration_min: int, ptype: str):
 
     # Send notification
     try:
-        from salmalm.tools_misc import _send_notification_impl
+        from salmalm.tools.tools_misc import _send_notification_impl
         if ptype == 'focus':
             _send_notification_impl('🍅 포모도로 완료! 휴식 시간이에요.', title='Pomodoro')
         else:
@@ -525,7 +525,7 @@ def handle_routine(args: dict) -> str:
         label = step.get('label', step_type)
 
         if step_type == 'briefing':
-            from salmalm.briefing import daily_briefing
+            from salmalm.features.briefing import daily_briefing
             result = daily_briefing.generate()
             parts.append(result)
         elif step_type == 'expense_today':
@@ -538,7 +538,7 @@ def handle_routine(args: dict) -> str:
             parts.append(f'{label}\n{step.get("content", "")}')
         elif step_type == 'tool':
             try:
-                from salmalm.tool_registry import execute_tool
+                from salmalm.tools.tool_registry import execute_tool
                 result = execute_tool(step.get('tool', ''), step.get('args', {}))
                 parts.append(f'{label}\n{result}')
             except Exception as e:
@@ -552,7 +552,7 @@ def handle_routine(args: dict) -> str:
 @register('briefing')
 def handle_briefing(args: dict) -> str:
     """Generate daily briefing."""
-    from salmalm.briefing import daily_briefing
+    from salmalm.features.briefing import daily_briefing
     sections = args.get('sections')
     if sections and isinstance(sections, str):
         sections = [s.strip() for s in sections.split(',')]

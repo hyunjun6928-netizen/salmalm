@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from salmalm.watcher import FileWatcher, RAGFileWatcher
+from salmalm.features.watcher import FileWatcher, RAGFileWatcher
 
 
 class TestFileWatcher(unittest.TestCase):

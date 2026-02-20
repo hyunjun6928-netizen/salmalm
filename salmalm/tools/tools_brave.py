@@ -14,7 +14,7 @@ def _get_api_key() -> str:
     key = os.environ.get('BRAVE_API_KEY', '')
     if not key:
         try:
-            from salmalm.crypto import vault
+            from salmalm.security.crypto import vault
             key = vault.get('brave_api_key', '') or ''
         except Exception:
             pass

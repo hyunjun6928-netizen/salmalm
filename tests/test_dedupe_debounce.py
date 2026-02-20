@@ -1,7 +1,7 @@
 """Tests for message deduplication and channel-aware debouncing."""
 import time
 import pytest
-from salmalm.dedup import (
+from salmalm.utils.dedup import (
     MessageDeduplicator, message_deduplicator,
     get_debounce_ms, should_skip_debounce,
     CHANNEL_DEBOUNCE_MS,

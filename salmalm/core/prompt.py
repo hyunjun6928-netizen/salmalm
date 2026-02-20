@@ -160,7 +160,7 @@ def build_system_prompt(full: bool = True, mode: str = 'full') -> str:
                      "web_search/web_fetch for web. Verify results after writing.")
         result = '\n\n'.join(parts)
         try:
-            from salmalm.edge_cases import substitute_prompt_variables
+            from salmalm.features.edge_cases import substitute_prompt_variables
             result = substitute_prompt_variables(result)
         except Exception:
             pass
@@ -248,7 +248,7 @@ def build_system_prompt(full: bool = True, mode: str = 'full') -> str:
 
     # Session memory context — today only, capped
     try:
-        from salmalm.memory import memory_manager
+        from salmalm.core.memory import memory_manager
         session_ctx = memory_manager.load_session_context()
         if session_ctx:
             parts.append(_truncate_file(session_ctx, MAX_SESSION_MEMORY_CHARS))
@@ -294,7 +294,7 @@ def build_system_prompt(full: bool = True, mode: str = 'full') -> str:
 
     # System prompt variable substitution (LobeChat style)
     try:
-        from salmalm.edge_cases import substitute_prompt_variables
+        from salmalm.features.edge_cases import substitute_prompt_variables
         result = substitute_prompt_variables(result)
     except Exception:
         pass

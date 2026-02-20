@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch, MagicMock, AsyncMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from salmalm.browser import CDPConnection, BrowserController, BrowserManager
+from salmalm.utils.browser import CDPConnection, BrowserController, BrowserManager
 
 
 class TestWebSocketFrameBuilder(unittest.TestCase):

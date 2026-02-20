@@ -3,8 +3,8 @@ import json
 import base64
 import urllib.request
 from datetime import datetime
-from salmalm.tool_registry import register
-from salmalm.crypto import vault
+from salmalm.tools.tool_registry import register
+from salmalm.security.crypto import vault
 
 
 def _google_oauth_headers() -> dict:

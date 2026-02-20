@@ -8,8 +8,8 @@ from typing import Dict, List
 
 async def compare_models(session_id: str, message: str,
                          models: List[str] = None) -> List[Dict]:
-    from salmalm.engine import _call_llm_async
-    from salmalm.prompt import build_system_prompt
+    from salmalm.core.engine import _call_llm_async
+    from salmalm.core.prompt import build_system_prompt
     from salmalm.core import get_session
 
     if not models:

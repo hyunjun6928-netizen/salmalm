@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from salmalm.constants import VERSION, BASE_DIR, MEMORY_DIR, VAULT_FILE, KST
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # ── Paths ──────────────────────────────────────────────────────
 _HOME_DIR = Path.home() / '.salmalm'
@@ -62,7 +62,7 @@ def _now_kst() -> str:
 def _get_agent_name() -> str:
     """Get agent name from SOUL.md or default."""
     try:
-        from salmalm.prompt import get_user_soul
+        from salmalm.core.prompt import get_user_soul
         soul = get_user_soul()
         if soul:
             for line in soul.split('\n')[:5]:
@@ -159,7 +159,7 @@ class AgentExporter:
     def _export_soul(self, zf: zipfile.ZipFile):
         """Export SOUL.md."""
         try:
-            from salmalm.prompt import get_user_soul, USER_SOUL_FILE  # noqa: F401
+            from salmalm.core.prompt import get_user_soul, USER_SOUL_FILE  # noqa: F401
             soul = get_user_soul()
             if soul:
                 zf.writestr('soul/SOUL.md', soul)
@@ -442,7 +442,7 @@ class AgentImporter:
     def _import_soul(self, zf: zipfile.ZipFile, result: ImportResult):
         try:
             soul_content = zf.read('soul/SOUL.md').decode('utf-8')
-            from salmalm.prompt import set_user_soul
+            from salmalm.core.prompt import set_user_soul
             set_user_soul(soul_content)
             result.imported.append('soul')
         except Exception as e:
@@ -631,21 +631,21 @@ def quick_sync_export() -> dict:
 
     # SOUL.md
     try:
-        from salmalm.prompt import get_user_soul, get_active_persona
+        from salmalm.core.prompt import get_user_soul, get_active_persona
         data['soul'] = get_user_soul() or ''
     except Exception:
         data['soul'] = ''
 
     # Routing config
     try:
-        from salmalm.engine import get_routing_config
+        from salmalm.core.engine import get_routing_config
         data['routing'] = get_routing_config()
     except Exception:
         data['routing'] = {}
 
     # Active persona
     try:
-        from salmalm.prompt import get_active_persona  # noqa: F811
+        from salmalm.core.prompt import get_active_persona  # noqa: F811
         data['persona'] = get_active_persona('default')
     except Exception:
         data['persona'] = 'default'
@@ -659,7 +659,7 @@ def quick_sync_export() -> dict:
 
     # Failover config
     try:
-        from salmalm.engine import get_failover_config
+        from salmalm.core.engine import get_failover_config
         data['failover'] = get_failover_config()
     except Exception:
         data['failover'] = {}
@@ -676,7 +676,7 @@ def quick_sync_import(data: dict):
     # SOUL.md
     if 'soul' in data and data['soul']:
         try:
-            from salmalm.prompt import set_user_soul
+            from salmalm.core.prompt import set_user_soul
             set_user_soul(data['soul'])
         except Exception as e:
             log.warning(f"[SYNC] Soul import failed: {e}")
@@ -684,7 +684,7 @@ def quick_sync_import(data: dict):
     # Routing config
     if 'routing' in data:
         try:
-            from salmalm.engine import _save_routing_config
+            from salmalm.core.engine import _save_routing_config
             _save_routing_config(data['routing'])
         except Exception as e:
             log.warning(f"[SYNC] Routing import failed: {e}")
@@ -692,7 +692,7 @@ def quick_sync_import(data: dict):
     # Failover config
     if 'failover' in data:
         try:
-            from salmalm.engine import save_failover_config
+            from salmalm.core.engine import save_failover_config
             save_failover_config(data['failover'])
         except Exception as e:
             log.warning(f"[SYNC] Failover import failed: {e}")

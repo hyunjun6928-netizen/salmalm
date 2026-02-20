@@ -3,7 +3,7 @@
 Delegates to the original tool_handlers.py implementations to avoid duplication.
 These will be fully extracted in a future refactor.
 """
-from salmalm.tool_registry import register
+from salmalm.tools.tool_registry import register
 
 
 def _legacy(name, args):

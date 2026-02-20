@@ -800,4 +800,4 @@ TOOL_DEFINITIONS = [
 
 
 # Re-export handler for backward compatibility
-from salmalm.tool_handlers import execute_tool, _resolve_path, _is_safe_command, _is_subpath  # noqa: F401
+from salmalm.tools.tool_handlers import execute_tool, _resolve_path, _is_safe_command, _is_subpath  # noqa: F401

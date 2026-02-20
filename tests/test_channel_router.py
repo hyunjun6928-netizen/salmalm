@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from salmalm.channel_router import (
+from salmalm.channels.channel_router import (
     ChannelRouter, format_for_channel, CHANNEL_FORMAT,
     _load_config, _save_config, channel_router,
 )

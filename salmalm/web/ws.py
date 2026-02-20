@@ -22,7 +22,7 @@ import time
 from typing import Dict, Optional
 
 from salmalm.constants import VERSION
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # WebSocket opcodes
 OP_CONT = 0x0
@@ -293,7 +293,7 @@ class WebSocketServer:
 
         # Auto-register presence
         try:
-            from salmalm.presence import presence_manager
+            from salmalm.features.presence import presence_manager
             peer = writer.get_extra_info('peername')
             ip = peer[0] if peer else ''
             presence_manager.register(
@@ -335,7 +335,7 @@ class WebSocketServer:
                     # Abort handling — LibreChat style (생성 중지)
                     if data.get('type') == 'abort':
                         try:
-                            from salmalm.edge_cases import abort_controller
+                            from salmalm.features.edge_cases import abort_controller
                             sid = data.get('session', client.session_id)
                             abort_controller.set_abort(sid)
                             await client.send_json({'type': 'aborted', 'session': sid})
@@ -372,7 +372,7 @@ class WebSocketServer:
             self.clients.pop(client._id, None)
             # Unregister presence
             try:
-                from salmalm.presence import presence_manager
+                from salmalm.features.presence import presence_manager
                 presence_manager.unregister(f'ws_{client._id}')
             except Exception:
                 pass

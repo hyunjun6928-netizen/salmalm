@@ -73,7 +73,7 @@ class ThoughtStream:
     def _index_thought(self, thought_id: int, content: str, tags: str):
         """Index thought in RAG engine."""
         try:
-            from salmalm.rag import rag_engine
+            from salmalm.features.rag import rag_engine
             label = f'thought:{thought_id}'
             rag_engine._index_text(label, content, time.time())
         except Exception:
@@ -92,7 +92,7 @@ class ThoughtStream:
         """Search thoughts using RAG or simple LIKE."""
         # Try RAG search first
         try:
-            from salmalm.rag import rag_engine
+            from salmalm.features.rag import rag_engine
             results = rag_engine.search(query)
             thought_ids = []
             for r in results:

@@ -56,22 +56,22 @@ class TestLLMInternals(unittest.TestCase):
     """Test LLM internal utilities."""
 
     def test_build_headers(self):
-        from salmalm.llm import call_llm
+        from salmalm.core.llm import call_llm
         # Just test import and that the function exists
         self.assertTrue(callable(call_llm))
 
     def test_track_usage(self):
-        from salmalm.llm import track_usage
+        from salmalm.core.llm import track_usage
         # Should not raise
         track_usage('test/model', 100, 50)
 
     def test_track_usage_zero(self):
-        from salmalm.llm import track_usage
+        from salmalm.core.llm import track_usage
         track_usage('test/model2', 0, 0)
 
     @patch('salmalm.llm.urllib.request.urlopen')
     def test_call_anthropic_mock(self, mock_urlopen):
-        from salmalm.llm import call_llm
+        from salmalm.core.llm import call_llm
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps({
             'content': [{'type': 'text', 'text': 'Hello!'}],
@@ -92,7 +92,7 @@ class TestLLMInternals(unittest.TestCase):
 
     @patch('salmalm.llm.urllib.request.urlopen')
     def test_call_google_mock(self, mock_urlopen):
-        from salmalm.llm import call_llm
+        from salmalm.core.llm import call_llm
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps({
             'candidates': [{'content': {'parts': [{'text': 'Hello!'}]}}],
@@ -116,20 +116,20 @@ class TestAgentsInternals(unittest.TestCase):
     """Test agents module internals."""
 
     def test_skill_loader_scan(self):
-        from salmalm.agents import SkillLoader
+        from salmalm.features.agents import SkillLoader
         sl = SkillLoader()
         skills = sl.scan()
         self.assertIsInstance(skills, list)
 
     def test_skill_loader_match(self):
-        from salmalm.agents import SkillLoader
+        from salmalm.features.agents import SkillLoader
         sl = SkillLoader()
         result = sl.match("test query")
         # May return None or a skill
         self.assertTrue(result is None or isinstance(result, dict))
 
     def test_sub_agent_init(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         sa = SubAgent.__new__(SubAgent)
         self.assertIsNotNone(sa)
 
@@ -138,16 +138,16 @@ class TestWSInternals(unittest.TestCase):
     """Test WebSocket internals."""
 
     def test_ws_client_init(self):
-        from salmalm.ws import WSClient
+        from salmalm.web.ws import WSClient
         # Can't create without reader/writer, just verify class exists
         self.assertTrue(hasattr(WSClient, '__init__'))
 
     def test_ws_magic(self):
-        from salmalm.ws import WS_MAGIC
+        from salmalm.web.ws import WS_MAGIC
         self.assertIsInstance(WS_MAGIC, (str, bytes))
 
     def test_opcodes(self):
-        from salmalm.ws import OP_TEXT, OP_BIN, OP_CLOSE, OP_PING, OP_PONG
+        from salmalm.web.ws import OP_TEXT, OP_BIN, OP_CLOSE, OP_PING, OP_PONG
         self.assertEqual(OP_TEXT, 0x1)
         self.assertEqual(OP_BIN, 0x2)
         self.assertEqual(OP_CLOSE, 0x8)
@@ -159,12 +159,12 @@ class TestMCPInternals(unittest.TestCase):
     """Test MCP internals."""
 
     def test_mcp_server_init(self):
-        from salmalm.mcp import MCPServer
+        from salmalm.features.mcp import MCPServer
         srv = MCPServer.__new__(MCPServer)
         self.assertIsNotNone(srv)
 
     def test_mcp_manager_add_remove(self):
-        from salmalm.mcp import MCPManager
+        from salmalm.features.mcp import MCPManager
         mgr = MCPManager()
         # Add a dummy server config
         try:
@@ -175,7 +175,7 @@ class TestMCPInternals(unittest.TestCase):
             pass  # May fail without actual MCP server
 
     def test_mcp_manager_load_config(self):
-        from salmalm.mcp import MCPManager
+        from salmalm.features.mcp import MCPManager
         mgr = MCPManager()
         mgr.load_config()  # Should not raise
 
@@ -184,23 +184,23 @@ class TestNodesInternals(unittest.TestCase):
     """Test nodes internals."""
 
     def test_node_load_config(self):
-        from salmalm.nodes import NodeManager
+        from salmalm.features.nodes import NodeManager
         mgr = NodeManager()
         mgr.load_config()
 
     def test_node_save_config(self):
-        from salmalm.nodes import NodeManager
+        from salmalm.features.nodes import NodeManager
         mgr = NodeManager()
         mgr.save_config()
 
     def test_node_get_nonexistent(self):
-        from salmalm.nodes import NodeManager
+        from salmalm.features.nodes import NodeManager
         mgr = NodeManager()
         node = mgr.get_node('nonexistent_node_xyz')
         self.assertIsNone(node)
 
     def test_http_node_init(self):
-        from salmalm.nodes import HTTPNode
+        from salmalm.features.nodes import HTTPNode
         node = HTTPNode.__new__(HTTPNode)
         self.assertIsNotNone(node)
 
@@ -209,13 +209,13 @@ class TestBrowserInternals(unittest.TestCase):
     """Test browser internals."""
 
     def test_cdp_connection_init(self):
-        from salmalm.browser import CDPConnection
+        from salmalm.utils.browser import CDPConnection
         cdp = CDPConnection.__new__(CDPConnection)
         self.assertIsNotNone(cdp)
 
     def test_browser_get_tabs_not_connected(self):
         import asyncio
-        from salmalm.browser import BrowserController
+        from salmalm.utils.browser import BrowserController
         bc = BrowserController()
         loop = asyncio.new_event_loop()
         try:
@@ -228,7 +228,7 @@ class TestBrowserInternals(unittest.TestCase):
 
     def test_browser_get_text_not_connected(self):
         import asyncio
-        from salmalm.browser import BrowserController
+        from salmalm.utils.browser import BrowserController
         bc = BrowserController()
         loop = asyncio.new_event_loop()
         try:
@@ -250,12 +250,12 @@ class TestToolHandlersEdgeCases(unittest.TestCase):
         return str(p / name)
 
     def test_read_nonexistent(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('read_file', {'path': '/nonexistent_xyz.txt'})
         self.assertTrue('error' in result.lower() or 'denied' in result.lower())
 
     def test_write_empty(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         path = self._ws_path('empty.txt')
         result = execute_tool('write_file', {'path': path, 'content': ''})
         self.assertIsInstance(result, str)
@@ -263,27 +263,27 @@ class TestToolHandlersEdgeCases(unittest.TestCase):
             os.unlink(path)
 
     def test_python_eval_error(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('python_eval', {'code': 'raise ValueError("test")'})
         self.assertIsInstance(result, str)
 
     def test_python_eval_timeout(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('python_eval', {'code': 'import time; time.sleep(0.1); print("ok")'})
         self.assertIn('ok', result)
 
     def test_hash_md5(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('hash_text', {'text': 'hello', 'algorithm': 'md5'})
         self.assertIn('5d41402', result)
 
     def test_hash_sha1(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('hash_text', {'text': 'hello', 'algorithm': 'sha1'})
         self.assertIn('aaf4c61', result)
 
     def test_json_query_nested(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('json_query', {
             'data': '{"a": {"b": {"c": [1,2,3]}}}',
             'query': 'a.b.c'
@@ -291,22 +291,22 @@ class TestToolHandlersEdgeCases(unittest.TestCase):
         self.assertIn('1', result)
 
     def test_json_query_invalid(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('json_query', {'data': 'not json', 'query': 'a'})
         self.assertIsInstance(result, str)
 
     def test_regex_no_match(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('regex_test', {'pattern': r'\d+', 'text': 'no numbers here'})
         self.assertIsInstance(result, str)
 
     def test_regex_invalid(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('regex_test', {'pattern': r'[invalid', 'text': 'test'})
         self.assertIsInstance(result, str)
 
     def test_edit_nonexistent(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('edit_file', {
             'path': '/nonexistent_xyz.txt',
             'old_text': 'a',
@@ -315,7 +315,7 @@ class TestToolHandlersEdgeCases(unittest.TestCase):
         self.assertIsInstance(result, str)
 
     def test_diff_nonexistent(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('diff_files', {
             'file1': '/nonexistent1.txt',
             'file2': '/nonexistent2.txt'
@@ -323,12 +323,12 @@ class TestToolHandlersEdgeCases(unittest.TestCase):
         self.assertIsInstance(result, str)
 
     def test_clipboard_read(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('clipboard', {'action': 'read'})
         self.assertIsInstance(result, str)
 
     def test_system_monitor_extended(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('system_monitor', {'detail': True})
         self.assertIsInstance(result, str)
 
@@ -364,17 +364,17 @@ class TestRAGInternals(unittest.TestCase):
     """Test RAG internals."""
 
     def test_tokenize_korean(self):
-        from salmalm.rag import RAGEngine
+        from salmalm.features.rag import RAGEngine
         tokens = RAGEngine._tokenize("안녕하세요 세계")
         self.assertTrue(len(tokens) >= 1)
 
     def test_tokenize_empty(self):
-        from salmalm.rag import RAGEngine
+        from salmalm.features.rag import RAGEngine
         tokens = RAGEngine._tokenize("")
         self.assertEqual(len(tokens), 0)
 
     def test_tokenize_special_chars(self):
-        from salmalm.rag import RAGEngine
+        from salmalm.features.rag import RAGEngine
         tokens = RAGEngine._tokenize("hello! @world #test $123")
         self.assertTrue(len(tokens) >= 1)
 
@@ -383,13 +383,13 @@ class TestStabilityInternals(unittest.TestCase):
     """Test stability internals."""
 
     def test_auto_recover(self):
-        from salmalm.stability import HealthMonitor
+        from salmalm.features.stability import HealthMonitor
         hm = HealthMonitor()
         # Should not raise
         hm.auto_recover()
 
     def test_startup_selftest(self):
-        from salmalm.stability import HealthMonitor
+        from salmalm.features.stability import HealthMonitor
         hm = HealthMonitor()
         result = hm.startup_selftest()
         self.assertIsInstance(result, (dict, list, str, bool))

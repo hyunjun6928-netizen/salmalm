@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from salmalm.stt import STTManager
+from salmalm.features.stt import STTManager
 
 
 class TestSTTManager(unittest.TestCase):

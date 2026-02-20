@@ -24,7 +24,7 @@ from datetime import datetime
 from typing import Dict
 
 from salmalm.constants import VERSION, KST, BASE_DIR, AUDIT_DB
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # ── Error tracking ──────────────────────────────────────────
 
@@ -195,7 +195,7 @@ class HealthMonitor:
         return info
 
     def _check_vault(self) -> dict:
-        from salmalm.crypto import vault
+        from salmalm.security.crypto import vault
         return {
             "status": "ok" if vault.is_unlocked else "locked",
             "locked": not vault.is_unlocked,
@@ -213,7 +213,7 @@ class HealthMonitor:
 
     def _check_websocket(self) -> dict:
         try:
-            from salmalm.ws import ws_server
+            from salmalm.web.ws import ws_server
             return {
                 "status": "ok" if ws_server._running else "stopped",
                 "running": ws_server._running,
@@ -225,7 +225,7 @@ class HealthMonitor:
 
     def _check_rag(self) -> dict:
         try:
-            from salmalm.rag import rag_engine
+            from salmalm.features.rag import rag_engine
             stats = rag_engine.get_stats()
             return {
                 "status": "ok" if stats["total_chunks"] > 0 else "empty",
@@ -236,7 +236,7 @@ class HealthMonitor:
 
     def _check_mcp(self) -> dict:
         try:
-            from salmalm.mcp import mcp_manager
+            from salmalm.features.mcp import mcp_manager
             servers = mcp_manager.list_servers()
             connected = sum(1 for s in servers if s.get("connected"))
             return {
@@ -309,14 +309,14 @@ class HealthMonitor:
 
             try:
                 if comp == "websocket":
-                    from salmalm.ws import ws_server
+                    from salmalm.web.ws import ws_server
                     if not ws_server._running:
                         await ws_server.start()
                         recovered.append(comp)
                         log.info(f"[FIX] Auto-recovered: {comp}")
 
                 elif comp == "rag" and status.get("status") == "empty":
-                    from salmalm.rag import rag_engine
+                    from salmalm.features.rag import rag_engine
                     rag_engine.reindex(force=True)
                     recovered.append(comp)
                     log.info(f"[FIX] Auto-recovered: {comp}")

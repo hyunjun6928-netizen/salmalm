@@ -410,7 +410,7 @@ class CommandRouter:
         if not shell_cmd:
             return '❓ Usage: /bash <command>'
         try:
-            from salmalm.exec_approvals import check_approval
+            from salmalm.security.exec_approvals import check_approval
             if not check_approval('bash', shell_cmd):
                 return '🚫 Exec not approved. Use /approve to allow.'
         except (ImportError, Exception):
@@ -505,7 +505,7 @@ class CommandRouter:
         if action not in ('allow-once', 'allow-always', 'deny'):
             return '❓ Action must be: allow-once|allow-always|deny'
         try:
-            from salmalm.exec_approvals import set_approval
+            from salmalm.security.exec_approvals import set_approval
             set_approval(target_id, action)
         except (ImportError, Exception):
             pass
@@ -562,7 +562,7 @@ class CommandRouter:
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else 'status'
         try:
-            from salmalm.oauth import oauth_manager
+            from salmalm.web.oauth import oauth_manager
             if sub == 'setup':
                 provider = parts[2] if len(parts) > 2 else 'anthropic'
                 return oauth_manager.setup(provider)
@@ -585,7 +585,7 @@ class CommandRouter:
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else 'capture'
         try:
-            from salmalm.screen_capture import screen_manager
+            from salmalm.features.screen_capture import screen_manager
             if sub == 'capture' or cmd.strip() == '/screen':
                 return screen_manager.capture()
             elif sub == 'watch':
@@ -610,7 +610,7 @@ class CommandRouter:
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else 'status'
         try:
-            from salmalm.mcp_marketplace import marketplace
+            from salmalm.features.mcp_marketplace import marketplace
             if sub == 'install' and len(parts) >= 3:
                 return marketplace.install(parts[2])
             elif sub == 'list':

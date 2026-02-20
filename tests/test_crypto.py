@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 import salmalm.constants as constants
-from salmalm.crypto import Vault, _derive_key
+from salmalm.security.crypto import Vault, _derive_key
 
 _test_dir = tempfile.mkdtemp()
 _test_vault = Path(_test_dir) / '.vault_crypto_test.enc'
@@ -20,7 +20,7 @@ class TestVault(unittest.TestCase):
         if _test_vault.exists():
             _test_vault.unlink()
         # Patch both constants AND crypto module references
-        import salmalm.crypto as crypto_mod
+        import salmalm.security.crypto as crypto_mod
         self._orig_const = constants.VAULT_FILE
         self._orig_crypto = crypto_mod.VAULT_FILE
         constants.VAULT_FILE = _test_vault
@@ -28,7 +28,7 @@ class TestVault(unittest.TestCase):
         self.vault = Vault()
 
     def tearDown(self):
-        import salmalm.crypto as crypto_mod
+        import salmalm.security.crypto as crypto_mod
         constants.VAULT_FILE = self._orig_const
         crypto_mod.VAULT_FILE = self._orig_crypto
 

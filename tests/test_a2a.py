@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from salmalm.a2a import A2AProtocol, PROTOCOL_VERSION, VALID_ACTIONS
+from salmalm.features.a2a import A2AProtocol, PROTOCOL_VERSION, VALID_ACTIONS
 
 
 @pytest.fixture

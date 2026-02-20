@@ -1,7 +1,7 @@
 """Tests for structured LLM output (LLMTask)."""
 import json
 import pytest
-from salmalm.llm_task import _validate_schema, _extract_json, LLMTask
+from salmalm.core.llm_task import _validate_schema, _extract_json, LLMTask
 
 
 def test_validate_basic_types():

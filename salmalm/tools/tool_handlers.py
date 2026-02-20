@@ -17,12 +17,12 @@ from pathlib import Path
 from salmalm.constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, EXEC_ELEVATED,  # noqa: F401
                                EXEC_BLOCKED_INTERPRETERS,
                                PROTECTED_FILES, WORKSPACE_DIR, VERSION, KST, MEMORY_FILE, MEMORY_DIR, AUDIT_DB)
-from salmalm.crypto import vault, log
+from salmalm.security.crypto import vault, log
 from salmalm.core import audit_log
-from salmalm.llm import _http_post
+from salmalm.core.llm import _http_post
 
 # Re-export symbols that tests and other modules import from here
-from salmalm.tools_misc import (  # noqa: F401 — re-export for tests and other modules
+from salmalm.tools.tools_misc import (  # noqa: F401 — re-export for tests and other modules
     _reminders, _reminder_lock, _send_notification_impl,
     _parse_relative_time, _parse_rss,
     _workflows_file, _feeds_file,
@@ -165,7 +165,7 @@ def execute_tool(name: str, args: dict) -> str:
 
     # Try remote node dispatch first (if gateway has registered nodes)
     try:
-        from salmalm.nodes import gateway
+        from salmalm.features.nodes import gateway
         if gateway._nodes:
             result = gateway.dispatch_auto(name, args)
             if result and 'error' not in result:
@@ -173,7 +173,7 @@ def execute_tool(name: str, args: dict) -> str:
     except Exception:
         pass  # Fall through to local execution
 
-    from salmalm.tool_registry import execute_tool as _registry_execute
+    from salmalm.tools.tool_registry import execute_tool as _registry_execute
     return _registry_execute(name, args)
 
 

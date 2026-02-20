@@ -10,7 +10,7 @@ Features:
   - Admin dashboard data
 
 Usage:
-  from salmalm.users import user_manager
+  from salmalm.features.users import user_manager
   user_manager.create_user('alice', 'password123')
   user_manager.check_quota(user_id)  # raises QuotaExceeded
   user_manager.record_cost(user_id, 0.05)
@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from salmalm.constants import BASE_DIR, KST
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 USERS_DB = BASE_DIR / "auth.db"  # Reuse auth.db for user tables
 _USERS_DIR = Path.home() / '.salmalm' / 'users'
@@ -473,7 +473,7 @@ class UserManager:
         Username = tg_username or 'tg_{chat_id}'.
         Returns {'ok': True, 'user': ...} or {'ok': False, 'error': ...}.
         """
-        from salmalm.auth import auth_manager
+        from salmalm.web.auth import auth_manager
         username = tg_username or f'tg_{chat_id}'
         # Check if chat_id already linked
         existing = self.get_user_by_telegram(chat_id)

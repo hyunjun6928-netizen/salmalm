@@ -21,7 +21,7 @@ class ProviderHealthCheck:
         if not force and self._cache and (now - self._cache_ts) < self._CACHE_TTL:
             return self._cache
 
-        from salmalm.crypto import vault
+        from salmalm.security.crypto import vault
         results = {}
 
         if vault.is_unlocked and vault.get('anthropic_api_key'):
@@ -63,7 +63,7 @@ class ProviderHealthCheck:
 
     def _test_anthropic(self, key: str) -> str:
         try:
-            from salmalm.llm import _http_post
+            from salmalm.core.llm import _http_post
             _http_post('https://api.anthropic.com/v1/messages',
                        {'x-api-key': key, 'content-type': 'application/json',
                         'anthropic-version': '2023-06-01'},
@@ -75,7 +75,7 @@ class ProviderHealthCheck:
 
     def _test_openai(self, key: str) -> str:
         try:
-            from salmalm.llm import _http_post
+            from salmalm.core.llm import _http_post
             _http_post('https://api.openai.com/v1/chat/completions',
                        {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
                        {'model': 'gpt-4.1-nano', 'max_tokens': 5,
@@ -86,7 +86,7 @@ class ProviderHealthCheck:
 
     def _test_xai(self, key: str) -> str:
         try:
-            from salmalm.llm import _http_post
+            from salmalm.core.llm import _http_post
             _http_post('https://api.x.ai/v1/chat/completions',
                        {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
                        {'model': 'grok-3-mini-fast', 'max_tokens': 5,
@@ -109,7 +109,7 @@ class ProviderHealthCheck:
 
     def _test_deepseek(self, key: str) -> str:
         try:
-            from salmalm.llm import _http_post
+            from salmalm.core.llm import _http_post
             _http_post('https://api.deepseek.com/v1/chat/completions',
                        {'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
                        {'model': 'deepseek-chat', 'max_tokens': 5,

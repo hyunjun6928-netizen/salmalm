@@ -6,8 +6,8 @@ import secrets
 import string
 from datetime import datetime
 from pathlib import Path
-from salmalm.tool_registry import register
-from salmalm.tools_common import _resolve_path, _clipboard_lock
+from salmalm.tools.tool_registry import register
+from salmalm.tools.tools_common import _resolve_path, _clipboard_lock
 from salmalm.constants import WORKSPACE_DIR, KST
 
 import urllib.request

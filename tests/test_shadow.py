@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from salmalm.shadow import ShadowMode, _PROFILE_PATH, _EMOJI_RE, _HONORIFIC_PATTERNS
+from salmalm.features.shadow import ShadowMode, _PROFILE_PATH, _EMOJI_RE, _HONORIFIC_PATTERNS
 
 
 @pytest.fixture

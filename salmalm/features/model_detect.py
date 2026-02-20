@@ -5,7 +5,7 @@ import json
 import time
 from typing import Dict, List
 
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 
 class ModelDetector:
@@ -20,7 +20,7 @@ class ModelDetector:
         if not force and self._cache and (now - self._cache_ts) < self._CACHE_TTL:
             return self._cache
 
-        from salmalm.crypto import vault
+        from salmalm.security.crypto import vault
         from salmalm.constants import MODELS
 
         models = []

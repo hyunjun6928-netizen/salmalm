@@ -18,7 +18,7 @@ import time
 import urllib.error
 from typing import Any, Callable, Optional
 
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # ── Constants ──
 DEFAULT_MAX_ATTEMPTS = 3

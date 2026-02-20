@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 def test_anthropic_system_prompt_cache_marking():
     """System prompt must use content array with cache_control."""
-    from salmalm.llm import _call_anthropic
+    from salmalm.core.llm import _call_anthropic
     # We can't call the real API, but we can verify the body structure
     # by intercepting _http_post
     captured = {}
@@ -53,7 +53,7 @@ def test_anthropic_beta_header():
         }
 
     with patch('salmalm.llm._http_post', fake_http_post):
-        from salmalm.llm import _call_anthropic
+        from salmalm.core.llm import _call_anthropic
         messages = [{'role': 'user', 'content': 'hi'}]
         _call_anthropic('fake-key', 'claude-sonnet-4-20250514', messages, None, 1024)
 
@@ -73,7 +73,7 @@ def test_tool_schema_cache_marking():
         }
 
     with patch('salmalm.llm._http_post', fake_http_post):
-        from salmalm.llm import _call_anthropic
+        from salmalm.core.llm import _call_anthropic
         tools = [
             {'name': 'tool_a', 'description': 'A', 'input_schema': {}},
             {'name': 'tool_b', 'description': 'B', 'input_schema': {}},
@@ -92,7 +92,7 @@ def test_tool_schema_cache_marking():
 
 def test_system_prompt_no_exact_time():
     """System prompt must NOT contain exact time (would break cache)."""
-    from salmalm.prompt import build_system_prompt
+    from salmalm.core.prompt import build_system_prompt
     prompt = build_system_prompt(full=False)
     # Should NOT have minute-level time like "2026-02-20 03:40"
     import re
@@ -104,14 +104,14 @@ def test_system_prompt_no_exact_time():
 
 def test_system_prompt_has_timezone():
     """System prompt must include timezone info."""
-    from salmalm.prompt import build_system_prompt
+    from salmalm.core.prompt import build_system_prompt
     prompt = build_system_prompt(full=False)
     assert 'Asia/Seoul' in prompt or 'KST' in prompt
 
 
 def test_system_prompt_stable_across_calls():
     """Two consecutive calls should produce identical prompts (cache-friendly)."""
-    from salmalm.prompt import build_system_prompt
+    from salmalm.core.prompt import build_system_prompt
     p1 = build_system_prompt(full=False)
     p2 = build_system_prompt(full=False)
     assert p1 == p2, "System prompt must be stable (no time changes)"
@@ -121,7 +121,7 @@ def test_system_prompt_stable_across_calls():
 
 def test_context_command_output():
     """Test /context command produces expected format."""
-    from salmalm.engine import _cmd_context
+    from salmalm.core.engine import _cmd_context
 
     class FakeSession:
         messages = [
@@ -138,7 +138,7 @@ def test_context_command_output():
 
 def test_context_detail_command():
     """Test /context detail includes file and tool breakdown."""
-    from salmalm.engine import _cmd_context
+    from salmalm.core.engine import _cmd_context
 
     class FakeSession:
         messages = [{'role': 'user', 'content': 'hi'}]
@@ -151,7 +151,7 @@ def test_context_detail_command():
 
 def test_usage_modes():
     """Test /usage command mode switching."""
-    from salmalm.engine import _cmd_usage, _session_usage
+    from salmalm.core.engine import _cmd_usage, _session_usage
 
     class FakeSession:
         messages = []
@@ -176,7 +176,7 @@ def test_usage_modes():
 
 def test_cost_estimation_opus():
     """Test cost estimation for Opus model."""
-    from salmalm.engine import estimate_cost
+    from salmalm.core.engine import estimate_cost
     usage = {'input': 1_000_000, 'output': 100_000,
              'cache_creation_input_tokens': 0, 'cache_read_input_tokens': 0}
     cost = estimate_cost('anthropic/claude-opus-4-6', usage)
@@ -186,7 +186,7 @@ def test_cost_estimation_opus():
 
 def test_cost_estimation_with_cache():
     """Test cost estimation with cache read tokens."""
-    from salmalm.engine import estimate_cost
+    from salmalm.core.engine import estimate_cost
     usage = {'input': 100_000, 'output': 10_000,
              'cache_creation_input_tokens': 0,
              'cache_read_input_tokens': 80_000}
@@ -200,7 +200,7 @@ def test_cost_estimation_with_cache():
 
 def test_cost_estimation_haiku():
     """Test cost estimation for Haiku."""
-    from salmalm.engine import estimate_cost
+    from salmalm.core.engine import estimate_cost
     usage = {'input': 500_000, 'output': 50_000,
              'cache_creation_input_tokens': 100_000,
              'cache_read_input_tokens': 0}
@@ -239,7 +239,7 @@ def test_ttl_prune_never_called():
 
 def test_token_estimation_english():
     """English text: ~len/4 tokens."""
-    from salmalm.engine import estimate_tokens
+    from salmalm.core.engine import estimate_tokens
     text = "Hello world, this is a test of token estimation."
     tokens = estimate_tokens(text)
     assert abs(tokens - len(text) / 4) < 2
@@ -247,7 +247,7 @@ def test_token_estimation_english():
 
 def test_token_estimation_korean():
     """Korean text: ~len/2 tokens."""
-    from salmalm.engine import estimate_tokens
+    from salmalm.core.engine import estimate_tokens
     text = "안녕하세요 이것은 토큰 추정 테스트입니다"
     tokens = estimate_tokens(text)
     assert abs(tokens - len(text) / 2) < 2
@@ -257,7 +257,7 @@ def test_token_estimation_korean():
 
 def test_cache_config_defaults():
     """Default cache config should be sensible."""
-    from salmalm.heartbeat import _DEFAULT_CONFIG
+    from salmalm.features.heartbeat import _DEFAULT_CONFIG
     assert _DEFAULT_CONFIG['promptCaching'] is True
     assert _DEFAULT_CONFIG['cacheTtlMinutes'] == 60
     assert _DEFAULT_CONFIG['warmingEnabled'] is True
@@ -268,7 +268,7 @@ def test_cache_config_defaults():
 
 def test_record_response_usage():
     """Test per-response usage recording."""
-    from salmalm.engine import record_response_usage, _get_session_usage, _session_usage
+    from salmalm.core.engine import record_response_usage, _get_session_usage, _session_usage
 
     _session_usage.pop('test_record', None)
     record_response_usage('test_record', 'anthropic/claude-sonnet-4-20250514', {
@@ -286,7 +286,7 @@ def test_record_response_usage():
 
 def test_streaming_has_cache_headers():
     """Streaming path must include prompt-caching beta header."""
-    from salmalm.llm import stream_anthropic
+    from salmalm.core.llm import stream_anthropic
     # We'll patch urlopen to capture the request
     captured = {}
 

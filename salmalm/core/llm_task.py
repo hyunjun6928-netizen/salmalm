@@ -98,7 +98,7 @@ class LLMTask:
 
         Returns: {'result': <parsed>, 'raw': <str>, 'errors': [], 'retried': bool}
         """
-        from salmalm.llm import call_llm
+        from salmalm.core.llm import call_llm
 
         user_content = prompt
         if input_data is not None:

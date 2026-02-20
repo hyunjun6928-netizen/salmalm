@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from salmalm.oauth import (
+from salmalm.web.oauth import (
     AnthropicOAuth, OpenAIOAuth, OAuthManager,
     _encrypt_tokens, _decrypt_tokens, _xor_bytes,
 )

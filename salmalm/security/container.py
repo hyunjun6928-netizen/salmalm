@@ -8,7 +8,7 @@ replacing scattered global instances. Supports:
   - Startup validation
 
 Usage:
-    from salmalm.container import app
+    from salmalm.security.container import app
     vault = app.vault
     router = app.router
 """

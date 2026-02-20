@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 class TestLifeDashboard(unittest.TestCase):
 
     def _make_dashboard(self):
-        from salmalm.dashboard_life import LifeDashboard
+        from salmalm.features.dashboard_life import LifeDashboard
         return LifeDashboard()
 
     def test_generate_dashboard_keys(self):
@@ -80,29 +80,29 @@ class TestLifeDashboard(unittest.TestCase):
 class TestProactiveDigest(unittest.TestCase):
 
     def test_morning_digest(self):
-        from salmalm.dashboard_life import ProactiveDigest
+        from salmalm.features.dashboard_life import ProactiveDigest
         digest = ProactiveDigest()
         text = digest.morning_digest()
         self.assertIn('아침', text)
 
     def test_evening_digest(self):
-        from salmalm.dashboard_life import ProactiveDigest
+        from salmalm.features.dashboard_life import ProactiveDigest
         digest = ProactiveDigest()
         text = digest.evening_digest()
         self.assertIn('하루', text)
 
     def test_should_send_morning(self):
-        from salmalm.dashboard_life import ProactiveDigest
+        from salmalm.features.dashboard_life import ProactiveDigest
         digest = ProactiveDigest()
         self.assertEqual(digest.should_send(8), 'morning')
 
     def test_should_send_evening(self):
-        from salmalm.dashboard_life import ProactiveDigest
+        from salmalm.features.dashboard_life import ProactiveDigest
         digest = ProactiveDigest()
         self.assertEqual(digest.should_send(20), 'evening')
 
     def test_should_send_none(self):
-        from salmalm.dashboard_life import ProactiveDigest
+        from salmalm.features.dashboard_life import ProactiveDigest
         digest = ProactiveDigest()
         self.assertIsNone(digest.should_send(12))
 

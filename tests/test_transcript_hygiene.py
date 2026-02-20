@@ -5,7 +5,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from salmalm.transcript_hygiene import TranscriptHygiene, PROVIDER_RULES
+from salmalm.features.transcript_hygiene import TranscriptHygiene, PROVIDER_RULES
 
 
 class TestTranscriptHygieneAnthropic(unittest.TestCase):

@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 _CACHE_CONFIG_FILE = Path.home() / '.salmalm' / 'cache.json'
 
@@ -102,8 +102,8 @@ class CacheWarmer:
 
         Uses a tiny max_tokens to minimize cost while keeping cache alive.
         """
-        from salmalm.prompt import build_system_prompt
-        from salmalm.crypto import vault
+        from salmalm.core.prompt import build_system_prompt
+        from salmalm.security.crypto import vault
 
         api_key = vault.get('anthropic_api_key')
         if not api_key:

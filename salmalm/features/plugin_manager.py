@@ -16,7 +16,7 @@ import threading
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 PLUGINS_DIR = Path.home() / '.salmalm' / 'plugins'
 PLUGINS_STATE_FILE = Path.home() / '.salmalm' / 'plugins.json'
@@ -159,7 +159,7 @@ class PluginManager:
     def _register_all_hooks(self):
         """Register all plugin hooks with the HookManager."""
         try:
-            from salmalm.hooks import hook_manager
+            from salmalm.features.hooks import hook_manager
             for plugin in self._plugins.values():
                 if not plugin.enabled:
                     continue
@@ -171,7 +171,7 @@ class PluginManager:
     def _unregister_all_hooks(self):
         """Unregister all plugin hooks."""
         try:
-            from salmalm.hooks import hook_manager
+            from salmalm.features.hooks import hook_manager
             all_cbs = []
             for plugin in self._plugins.values():
                 all_cbs.extend(plugin.hook_callbacks.values())

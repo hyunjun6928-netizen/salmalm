@@ -17,7 +17,7 @@ Features:
   - rag.json configuration file
 
 Usage:
-  from salmalm.rag import rag_engine
+  from salmalm.features.rag import rag_engine
   results = rag_engine.search("DB schema")
   context = rag_engine.build_context("DB schema", max_chars=3000)
 """
@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from salmalm.constants import MEMORY_DIR, WORKSPACE_DIR, MEMORY_FILE, BASE_DIR
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # ── BM25 Parameters ──
 BM25_K1 = 1.5

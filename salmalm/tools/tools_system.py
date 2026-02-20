@@ -1,7 +1,7 @@
 """System tools: system_monitor, health_check."""
 import os
 import subprocess
-from salmalm.tool_registry import register
+from salmalm.tools.tool_registry import register
 from salmalm.core import _sessions
 
 try:
@@ -74,7 +74,7 @@ def handle_system_monitor(args: dict) -> str:
 
 @register('health_check')
 def handle_health_check(args: dict) -> str:
-    from salmalm.stability import health_monitor
+    from salmalm.features.stability import health_monitor
     action = args.get('action', 'check')
     if action == 'check':
         report = health_monitor.check_health()

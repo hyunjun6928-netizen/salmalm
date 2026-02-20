@@ -1,7 +1,7 @@
 """File tools: read_file, write_file, edit_file, diff_files."""
 import difflib
-from salmalm.tool_registry import register
-from salmalm.tools_common import _resolve_path
+from salmalm.tools.tool_registry import register
+from salmalm.tools.tools_common import _resolve_path
 
 
 @register('read_file')

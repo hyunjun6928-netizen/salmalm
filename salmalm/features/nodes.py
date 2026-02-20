@@ -35,7 +35,7 @@ import urllib.request
 from typing import Dict, List, Optional
 
 from salmalm.constants import BASE_DIR
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 NODES_CONFIG = BASE_DIR / "nodes.json"
 

@@ -23,31 +23,31 @@ def _mock_execute_tool(name, args):
 class TestNotes(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        import salmalm.tools_personal as tp
+        import salmalm.tools.tools_personal as tp
         self._orig_db = getattr(tp, '_DB_PATH', None)
         tp._DB_PATH = Path(self.tmpdir) / 'test_personal.db'
         tp._init_db()
 
     def tearDown(self):
-        import salmalm.tools_personal as tp
+        import salmalm.tools.tools_personal as tp
         if self._orig_db is not None:
             tp._DB_PATH = self._orig_db
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_create_note(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('note', {'action': 'save', 'content': 'Test note', 'tags': 'test'})
         self.assertTrue(len(result) > 0)
 
     def test_list_notes(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         execute_tool('note', {'action': 'save', 'content': 'Note 1', 'tags': 'a'})
         execute_tool('note', {'action': 'save', 'content': 'Note 2', 'tags': 'b'})
         result = execute_tool('note', {'action': 'list'})
         self.assertIn('Note 1', result)
 
     def test_search_notes(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         execute_tool('note', {'action': 'save', 'content': 'Python tutorial', 'tags': 'code'})
         result = execute_tool('note', {'action': 'search', 'query': 'Python'})
         self.assertIn('Python', result)
@@ -56,24 +56,24 @@ class TestNotes(unittest.TestCase):
 class TestExpenses(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        import salmalm.tools_personal as tp
+        import salmalm.tools.tools_personal as tp
         self._orig_db = getattr(tp, '_DB_PATH', None)
         tp._DB_PATH = Path(self.tmpdir) / 'test_personal.db'
         tp._init_db()
 
     def tearDown(self):
-        import salmalm.tools_personal as tp
+        import salmalm.tools.tools_personal as tp
         if self._orig_db is not None:
             tp._DB_PATH = self._orig_db
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_add_expense(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('expense', {'action': 'add', 'amount': 15.50, 'category': '식비', 'description': '점심'})
         self.assertTrue(len(result) > 0)
 
     def test_expense_summary(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         execute_tool('expense', {'action': 'add', 'amount': 10, 'category': '식비'})
         execute_tool('expense', {'action': 'add', 'amount': 20, 'category': '교통'})
         result = execute_tool('expense', {'action': 'month'})
@@ -83,24 +83,24 @@ class TestExpenses(unittest.TestCase):
 class TestSaveLink(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        import salmalm.tools_personal as tp
+        import salmalm.tools.tools_personal as tp
         self._orig_db = getattr(tp, '_DB_PATH', None)
         tp._DB_PATH = Path(self.tmpdir) / 'test_personal.db'
         tp._init_db()
 
     def tearDown(self):
-        import salmalm.tools_personal as tp
+        import salmalm.tools.tools_personal as tp
         if self._orig_db is not None:
             tp._DB_PATH = self._orig_db
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_save_link(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('save_link', {'action': 'save', 'url': 'https://example.com', 'title': 'Example'})
         self.assertTrue(len(result) > 0)
 
     def test_list_links(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         execute_tool('save_link', {'action': 'save', 'url': 'https://a.com', 'title': 'A'})
         result = execute_tool('save_link', {'action': 'list'})
         self.assertTrue(len(result) > 0)
@@ -109,13 +109,13 @@ class TestSaveLink(unittest.TestCase):
 class TestPomodoro(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        import salmalm.tools_personal as tp
+        import salmalm.tools.tools_personal as tp
         self._orig_db = getattr(tp, '_DB_PATH', None)
         tp._DB_PATH = Path(self.tmpdir) / 'test_personal.db'
         tp._init_db()
 
     def tearDown(self):
-        import salmalm.tools_personal as tp
+        import salmalm.tools.tools_personal as tp
         if self._orig_db is not None:
             tp._DB_PATH = self._orig_db
         # Cancel any running pomodoro timer
@@ -129,12 +129,12 @@ class TestPomodoro(unittest.TestCase):
     @patch('salmalm.tools.tools_personal.threading.Thread')
     def test_start_pomodoro(self, mock_thread):
         mock_thread.return_value = MagicMock()
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('pomodoro', {'action': 'start', 'task': 'Coding', 'minutes': 25})
         self.assertTrue(len(result) > 0)
 
     def test_pomodoro_status(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('pomodoro', {'action': 'status'})
         self.assertTrue(len(result) > 0)
 
@@ -142,7 +142,7 @@ class TestPomodoro(unittest.TestCase):
 class TestBriefing(unittest.TestCase):
     @patch('salmalm.tool_registry.execute_tool', side_effect=lambda name, args: f"mock {name}")
     def test_briefing_returns_string(self, mock_et):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('briefing', {'action': 'generate'})
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 0)

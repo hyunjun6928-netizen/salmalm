@@ -16,7 +16,7 @@ Requirements:
   Launch: google-chrome --remote-debugging-port=9222 --headless=new
 
 Usage:
-  from salmalm.browser import browser
+  from salmalm.utils.browser import browser
   await browser.connect()
   await browser.navigate("https://example.com")
   text = await browser.get_text()
@@ -35,7 +35,7 @@ import time
 import urllib.request
 from typing import Any, Dict, List, Optional
 
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # CDP WebSocket frame helpers (reuse ws.py logic but as client)
 _WS_MAGIC = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"

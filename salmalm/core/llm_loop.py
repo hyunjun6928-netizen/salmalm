@@ -11,8 +11,8 @@ import time as _time
 from pathlib import Path as _Path
 from typing import Any, Dict, Optional, Tuple
 
-from salmalm.crypto import log
-from salmalm.llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic, stream_google as _stream_google
+from salmalm.security.crypto import log
+from salmalm.core.llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic, stream_google as _stream_google
 
 # ============================================================
 # Model Failover — exponential backoff cooldown + fallback chain

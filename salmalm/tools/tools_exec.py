@@ -5,10 +5,10 @@ import json
 import re
 import os
 import time
-from salmalm.tool_registry import register
-from salmalm.tools_common import _is_safe_command
+from salmalm.tools.tool_registry import register
+from salmalm.tools.tools_common import _is_safe_command
 from salmalm.constants import WORKSPACE_DIR
-from salmalm.exec_approvals import (check_approval, check_env_override, BackgroundSession,  # noqa: F401
+from salmalm.security.exec_approvals import (check_approval, check_env_override, BackgroundSession,  # noqa: F401
                                     BLOCKED_ENV_OVERRIDES)
 
 

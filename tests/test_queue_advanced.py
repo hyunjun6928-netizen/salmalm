@@ -4,7 +4,7 @@ import asyncio
 import pytest
 import time
 
-from salmalm.queue import (
+from salmalm.utils.queue import (
     QueueMode, DropPolicy, QueueLane, QueuedMessage, MessageQueue,
     apply_overflow, _merge_messages, _parse_duration_ms, SessionOptions,
     DEFAULT_CONFIG,

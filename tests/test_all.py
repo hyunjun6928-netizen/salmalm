@@ -22,20 +22,20 @@ class TestAuth(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         # Monkey-patch AUTH_DB
-        import salmalm.auth as auth_mod
+        import salmalm.web.auth as auth_mod
         self.orig_db = auth_mod.AUTH_DB
         auth_mod.AUTH_DB = Path(self.tmpdir) / "test_auth.db"
         self.auth = auth_mod.AuthManager()
         self.auth._initialized = False
 
     def tearDown(self):
-        import salmalm.auth as auth_mod
+        import salmalm.web.auth as auth_mod
         auth_mod.AUTH_DB = self.orig_db
         import shutil
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_password_hashing(self):
-        from salmalm.auth import _hash_password, _verify_password
+        from salmalm.web.auth import _hash_password, _verify_password
         pw_hash, salt = _hash_password("test_password")
         self.assertTrue(_verify_password("test_password", pw_hash, salt))
         self.assertFalse(_verify_password("wrong_password", pw_hash, salt))
@@ -118,7 +118,7 @@ class TestAuth(unittest.TestCase):
 class TestRateLimiter(unittest.TestCase):
 
     def test_basic_limit(self):
-        from salmalm.auth import RateLimiter, RateLimitExceeded
+        from salmalm.web.auth import RateLimiter, RateLimitExceeded
         rl = RateLimiter()
         # Anonymous: 5 req/min, burst 10
         for _ in range(10):
@@ -127,7 +127,7 @@ class TestRateLimiter(unittest.TestCase):
             rl.check("test_ip", "anonymous")
 
     def test_different_keys(self):
-        from salmalm.auth import RateLimiter
+        from salmalm.web.auth import RateLimiter
         rl = RateLimiter()
         for _ in range(10):
             rl.check("ip_a", "anonymous")
@@ -135,7 +135,7 @@ class TestRateLimiter(unittest.TestCase):
         rl.check("ip_b", "anonymous")
 
     def test_admin_higher_limit(self):
-        from salmalm.auth import RateLimiter
+        from salmalm.web.auth import RateLimiter
         rl = RateLimiter()
         for _ in range(50):
             rl.check("admin_key", "admin")
@@ -145,14 +145,14 @@ class TestRateLimiter(unittest.TestCase):
 class TestTokenManager(unittest.TestCase):
 
     def test_create_and_verify(self):
-        from salmalm.auth import TokenManager
+        from salmalm.web.auth import TokenManager
         tm = TokenManager(b'test_secret')
         token = tm.create({'user': 'test'})
         payload = tm.verify(token)
         self.assertEqual(payload['user'], 'test')
 
     def test_different_secret(self):
-        from salmalm.auth import TokenManager
+        from salmalm.web.auth import TokenManager
         tm1 = TokenManager(b'secret1')
         tm2 = TokenManager(b'secret2')
         token = tm1.create({'user': 'test'})
@@ -170,7 +170,7 @@ class TestRAG(unittest.TestCase):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_tokenize(self):
-        from salmalm.rag import RAGEngine
+        from salmalm.features.rag import RAGEngine
         tokens = RAGEngine._tokenize("머슴포커 랭크 매치 시스템")
         self.assertIn('머슴포커', tokens)
         self.assertIn('시스템', tokens)
@@ -178,7 +178,7 @@ class TestRAG(unittest.TestCase):
         self.assertTrue(any('_' in t for t in tokens))
 
     def test_search_empty(self):
-        from salmalm.rag import RAGEngine
+        from salmalm.features.rag import RAGEngine
         engine = RAGEngine(db_path=self.db_path)
         engine._get_indexable_files = lambda: []
         engine._get_session_files = lambda: []
@@ -187,7 +187,7 @@ class TestRAG(unittest.TestCase):
         engine.close()
 
     def test_build_context(self):
-        from salmalm.rag import RAGEngine
+        from salmalm.features.rag import RAGEngine
         engine = RAGEngine(db_path=self.db_path)
         # Patch to avoid indexing real workspace files
         engine._get_indexable_files = lambda: []
@@ -200,7 +200,7 @@ class TestRAG(unittest.TestCase):
 class TestTLS(unittest.TestCase):
 
     def test_cert_info_no_cert(self):
-        from salmalm.tls import get_cert_info
+        from salmalm.utils.tls import get_cert_info
         info = get_cert_info()
         self.assertIn('cert_exists', info)
 
@@ -208,7 +208,7 @@ class TestTLS(unittest.TestCase):
 class TestStability(unittest.TestCase):
 
     def test_circuit_breaker(self):
-        from salmalm.stability import CircuitBreaker
+        from salmalm.features.stability import CircuitBreaker
         cb = CircuitBreaker(threshold=3, window_sec=60)
         self.assertFalse(cb.is_tripped('test'))
         for _ in range(3):
@@ -216,7 +216,7 @@ class TestStability(unittest.TestCase):
         self.assertTrue(cb.is_tripped('test'))
 
     def test_circuit_breaker_reset(self):
-        from salmalm.stability import CircuitBreaker
+        from salmalm.features.stability import CircuitBreaker
         # Errors with very short window so they expire
         cb = CircuitBreaker(threshold=3, window_sec=0.01, cooldown_sec=0)
         for _ in range(3):
@@ -226,7 +226,7 @@ class TestStability(unittest.TestCase):
         self.assertFalse(cb.is_tripped('test2'))
 
     def test_health_monitor_system(self):
-        from salmalm.stability import health_monitor
+        from salmalm.features.stability import health_monitor
         health = health_monitor.check_health()
         self.assertIn('status', health)
         self.assertIn('components', health)
@@ -234,7 +234,7 @@ class TestStability(unittest.TestCase):
         self.assertIn('uptime_seconds', health)
 
     def test_selftest(self):
-        from salmalm.stability import health_monitor
+        from salmalm.features.stability import health_monitor
         result = health_monitor.startup_selftest()
         self.assertTrue(result['all_ok'])
         self.assertGreaterEqual(result['passed'], 14)
@@ -243,14 +243,14 @@ class TestStability(unittest.TestCase):
 class TestWebSocket(unittest.TestCase):
 
     def test_ws_client_init(self):
-        from salmalm.ws import WSClient
+        from salmalm.web.ws import WSClient
         # Just test object creation
         client = WSClient(None, None, "test")
         self.assertEqual(client.session_id, "test")
         self.assertTrue(client.connected)
 
     def test_streaming_response_init(self):
-        from salmalm.ws import StreamingResponse
+        from salmalm.web.ws import StreamingResponse
         client = type('MockClient', (), {'session_id': 'test', 'connected': True,
                                           'send_json': lambda self, d: None})()
         sr = StreamingResponse(client)
@@ -261,19 +261,19 @@ class TestWebSocket(unittest.TestCase):
 class TestMCP(unittest.TestCase):
 
     def test_rpc_request(self):
-        from salmalm.mcp import _rpc_request
+        from salmalm.features.mcp import _rpc_request
         msg = _rpc_request("test/method", {"key": "val"}, id=1)
         self.assertEqual(msg['method'], 'test/method')
         self.assertEqual(msg['id'], 1)
 
     def test_rpc_response(self):
-        from salmalm.mcp import _rpc_response
+        from salmalm.features.mcp import _rpc_response
         msg = _rpc_response(1, result={"ok": True})
         self.assertEqual(msg['id'], 1)
         self.assertTrue(msg['result']['ok'])
 
     def test_mcp_manager_empty(self):
-        from salmalm.mcp import MCPManager
+        from salmalm.features.mcp import MCPManager
         mgr = MCPManager()
         self.assertEqual(mgr.list_servers(), [])
         self.assertEqual(mgr.get_all_tools(), [])
@@ -282,7 +282,7 @@ class TestMCP(unittest.TestCase):
 class TestBrowser(unittest.TestCase):
 
     def test_browser_status_disconnected(self):
-        from salmalm.browser import BrowserController
+        from salmalm.utils.browser import BrowserController
         bc = BrowserController()
         self.assertFalse(bc.connected)
         status = bc.get_status()
@@ -292,12 +292,12 @@ class TestBrowser(unittest.TestCase):
 class TestNodes(unittest.TestCase):
 
     def test_node_manager_empty(self):
-        from salmalm.nodes import NodeManager
+        from salmalm.features.nodes import NodeManager
         nm = NodeManager()
         self.assertEqual(nm.list_nodes(), [])
 
     def test_wol_invalid_mac(self):
-        from salmalm.nodes import NodeManager
+        from salmalm.features.nodes import NodeManager
         nm = NodeManager()
         result = nm.wake_on_lan("invalid")
         self.assertIn('error', result)
@@ -328,7 +328,7 @@ class TestTools(unittest.TestCase):
 class TestLogging(unittest.TestCase):
 
     def test_json_formatter(self):
-        from salmalm.logging_ext import JSONFormatter
+        from salmalm.utils.logging_ext import JSONFormatter
         import logging
         fmt = JSONFormatter()
         record = logging.LogRecord('test', logging.INFO, '', 0, 'test message', (), None)
@@ -338,7 +338,7 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(parsed['level'], 'INFO')
 
     def test_request_logger_metrics(self):
-        from salmalm.logging_ext import RequestLogger
+        from salmalm.utils.logging_ext import RequestLogger
         rl = RequestLogger()
         rl.log_request('GET', '/api/status', status_code=200, duration_ms=15)
         rl.log_request('POST', '/api/chat', status_code=200, duration_ms=1500)
@@ -368,20 +368,20 @@ class TestConstants(unittest.TestCase):
 class TestEngineAliases(unittest.TestCase):
 
     def test_model_aliases(self):
-        from salmalm.engine import MODEL_ALIASES
+        from salmalm.core.engine import MODEL_ALIASES
         self.assertIn('opus', MODEL_ALIASES)
         self.assertIn('grok', MODEL_ALIASES)
         self.assertIn('auto', MODEL_ALIASES)
         self.assertIsNone(MODEL_ALIASES['auto'])
 
     def test_task_classifier(self):
-        from salmalm.engine import TaskClassifier
+        from salmalm.core.engine import TaskClassifier
         result = TaskClassifier.classify("refactor this code please")
         self.assertEqual(result['intent'], 'code')
         self.assertGreaterEqual(result['tier'], 2)
 
     def test_chat_classification(self):
-        from salmalm.engine import TaskClassifier
+        from salmalm.core.engine import TaskClassifier
         result = TaskClassifier.classify("안녕")
         self.assertEqual(result['intent'], 'chat')
         self.assertEqual(result['tier'], 1)

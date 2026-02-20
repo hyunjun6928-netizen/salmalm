@@ -11,14 +11,14 @@ import threading
 from salmalm.constants import (  # noqa: F401
     VERSION, APP_NAME, VAULT_FILE, MEMORY_DIR, BASE_DIR
 )
-from salmalm.crypto import vault, log, HAS_CRYPTO
+from salmalm.security.crypto import vault, log, HAS_CRYPTO
 from salmalm.core import (  # noqa: F401
     _init_audit_db, _restore_usage, audit_log,
     _sessions, cron, LLMCronManager, PluginLoader
 )
 from salmalm.telegram import telegram_bot
 from salmalm.web import WebHandler
-from salmalm.ws import ws_server, StreamingResponse
+from salmalm.web.ws import ws_server, StreamingResponse
 from salmalm.rag import rag_engine
 from salmalm.mcp import mcp_manager
 from salmalm.nodes import node_manager
@@ -165,7 +165,7 @@ async def run_server():
                 """Forward engine status to WS client as typing events."""
                 await client.send_json({'type': 'typing', 'status': status_type, 'detail': detail})
             try:
-                from salmalm.engine import process_message
+                from salmalm.core.engine import process_message
                 image_data = (image_b64, image_mime) if image_b64 else None
                 response = await process_message(session_id, text or '', image_data=image_data,
                                                  on_tool=on_tool, on_status=on_status)
@@ -275,7 +275,7 @@ async def run_server():
 
     # === Shutdown Sequence ===
     log.info("[SHUTDOWN] Phase 1: Stop accepting new requests")
-    from salmalm.engine import begin_shutdown, wait_for_active_requests
+    from salmalm.core.engine import begin_shutdown, wait_for_active_requests
     begin_shutdown()
 
     log.info("[SHUTDOWN] Phase 2: Wait for active LLM requests (max 30s)")

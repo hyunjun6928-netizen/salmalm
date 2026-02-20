@@ -1,6 +1,6 @@
 """UI control tool — lets AI change UI settings via WebSocket commands."""
 import logging
-from salmalm.tool_registry import register
+from salmalm.tools.tool_registry import register
 
 log = logging.getLogger('salmalm')
 

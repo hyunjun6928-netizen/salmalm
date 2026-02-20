@@ -12,7 +12,7 @@ class TestSubAgentListAndMetadata:
     """Test /subagents list, info, log commands."""
 
     def test_list_empty(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         # Save and restore state
         old = SubAgent._agents.copy()
         SubAgent._agents.clear()
@@ -23,7 +23,7 @@ class TestSubAgentListAndMetadata:
             SubAgent._agents = old
 
     def test_list_with_agents(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         old = SubAgent._agents.copy()
         SubAgent._agents = {
             'sub-99': {
@@ -44,7 +44,7 @@ class TestSubAgentListAndMetadata:
             SubAgent._agents = old
 
     def test_list_excludes_archived(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         old = SubAgent._agents.copy()
         SubAgent._agents = {
             'sub-100': {
@@ -62,7 +62,7 @@ class TestSubAgentListAndMetadata:
             SubAgent._agents = old
 
     def test_get_info(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         old = SubAgent._agents.copy()
         SubAgent._agents = {
             'sub-50': {
@@ -85,7 +85,7 @@ class TestSubAgentListAndMetadata:
             SubAgent._agents = old
 
     def test_get_info_by_index(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         old = SubAgent._agents.copy()
         SubAgent._agents = {
             'sub-1': {'id': 'sub-1', 'task': 'first', 'label': 'first',
@@ -102,14 +102,14 @@ class TestSubAgentListAndMetadata:
             SubAgent._agents = old
 
     def test_get_info_not_found(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         info = SubAgent.get_info('sub-nonexistent')
         assert '❌' in info
 
 
 class TestSubAgentStop:
     def test_stop_running(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         old = SubAgent._agents.copy()
         SubAgent._agents = {
             'sub-10': {'id': 'sub-10', 'task': 't', 'status': 'running',
@@ -123,7 +123,7 @@ class TestSubAgentStop:
             SubAgent._agents = old
 
     def test_stop_not_running(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         old = SubAgent._agents.copy()
         SubAgent._agents = {
             'sub-11': {'id': 'sub-11', 'task': 't', 'status': 'completed',
@@ -136,7 +136,7 @@ class TestSubAgentStop:
             SubAgent._agents = old
 
     def test_stop_all(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         old = SubAgent._agents.copy()
         SubAgent._agents = {
             'sub-20': {'id': 'sub-20', 'task': 't', 'status': 'running',
@@ -151,14 +151,14 @@ class TestSubAgentStop:
             SubAgent._agents = old
 
     def test_stop_not_found(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         result = SubAgent.stop_agent('sub-999')
         assert '❌' in result
 
 
 class TestSubAgentLog:
     def test_get_log_with_transcript(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         old = SubAgent._agents.copy()
         SubAgent._agents = {
             'sub-30': {'id': 'sub-30', 'task': 't', 'status': 'completed',
@@ -175,7 +175,7 @@ class TestSubAgentLog:
             SubAgent._agents = old
 
     def test_get_log_no_transcript(self):
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         old = SubAgent._agents.copy()
         SubAgent._agents = {
             'sub-31': {'id': 'sub-31', 'task': 't', 'status': 'completed',
@@ -190,13 +190,13 @@ class TestSubAgentLog:
 
 class TestToolPolicy:
     def test_load_default_policy(self):
-        from salmalm.agents import _load_tool_policy
+        from salmalm.features.agents import _load_tool_policy
         policy = _load_tool_policy()
         assert 'deny' in policy
         assert 'sub_agent' in policy['deny']
 
     def test_filter_tools(self):
-        from salmalm.agents import _filter_tools_for_subagent
+        from salmalm.features.agents import _filter_tools_for_subagent
         tools = [
             {'name': 'exec', 'description': 'run'},
             {'name': 'sub_agent', 'description': 'spawn sub'},
@@ -213,7 +213,7 @@ class TestToolPolicy:
 
 class TestMinimalPrompt:
     def test_minimal_mode(self):
-        from salmalm.prompt import build_system_prompt
+        from salmalm.core.prompt import build_system_prompt
         prompt = build_system_prompt(mode='minimal')
         assert 'SubAgent' in prompt
         assert 'Workspace' in prompt

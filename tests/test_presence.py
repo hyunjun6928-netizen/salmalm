@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from salmalm.presence import (
+from salmalm.features.presence import (
     PresenceManager, PresenceEntry,
     ACTIVE_THRESHOLD, IDLE_THRESHOLD, DEFAULT_TTL,
 )

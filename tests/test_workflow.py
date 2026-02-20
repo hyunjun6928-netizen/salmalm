@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from salmalm.workflow import (
+from salmalm.features.workflow import (
     WorkflowEngine, _substitute, _substitute_params, _eval_condition,
     handle_workflow_command, WORKFLOWS_DIR
 )
@@ -59,14 +59,14 @@ class TestWorkflowEngine(unittest.TestCase):
         self.orig_dir = WORKFLOWS_DIR
         self.tmpdir = tempfile.mkdtemp()
         # Patch WORKFLOWS_DIR
-        import salmalm.workflow as wm
+        import salmalm.features.workflow as wm
         wm.WORKFLOWS_DIR = Path(self.tmpdir)
         wm.WORKFLOW_LOG_DIR = Path(self.tmpdir) / 'logs'
         self.engine = WorkflowEngine(tool_executor=lambda tool, params: f'result_{tool}')
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
-        import salmalm.workflow as wm
+        import salmalm.features.workflow as wm
         wm.WORKFLOWS_DIR = self.orig_dir
         wm.WORKFLOW_LOG_DIR = self.orig_dir / 'logs'
 

@@ -10,10 +10,10 @@ from pathlib import Path
 _test_dir = tempfile.mkdtemp()
 _test_db = Path(_test_dir) / 'auth_test.db'
 
-import salmalm.auth as auth_mod
+import salmalm.web.auth as auth_mod
 auth_mod.AUTH_DB = _test_db
 
-from salmalm.auth import (
+from salmalm.web.auth import (
     AuthManager, RateLimiter, RateLimitExceeded, TokenManager,
     _hash_password, _verify_password
 )

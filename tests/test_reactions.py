@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from salmalm.tools_reaction import (
+from salmalm.tools.tools_reaction import (
     send_reaction, _react_telegram, _react_discord, _react_slack, _react_web,
     REACTION_TOOL,
 )

@@ -65,7 +65,7 @@ def _run(coro):
     """13. RAG 인덱싱 → 검색 → 컨텍스트."""
 
     def test_rag_search_to_context(self):
-        from salmalm.rag import RAGEngine
+        from salmalm.features.rag import RAGEngine
         db_path = Path(_tmpdir) / 'test_rag.db'
         engine = RAGEngine(db_path=db_path)
 

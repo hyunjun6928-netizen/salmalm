@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from salmalm.commands import (
+from salmalm.features.commands import (
     ALIASES, COMMAND_DEFS, CommandRouter, DIRECTIVE_COMMANDS,
     INLINE_SHORTCUTS, TELEGRAM_COMMANDS, get_router, _runtime_overrides,
 )
@@ -213,7 +213,7 @@ class TestTelegramCommands:
 
 class TestSingleton:
     def test_get_router(self):
-        import salmalm.commands as mod
+        import salmalm.features.commands as mod
         mod._router = None
         r = get_router()
         assert isinstance(r, CommandRouter)

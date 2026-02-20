@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from salmalm.constants import VERSION, KST, AUDIT_DB
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # ── Paths ────────────────────────────────────────────────────
 _SALMALM_DIR = Path.home() / '.salmalm'
@@ -592,7 +592,7 @@ class Watchdog:
 
         # 5. WebSocket check
         try:
-            from salmalm.ws import ws_server
+            from salmalm.web.ws import ws_server
             ws_ok = ws_server.is_running if hasattr(ws_server, 'is_running') else True
             report['checks']['websocket'] = {
                 'status': 'ok' if ws_ok else 'error',
@@ -667,7 +667,7 @@ class Watchdog:
         log.info("[SLA] Attempting WebSocket recovery...")
         try:
             import asyncio
-            from salmalm.ws import ws_server
+            from salmalm.web.ws import ws_server
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 asyncio.ensure_future(ws_server.start())

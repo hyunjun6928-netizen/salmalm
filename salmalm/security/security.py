@@ -283,7 +283,7 @@ class SecurityAuditor:
     def _check_a02_cryptographic_failures(self) -> dict:
         """A02: Cryptographic Failures — 암호화 취약점."""
         issues = []
-        from salmalm.crypto import vault, HAS_CRYPTO  # noqa: F401
+        from salmalm.security.crypto import vault, HAS_CRYPTO  # noqa: F401
         if not HAS_CRYPTO:
             issues.append('WARN: AES-256-GCM unavailable (using HMAC-CTR fallback)')
         # Check PBKDF2 iterations
@@ -292,7 +292,7 @@ class SecurityAuditor:
             issues.append(f'WARN: PBKDF2 iterations low ({PBKDF2_ITER}), recommend ≥100000')
         # Check password hashing in auth
         try:
-            from salmalm.auth import _hash_password
+            from salmalm.web.auth import _hash_password
             h, s = _hash_password('test')
             if len(h) < 32:
                 issues.append('Password hash output too short')
@@ -335,7 +335,7 @@ class SecurityAuditor:
 
         # Check path traversal protection
         try:
-            from salmalm.tools_common import _resolve_path  # noqa: F401
+            from salmalm.tools.tools_common import _resolve_path  # noqa: F401
             pass  # Function exists
         except ImportError:
             issues.append('Missing path traversal protection')
@@ -353,7 +353,7 @@ class SecurityAuditor:
         issues = []
         # Check rate limiting
         try:
-            from salmalm.auth import rate_limiter
+            from salmalm.web.auth import rate_limiter
             if not rate_limiter:
                 issues.append('No rate limiting configured')
         except Exception:
@@ -372,7 +372,7 @@ class SecurityAuditor:
 
         # Check exec sandboxing
         try:
-            from salmalm.tools_common import _is_safe_command  # noqa: F401
+            from salmalm.tools.tools_common import _is_safe_command  # noqa: F401
         except ImportError:
             issues.append('No command execution sandboxing')
 
@@ -435,7 +435,7 @@ class SecurityAuditor:
         """A07: Authentication Failures — 인증 실패."""
         issues = []
         try:
-            from salmalm.auth import auth_manager
+            from salmalm.web.auth import auth_manager
             if auth_manager._lockout_duration < 60:
                 issues.append('Lockout duration too short')
             if auth_manager._max_attempts > 10:
@@ -444,7 +444,7 @@ class SecurityAuditor:
             issues.append('Auth manager not available')
         # Check session timeout
         try:
-            from salmalm.auth import TokenManager  # noqa: F401
+            from salmalm.web.auth import TokenManager  # noqa: F401
             # Default token expiry is 24h (86400s)
         except Exception:
             pass
@@ -496,7 +496,7 @@ class SecurityAuditor:
         issues = []
         # Verify SSRF protection exists
         try:
-            from salmalm.tools_common import _is_private_url
+            from salmalm.tools.tools_common import _is_private_url
             # Test internal IPs
             blocked, _ = _is_private_url('http://127.0.0.1/')
             if not blocked:

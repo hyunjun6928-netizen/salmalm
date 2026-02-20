@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from salmalm.deadman import DeadManSwitch, DEFAULT_CONFIG
+from salmalm.features.deadman import DeadManSwitch, DEFAULT_CONFIG
 
 
 @pytest.fixture

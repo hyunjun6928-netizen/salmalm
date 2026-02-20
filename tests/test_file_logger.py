@@ -3,7 +3,7 @@ import json
 import tempfile
 from pathlib import Path
 import pytest
-from salmalm.file_logger import FileLogger
+from salmalm.utils.file_logger import FileLogger
 
 
 @pytest.fixture

@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from salmalm.constants import WORKSPACE_DIR, BASE_DIR, KST
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # Auto-archive delay (seconds after completion)
 _ARCHIVE_DELAY_SEC = 3600  # 60 minutes
@@ -98,7 +98,7 @@ class SubAgent:
             try:
                 session_id = f'subagent-{agent_id}'
                 session = _core().get_session(session_id)
-                from salmalm.engine import process_message
+                from salmalm.core.engine import process_message
                 result = asyncio.run(
                     process_message(session_id, task, model_override=model))
                 agent_info['result'] = result
@@ -120,7 +120,7 @@ class SubAgent:
 
                 # Collect token usage from session metrics
                 try:
-                    from salmalm.edge_cases import usage_tracker  # noqa: F401
+                    from salmalm.features.edge_cases import usage_tracker  # noqa: F401
                     # Rough estimate from result length
                     out_tokens = len(result) // 3
                     in_tokens = len(task) // 3
@@ -329,7 +329,7 @@ class SubAgent:
         # Run in the agent's existing session
         session_id = f'subagent-{agent_id}'
         try:
-            from salmalm.engine import process_message
+            from salmalm.core.engine import process_message
             result = asyncio.run(process_message(session_id, message))
             agent['result'] = result  # Update with latest result
             return f'🤖 [{agent_id}] responded:\n\n{result[:3000]}'

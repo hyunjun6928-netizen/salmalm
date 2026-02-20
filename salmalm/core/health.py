@@ -136,7 +136,7 @@ def _check_llm_status() -> dict:
 
     result: dict = {'connected': False}
     try:
-        from salmalm.stability import health_monitor
+        from salmalm.features.stability import health_monitor
         breaker = health_monitor.circuit_breaker.get_status()
         llm_breaker = breaker.get('llm', {})
         if llm_breaker.get('tripped'):
@@ -144,7 +144,7 @@ def _check_llm_status() -> dict:
             result['error'] = llm_breaker.get('last_error', 'circuit breaker tripped')
         else:
             # Check if any API key is configured
-            from salmalm.crypto import vault
+            from salmalm.security.crypto import vault
             providers = ['anthropic_api_key', 'openai_api_key', 'xai_api_key', 'google_api_key']
             has_key = any(vault.get(k) for k in providers)
             has_ollama = bool(vault.get('ollama_url'))

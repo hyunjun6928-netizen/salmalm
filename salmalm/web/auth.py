@@ -10,7 +10,7 @@ Features:
   - Login attempt tracking + lockout
 
 Usage:
-  from salmalm.auth import auth_manager, rate_limiter
+  from salmalm.web.auth import auth_manager, rate_limiter
   user = auth_manager.authenticate(username, password)
   token = auth_manager.create_token(user)
   auth_manager.verify_token(token)
@@ -29,7 +29,7 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 from salmalm.constants import DATA_DIR, KST, PBKDF2_ITER
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 AUTH_DB = DATA_DIR / "auth.db"
 

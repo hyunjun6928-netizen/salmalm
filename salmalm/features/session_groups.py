@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from salmalm.constants import KST
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 
 class SessionGroupManager:

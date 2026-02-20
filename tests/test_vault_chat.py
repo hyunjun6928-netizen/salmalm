@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from salmalm.vault_chat import VaultChat, _aes_gcm_encrypt, _aes_gcm_decrypt, _pbkdf2_derive
+from salmalm.features.vault_chat import VaultChat, _aes_gcm_encrypt, _aes_gcm_decrypt, _pbkdf2_derive
 
 
 @pytest.fixture

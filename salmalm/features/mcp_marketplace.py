@@ -193,7 +193,7 @@ class MCPMarketplace:
         if not info:
             return
         try:
-            from salmalm.mcp import MCPManager
+            from salmalm.features.mcp import MCPManager
             mgr = MCPManager()
             mgr.add_server(name, info['command'], env=info.get('env'))
             info['status'] = 'connected'
@@ -207,7 +207,7 @@ class MCPMarketplace:
         if name not in self._installed:
             return f'ℹ️ `{name}` is not installed.'
         try:
-            from salmalm.mcp import MCPManager
+            from salmalm.features.mcp import MCPManager
             mgr = MCPManager()
             mgr.remove_server(name)
         except Exception:

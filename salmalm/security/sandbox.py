@@ -21,7 +21,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # Default config path
 _CONFIG_DIR = Path.home() / ".salmalm"

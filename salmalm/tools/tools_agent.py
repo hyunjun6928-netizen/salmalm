@@ -1,6 +1,6 @@
 """Agent tools: sub_agent, skill_manage, plugin_manage, cron_manage, mcp_manage, node_manage."""
 import json
-from salmalm.tool_registry import register
+from salmalm.tools.tool_registry import register
 from salmalm.core import SubAgent, SkillLoader
 
 
@@ -144,7 +144,7 @@ def handle_cron_manage(args: dict) -> str:
 
 @register('mcp_manage')
 def handle_mcp_manage(args: dict) -> str:
-    from salmalm.mcp import mcp_manager
+    from salmalm.features.mcp import mcp_manager
     action = args.get('action', 'list')
     if action == 'list':
         servers = mcp_manager.list_servers()
@@ -186,7 +186,7 @@ def handle_mcp_manage(args: dict) -> str:
 
 @register('node_manage')
 def handle_node_manage(args: dict) -> str:
-    from salmalm.nodes import node_manager
+    from salmalm.features.nodes import node_manager
     action = args.get('action', 'list')
     if action == 'list':
         nodes = node_manager.list_nodes()
@@ -246,7 +246,7 @@ def handle_node_manage(args: dict) -> str:
 
 @register('rag_search')
 def handle_rag_search(args: dict) -> str:
-    from salmalm.rag import rag_engine
+    from salmalm.features.rag import rag_engine
     query = args.get('query', '')
     if not query:
         return '❌ query is required'

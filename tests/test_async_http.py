@@ -3,7 +3,7 @@ import asyncio
 import json
 import unittest
 
-from salmalm.async_http import AsyncHTTPClient, AsyncHTTPResponse
+from salmalm.utils.async_http import AsyncHTTPClient, AsyncHTTPResponse
 
 
 def _run(coro):

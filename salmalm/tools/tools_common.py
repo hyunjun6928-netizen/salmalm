@@ -6,7 +6,7 @@ from pathlib import Path
 from salmalm.constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS,
                                EXEC_ELEVATED, EXEC_BLOCKED_INTERPRETERS,
                                PROTECTED_FILES, WORKSPACE_DIR)
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 _clipboard_lock = threading.Lock()
 

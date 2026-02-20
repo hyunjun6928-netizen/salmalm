@@ -3,8 +3,8 @@ import json
 import base64
 import urllib.request
 import email.mime.text
-from salmalm.tool_registry import register
-from salmalm.tools_google import _google_oauth_headers
+from salmalm.tools.tool_registry import register
+from salmalm.tools.tools_google import _google_oauth_headers
 
 _BASE_URL = 'https://www.googleapis.com/gmail/v1/users/me'
 

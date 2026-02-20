@@ -5,7 +5,7 @@ Pure stdlib (ssl module). Generates self-signed certs on first run.
 Production: replace with Let's Encrypt or reverse proxy (nginx/caddy).
 
 Usage:
-  from salmalm.tls import create_https_server, ensure_cert
+  from salmalm.utils.tls import create_https_server, ensure_cert
   ensure_cert()  # Generate self-signed cert if missing
   server = create_https_server(('0.0.0.0', 443), handler)
 """
@@ -18,7 +18,7 @@ import http.server
 from typing import Optional
 
 from salmalm.constants import BASE_DIR
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 CERT_DIR = BASE_DIR / "certs"
 CERT_FILE = CERT_DIR / "server.crt"

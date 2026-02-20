@@ -2,14 +2,14 @@
 import json
 import time
 import base64
-from salmalm.tool_registry import register
+from salmalm.tools.tool_registry import register
 from salmalm.constants import WORKSPACE_DIR
 
 
 @register('browser')
 def handle_browser(args: dict) -> str:
     import asyncio
-    from salmalm.browser import browser
+    from salmalm.utils.browser import browser
 
     def _run_async(coro):
         try:

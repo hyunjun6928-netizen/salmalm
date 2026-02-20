@@ -17,7 +17,7 @@ import threading
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 HOOKS_FILE = Path.home() / '.salmalm' / 'hooks.json'
 

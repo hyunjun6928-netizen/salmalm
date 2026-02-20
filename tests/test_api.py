@@ -113,7 +113,7 @@ class TestAPIInputValidation(unittest.TestCase):
 
     def test_empty_message_rejected(self):
         """Empty messages should return early without hitting LLM."""
-        from salmalm.engine import process_message
+        from salmalm.core.engine import process_message
         import asyncio
         loop = asyncio.new_event_loop()
         try:
@@ -126,7 +126,7 @@ class TestAPIInputValidation(unittest.TestCase):
 
     def test_whitespace_message_rejected(self):
         """Whitespace-only messages should return early."""
-        from salmalm.engine import process_message
+        from salmalm.core.engine import process_message
         import asyncio
         loop = asyncio.new_event_loop()
         try:
@@ -139,7 +139,7 @@ class TestAPIInputValidation(unittest.TestCase):
 
     def test_slash_commands(self):
         """Slash commands should work without LLM."""
-        from salmalm.engine import process_message
+        from salmalm.core.engine import process_message
         import asyncio
         loop = asyncio.new_event_loop()
         try:

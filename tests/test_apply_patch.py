@@ -1,7 +1,7 @@
 """Tests for apply_patch tool."""
 import pytest
 from pathlib import Path
-from salmalm.tools_patch import apply_patch, _is_safe_path, _find_context_match
+from salmalm.tools.tools_patch import apply_patch, _is_safe_path, _find_context_match
 
 
 @pytest.fixture

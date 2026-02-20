@@ -13,7 +13,7 @@ class TestWeatherTool(unittest.TestCase):
     """Test weather tool handler."""
 
     def test_missing_location(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('weather', {'location': ''})
         self.assertIn('required', result)
 
@@ -24,7 +24,7 @@ class TestWeatherTool(unittest.TestCase):
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_resp
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('weather', {'location': 'Seoul', 'format': 'short'})
         self.assertIn('Seoul', result)
 
@@ -43,7 +43,7 @@ class TestWeatherTool(unittest.TestCase):
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_resp
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('weather', {'location': 'Seoul', 'format': 'full'})
         self.assertIn('Seoul', result)
         self.assertIn('5°C', result)
@@ -53,12 +53,12 @@ class TestTranslateTool(unittest.TestCase):
     """Test translate tool handler."""
 
     def test_missing_args(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('translate', {'text': '', 'target': 'en'})
         self.assertIn('required', result)
 
     def test_missing_target(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('translate', {'text': 'hello', 'target': ''})
         self.assertIn('required', result)
 
@@ -69,7 +69,7 @@ class TestTranslateTool(unittest.TestCase):
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_resp
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('translate', {'text': '안녕하세요', 'target': 'en'})
         self.assertIn('Hello', result)
 
@@ -78,12 +78,12 @@ class TestRSSReaderTool(unittest.TestCase):
     """Test rss_reader tool handler."""
 
     def test_list_empty(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('rss_reader', {'action': 'list'})
         self.assertTrue('feed' in result.lower() or 'Feed' in result)
 
     def test_subscribe(self):
-        from salmalm.tool_handlers import execute_tool, _feeds_file
+        from salmalm.tools.tool_handlers import execute_tool, _feeds_file
         result = execute_tool('rss_reader', {
             'action': 'subscribe', 'url': 'https://example.com/rss', 'name': '_test_feed'})
         self.assertIn('Subscribed', result)
@@ -91,18 +91,18 @@ class TestRSSReaderTool(unittest.TestCase):
         execute_tool('rss_reader', {'action': 'unsubscribe', 'name': '_test_feed'})
 
     def test_unsubscribe_nonexistent(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('rss_reader', {'action': 'unsubscribe', 'name': '_fake_feed_xyz'})
         self.assertIn('not found', result)
 
     def test_fetch_no_url_no_feeds(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('rss_reader', {'action': 'fetch'})
         self.assertTrue('No' in result or 'error' in result.lower() or 'feed' in result.lower())
 
     @patch('urllib.request.urlopen')
     def test_parse_rss(self, mock_urlopen):
-        from salmalm.tool_handlers import _parse_rss
+        from salmalm.tools.tool_handlers import _parse_rss
         xml = '''<?xml version="1.0"?>
         <rss version="2.0"><channel><title>Test</title>
         <item><title>Article 1</title><link>https://example.com/1</link>
@@ -114,7 +114,7 @@ class TestRSSReaderTool(unittest.TestCase):
 
     @patch('urllib.request.urlopen')
     def test_parse_atom(self, mock_urlopen):
-        from salmalm.tool_handlers import _parse_rss
+        from salmalm.tools.tool_handlers import _parse_rss
         xml = '''<?xml version="1.0"?>
         <feed xmlns="http://www.w3.org/2005/Atom">
         <entry><title>Atom Article</title>
@@ -131,7 +131,7 @@ class TestQRCodeTool(unittest.TestCase):
     """Test qr_code tool handler."""
 
     def test_missing_data(self):
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('qr_code', {'data': ''})
         self.assertIn('required', result)
 
@@ -142,7 +142,7 @@ class TestQRCodeTool(unittest.TestCase):
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_resp
-        from salmalm.tool_handlers import execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('qr_code', {'data': 'https://example.com', 'format': 'svg'})
         self.assertIn('QR code saved', result)
 
@@ -151,51 +151,51 @@ class TestEnhancedTimeParsing(unittest.TestCase):
     """Test enhanced natural language time parsing."""
 
     def test_korean_tomorrow(self):
-        from salmalm.tool_handlers import _parse_relative_time
+        from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('내일 오후 3시')
         expected_day = (datetime.now() + timedelta(days=1)).day
         self.assertEqual(result.day, expected_day)
         self.assertEqual(result.hour, 15)
 
     def test_korean_tomorrow_morning(self):
-        from salmalm.tool_handlers import _parse_relative_time
+        from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('내일 아침')
         expected_day = (datetime.now() + timedelta(days=1)).day
         self.assertEqual(result.day, expected_day)
         self.assertEqual(result.hour, 8)
 
     def test_korean_today_evening(self):
-        from salmalm.tool_handlers import _parse_relative_time
+        from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('오늘 저녁 7시')
         self.assertEqual(result.day, datetime.now().day)
         self.assertEqual(result.hour, 19)
 
     def test_korean_day_after_tomorrow(self):
-        from salmalm.tool_handlers import _parse_relative_time
+        from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('모레')
         expected_day = (datetime.now() + timedelta(days=2)).day
         self.assertEqual(result.day, expected_day)
 
     def test_korean_am_pm(self):
-        from salmalm.tool_handlers import _parse_relative_time
+        from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('오전 10시 30분')
         self.assertEqual(result.hour, 10)
         self.assertEqual(result.minute, 30)
 
     def test_english_tomorrow_3pm(self):
-        from salmalm.tool_handlers import _parse_relative_time
+        from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('tomorrow 3pm')
         expected_day = (datetime.now() + timedelta(days=1)).day
         self.assertEqual(result.day, expected_day)
         self.assertEqual(result.hour, 15)
 
     def test_relative_still_works(self):
-        from salmalm.tool_handlers import _parse_relative_time
+        from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('45m')
         self.assertGreater(result, datetime.now() + timedelta(minutes=44))
 
     def test_iso_still_works(self):
-        from salmalm.tool_handlers import _parse_relative_time
+        from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('2026-03-01T10:00:00')
         self.assertEqual(result.year, 2026)
         self.assertEqual(result.month, 3)

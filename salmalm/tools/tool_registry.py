@@ -1,6 +1,6 @@
 """Tool registry — decorator-based tool dispatch replacing if-elif chain."""
 import json
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 from salmalm.core import audit_log
 
 _HANDLERS = {}
@@ -20,7 +20,7 @@ def _ensure_modules():
                          tools_calendar, tools_email, tools_personal)
     from salmalm.tools import tools_brave  # noqa: F401
     # Register apply_patch tool
-    from salmalm.tools_patch import apply_patch as _apply_patch_fn
+    from salmalm.tools.tools_patch import apply_patch as _apply_patch_fn
     _HANDLERS['apply_patch'] = lambda args: _apply_patch_fn(
         args.get('patch_text', ''), args.get('base_dir', '.'))
 
@@ -63,7 +63,7 @@ def execute_tool(name: str, args: dict) -> str:
 
     # Try remote node dispatch first (if gateway has registered nodes)
     try:
-        from salmalm.nodes import gateway
+        from salmalm.features.nodes import gateway
         if gateway._nodes:
             result = gateway.dispatch_auto(name, args)
             if result and 'error' not in result:
@@ -86,7 +86,7 @@ def execute_tool(name: str, args: dict) -> str:
 
         # Try directory-based plugins (new plugin architecture)
         try:
-            from salmalm.plugin_manager import plugin_manager
+            from salmalm.features.plugin_manager import plugin_manager
             result = plugin_manager._execute_plugin_tool(name, args)
             if result is not None:
                 return result
@@ -95,7 +95,7 @@ def execute_tool(name: str, args: dict) -> str:
 
         # Try MCP tools as last fallback
         if name.startswith('mcp_'):
-            from salmalm.mcp import mcp_manager
+            from salmalm.features.mcp import mcp_manager
             mcp_result = mcp_manager.call_tool(name, args)
             if mcp_result is not None:
                 return mcp_result

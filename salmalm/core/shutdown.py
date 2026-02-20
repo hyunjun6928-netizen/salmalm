@@ -86,7 +86,7 @@ class ShutdownManager:
         # Phase 5: Notify WebSocket clients
         log.info("[SHUTDOWN] Phase 5: Notify WebSocket clients")
         try:
-            from salmalm.ws import ws_server
+            from salmalm.web.ws import ws_server
             await ws_server.shutdown()
         except Exception as e:
             log.warning(f"[SHUTDOWN] WebSocket shutdown error: {e}")

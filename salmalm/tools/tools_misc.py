@@ -9,9 +9,9 @@ import sys
 import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
-from salmalm.tool_registry import register
+from salmalm.tools.tool_registry import register
 from salmalm.constants import WORKSPACE_DIR
-from salmalm.crypto import vault, log
+from salmalm.security.crypto import vault, log
 from salmalm.core import _tg_bot
 
 
@@ -327,7 +327,7 @@ def _save_workflows(wf: dict):
 
 @register('workflow')
 def handle_workflow(args: dict) -> str:
-    from salmalm.tool_registry import execute_tool
+    from salmalm.tools.tool_registry import execute_tool
     action = args.get('action', 'list')
 
     if action == 'list':

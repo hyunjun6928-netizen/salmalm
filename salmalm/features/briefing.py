@@ -55,7 +55,7 @@ class DailyBriefing:
         # Weather
         if 'weather' in include:
             try:
-                from salmalm.tool_registry import execute_tool
+                from salmalm.tools.tool_registry import execute_tool
                 location = config.get('weather_location', 'Seoul')
                 result = execute_tool('weather', {'location': location, 'format': 'full', 'lang': 'ko'})
                 parts.append(f"**🌤️ 날씨**\n{result}\n")
@@ -65,7 +65,7 @@ class DailyBriefing:
         # Calendar
         if 'calendar' in include:
             try:
-                from salmalm.tool_registry import execute_tool
+                from salmalm.tools.tool_registry import execute_tool
                 result = execute_tool('calendar_list', {'period': 'today'})
                 parts.append(f"**📅 오늘 일정**\n{result}\n")
             except Exception as e:
@@ -74,7 +74,7 @@ class DailyBriefing:
         # Email
         if 'email' in include:
             try:
-                from salmalm.tool_registry import execute_tool
+                from salmalm.tools.tool_registry import execute_tool
                 result = execute_tool('email_inbox', {'count': 5})
                 parts.append(f"**📧 최근 이메일**\n{result}\n")
             except Exception as e:
@@ -83,7 +83,7 @@ class DailyBriefing:
         # Tasks (incomplete reminders)
         if 'tasks' in include or 'reminders' in include:
             try:
-                from salmalm.tool_registry import execute_tool
+                from salmalm.tools.tool_registry import execute_tool
                 result = execute_tool('reminder', {'action': 'list'})
                 if '⏰ No active' not in result:
                     parts.append(f"**⏰ 활성 리마인더**\n{result}\n")
@@ -93,7 +93,7 @@ class DailyBriefing:
         # Notes summary (recent)
         if 'notes' in include:
             try:
-                from salmalm.tool_registry import execute_tool
+                from salmalm.tools.tool_registry import execute_tool
                 result = execute_tool('note', {'action': 'list', 'count': 3})
                 if '📝 No notes' not in result:
                     parts.append(f"**📝 최근 메모**\n{result}\n")
@@ -103,7 +103,7 @@ class DailyBriefing:
         # Expenses today
         if 'expenses' in include:
             try:
-                from salmalm.tool_registry import execute_tool
+                from salmalm.tools.tool_registry import execute_tool
                 result = execute_tool('expense', {'action': 'today'})
                 if '💰 No expenses' not in result:
                     parts.append(f"**💸 오늘 지출**\n{result}\n")

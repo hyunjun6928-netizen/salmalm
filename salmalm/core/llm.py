@@ -13,7 +13,7 @@ import urllib.parse
 import urllib.request
 
 from salmalm.constants import DEFAULT_MAX_TOKENS, FALLBACK_MODELS
-from salmalm.crypto import vault, log
+from salmalm.security.crypto import vault, log
 from salmalm.core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded, _metrics
 
 import os as _os
@@ -24,7 +24,7 @@ _UA: str = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Geck
 
 def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120) -> dict:
     """HTTP POST with retry for transient errors (5xx, timeout, 429, 529)."""
-    from salmalm.retry import retry_call
+    from salmalm.utils.retry import retry_call
 
     def _do_post():
         data = json.dumps(body).encode('utf-8')

@@ -19,7 +19,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 
 # ── Enums ──
 

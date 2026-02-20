@@ -71,7 +71,7 @@ class TestXSS(unittest.TestCase):
     def test_script_tag_in_html_response(self):
         """HTML responses should use CSP nonces, not raw script tags."""
         try:
-            from salmalm.templates import WEB_HTML
+            from salmalm.web.templates import WEB_HTML
             # All script tags should be plain <script> (nonce injected at runtime)
             scripts = re.findall(r'<script[^>]*>', WEB_HTML)
             for s in scripts:
@@ -110,7 +110,7 @@ class TestPathTraversal(unittest.TestCase):
 
     def test_basic_traversal(self):
         """Path with .. should be blocked for writing."""
-        from salmalm.tools_common import _resolve_path
+        from salmalm.tools.tools_common import _resolve_path
         traversal_paths = [
             '../../etc/passwd',
             '../../../etc/shadow',
@@ -124,7 +124,7 @@ class TestPathTraversal(unittest.TestCase):
 
     def test_null_byte_in_path(self):
         """Null bytes in file paths should be rejected."""
-        from salmalm.tools_common import _resolve_path
+        from salmalm.tools.tools_common import _resolve_path
         try:
             result = _resolve_path('test\x00.txt', writing=True)
             # If it doesn't raise, path should not contain null byte
@@ -151,7 +151,7 @@ class TestSSRF(unittest.TestCase):
 
     def test_localhost_blocked(self):
         """Requests to localhost should be blocked."""
-        from salmalm.tools_common import _is_private_url
+        from salmalm.tools.tools_common import _is_private_url
         localhost_urls = [
             'http://127.0.0.1/',
             'http://localhost/',
@@ -165,7 +165,7 @@ class TestSSRF(unittest.TestCase):
 
     def test_metadata_endpoint_blocked(self):
         """Cloud metadata endpoints should be blocked."""
-        from salmalm.tools_common import _is_private_url
+        from salmalm.tools.tools_common import _is_private_url
         metadata_urls = [
             'http://169.254.169.254/latest/meta-data/',
             'http://metadata.google.internal/computeMetadata/v1/',
@@ -176,7 +176,7 @@ class TestSSRF(unittest.TestCase):
 
     def test_private_ip_blocked(self):
         """Private IP ranges should be blocked."""
-        from salmalm.tools_common import _is_private_url
+        from salmalm.tools.tools_common import _is_private_url
         private_urls = [
             'http://10.0.0.1/',
             'http://172.16.0.1/',
@@ -213,14 +213,14 @@ class TestAuthentication(unittest.TestCase):
 
     def test_invalid_token(self):
         """Invalid tokens should be rejected."""
-        from salmalm.auth import auth_manager
+        from salmalm.web.auth import auth_manager
         auth_manager._ensure_db()
         result = auth_manager.verify_token('invalid.token.here')
         self.assertIsNone(result)
 
     def test_expired_token(self):
         """Expired tokens should be rejected."""
-        from salmalm.auth import TokenManager
+        from salmalm.web.auth import TokenManager
         tm = TokenManager(secret=b'test_secret_key_32bytes_minimum!')
         token = tm.create({'uid': 1, 'usr': 'test', 'role': 'user'}, expires_in=-1)
         result = tm.verify(token)
@@ -228,7 +228,7 @@ class TestAuthentication(unittest.TestCase):
 
     def test_tampered_token(self):
         """Tampered tokens should be rejected."""
-        from salmalm.auth import TokenManager
+        from salmalm.web.auth import TokenManager
         tm = TokenManager(secret=b'test_secret_key_32bytes_minimum!')
         token = tm.create({'uid': 1, 'usr': 'test', 'role': 'user'})
         # Tamper with the token
@@ -239,7 +239,7 @@ class TestAuthentication(unittest.TestCase):
 
     def test_missing_auth_header(self):
         """Requests without auth headers should return None."""
-        from salmalm.auth import extract_auth
+        from salmalm.web.auth import extract_auth
         result = extract_auth({})
         self.assertIsNone(result)
 
@@ -250,7 +250,7 @@ class TestAuthentication(unittest.TestCase):
 
     def test_password_hashing_strength(self):
         """Password hashing should use PBKDF2 with sufficient iterations."""
-        from salmalm.auth import _hash_password, _verify_password
+        from salmalm.web.auth import _hash_password, _verify_password
         pw = 'test_password_123!'
         h, s = _hash_password(pw)
         self.assertEqual(len(h), 32, "Hash should be 32 bytes (SHA-256)")
@@ -264,7 +264,7 @@ class TestRateLimiting(unittest.TestCase):
 
     def test_rate_limiter_blocks_excess(self):
         """Rate limiter should block excessive requests."""
-        from salmalm.auth import RateLimiter, RateLimitExceeded
+        from salmalm.web.auth import RateLimiter, RateLimitExceeded
         rl = RateLimiter()
         # Anonymous: 5 req/min burst 10
         key = 'test_anon_' + secrets.token_hex(4)
@@ -347,7 +347,7 @@ class TestCommandInjection(unittest.TestCase):
 
     def test_blocked_commands(self):
         """Dangerous commands should be blocked."""
-        from salmalm.tools_common import _is_safe_command
+        from salmalm.tools.tools_common import _is_safe_command
         dangerous_cmds = [
             'rm -rf /',
             'dd if=/dev/zero of=/dev/sda',
@@ -361,7 +361,7 @@ class TestCommandInjection(unittest.TestCase):
 
     def test_pipeline_injection(self):
         """Command injection via pipeline should be blocked."""
-        from salmalm.tools_common import _is_safe_command
+        from salmalm.tools.tools_common import _is_safe_command
         injection_cmds = [
             'ls | rm -rf /',
             'echo test; rm -rf /',
@@ -377,7 +377,7 @@ class TestCryptography(unittest.TestCase):
 
     def test_vault_encryption_roundtrip(self):
         """Vault should encrypt and decrypt data correctly."""
-        from salmalm.crypto import Vault
+        from salmalm.security.crypto import Vault
         import tempfile
         v = Vault()
         with tempfile.NamedTemporaryFile(suffix='.vault', delete=False) as f:
@@ -424,7 +424,7 @@ class TestCryptography(unittest.TestCase):
         """Password verification should use constant-time comparison."""
         import hmac
         # Verify hmac.compare_digest is used (checked in source)
-        from salmalm.auth import _verify_password
+        from salmalm.web.auth import _verify_password
         h, s = hashlib.pbkdf2_hmac('sha256', b'test', os.urandom(32), 100000), os.urandom(32)
         # Just verify the function exists and works
         self.assertIsNotNone(_verify_password)
@@ -532,7 +532,7 @@ class TestPythonEvalSandbox(unittest.TestCase):
 
     def test_blocked_imports(self):
         """Dangerous imports should be blocked in python_eval."""
-        from salmalm.tools_exec import handle_python_eval
+        from salmalm.tools.tools_exec import handle_python_eval
         dangerous_codes = [
             'import os; os.system("ls")',
             'import subprocess; subprocess.run(["ls"])',
@@ -547,7 +547,7 @@ class TestPythonEvalSandbox(unittest.TestCase):
 
     def test_dunder_access_blocked(self):
         """Dunder attribute access should be blocked."""
-        from salmalm.tools_exec import handle_python_eval
+        from salmalm.tools.tools_exec import handle_python_eval
         dunder_codes = [
             '().__class__.__bases__[0].__subclasses__()',
             '"".__class__.__mro__[1].__subclasses__()',

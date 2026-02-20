@@ -3,7 +3,7 @@ import asyncio
 
 import pytest
 
-from salmalm.split_response import SplitResponder, SPLIT_MODES, _AUTO_DETECT_RE
+from salmalm.features.split_response import SplitResponder, SPLIT_MODES, _AUTO_DETECT_RE
 
 
 @pytest.fixture

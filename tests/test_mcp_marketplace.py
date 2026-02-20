@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from salmalm.mcp_marketplace import MCPMarketplace, MCP_CATALOG
+from salmalm.features.mcp_marketplace import MCPMarketplace, MCP_CATALOG
 
 
 class TestMCPCatalog:

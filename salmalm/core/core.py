@@ -15,8 +15,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
-from salmalm.constants import *  # noqa: F403
-from salmalm.crypto import vault, log
+from salmalm.constants import (
+    AUDIT_DB, BASE_DIR, CACHE_TTL, COMPACTION_THRESHOLD, COMPLEX_INDICATORS,
+    DATA_DIR, KST, MEMORY_DIR, MEMORY_FILE, MODEL_COSTS, MODEL_TIERS,
+    SIMPLE_QUERY_MAX_CHARS, TOOL_HINT_KEYWORDS, WORKSPACE_DIR,
+)
+from salmalm.security.crypto import vault, log
 
 # ============================================================
 _audit_lock = threading.Lock()  # Audit log writes
@@ -453,7 +457,7 @@ def track_usage(
         # Record cost against user quota
         if user_id:
             try:
-                from salmalm.users import user_manager
+                from salmalm.features.users import user_manager
 
                 user_manager.record_cost(user_id, cost)
             except Exception as e:
@@ -679,7 +683,7 @@ def compact_messages(
         f"[{m['role']}]: {_msg_content_str(m)[:300]}" for m in to_summarize[-20:]
     )
 
-    from salmalm.llm import call_llm
+    from salmalm.core.llm import call_llm
 
     # Pick cheapest available model for summarization (avoid hardcoded google)
     summary_model = router._pick_available(1)
@@ -901,7 +905,7 @@ _tfidf = TFIDFSearch()
 # ============================================================
 # MEMORY MANAGER — delegated to salmalm.memory module
 # ============================================================
-from salmalm.memory import MemoryManager, memory_manager
+from salmalm.core.memory import MemoryManager, memory_manager
 
 
 # ============================================================
@@ -1063,7 +1067,7 @@ class LLMCronManager:
                 continue
             log.info(f"[CRON] LLM cron firing: {job['name']} ({job['id']})")
             try:
-                from salmalm.engine import process_message
+                from salmalm.core.engine import process_message
 
                 # Track cost before/after to enforce per-cron-job cap
                 cost_before = _usage["total_cost"]
@@ -1104,7 +1108,7 @@ class LLMCronManager:
                             channel_id = notify_cfg.get("channel_id", "")
                             if channel_id:
                                 try:
-                                    import salmalm.discord_bot as _dmod
+                                    import salmalm.channels.discord_bot as _dmod
 
                                     dbot = getattr(_dmod, "_bot", None)
                                     if dbot and hasattr(dbot, "send_message"):
@@ -1341,13 +1345,13 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                         )
                         _sessions[session_id].messages = []
                     # Refresh system prompt
-                    from salmalm.prompt import build_system_prompt
+                    from salmalm.core.prompt import build_system_prompt
 
                     _sessions[session_id].add_system(build_system_prompt(full=False))
                     return _sessions[session_id]
             except Exception as e:
                 log.warning(f"Session restore error: {e}")
-            from salmalm.prompt import build_system_prompt
+            from salmalm.core.prompt import build_system_prompt
 
             _sessions[session_id].add_system(build_system_prompt(full=True))
             log.info(
@@ -1717,7 +1721,7 @@ class HeartbeatManager:
             state_ctx = "\n\nLast checks:\n" + "\n".join(checks)
 
         try:
-            from salmalm.engine import process_message
+            from salmalm.core.engine import process_message
 
             # Run in isolated session (OpenClaw pattern: no cross-contamination)
             result = await process_message(
@@ -1832,7 +1836,7 @@ def compact_session(session_id: str, force: bool = False) -> str:
 
     summary_text = "\n".join(summary_parts)
 
-    from salmalm.llm import call_llm
+    from salmalm.core.llm import call_llm
 
     summary_model = router._pick_available(1)
     summ_msgs = [
@@ -2084,7 +2088,7 @@ def search_messages(query: str, limit: int = 20) -> list:
 
 
 # Re-export from agents.py
-from salmalm.agents import SubAgent, SkillLoader, PluginLoader
+from salmalm.features.agents import SubAgent, SkillLoader, PluginLoader
 
 # Module-level exports for convenience
 __all__ = [

@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from salmalm.sandbox import SandboxManager, SandboxResult, _DANGEROUS_PATTERNS
+from salmalm.security.sandbox import SandboxManager, SandboxResult, _DANGEROUS_PATTERNS
 
 
 class TestSandboxResult(unittest.TestCase):

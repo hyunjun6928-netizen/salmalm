@@ -120,7 +120,7 @@ class Doctor:
     def check_api_keys(self) -> dict:
         """API 키 설정 여부."""
         try:
-            from salmalm.crypto import vault
+            from salmalm.security.crypto import vault
             if not vault.is_unlocked:
                 return _status(False, 'Vault is locked', fixable=False)
             keys = ['anthropic_api_key']

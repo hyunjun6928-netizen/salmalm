@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from salmalm.chunker import (
+from salmalm.utils.chunker import (
     BREAK_HARD, BREAK_NEWLINE, BREAK_PARAGRAPH, BREAK_SENTENCE, BREAK_WHITESPACE,
     CHANNEL_DISCORD, CHANNEL_TELEGRAM, CHANNEL_WEB,
     ChunkerConfig, EmbeddedBlockChunker,

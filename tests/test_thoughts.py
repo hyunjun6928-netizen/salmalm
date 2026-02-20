@@ -7,7 +7,7 @@ import pytest
 
 @pytest.fixture
 def thought_db(tmp_path):
-    from salmalm.thoughts import ThoughtStream
+    from salmalm.features.thoughts import ThoughtStream
     db = tmp_path / 'thoughts.db'
     return ThoughtStream(db_path=db)
 
@@ -86,18 +86,18 @@ class TestThoughtStream:
 
 class TestFormatHelpers:
     def test_format_thoughts(self):
-        from salmalm.thoughts import _format_thoughts
+        from salmalm.features.thoughts import _format_thoughts
         thoughts = [{'id': 1, 'content': 'test', 'tags': 'a', 'mood': 'happy',
                       'created_at': '2026-02-20T10:00:00'}]
         result = _format_thoughts(thoughts)
         assert '#1' in result
 
     def test_format_thoughts_empty(self):
-        from salmalm.thoughts import _format_thoughts
+        from salmalm.features.thoughts import _format_thoughts
         assert '없습니다' in _format_thoughts([])
 
     def test_format_stats(self):
-        from salmalm.thoughts import _format_stats
+        from salmalm.features.thoughts import _format_stats
         s = {'total': 10, 'weekly': 3, 'top_tags': [('python', 5)]}
         result = _format_stats(s)
         assert '10' in result

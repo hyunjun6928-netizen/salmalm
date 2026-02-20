@@ -66,7 +66,7 @@ class TestE2EToolApproval(unittest.TestCase):
     """7. 위험 명령 승인 플로우."""
 
     def test_tool_approval_flow(self):
-        from salmalm.exec_approvals import check_approval
+        from salmalm.security.exec_approvals import check_approval
         # Dangerous commands should be flagged (returns (approved, reason, needs_confirm))
         _, _, needs_confirm_rm = check_approval('rm -rf /')
         self.assertTrue(needs_confirm_rm)
@@ -116,7 +116,7 @@ class TestE2EVaultOpenClose(unittest.TestCase):
     """10. 볼트 열기 → 저장 → 닫기 → 접근 거부."""
 
     def test_vault_open_close_flow(self):
-        from salmalm.crypto import Vault
+        from salmalm.security.crypto import Vault
         v = Vault()
         v.create('test_password_123')
         self.assertTrue(v.is_unlocked)
@@ -134,7 +134,7 @@ class TestE2EWorkflowExecution(unittest.TestCase):
     """11. 워크플로우 정의 → 실행 → 완료."""
 
     def test_workflow_execution(self):
-        from salmalm.workflow import WorkflowEngine
+        from salmalm.features.workflow import WorkflowEngine
 
         executed = []
 
@@ -159,7 +159,7 @@ class TestE2EMoodDetection(unittest.TestCase):
     """12. 슬픈 메시지 → 감정 감지."""
 
     def test_mood_detection_to_tone(self):
-        from salmalm.mood import MoodDetector
+        from salmalm.features.mood import MoodDetector
         detector = MoodDetector()
         mood, confidence = detector.detect('너무 슬퍼... 힘들어 😢')
         self.assertIn(mood, ('sad', 'anxious', 'stressed', 'neutral'))
@@ -168,7 +168,7 @@ class TestE2EMoodDetection(unittest.TestCase):
             self.assertGreater(confidence, 0)
 
     def test_happy_mood(self):
-        from salmalm.mood import MoodDetector
+        from salmalm.features.mood import MoodDetector
         detector = MoodDetector()
         mood, conf = detector.detect('정말 행복해! 최고야! 😄🎉')
         self.assertIn(mood, ('happy', 'excited', 'grateful', 'neutral'))

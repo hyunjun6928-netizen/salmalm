@@ -94,24 +94,24 @@ class TestSubAgentLimits(unittest.TestCase):
 
     def test_max_depth_exceeded(self):
         """Sub-agent should reject spawning beyond MAX_DEPTH."""
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         with self.assertRaises(ValueError) as ctx:
             SubAgent.spawn('test task', _depth=SubAgent.MAX_DEPTH)
         self.assertIn('depth limit', str(ctx.exception).lower())
 
     def test_max_depth_value(self):
         """MAX_DEPTH should be 2."""
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         self.assertEqual(SubAgent.MAX_DEPTH, 2)
 
     def test_max_concurrent_value(self):
         """MAX_CONCURRENT should be 5."""
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         self.assertEqual(SubAgent.MAX_CONCURRENT, 5)
 
     def test_max_concurrent_exceeded(self):
         """Sub-agent should reject when too many are running."""
-        from salmalm.agents import SubAgent
+        from salmalm.features.agents import SubAgent
         original_agents = SubAgent._agents.copy()
         try:
             # Fill up with fake running agents
@@ -133,7 +133,7 @@ class TestToolResultTruncation(unittest.TestCase):
 
     def test_truncation_at_50k(self):
         """Results > 50K chars should be truncated."""
-        from salmalm.engine import IntelligenceEngine as Engine
+        from salmalm.core.engine import IntelligenceEngine as Engine
         eng = Engine()
         long_result = 'x' * 60000
         truncated = eng._truncate_tool_result(long_result)
@@ -142,7 +142,7 @@ class TestToolResultTruncation(unittest.TestCase):
 
     def test_no_truncation_under_50k(self):
         """Results <= 50K chars should pass through unchanged."""
-        from salmalm.engine import IntelligenceEngine as Engine
+        from salmalm.core.engine import IntelligenceEngine as Engine
         eng = Engine()
         short_result = 'x' * 1000
         result = eng._truncate_tool_result(short_result)
@@ -150,7 +150,7 @@ class TestToolResultTruncation(unittest.TestCase):
 
     def test_max_tool_result_chars_value(self):
         """MAX_TOOL_RESULT_CHARS should be 50_000."""
-        from salmalm.engine import IntelligenceEngine as Engine
+        from salmalm.core.engine import IntelligenceEngine as Engine
         self.assertEqual(Engine.MAX_TOOL_RESULT_CHARS, 50_000)
 
 
@@ -163,12 +163,12 @@ class TestMaxToolIterations(unittest.TestCase):
 
     def test_max_iterations_value(self):
         """MAX_TOOL_ITERATIONS should be 15."""
-        from salmalm.engine import IntelligenceEngine as Engine
+        from salmalm.core.engine import IntelligenceEngine as Engine
         self.assertEqual(Engine.MAX_TOOL_ITERATIONS, 15)
 
     def test_loop_stops_at_max_iterations(self):
         """Engine should stop the loop after MAX_TOOL_ITERATIONS."""
-        from salmalm.engine import IntelligenceEngine as Engine
+        from salmalm.core.engine import IntelligenceEngine as Engine
         from salmalm.core import get_session
 
         eng = Engine()
@@ -214,7 +214,7 @@ class TestWebFetch2MBLimit(unittest.TestCase):
 
     def test_fetch_reads_max_2mb(self):
         """web_fetch should only read up to 2MB."""
-        from salmalm.tools_web import handle_web_fetch
+        from salmalm.tools.tools_web import handle_web_fetch
 
         # Create a mock response that would return > 2MB
         mock_resp = MagicMock()
@@ -239,7 +239,7 @@ class TestCircuitBreakerIntegration(unittest.TestCase):
 
     def test_circuit_breaker_reset_on_success(self):
         """Circuit breaker should reset after cooldown + success."""
-        from salmalm.stability import CircuitBreaker
+        from salmalm.features.stability import CircuitBreaker
         cb = CircuitBreaker(threshold=2, window_sec=60, cooldown_sec=0)
         cb.record_error('test_svc', 'err1')
         cb.record_error('test_svc', 'err2')
@@ -254,7 +254,7 @@ class TestCircuitBreakerIntegration(unittest.TestCase):
 
     def test_circuit_breaker_get_status_with_errors(self):
         """get_status should report error counts."""
-        from salmalm.stability import CircuitBreaker
+        from salmalm.features.stability import CircuitBreaker
         cb = CircuitBreaker(threshold=5, window_sec=60)
         for i in range(3):
             cb.record_error('svc_a', f'error {i}')
@@ -263,7 +263,7 @@ class TestCircuitBreakerIntegration(unittest.TestCase):
 
     def test_circuit_breaker_multiple_components(self):
         """Different components should be tracked independently."""
-        from salmalm.stability import CircuitBreaker
+        from salmalm.features.stability import CircuitBreaker
         cb = CircuitBreaker(threshold=2, window_sec=60)
         cb.record_error('svc_a', 'err')
         cb.record_error('svc_a', 'err')
@@ -316,7 +316,7 @@ class TestEngineConsecutiveErrors(unittest.TestCase):
     """Test that engine stops on consecutive tool errors."""
 
     def test_max_consecutive_errors_value(self):
-        from salmalm.engine import IntelligenceEngine as Engine
+        from salmalm.core.engine import IntelligenceEngine as Engine
         self.assertEqual(Engine.MAX_CONSECUTIVE_ERRORS, 3)
 
 

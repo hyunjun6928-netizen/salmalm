@@ -15,19 +15,19 @@ class TestPersonas(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        import salmalm.prompt as prompt_mod
+        import salmalm.core.prompt as prompt_mod
         self._orig_dir = prompt_mod.PERSONAS_DIR
         prompt_mod.PERSONAS_DIR = Path(self.tmpdir) / 'personas'
         # Reset builtin flag
         prompt_mod._active_personas.clear()
 
     def tearDown(self):
-        import salmalm.prompt as prompt_mod
+        import salmalm.core.prompt as prompt_mod
         prompt_mod.PERSONAS_DIR = self._orig_dir
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_list_personas_returns_builtins(self):
-        from salmalm.prompt import list_personas
+        from salmalm.core.prompt import list_personas
         personas = list_personas()
         self.assertIsInstance(personas, list)
         names = [p['name'] for p in personas]
@@ -35,7 +35,7 @@ class TestPersonas(unittest.TestCase):
         self.assertIn('coding', names)
 
     def test_list_personas_has_required_fields(self):
-        from salmalm.prompt import list_personas
+        from salmalm.core.prompt import list_personas
         personas = list_personas()
         for p in personas:
             self.assertIn('name', p)
@@ -43,36 +43,36 @@ class TestPersonas(unittest.TestCase):
             self.assertIn('builtin', p)
 
     def test_get_persona_default(self):
-        from salmalm.prompt import get_persona
+        from salmalm.core.prompt import get_persona
         content = get_persona('default')
         self.assertIsNotNone(content)
         self.assertIn('assistant', content.lower())
 
     def test_get_persona_coding(self):
-        from salmalm.prompt import get_persona
+        from salmalm.core.prompt import get_persona
         content = get_persona('coding')
         self.assertIsNotNone(content)
         self.assertIn('code', content.lower())
 
     def test_get_persona_nonexistent(self):
-        from salmalm.prompt import get_persona
+        from salmalm.core.prompt import get_persona
         content = get_persona('nonexistent_persona_xyz')
         self.assertIsNone(content)
 
     def test_create_persona(self):
-        from salmalm.prompt import create_persona, list_personas
+        from salmalm.core.prompt import create_persona, list_personas
         ok = create_persona('test_persona', '# Test\nYou are a test bot.')
         self.assertTrue(ok)
         names = [p['name'] for p in list_personas()]
         self.assertIn('test_persona', names)
 
     def test_create_persona_invalid_name(self):
-        from salmalm.prompt import create_persona
+        from salmalm.core.prompt import create_persona
         ok = create_persona('', 'content')
         self.assertFalse(ok)
 
     def test_delete_persona_custom(self):
-        from salmalm.prompt import create_persona, delete_persona, list_personas
+        from salmalm.core.prompt import create_persona, delete_persona, list_personas
         create_persona('deleteme', '# Delete me')
         ok = delete_persona('deleteme')
         self.assertTrue(ok)
@@ -80,12 +80,12 @@ class TestPersonas(unittest.TestCase):
         self.assertNotIn('deleteme', names)
 
     def test_delete_builtin_persona_fails(self):
-        from salmalm.prompt import delete_persona
+        from salmalm.core.prompt import delete_persona
         ok = delete_persona('default')
         self.assertFalse(ok)
 
     def test_switch_persona(self):
-        from salmalm.prompt import switch_persona, get_active_persona
+        from salmalm.core.prompt import switch_persona, get_active_persona
         content = switch_persona('test_session', 'coding')
         self.assertIsNotNone(content)
         active = get_active_persona('test_session')

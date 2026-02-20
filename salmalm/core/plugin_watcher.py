@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Dict, Optional, Set
 
-from salmalm.crypto import log
+from salmalm.security.crypto import log
 from salmalm.features.plugin_manager import PLUGINS_DIR, plugin_manager
 
 

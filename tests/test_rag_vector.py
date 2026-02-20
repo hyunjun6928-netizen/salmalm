@@ -15,7 +15,7 @@ import pytest
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from salmalm.rag import (
+from salmalm.features.rag import (
     RAGEngine, decompose_jamo, simple_stem, expand_query,
     compute_tf, cosine_similarity, load_rag_config, _SYNONYMS,
 )
