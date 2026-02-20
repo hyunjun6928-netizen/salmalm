@@ -235,7 +235,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     </div>
     <div id="session-list" style="max-height:240px;overflow-y:auto;padding:0 8px 4px"></div>
     <div class="nav-section" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px">📡 Channels</div>
-    <div class="nav-item" id="tg-status">📡 Telegram <span class="badge">ON</span></div>
+    <div class="nav-item" data-action="showChannels" id="tg-status">📡 Telegram <span class="badge">ON</span></div>
+    <div class="nav-item" data-action="showSessions" data-i18n="nav-sessions">📋 Sessions</div>
     <div class="nav-section" data-action="toggleTools" style="cursor:pointer" id="tools-header">🛠️ Tools ▾</div>
     <div id="tools-list" style="display:none">
     <input id="tools-search" type="text" placeholder="Search tools..." style="width:calc(100% - 16px);margin:4px 8px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:12px;outline:none">
@@ -245,6 +246,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div class="nav-item" data-action="showSettings"data-i18n="nav-settings">⚙️ Settings</div>
     <div class="nav-item" data-action="showUsage">📊 Usage</div>
     <div class="nav-item" data-action="showDashboard">📈 Dashboard</div>
+    <div class="nav-item" data-action="showDocs" data-i18n="nav-docs">📖 Docs</div>
   </div>
   <div class="side-footer">
     <div class="status"><span class="dot"></span> Running</div>
@@ -547,6 +549,32 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px" data-i18n="dash-back">← Back to Chat</a></div>
   <h2 style="margin-bottom:16px" data-i18n="dash-title">📈 Dashboard</h2>
   <div id="dashboard-content" style="color:var(--text2)" data-i18n="dash-loading">Loading...</div>
+</div>
+
+<!-- Sessions Panel -->
+<div id="sessions-view" style="display:none;padding:20px;max-width:1200px;margin:0 auto">
+  <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px">← Back to Chat</a></div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <h2 style="margin:0" data-i18n="sess-title">📋 Sessions</h2>
+    <input id="sess-search" type="text" placeholder="Search sessions..." style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px" data-i18n-ph="sess-search-ph">
+    <button class="btn" data-action="refreshSessions" style="font-size:12px">🔄</button>
+  </div>
+  <div id="sessions-table" style="color:var(--text2)">Loading...</div>
+</div>
+
+<!-- Channels Panel -->
+<div id="channels-view" style="display:none;padding:20px;max-width:1200px;margin:0 auto">
+  <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px">← Back to Chat</a></div>
+  <h2 style="margin-bottom:16px" data-i18n="ch-title">📡 Channels</h2>
+  <div id="channels-content">Loading...</div>
+</div>
+
+<!-- Docs Panel -->
+<div id="docs-view" style="display:none;padding:20px;max-width:900px;margin:0 auto">
+  <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px">← Back to Chat</a></div>
+  <h2 style="margin-bottom:16px" data-i18n="docs-title">📖 Documentation</h2>
+  <input id="docs-search" type="text" placeholder="Search docs..." style="width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;margin-bottom:16px" data-i18n-ph="docs-search-ph">
+  <div id="docs-content"></div>
 </div>
 
 <div id="search-modal">
@@ -1369,6 +1397,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-cmdpalette':'Command palette',
       'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.',
       'mr-active':'Active Model','mr-providers-title':'📦 Models by Provider','mr-providers-desc':'Click a model to switch. Pricing per 1M tokens (input / output).','mr-keys-desc':'Enter API keys to enable providers. Keys are tested in real-time.',
+      'nav-sessions':'📋 Sessions','nav-docs':'📖 Docs',
+      'sess-title':'📋 Sessions','sess-search-ph':'Search sessions...',
+      'ch-title':'📡 Channels','docs-title':'📖 Documentation','docs-search-ph':'Search docs...',
       'tab-debug':'🔬 Debug','h-debug':'🔬 Debug Diagnostics',
       'tab-logs':'📋 Logs','h-logs':'📋 Server Logs',
       'pwa-install-text':'Install SalmAlm as an app','pwa-install-btn':'Install','pwa-dismiss':'Later',
@@ -1475,6 +1506,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-cmdpalette':'커맨드 팔레트',
       'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.',
       'mr-active':'활성 모델','mr-providers-title':'📦 프로바이더별 모델','mr-providers-desc':'모델을 클릭하면 전환됩니다. 가격: 1M 토큰당 (입력 / 출력).','mr-keys-desc':'API 키를 입력하면 프로바이더가 활성화됩니다. 키는 실시간으로 테스트됩니다.',
+      'nav-sessions':'📋 세션','nav-docs':'📖 문서',
+      'sess-title':'📋 세션 관리','sess-search-ph':'세션 검색...',
+      'ch-title':'📡 채널','docs-title':'📖 문서','docs-search-ph':'문서 검색...',
       'tab-debug':'🔬 디버그','h-debug':'🔬 디버그 진단',
       'tab-logs':'📋 로그','h-logs':'📋 서버 로그',
       'pwa-install-text':'SalmAlm을 앱으로 설치','pwa-install-btn':'설치','pwa-dismiss':'나중에',
@@ -1597,8 +1631,15 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   window.setLang=function(v){_lang=v;localStorage.setItem('salmalm-lang',v);applyLang();if(typeof renderFeatures==='function')renderFeatures(document.getElementById('features-search')?document.getElementById('features-search').value:'');};
   /* --- Settings --- */
   var dashView=document.getElementById('dashboard-view');
-  window.showChat=function(){settingsEl.style.display='none';dashView.style.display='none';chat.style.display='flex';inputArea.style.display='block'};
-  window.showSettings=function(){chat.style.display='none';inputArea.style.display='none';dashView.style.display='none';settingsEl.style.display='block';
+  var sessView=document.getElementById('sessions-view');
+  var chView=document.getElementById('channels-view');
+  var docsView=document.getElementById('docs-view');
+  function _hideAll(){settingsEl.style.display='none';dashView.style.display='none';sessView.style.display='none';chView.style.display='none';docsView.style.display='none';chat.style.display='none';inputArea.style.display='none'}
+  window.showChat=function(){_hideAll();chat.style.display='flex';inputArea.style.display='block'};
+  window.showSessions=function(){_hideAll();sessView.style.display='block';window._loadSessions()};
+  window.showChannels=function(){_hideAll();chView.style.display='block';window._loadChannels()};
+  window.showDocs=function(){_hideAll();docsView.style.display='block';window._renderDocs('')};
+  window.showSettings=function(){_hideAll();settingsEl.style.display='block';
     /* Load personas */
     if(window.loadPersonas)window.loadPersonas();
     /* Load users panel */
@@ -1880,7 +1921,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   });
 
   window.showDashboard=function(){
-    chat.style.display='none';inputArea.style.display='none';settingsEl.style.display='none';dashView.style.display='block';
+    _hideAll();dashView.style.display='block';
     var dc=document.getElementById('dashboard-content');dc.innerHTML='<p style="color:var(--text2)">Loading...</p>';
     fetch('/api/dashboard',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
       var u=d.usage||{};var kr=_lang==='ko';
@@ -2282,6 +2323,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='showSettings')window.showSettings();
     else if(a==='showUsage')window.showSettings();
     else if(a==='showDashboard')window.showDashboard();
+    else if(a==='showSessions')window.showSessions();
+    else if(a==='showChannels')window.showChannels();
+    else if(a==='showDocs')window.showDocs();
+    else if(a==='refreshSessions')window._loadSessions();
+    else if(a==='sess-delete'){var sid=el.getAttribute('data-sid');if(sid&&confirm((_lang==='ko'?'세션을 삭제하시겠습니까?':'Delete this session?')+'\n'+sid)){fetch('/api/sessions/delete',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({session_id:sid})}).then(function(){window._loadSessions();loadSessions()})}}
+    else if(a==='sess-open'){var sid2=el.getAttribute('data-sid');if(sid2){window._currentSession=sid2;showChat();loadSessions();loadChatHistory(sid2)}}
     else if(a==='toggleSidebar')window.toggleSidebar();
     else if(a==='toggleTheme')window.toggleTheme();
     else if(a==='openDashboard')window.showDashboard();
@@ -2539,6 +2586,152 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* ── Logs Tab ── */
   var _logAutoTimer=null;
+  /* ── Sessions Panel ── */
+  window._loadSessions=function(){
+    var container=document.getElementById('sessions-table');if(!container)return;
+    container.innerHTML='Loading...';
+    fetch('/api/sessions',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var sessions=d.sessions||[];var kr=_lang==='ko';
+      var q=(document.getElementById('sess-search')||{}).value||'';
+      var ql=q.toLowerCase();
+      if(ql)sessions=sessions.filter(function(s){return(s.title||'').toLowerCase().indexOf(ql)>=0||s.id.toLowerCase().indexOf(ql)>=0});
+      if(!sessions.length){container.innerHTML='<div style="padding:20px;text-align:center;color:var(--text2)">'+(kr?'세션 없음':'No sessions')+'</div>';return}
+      var h='<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+      h+='<div style="padding:10px 14px;font-weight:600;font-size:12px;background:var(--bg3);border-bottom:1px solid var(--border)">'+(kr?'제목':'Title')+'</div>';
+      h+='<div style="padding:10px 14px;font-weight:600;font-size:12px;background:var(--bg3);border-bottom:1px solid var(--border)">'+(kr?'메시지':'Msgs')+'</div>';
+      h+='<div style="padding:10px 14px;font-weight:600;font-size:12px;background:var(--bg3);border-bottom:1px solid var(--border)">'+(kr?'마지막 활동':'Last Active')+'</div>';
+      h+='<div style="padding:10px 14px;font-weight:600;font-size:12px;background:var(--bg3);border-bottom:1px solid var(--border)"></div>';
+      sessions.forEach(function(s){
+        var title=(s.title||s.id).substring(0,50);
+        var ago=s.updated_at?_timeAgo(s.updated_at):'—';
+        var isBranch=s.parent_session_id?'🔀 ':'';
+        h+='<div style="padding:8px 14px;font-size:13px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center" data-action="sess-open" data-sid="'+s.id+'">'+isBranch+title+'</div>';
+        h+='<div style="padding:8px 14px;font-size:12px;border-bottom:1px solid var(--border);color:var(--text2);text-align:center">'+(s.messages||0)+'</div>';
+        h+='<div style="padding:8px 14px;font-size:12px;border-bottom:1px solid var(--border);color:var(--text2)">'+ago+'</div>';
+        h+='<div style="padding:8px 14px;font-size:12px;border-bottom:1px solid var(--border);text-align:center"><button data-action="sess-delete" data-sid="'+s.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Delete">🗑️</button></div>';
+      });
+      h+='</div>';
+      h+='<div style="margin-top:8px;font-size:12px;color:var(--text2)">'+(kr?'총 '+sessions.length+'개 세션':sessions.length+' sessions')+'</div>';
+      container.innerHTML=h;
+    }).catch(function(e){container.innerHTML='Error: '+e.message});
+  };
+  function _timeAgo(dt){
+    var d=new Date(dt);var now=new Date();var diff=Math.floor((now-d)/1000);
+    if(diff<60)return diff+'s';if(diff<3600)return Math.floor(diff/60)+'m';
+    if(diff<86400)return Math.floor(diff/3600)+'h';return Math.floor(diff/86400)+'d';
+  }
+  if(document.getElementById('sess-search'))document.getElementById('sess-search').addEventListener('input',function(){window._loadSessions()});
+
+  /* ── Channels Panel ── */
+  window._loadChannels=function(){
+    var c=document.getElementById('channels-content');if(!c)return;
+    var kr=_lang==='ko';
+    fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">';
+      // Telegram
+      h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">';
+      h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:24px">📡</span><div><div style="font-weight:600">Telegram</div><div style="font-size:12px;color:var(--text2)">'+(kr?'메시지 채널':'Messaging Channel')+'</div></div>';
+      h+='<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;background:'+(d.unlocked?'#dcfce7;color:#16a34a':'#fee2e2;color:#dc2626')+'">'+(d.unlocked?(kr?'활성':'Active'):(kr?'비활성':'Inactive'))+'</span></div>';
+      h+='<div style="font-size:12px;color:var(--text2);line-height:1.8">';
+      h+=(kr?'상태: 웹 UI에서 설정 → Telegram Bot Token 입력':'Status: Set Telegram Bot Token in Settings')+'</div></div>';
+      // Web Chat
+      h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">';
+      h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:24px">💬</span><div><div style="font-weight:600">Web Chat</div><div style="font-size:12px;color:var(--text2)">'+(kr?'기본 채널':'Default Channel')+'</div></div>';
+      h+='<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;background:#dcfce7;color:#16a34a">'+(kr?'활성':'Active')+'</span></div>';
+      h+='<div style="font-size:12px;color:var(--text2);line-height:1.8">localhost:'+location.port+'</div></div>';
+      // WebSocket
+      h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">';
+      h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:24px">🔌</span><div><div style="font-weight:600">WebSocket</div><div style="font-size:12px;color:var(--text2)">'+(kr?'실시간 연결':'Real-time Connection')+'</div></div>';
+      h+='<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;background:#dcfce7;color:#16a34a">'+(kr?'활성':'Active')+'</span></div>';
+      h+='<div style="font-size:12px;color:var(--text2);line-height:1.8">ws://localhost</div></div>';
+      // Future channels placeholder
+      h+='<div style="background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:13px">';
+      h+='<div style="text-align:center">➕<br>'+(kr?'Discord, Slack 등 추가 예정':'Discord, Slack coming soon')+'</div></div>';
+      h+='</div>';
+      c.innerHTML=h;
+    }).catch(function(e){c.innerHTML='Error: '+e.message});
+  };
+
+  /* ── Docs Panel ── */
+  var _docsData=[
+    {catKr:'슬래시 커맨드',catEn:'Slash Commands',items:[
+      {cmd:'/help',en:'Show all commands and tools',kr:'모든 명령어와 도구 표시'},
+      {cmd:'/status',en:'Session status (model, tokens, cost)',kr:'세션 상태 (모델, 토큰, 비용)'},
+      {cmd:'/model <name>',en:'Switch AI model',kr:'AI 모델 전환'},
+      {cmd:'/compact',en:'Compress conversation context',kr:'대화 컨텍스트 압축'},
+      {cmd:'/context',en:'Token count breakdown',kr:'토큰 수 분석'},
+      {cmd:'/usage',en:'Token and cost tracking',kr:'토큰 및 비용 추적'},
+      {cmd:'/think [level]',en:'Extended thinking mode (low/medium/high)',kr:'확장 사고 모드 (low/medium/high)'},
+      {cmd:'/persona <name>',en:'Switch persona',kr:'페르소나 전환'},
+      {cmd:'/branch',en:'Branch conversation',kr:'대화 분기'},
+      {cmd:'/rollback [n]',en:'Rollback last n messages',kr:'마지막 n개 메시지 롤백'},
+      {cmd:'/remind <time> <msg>',en:'Set a reminder',kr:'리마인더 설정'},
+      {cmd:'/expense <amount> <desc>',en:'Track an expense',kr:'지출 기록'},
+      {cmd:'/pomodoro',en:'Pomodoro timer',kr:'뽀모도로 타이머'},
+      {cmd:'/note <text>',en:'Quick note',kr:'빠른 메모'},
+      {cmd:'/link <url>',en:'Save a link',kr:'링크 저장'},
+      {cmd:'/routine',en:'Manage daily routines',kr:'일일 루틴 관리'},
+      {cmd:'/shadow',en:'Shadow mode (silent learning)',kr:'섀도우 모드 (무음 학습)'},
+      {cmd:'/vault',en:'Encrypted vault operations',kr:'암호화 금고 작업'},
+      {cmd:'/capsule',en:'Time capsule messages',kr:'타임캡슐 메시지'},
+      {cmd:'/deadman',en:'Dead man\'s switch',kr:'데드맨 스위치'},
+      {cmd:'/a2a',en:'Agent-to-agent protocol',kr:'에이전트 간 프로토콜'},
+      {cmd:'/workflow',en:'Workflow engine',kr:'워크플로우 엔진'},
+      {cmd:'/mcp',en:'MCP server management',kr:'MCP 서버 관리'},
+      {cmd:'/subagents',en:'Sub-agent management',kr:'서브 에이전트 관리'},
+      {cmd:'/evolve',en:'Self-evolving prompt rules',kr:'자기 진화 프롬프트 규칙'},
+      {cmd:'/mood',en:'Mood-aware mode',kr:'감정 인식 모드'},
+      {cmd:'/split',en:'A/B split response comparison',kr:'A/B 분할 응답 비교'},
+      {cmd:'/cron',en:'Cron job management',kr:'크론 작업 관리'},
+      {cmd:'/bash <cmd>',en:'Run shell command',kr:'셸 명령 실행'},
+      {cmd:'/screen',en:'Browser control',kr:'브라우저 제어'},
+      {cmd:'/life',en:'Life dashboard',kr:'라이프 대시보드'},
+      {cmd:'/oauth',en:'OAuth setup',kr:'OAuth 설정'},
+    ]},
+    {catKr:'단축키',catEn:'Keyboard Shortcuts',items:[
+      {cmd:'Enter',en:'Send message',kr:'메시지 전송'},
+      {cmd:'Shift+Enter',en:'New line',kr:'줄바꿈'},
+      {cmd:'Ctrl+K',en:'Search conversations',kr:'대화 검색'},
+      {cmd:'Ctrl+/',en:'Command palette',kr:'명령 팔레트'},
+      {cmd:'Ctrl+V',en:'Paste image/file',kr:'이미지/파일 붙여넣기'},
+      {cmd:'Esc',en:'Close modal / Back to chat',kr:'모달 닫기 / 채팅으로 돌아가기'},
+    ]},
+    {catKr:'고유 기능',catEn:'Unique Features',items:[
+      {cmd:'Self-Evolving Prompt',en:'AI auto-generates prompt rules from conversations (max 20)',kr:'대화에서 프롬프트 규칙 자동 생성 (최대 20개)'},
+      {cmd:'Dead Man\'s Switch',en:'Automated actions if owner goes inactive',kr:'소유자 비활성 시 자동 조치'},
+      {cmd:'Shadow Mode',en:'AI silently observes without responding',kr:'AI가 응답 없이 조용히 관찰'},
+      {cmd:'Life Dashboard',en:'Unified view of health, finance, habits',kr:'건강, 재정, 습관 통합 뷰'},
+      {cmd:'Mood-Aware',en:'Emotional state detection and adaptation',kr:'감정 상태 감지 및 적응'},
+      {cmd:'Encrypted Vault',en:'AES-256-GCM encrypted secret storage',kr:'AES-256-GCM 암호화 비밀 저장소'},
+      {cmd:'A/B Split Response',en:'Compare two model responses side-by-side',kr:'두 모델 응답을 나란히 비교'},
+      {cmd:'Time Capsule',en:'Schedule messages to future self',kr:'미래의 나에게 메시지 예약'},
+      {cmd:'Thought Stream',en:'Private journaling with mood tracking',kr:'감정 추적 포함 개인 일기'},
+      {cmd:'Agent-to-Agent',en:'HMAC-signed inter-agent communication',kr:'HMAC 서명된 에이전트 간 통신'},
+    ]},
+  ];
+  window._renderDocs=function(q){
+    var c=document.getElementById('docs-content');if(!c)return;
+    var kr=_lang==='ko';var ql=q.toLowerCase();var h='';
+    _docsData.forEach(function(sec){
+      var catTitle=kr?sec.catKr:sec.catEn;
+      var items=sec.items;
+      if(ql)items=items.filter(function(i){return i.cmd.toLowerCase().indexOf(ql)>=0||(kr?i.kr:i.en).toLowerCase().indexOf(ql)>=0||i.en.toLowerCase().indexOf(ql)>=0||i.kr.indexOf(ql)>=0});
+      if(!items.length)return;
+      h+='<div style="margin-bottom:20px"><h3 style="margin-bottom:10px;font-size:15px">'+catTitle+'</h3>';
+      h+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+      items.forEach(function(i,idx){
+        var bg=idx%2===0?'var(--bg)':'var(--bg3)';
+        h+='<div style="display:flex;padding:10px 14px;background:'+bg+';border-bottom:1px solid var(--border);gap:16px;align-items:baseline">';
+        h+='<code style="font-size:13px;font-weight:600;white-space:nowrap;min-width:180px;color:var(--accent2)">'+i.cmd+'</code>';
+        h+='<span style="font-size:13px;color:var(--text)">'+(kr?i.kr:i.en)+'</span></div>';
+      });
+      h+='</div></div>';
+    });
+    if(!h)h='<div style="padding:20px;text-align:center;color:var(--text2)">'+(kr?'검색 결과 없음':'No results')+'</div>';
+    c.innerHTML=h;
+  };
+  if(document.getElementById('docs-search'))document.getElementById('docs-search').addEventListener('input',function(){window._renderDocs(this.value)});
+
   /* ── Debug Tab ── */
   var _debugAutoTimer=null;
   window._loadDebug=function(){
