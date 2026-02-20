@@ -243,6 +243,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="tools-items" style="max-height:320px;overflow-y:auto"></div>
     </div>
     <div class="nav-section" data-i18n="sec-admin">Admin</div>
+    <div class="nav-item" data-action="showCron" data-i18n="nav-cron">⏰ Cron Jobs</div>
+    <div class="nav-item" data-action="showMemory" data-i18n="nav-memory">🧠 Memory</div>
     <div class="nav-item" data-action="showSettings" data-i18n="nav-settings">⚙️ Settings</div>
     <div class="nav-item" data-action="showDashboard" data-i18n="nav-dashboard">📈 Dashboard</div>
     <div class="nav-item" data-action="showDocs" data-i18n="nav-docs">📖 Docs</div>
@@ -548,6 +550,44 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px" data-i18n="dash-back">← Back to Chat</a></div>
   <h2 style="margin-bottom:16px" data-i18n="dash-title">📈 Dashboard</h2>
   <div id="dashboard-content" style="color:var(--text2)" data-i18n="dash-loading">Loading...</div>
+</div>
+
+<!-- Cron Jobs Panel -->
+<div id="cron-view" style="display:none;padding:20px;max-width:1200px;margin:0 auto">
+  <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px">← Back to Chat</a></div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <h2 style="margin:0" data-i18n="cron-title">⏰ Cron Jobs</h2>
+    <button class="btn" data-action="refreshCron" style="font-size:12px">🔄</button>
+    <button class="btn" data-action="addCronForm" style="font-size:12px;background:var(--accent);color:#fff" data-i18n="cron-add">➕ Add Job</button>
+  </div>
+  <div id="cron-add-form" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;font-weight:600" data-i18n="cron-name">Name</label><input id="cron-name" type="text" placeholder="my-job" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:4px"></div>
+      <div><label style="font-size:12px;font-weight:600" data-i18n="cron-interval">Interval (seconds)</label><input id="cron-interval" type="number" value="3600" min="60" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:4px"></div>
+    </div>
+    <label style="font-size:12px;font-weight:600" data-i18n="cron-prompt">Prompt</label>
+    <textarea id="cron-prompt" rows="3" placeholder="What should the AI do?" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:4px;resize:vertical"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn" data-action="saveCron" style="background:var(--accent);color:#fff" data-i18n="btn-save">Save</button>
+      <button class="btn" data-action="cancelCron" style="background:var(--bg3)" data-i18n="btn-cancel">Cancel</button>
+    </div>
+  </div>
+  <div id="cron-table">Loading...</div>
+</div>
+
+<!-- Memory Panel -->
+<div id="memory-view" style="display:none;padding:20px;max-width:1200px;margin:0 auto">
+  <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px">← Back to Chat</a></div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <h2 style="margin:0" data-i18n="mem-title">🧠 Memory</h2>
+    <button class="btn" data-action="refreshMemory" style="font-size:12px">🔄</button>
+  </div>
+  <div style="display:grid;grid-template-columns:250px 1fr;gap:16px">
+    <div id="mem-file-list" style="border:1px solid var(--border);border-radius:10px;overflow:hidden;max-height:500px;overflow-y:auto"></div>
+    <div id="mem-file-content" style="border:1px solid var(--border);border-radius:10px;padding:16px;max-height:500px;overflow-y:auto">
+      <div style="color:var(--text2);font-size:13px" data-i18n="mem-select">Select a memory file to view</div>
+    </div>
+  </div>
 </div>
 
 <!-- Sessions Panel -->
@@ -1396,7 +1436,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-cmdpalette':'Command palette',
       'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.',
       'mr-active':'Active Model','mr-providers-title':'📦 Models by Provider','mr-providers-desc':'Click a model to switch. Pricing per 1M tokens (input / output).','mr-keys-desc':'Enter API keys to enable providers. Keys are tested in real-time.',
-      'nav-sessions':'📋 Sessions','nav-docs':'📖 Docs',
+      'nav-sessions':'📋 Sessions','nav-docs':'📖 Docs','nav-cron':'⏰ Cron Jobs','nav-memory':'🧠 Memory',
+      'cron-title':'⏰ Cron Jobs','cron-add':'➕ Add Job','cron-name':'Name','cron-interval':'Interval (seconds)','cron-prompt':'Prompt','btn-cancel':'Cancel',
+      'mem-title':'🧠 Memory','mem-select':'Select a memory file to view',
       'sess-title':'📋 Sessions','sess-search-ph':'Search sessions...',
       'ch-title':'📡 Channels','docs-title':'📖 Documentation','docs-search-ph':'Search docs...',
       'tab-debug':'🔬 Debug','h-debug':'🔬 Debug Diagnostics',
@@ -1505,7 +1547,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-cmdpalette':'커맨드 팔레트',
       'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.',
       'mr-active':'활성 모델','mr-providers-title':'📦 프로바이더별 모델','mr-providers-desc':'모델을 클릭하면 전환됩니다. 가격: 1M 토큰당 (입력 / 출력).','mr-keys-desc':'API 키를 입력하면 프로바이더가 활성화됩니다. 키는 실시간으로 테스트됩니다.',
-      'nav-sessions':'📋 세션','nav-docs':'📖 문서',
+      'nav-sessions':'📋 세션','nav-docs':'📖 문서','nav-cron':'⏰ 크론 작업','nav-memory':'🧠 기억',
+      'cron-title':'⏰ 크론 작업','cron-add':'➕ 작업 추가','cron-name':'이름','cron-interval':'간격 (초)','cron-prompt':'프롬프트','btn-cancel':'취소',
+      'mem-title':'🧠 기억','mem-select':'보려는 기억 파일을 선택하세요',
       'sess-title':'📋 세션 관리','sess-search-ph':'세션 검색...',
       'ch-title':'📡 채널','docs-title':'📖 문서','docs-search-ph':'문서 검색...',
       'tab-debug':'🔬 디버그','h-debug':'🔬 디버그 진단',
@@ -1633,11 +1677,15 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var sessView=document.getElementById('sessions-view');
   var chView=document.getElementById('channels-view');
   var docsView=document.getElementById('docs-view');
-  function _hideAll(){settingsEl.style.display='none';dashView.style.display='none';sessView.style.display='none';chView.style.display='none';docsView.style.display='none';chat.style.display='none';inputArea.style.display='none'}
+  var cronView=document.getElementById('cron-view');
+  var memView=document.getElementById('memory-view');
+  function _hideAll(){settingsEl.style.display='none';dashView.style.display='none';sessView.style.display='none';chView.style.display='none';docsView.style.display='none';cronView.style.display='none';memView.style.display='none';chat.style.display='none';inputArea.style.display='none'}
   window.showChat=function(){_hideAll();chat.style.display='flex';inputArea.style.display='block'};
   window.showSessions=function(){_hideAll();sessView.style.display='block';window._loadSessions()};
   window.showChannels=function(){_hideAll();chView.style.display='block';window._loadChannels()};
   window.showDocs=function(){_hideAll();docsView.style.display='block';window._renderDocs('')};
+  window.showCron=function(){_hideAll();cronView.style.display='block';window._loadCron()};
+  window.showMemory=function(){_hideAll();memView.style.display='block';window._loadMemory()};
   window.showSettings=function(){_hideAll();settingsEl.style.display='block';
     /* Load personas */
     if(window.loadPersonas)window.loadPersonas();
@@ -2322,6 +2370,16 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='showSettings')window.showSettings();
     else if(a==='showUsage')window.showDashboard();
     else if(a==='showDashboard')window.showDashboard();
+    else if(a==='showCron')window.showCron();
+    else if(a==='showMemory')window.showMemory();
+    else if(a==='refreshCron')window._loadCron();
+    else if(a==='refreshMemory')window._loadMemory();
+    else if(a==='addCronForm'){document.getElementById('cron-add-form').style.display='block'}
+    else if(a==='cancelCron'){document.getElementById('cron-add-form').style.display='none'}
+    else if(a==='saveCron'){window._saveCron()}
+    else if(a==='toggleCronJob'){fetch('/api/cron/toggle',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({id:el.getAttribute('data-cron-id')})}).then(function(){window._loadCron()})}
+    else if(a==='deleteCronJob'){if(confirm(_lang==='ko'?'삭제하시겠습니까?':'Delete this job?'))fetch('/api/cron/delete',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({id:el.getAttribute('data-cron-id')})}).then(function(){window._loadCron()})}
+    else if(a==='memRead'){window._readMemFile(el.getAttribute('data-mem-path'))}
     else if(a==='showSessions')window.showSessions();
     else if(a==='showChannels')window.showChannels();
     else if(a==='showDocs')window.showDocs();
@@ -2585,6 +2643,72 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* ── Logs Tab ── */
   var _logAutoTimer=null;
+  /* ── Cron Panel ── */
+  window._loadCron=function(){
+    var c=document.getElementById('cron-table');if(!c)return;
+    c.innerHTML='Loading...';
+    fetch('/api/cron',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var jobs=d.jobs||[];var kr=_lang==='ko';
+      if(!jobs.length){c.innerHTML='<div style="padding:24px;text-align:center;color:var(--text2);border:1px dashed var(--border);border-radius:10px">'+(kr?'크론 작업 없음 — 위의 ➕ 버튼으로 추가하세요':'No cron jobs — click ➕ above to add one')+'</div>';return}
+      var h='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+      h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;background:var(--bg3);font-weight:600;font-size:12px">';
+      h+='<div style="padding:10px 14px">'+(kr?'이름':'Name')+'</div><div style="padding:10px 14px">'+(kr?'간격':'Interval')+'</div><div style="padding:10px 14px">'+(kr?'실행 횟수':'Runs')+'</div><div style="padding:10px 14px">'+(kr?'상태':'Status')+'</div><div style="padding:10px 14px"></div></div>';
+      jobs.forEach(function(j){
+        var sched=j.schedule||{};var interval=sched.seconds?_fmtInterval(sched.seconds):(sched.expr||'—');
+        h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;font-size:13px;border-top:1px solid var(--border)">';
+        h+='<div style="padding:10px 14px;font-weight:500">'+j.name+'</div>';
+        h+='<div style="padding:10px 14px;color:var(--text2)">'+interval+'</div>';
+        h+='<div style="padding:10px 14px;color:var(--text2)">'+j.run_count+'</div>';
+        h+='<div style="padding:10px 14px"><button data-action="toggleCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:13px">'+(j.enabled?'🟢 '+(kr?'활성':'On'):'🔴 '+(kr?'비활성':'Off'))+'</button></div>';
+        h+='<div style="padding:10px 14px"><button data-action="deleteCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Delete">🗑️</button></div>';
+        h+='</div>';
+      });
+      h+='</div>';
+      c.innerHTML=h;
+    }).catch(function(e){c.innerHTML='Error: '+e.message});
+  };
+  function _fmtInterval(s){if(s<60)return s+'s';if(s<3600)return Math.round(s/60)+'m';if(s<86400)return Math.round(s/3600)+'h';return Math.round(s/86400)+'d'}
+  window._saveCron=function(){
+    var name=document.getElementById('cron-name').value.trim()||'untitled';
+    var interval=parseInt(document.getElementById('cron-interval').value)||3600;
+    var prompt=document.getElementById('cron-prompt').value.trim();
+    if(!prompt){alert(_lang==='ko'?'프롬프트를 입력하세요':'Enter a prompt');return}
+    fetch('/api/cron/add',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+      body:JSON.stringify({name:name,interval:interval,prompt:prompt})
+    }).then(function(r){return r.json()}).then(function(d){
+      if(d.ok){document.getElementById('cron-add-form').style.display='none';window._loadCron()}
+      else alert(d.error||'Failed');
+    });
+  };
+
+  /* ── Memory Panel ── */
+  window._loadMemory=function(){
+    var fl=document.getElementById('mem-file-list');if(!fl)return;
+    fl.innerHTML='<div style="padding:12px;color:var(--text2);font-size:12px">Loading...</div>';
+    fetch('/api/memory/files',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var files=d.files||[];var kr=_lang==='ko';
+      if(!files.length){fl.innerHTML='<div style="padding:16px;color:var(--text2);font-size:12px">'+(kr?'메모리 파일 없음':'No memory files')+'</div>';return}
+      var h='';
+      files.forEach(function(f){
+        var icon=f.name.endsWith('.json')?'📦':f.name.endsWith('.md')?'📝':'📄';
+        var sz=f.size>1024?(f.size/1024).toFixed(1)+'KB':f.size+'B';
+        h+='<div class="nav-item" data-action="memRead" data-mem-path="'+f.path+'" style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;font-size:13px"><span>'+icon+' '+f.name+'</span><span style="color:var(--text2);font-size:11px">'+sz+'</span></div>';
+      });
+      fl.innerHTML=h;
+    }).catch(function(e){fl.innerHTML='Error: '+e.message});
+  };
+  window._readMemFile=function(path){
+    var mc=document.getElementById('mem-file-content');if(!mc)return;
+    mc.innerHTML='<div style="color:var(--text2)">Loading...</div>';
+    fetch('/api/memory/read?file='+encodeURIComponent(path),{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      if(d.error){mc.innerHTML='<div style="color:#f87171">'+d.error+'</div>';return}
+      var ext=path.split('.').pop();
+      var h='<div style="margin-bottom:8px;font-weight:600;font-size:13px">'+path+' <span style="color:var(--text2);font-weight:400;font-size:11px">'+(d.size/1024).toFixed(1)+'KB</span></div>';
+      h+='<pre style="background:var(--bg);padding:12px;border-radius:8px;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto">'+d.content.replace(/</g,'&lt;')+'</pre>';
+      mc.innerHTML=h;
+    }).catch(function(e){mc.innerHTML='Error: '+e.message});
+  };
+
   /* ── Sessions Panel ── */
   window._loadSessions=function(){
     var container=document.getElementById('sessions-table');if(!container)return;

@@ -439,6 +439,27 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         from salmalm.engine import get_failover_config, _load_cooldowns
         self._json({'config': get_failover_config(), 'cooldowns': _load_cooldowns()})
 
+    def _get_memory_files(self):
+        if not self._require_auth('user'):
+            return
+        from salmalm.constants import BASE_DIR
+        mem_dir = BASE_DIR / 'memory'
+        files = []
+        # Main memory file
+        main_mem = BASE_DIR / 'memory.json'
+        if main_mem.exists():
+            files.append({'name': 'memory.json', 'size': main_mem.stat().st_size, 'path': 'memory.json'})
+        # Memory directory files
+        if mem_dir.exists():
+            for f in sorted(mem_dir.iterdir(), reverse=True):
+                if f.is_file() and f.suffix in ('.json', '.md', '.txt'):
+                    files.append({'name': f.name, 'size': f.stat().st_size, 'path': f'memory/{f.name}'})
+        # Soul file
+        soul = BASE_DIR / 'soul.md'
+        if soul.exists():
+            files.append({'name': 'soul.md', 'size': soul.stat().st_size, 'path': 'soul.md'})
+        self._json({'files': files})
+
     def _get_cron(self):
         if not self._require_auth('user'):
             return
@@ -625,6 +646,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         '/api/routing': '_get_routing',
         '/api/failover': '_get_failover',
         '/api/cron': '_get_cron',
+        '/api/memory/files': '_get_memory_files',
         '/api/mcp': '_get_mcp',
         '/api/rag': '_get_rag',
         '/api/personas': '_get_personas',
@@ -974,6 +996,26 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         continue
                     entries.append(ln)
             self._json({'logs': entries, 'total': len(entries)})
+
+        elif self.path.startswith('/api/memory/read?'):
+            if not self._require_auth('user'):
+                return
+            from salmalm.constants import BASE_DIR
+            import urllib.parse as _up
+            qs = _up.parse_qs(_up.urlparse(self.path).query)
+            fpath = qs.get('file', [''])[0]
+            if not fpath or '..' in fpath:
+                self._json({'error': 'Invalid path'}, 400)
+                return
+            full = BASE_DIR / fpath
+            if not full.exists() or not full.is_file():
+                self._json({'error': 'File not found'}, 404)
+                return
+            try:
+                content = full.read_text(encoding='utf-8')[:50000]
+                self._json({'file': fpath, 'content': content, 'size': full.stat().st_size})
+            except Exception as e:
+                self._json({'error': str(e)}, 500)
 
         elif self.path == '/api/health':
             # K8s readiness/liveness probe compatible: 200=healthy, 503=unhealthy
@@ -1770,6 +1812,46 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 self._json({'ok': True, 'preview': preview})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)}, 400)
+
+        elif self.path == '/api/cron/add':
+            if not self._require_auth('user'):
+                return
+            from salmalm.core import _llm_cron
+            if not _llm_cron:
+                self._json({'ok': False, 'error': 'Cron not available'}, 500)
+                return
+            name = body.get('name', 'untitled')
+            interval = int(body.get('interval', 3600))
+            prompt = body.get('prompt', '')
+            if not prompt:
+                self._json({'ok': False, 'error': 'Prompt required'}, 400)
+                return
+            job = _llm_cron.add_job(name, {'kind': 'every', 'seconds': interval}, prompt)
+            self._json({'ok': True, 'job': job})
+
+        elif self.path == '/api/cron/delete':
+            if not self._require_auth('user'):
+                return
+            from salmalm.core import _llm_cron
+            job_id = body.get('id', '')
+            if _llm_cron and _llm_cron.remove_job(job_id):
+                self._json({'ok': True})
+            else:
+                self._json({'ok': False, 'error': 'Job not found'}, 404)
+
+        elif self.path == '/api/cron/toggle':
+            if not self._require_auth('user'):
+                return
+            from salmalm.core import _llm_cron
+            job_id = body.get('id', '')
+            if _llm_cron:
+                for j in _llm_cron.jobs:
+                    if j['id'] == job_id:
+                        j['enabled'] = not j['enabled']
+                        _llm_cron.save_jobs()
+                        self._json({'ok': True, 'enabled': j['enabled']})
+                        return
+            self._json({'ok': False, 'error': 'Job not found'}, 404)
 
         elif self.path == '/api/sessions/create':
             if not self._require_auth('user'):
