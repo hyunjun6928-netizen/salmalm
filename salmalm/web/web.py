@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from salmalm.constants import (  # noqa: F401
-    APP_NAME, AUDIT_DB, BASE_DIR, MODELS,
+    APP_NAME, AUDIT_DB, BASE_DIR, DATA_DIR, MODELS,
     TEST_MODELS, VAULT_FILE, VERSION, WORKSPACE_DIR,
 )
 from salmalm.crypto import vault, log
@@ -460,7 +460,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         mem_dir = BASE_DIR / 'memory'
         files = []
         # Main memory file
-        main_mem = BASE_DIR / 'memory.json'
+        main_mem = DATA_DIR / 'memory.json'
         if main_mem.exists():
             files.append({'name': 'memory.json', 'size': main_mem.stat().st_size, 'path': 'memory.json'})
         # Memory directory files
@@ -469,7 +469,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 if f.is_file() and f.suffix in ('.json', '.md', '.txt'):
                     files.append({'name': f.name, 'size': f.stat().st_size, 'path': f'memory/{f.name}'})
         # Soul file
-        soul = BASE_DIR / 'soul.md'
+        soul = DATA_DIR / 'soul.md'
         if soul.exists():
             files.append({'name': 'soul.md', 'size': soul.stat().st_size, 'path': 'soul.md'})
         self._json({'files': files})
@@ -1002,7 +1002,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             qs = parse_qs(urlparse(self.path).query)
             lines = int(qs.get('lines', ['100'])[0])
             level = qs.get('level', [''])[0].upper()
-            log_path = BASE_DIR / 'salmalm.log'
+            log_path = DATA_DIR / 'salmalm.log'
             entries = []
             if log_path.exists():
                 all_lines = log_path.read_text(encoding='utf-8', errors='replace').strip().split('\n')
@@ -1255,7 +1255,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
                 # Soul / personality
-                soul_path = BASE_DIR / 'soul.md'
+                soul_path = DATA_DIR / 'soul.md'
                 if soul_path.exists():
                     zf.writestr('soul.md', soul_path.read_text(encoding='utf-8'))
                 # Memory files
@@ -1265,7 +1265,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                         if f.is_file():
                             zf.writestr(f'memory/{f.name}', f.read_text(encoding='utf-8'))
                 # Config
-                config_path = BASE_DIR / 'config.json'
+                config_path = DATA_DIR / 'config.json'
                 if config_path.exists():
                     zf.writestr('config.json', config_path.read_text(encoding='utf-8'))
                 routing_path = Path.home() / '.salmalm' / 'routing.json'
@@ -1772,10 +1772,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 import json as _json
                 export_data = {}
                 # Quick sync: lightweight JSON export (no ZIP)
-                soul_path = BASE_DIR / 'soul.md'
+                soul_path = DATA_DIR / 'soul.md'
                 if soul_path.exists():
                     export_data['soul'] = soul_path.read_text(encoding='utf-8')
-                config_path = BASE_DIR / 'config.json'
+                config_path = DATA_DIR / 'config.json'
                 if config_path.exists():
                     export_data['config'] = _json.loads(config_path.read_text(encoding='utf-8'))
                 routing_path = Path.home() / '.salmalm' / 'routing.json'
@@ -2532,7 +2532,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             }
             template = persona_templates.get(persona, persona_templates['expert'])
             try:
-                soul_path = os.path.join(str(BASE_DIR), 'SOUL.md')
+                soul_path = os.path.join(str(DATA_DIR), 'SOUL.md')
                 if not os.path.exists(soul_path):
                     os.makedirs(os.path.dirname(soul_path), exist_ok=True)
                     with open(soul_path, 'w', encoding='utf-8') as f:

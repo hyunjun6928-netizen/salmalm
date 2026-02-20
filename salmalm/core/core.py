@@ -372,7 +372,7 @@ class ModelRouter:
     # Tier pools sourced from constants.py MODEL_TIERS (single source of truth)
     TIERS = MODEL_TIERS  # noqa: F405
 
-    _MODEL_PREF_FILE = BASE_DIR / '.model_pref'  # noqa: F405
+    _MODEL_PREF_FILE = DATA_DIR / '.model_pref'  # noqa: F405
 
     def __init__(self):
         self.default_tier = 2

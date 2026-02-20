@@ -27,10 +27,10 @@ import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
-from salmalm.constants import BASE_DIR, KST, PBKDF2_ITER
+from salmalm.constants import BASE_DIR, DATA_DIR, KST, PBKDF2_ITER
 from salmalm.crypto import log
 
-AUTH_DB = BASE_DIR / "auth.db"
+AUTH_DB = DATA_DIR / "auth.db"
 
 # ── Password hashing (PBKDF2-HMAC-SHA256) ──────────────────
 
