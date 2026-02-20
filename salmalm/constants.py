@@ -6,20 +6,25 @@ from salmalm import __version__ as VERSION  # Single source of truth
 APP_NAME = "SalmAlm"
 KST = timezone(timedelta(hours=9))
 
-# Paths — resolved relative to project root (parent of salmalm/)
-BASE_DIR = Path(__file__).parent.parent.resolve()
-MEMORY_DIR = BASE_DIR / "memory"
-WORKSPACE_DIR = BASE_DIR
-SOUL_FILE = BASE_DIR / "SOUL.md"
-AGENTS_FILE = BASE_DIR / "AGENTS.md"
-MEMORY_FILE = BASE_DIR / "MEMORY.md"
-USER_FILE = BASE_DIR / "USER.md"
-TOOLS_FILE = BASE_DIR / "TOOLS.md"
-VAULT_FILE = BASE_DIR / ".vault.enc"
-AUDIT_DB = BASE_DIR / "audit.db"
-MEMORY_DB = BASE_DIR / "memory.db"
-CACHE_DB = BASE_DIR / "cache.db"
-LOG_FILE = BASE_DIR / "salmalm.log"
+# Paths
+# BASE_DIR = code/resource root (package directory)
+# DATA_DIR = runtime data root (user data: DB, vault, memory, logs)
+#   Priority: $SALMALM_HOME > ~/SalmAlm
+import os as _os
+BASE_DIR = Path(__file__).parent.resolve()  # salmalm/ package dir
+DATA_DIR = Path(_os.environ.get('SALMALM_HOME', '') or Path.home() / 'SalmAlm')
+MEMORY_DIR = DATA_DIR / "memory"
+WORKSPACE_DIR = DATA_DIR
+SOUL_FILE = DATA_DIR / "soul.md"
+AGENTS_FILE = DATA_DIR / "agents.md"
+MEMORY_FILE = DATA_DIR / "memory.md"
+USER_FILE = DATA_DIR / "user.md"
+TOOLS_FILE = DATA_DIR / "tools.md"
+VAULT_FILE = DATA_DIR / ".vault.enc"
+AUDIT_DB = DATA_DIR / "audit.db"
+MEMORY_DB = DATA_DIR / "memory.db"
+CACHE_DB = DATA_DIR / "cache.db"
+LOG_FILE = DATA_DIR / "salmalm.log"
 
 # Security
 VAULT_VERSION = b'\x03'
@@ -36,7 +41,7 @@ EXEC_ALLOWLIST = {
     'md5sum', 'sha256sum', 'base64', 'xxd', 'hexdump', 'yes', 'true', 'false',
     # Dev tools (safe)
     'git', 'gh', 'cargo', 'rustc', 'go', 'java', 'javac', 'gcc', 'g++', 'make',
-    'cmake', 'pip', 'pip3', 'npm', 'npx',
+    'cmake',
     # Network (read-only)
     'ping', 'dig', 'nslookup', 'host', 'traceroute', 'ss', 'ip',
     # curl/wget removed: SSRF bypass risk (use web_fetch/http_request tools instead)
@@ -51,6 +56,7 @@ EXEC_ALLOWLIST = {
 EXEC_ELEVATED = {
     'python3', 'python', 'node', 'deno', 'bun',
     'docker', 'kubectl', 'terraform',
+    'pip', 'pip3', 'npm', 'npx',  # install hooks can run arbitrary code
 }
 EXEC_BLOCKLIST = {
     'rm', 'rmdir', 'mkfs', 'dd', 'shutdown', 'reboot', 'halt', 'poweroff',

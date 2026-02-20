@@ -24,9 +24,15 @@ log = logging.getLogger(__name__)
 
 _CONFIG_DIR = Path.home() / '.salmalm'
 _TOKENS_PATH = _CONFIG_DIR / 'oauth_tokens.json'
-_OBFUSCATION_KEY = hashlib.sha256(
-    (os.environ.get('SALMALM_SECRET', 'salmalm-default-key')).encode()
-).digest()
+_secret = os.environ.get('SALMALM_SECRET', '')
+if not _secret:
+    import logging as _log
+    _log.getLogger(__name__).warning(
+        "SALMALM_SECRET not set — OAuth tokens use weak obfuscation. "
+        "Set SALMALM_SECRET or use /vault for AES-GCM encryption."
+    )
+    _secret = 'salmalm-default-key'
+_OBFUSCATION_KEY = hashlib.sha256(_secret.encode()).digest()
 
 
 def _xor_bytes(data: bytes, key: bytes) -> bytes:
@@ -35,11 +41,29 @@ def _xor_bytes(data: bytes, key: bytes) -> bytes:
 
 
 def _encrypt_tokens(data: dict) -> str:
+    # Prefer vault (AES-GCM) over XOR obfuscation
+    try:
+        from salmalm.security.crypto import vault
+        if vault.is_unlocked:
+            vault.set('oauth_tokens', json.dumps(data))
+            return '__VAULT__'
+    except Exception:
+        pass
     raw = json.dumps(data).encode()
     return base64.b64encode(_xor_bytes(raw, _OBFUSCATION_KEY)).decode()
 
 
 def _decrypt_tokens(encoded: str) -> dict:
+    if encoded == '__VAULT__':
+        try:
+            from salmalm.security.crypto import vault
+            if vault.is_unlocked:
+                stored = vault.get('oauth_tokens')
+                if stored:
+                    return json.loads(stored)
+        except Exception:
+            pass
+        return {}
     raw = _xor_bytes(base64.b64decode(encoded), _OBFUSCATION_KEY)
     return json.loads(raw)
 

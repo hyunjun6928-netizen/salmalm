@@ -7,6 +7,10 @@ import urllib.request
 
 faulthandler.enable()
 
+# Speed up PBKDF2 in tests (200K → 1K iterations)
+import salmalm.constants as _c
+_c.PBKDF2_ITER = 1_000
+
 import pytest
 
 # ---------------------------------------------------------------------------

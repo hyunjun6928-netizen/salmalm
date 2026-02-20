@@ -29,10 +29,11 @@ def _register_services() -> None:
 
 
 try:
-    from .constants import LOG_FILE
+    from .constants import LOG_FILE, DATA_DIR
 
     if not log.handlers:
         log.setLevel(logging.INFO)
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
         log.addHandler(logging.FileHandler(LOG_FILE, encoding='utf-8'))
         _sh = logging.StreamHandler(sys.stdout)
         _sh.setStream(open(sys.stdout.fileno(), 'w', encoding='utf-8', errors='replace', closefd=False))
