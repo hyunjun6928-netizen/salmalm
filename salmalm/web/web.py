@@ -1851,10 +1851,20 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             name = body.get('name', 'untitled')
             interval = int(body.get('interval', 3600))
             prompt = body.get('prompt', '')
+            run_at = body.get('run_at', '')  # HH:MM or ISO datetime
             if not prompt:
                 self._json({'ok': False, 'error': 'Prompt required'}, 400)
                 return
-            job = _llm_cron.add_job(name, {'kind': 'every', 'seconds': interval}, prompt)
+            if run_at:
+                # "Run at" mode: daily alarm at specific time
+                from datetime import datetime as _dt, timedelta as _td
+                if len(run_at) <= 5:  # HH:MM format → daily
+                    schedule = {'kind': 'cron', 'expr': f'{run_at.split(":")[1]} {run_at.split(":")[0]} * * *'}
+                else:  # ISO datetime → one-shot
+                    schedule = {'kind': 'at', 'time': run_at}
+            else:
+                schedule = {'kind': 'every', 'seconds': interval}
+            job = _llm_cron.add_job(name, schedule, prompt)
             self._json({'ok': True, 'job': job})
 
         elif self.path == '/api/cron/delete':

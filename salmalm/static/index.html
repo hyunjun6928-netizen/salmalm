@@ -583,7 +583,28 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div id="cron-add-form" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div><label style="font-size:12px;font-weight:600" data-i18n="cron-name">Name</label><input id="cron-name" type="text" placeholder="my-job" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:4px"></div>
-      <div><label style="font-size:12px;font-weight:600" data-i18n="cron-interval">Interval (seconds)</label><input id="cron-interval" type="number" value="3600" min="60" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:4px"></div>
+      <div><label style="font-size:12px;font-weight:600" data-i18n="cron-schedule">Schedule</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          <button type="button" class="btn cron-preset" data-seconds="300" style="font-size:11px;padding:4px 10px">5m</button>
+          <button type="button" class="btn cron-preset" data-seconds="900" style="font-size:11px;padding:4px 10px">15m</button>
+          <button type="button" class="btn cron-preset" data-seconds="1800" style="font-size:11px;padding:4px 10px">30m</button>
+          <button type="button" class="btn cron-preset" data-seconds="3600" style="font-size:11px;padding:4px 10px;background:var(--accent);color:#fff">1h</button>
+          <button type="button" class="btn cron-preset" data-seconds="7200" style="font-size:11px;padding:4px 10px">2h</button>
+          <button type="button" class="btn cron-preset" data-seconds="21600" style="font-size:11px;padding:4px 10px">6h</button>
+          <button type="button" class="btn cron-preset" data-seconds="43200" style="font-size:11px;padding:4px 10px">12h</button>
+          <button type="button" class="btn cron-preset" data-seconds="86400" style="font-size:11px;padding:4px 10px">24h</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div>
+            <label style="font-size:11px;color:var(--text2)" data-i18n="cron-interval">Interval (seconds)</label>
+            <input id="cron-interval" type="number" value="3600" min="60" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:2px">
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text2)" data-i18n="cron-at">Run at (optional)</label>
+            <input id="cron-at" type="time" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:2px">
+          </div>
+        </div>
+      </div>
     </div>
     <label style="font-size:12px;font-weight:600" data-i18n="cron-prompt">Prompt</label>
     <textarea id="cron-prompt" rows="3" placeholder="What should the AI do?" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:4px;resize:vertical"></textarea>
@@ -1460,7 +1481,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.',
       'mr-active':'Active Model','mr-providers-title':'📦 Models by Provider','mr-providers-desc':'Click a model to switch. Pricing per 1M tokens (input / output).','mr-keys-desc':'Enter API keys to enable providers. Keys are tested in real-time.',
       'nav-sessions':'📋 Sessions','nav-docs':'📖 Docs','nav-cron':'⏰ Cron Jobs','nav-memory':'🧠 Memory',
-      'cron-title':'⏰ Cron Jobs','cron-add':'➕ Add Job','cron-name':'Name','cron-interval':'Interval (seconds)','cron-prompt':'Prompt','btn-cancel':'Cancel',
+      'cron-title':'⏰ Cron Jobs','cron-add':'➕ Add Job','cron-name':'Name','cron-interval':'Interval (seconds)','cron-schedule':'Schedule','cron-at':'Run at (optional)','cron-prompt':'Prompt','btn-cancel':'Cancel',
       'mem-title':'🧠 Memory','mem-select':'Select a memory file to view',
       'sess-title':'📋 Sessions','sess-search-ph':'Search sessions...',
       'ch-title':'📡 Channels','docs-title':'📖 Documentation','docs-search-ph':'Search docs...',
@@ -1571,7 +1592,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.',
       'mr-active':'활성 모델','mr-providers-title':'📦 프로바이더별 모델','mr-providers-desc':'모델을 클릭하면 전환됩니다. 가격: 1M 토큰당 (입력 / 출력).','mr-keys-desc':'API 키를 입력하면 프로바이더가 활성화됩니다. 키는 실시간으로 테스트됩니다.',
       'nav-sessions':'📋 세션','nav-docs':'📖 문서','nav-cron':'⏰ 크론 작업','nav-memory':'🧠 기억',
-      'cron-title':'⏰ 크론 작업','cron-add':'➕ 작업 추가','cron-name':'이름','cron-interval':'간격 (초)','cron-prompt':'프롬프트','btn-cancel':'취소',
+      'cron-title':'⏰ 크론 작업','cron-add':'➕ 작업 추가','cron-name':'이름','cron-interval':'간격 (초)','cron-schedule':'스케줄','cron-at':'실행 시각 (선택)','cron-prompt':'프롬프트','btn-cancel':'취소',
       'mem-title':'🧠 기억','mem-select':'보려는 기억 파일을 선택하세요',
       'sess-title':'📋 세션 관리','sess-search-ph':'세션 검색...',
       'ch-title':'📡 채널','docs-title':'📖 문서','docs-search-ph':'문서 검색...',
@@ -2747,13 +2768,25 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     }).catch(function(e){c.innerHTML='Error: '+e.message});
   };
   function _fmtInterval(s){if(s<60)return s+'s';if(s<3600)return Math.round(s/60)+'m';if(s<86400)return Math.round(s/3600)+'h';return Math.round(s/86400)+'d'}
+  /* Cron preset buttons */
+  document.querySelectorAll('.cron-preset').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var s=parseInt(this.getAttribute('data-seconds'));
+      document.getElementById('cron-interval').value=s;
+      document.querySelectorAll('.cron-preset').forEach(function(b){b.style.background='var(--bg3)';b.style.color='var(--text)'});
+      this.style.background='var(--accent)';this.style.color='#fff';
+    });
+  });
   window._saveCron=function(){
     var name=document.getElementById('cron-name').value.trim()||'untitled';
     var interval=parseInt(document.getElementById('cron-interval').value)||3600;
     var prompt=document.getElementById('cron-prompt').value.trim();
+    var runAt=document.getElementById('cron-at').value||'';
     if(!prompt){alert(_lang==='ko'?'프롬프트를 입력하세요':'Enter a prompt');return}
+    var payload={name:name,interval:interval,prompt:prompt};
+    if(runAt)payload.run_at=runAt;
     fetch('/api/cron/add',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
-      body:JSON.stringify({name:name,interval:interval,prompt:prompt})
+      body:JSON.stringify(payload)
     }).then(function(r){return r.json()}).then(function(d){
       if(d.ok){document.getElementById('cron-add-form').style.display='none';window._loadCron()}
       else alert(d.error||'Failed');
