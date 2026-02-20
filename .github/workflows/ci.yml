@@ -42,13 +42,18 @@ jobs:
       - name: Test
         run: |
           pip install pytest-timeout
-          failed=0
+          failed=""
           for f in tests/test_*.py; do
-            echo "::group::$f"
-            pytest "$f" -q --tb=short --timeout=30 || failed=$((failed+1))
-            echo "::endgroup::"
+            echo "--- $f ---"
+            if ! python -m pytest "$f" -q --tb=short --timeout=30; then
+              echo "::error::FAIL $f"
+              failed="$failed $f"
+            fi
           done
-          [ $failed -eq 0 ] || exit 1
+          if [ -n "$failed" ]; then
+            echo "::error::Failed tests:$failed"
+            exit 1
+          fi
 
       - name: Coverage
         if: matrix.python-version == '3.12'
@@ -58,12 +63,12 @@ jobs:
           for f in tests/test_*.py; do
             cov_args="$cov_args $f"
           done
-          failed=0
+          failed=""
           for f in tests/test_*.py; do
-            pytest "$f" --cov=salmalm --cov-append -q --tb=short --timeout=30 || failed=$((failed+1))
+            python -m pytest "$f" --cov=salmalm --cov-append -q --tb=short --timeout=30 || failed="$failed $f"
           done
           coverage xml
-          [ $failed -eq 0 ] || exit 1
+          if [ -n "$failed" ]; then exit 1; fi
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
