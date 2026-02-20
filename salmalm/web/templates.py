@@ -1,8 +1,8 @@
 """SalmAlm HTML templates — thin loader over static/ files.
 
 Templates are stored as plain HTML in salmalm/static/ for easier editing.
-This module reads them and exposes the same module-level constants for
-backward compatibility with ``from salmalm.templates import WEB_HTML`` etc.
+Uses module-level __getattr__ so templates are re-read on every access
+(no server restart needed during development).
 """
 from pathlib import Path
 
@@ -18,8 +18,16 @@ def _load(name: str) -> str:
     return ''
 
 
-WEB_HTML: str = _load('index.html')
-ONBOARDING_HTML: str = _load('onboarding.html')
-SETUP_HTML: str = _load('setup.html')
-UNLOCK_HTML: str = _load('unlock.html')
-DASHBOARD_HTML: str = _load('dashboard.html')
+_TEMPLATE_MAP = {
+    'WEB_HTML': 'index.html',
+    'ONBOARDING_HTML': 'onboarding.html',
+    'SETUP_HTML': 'setup.html',
+    'UNLOCK_HTML': 'unlock.html',
+    'DASHBOARD_HTML': 'dashboard.html',
+}
+
+
+def __getattr__(name):
+    if name in _TEMPLATE_MAP:
+        return _load(_TEMPLATE_MAP[name])
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

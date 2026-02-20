@@ -19,7 +19,7 @@ from salmalm.crypto import vault, log
 from salmalm.core import get_usage_report, router, audit_log
 from salmalm.auth import auth_manager, rate_limiter, extract_auth, RateLimitExceeded
 from salmalm.logging_ext import request_logger, set_correlation_id
-from salmalm.templates import WEB_HTML, ONBOARDING_HTML, UNLOCK_HTML, SETUP_HTML
+from salmalm.web import templates as _tmpl
 
 # ============================================================
 
@@ -673,19 +673,19 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             return getattr(self, _handler_name)()
         if self.path == '/' or self.path == '/index.html':
             if self._needs_first_run():
-                self._html(SETUP_HTML)
+                self._html(_tmpl.SETUP_HTML)
                 return
             self._auto_unlock_localhost()
             if not vault.is_unlocked:
-                self._html(UNLOCK_HTML)
+                self._html(_tmpl.UNLOCK_HTML)
             elif self._needs_onboarding():
-                self._html(ONBOARDING_HTML)
+                self._html(_tmpl.ONBOARDING_HTML)
             else:
-                self._html(WEB_HTML)
+                self._html(_tmpl.WEB_HTML)
 
         elif self.path == '/setup':
             # Allow re-running the setup wizard anytime
-            self._html(ONBOARDING_HTML)
+            self._html(_tmpl.ONBOARDING_HTML)
 
         elif self.path == '/api/sessions':
             if not self._require_auth('user'):
@@ -1310,8 +1310,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         elif self.path == '/dashboard':
             if not self._require_auth('user'):
                 return
-            from salmalm.templates import DASHBOARD_HTML
-            self._html(DASHBOARD_HTML)
+            self._html(_tmpl.DASHBOARD_HTML)
 
         elif self.path == '/docs':
             from salmalm.docs import generate_api_docs_html
