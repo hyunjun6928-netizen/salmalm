@@ -4,57 +4,57 @@
 <title>SalmAlm — Setup Wizard</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.wizard{background:#1a1d27;padding:40px;border-radius:16px;border:1px solid #2a2d37;max-width:560px;width:100%;position:relative;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f7;color:#1a1a1a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.wizard{background:#ffffff;padding:40px;border:1px solid #e0e0e0;max-width:560px;width:100%;position:relative;overflow:hidden}
 h1{color:#a78bfa;margin-bottom:4px;font-size:26px}
 h2{color:#c4b5fd;font-size:20px;margin-bottom:8px}
-.sub{color:#888;font-size:13px;margin-bottom:24px;line-height:1.6}
+.sub{color:#666;font-size:13px;margin-bottom:24px;line-height:1.6}
 .step{display:none}
 .step.active{display:block}
-.step label{display:block;font-size:13px;color:#aaa;margin-bottom:6px;font-weight:500}
-.step input,.step select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f1117;color:#e0e0e0;font-size:14px;font-family:monospace}
+.step label{display:block;font-size:13px;color:#888;margin-bottom:6px;font-weight:500}
+.step input,.step select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #ddd;background:#f5f5f7;color:#1a1a1a;font-size:14px;font-family:monospace}
 .step input:focus,.step select:focus{border-color:#7c5cfc;outline:none}
 .step .hint{font-size:11px;color:#666;margin-top:4px}
 .field{margin-bottom:16px}
 .required::after{content:" *";color:#f87171}
-.divider{border-top:1px solid #2a2d37;margin:20px 0}
+.divider{border:1px solid #e0e0e0;margin:20px 0}
 .btn-row{display:flex;gap:12px;margin-top:24px}
 button{padding:14px 24px;border-radius:8px;border:none;font-size:15px;cursor:pointer;font-weight:500;transition:all .2s}
 .btn-primary{background:#4f46e5;color:#fff;flex:1}
 .btn-primary:hover{background:#4338ca}
-.btn-secondary{background:#2a2d37;color:#aaa;padding:14px 20px}
-.btn-secondary:hover{background:#333;color:#e0e0e0}
+.btn-secondary{background:#2a2d37;color:#888;padding:14px 20px}
+.btn-secondary:hover{background:#ddd;color:#1a1a1a}
 button:disabled{opacity:0.5;cursor:not-allowed}
 .result{margin-top:16px;padding:12px;border-radius:8px;font-size:14px;display:none}
 .result.ok{background:#0f2a1f;border:1px solid #34d399;color:#34d399;display:block}
 .result.err{background:#2a0f0f;border:1px solid #f87171;color:#f87171;display:block}
 .progress{display:flex;gap:8px;margin-bottom:28px;justify-content:center}
-.progress .dot{width:10px;height:10px;border-radius:50%;background:#333;transition:all .3s}
+.progress .dot{width:10px;height:10px;border-radius:50%;background:#ddd;transition:all .3s}
 .progress .dot.active{background:#7c5cfc;transform:scale(1.2)}
 .progress .dot.done{background:#34d399}
 .welcome-emoji{font-size:64px;text-align:center;margin:20px 0}
-.welcome-text{text-align:center;font-size:18px;color:#ccc;line-height:1.6;margin-bottom:24px}
+.welcome-text{text-align:center;font-size:18px;color:#444;line-height:1.6;margin-bottom:24px}
 .persona-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
-.persona-card{padding:16px 12px;border-radius:12px;border:2px solid #333;background:#0f1117;cursor:pointer;text-align:center;transition:all .2s}
-.persona-card:hover{border-color:#7c5cfc;background:#1e1b2e}
-.persona-card.selected{border-color:#7c5cfc;background:#1e1b2e}
+.persona-card{padding:16px 12px;border-radius:12px;border:2px solid #ddd;background:#f5f5f7;cursor:pointer;text-align:center;transition:all .2s}
+.persona-card:hover{border-color:#7c5cfc;background:#f0ecff}
+.persona-card.selected{border-color:#7c5cfc;background:#f0ecff}
 .persona-card .emoji{font-size:32px;margin-bottom:8px}
-.persona-card .name{font-size:14px;font-weight:600;color:#e0e0e0;margin-bottom:4px}
-.persona-card .desc{font-size:11px;color:#888}
-.model-option{display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;border:1px solid #333;background:#0f1117;cursor:pointer;margin-bottom:8px;transition:all .2s}
+.persona-card .name{font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:4px}
+.persona-card .desc{font-size:11px;color:#666}
+.model-option{display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;border:1px solid #ddd;background:#f5f5f7;cursor:pointer;margin-bottom:8px;transition:all .2s}
 .model-option:hover{border-color:#7c5cfc}
-.model-option.selected{border-color:#7c5cfc;background:#1e1b2e}
+.model-option.selected{border-color:#7c5cfc;background:#f0ecff}
 .model-option .radio{width:18px;height:18px;border-radius:50%;border:2px solid #555;flex-shrink:0;display:flex;align-items:center;justify-content:center}
 .model-option.selected .radio{border-color:#7c5cfc}
 .model-option.selected .radio::after{content:'';width:10px;height:10px;border-radius:50%;background:#7c5cfc}
 .model-option .info{flex:1}
 .model-option .mname{font-size:14px;font-weight:500}
-.model-option .mdesc{font-size:11px;color:#888}
+.model-option .mdesc{font-size:11px;color:#666}
 .complete-box{text-align:center;padding:20px 0}
 .complete-emoji{font-size:72px;margin-bottom:16px}
 .complete-title{font-size:24px;color:#34d399;font-weight:600;margin-bottom:8px}
-.complete-sub{font-size:14px;color:#888;margin-bottom:24px}
-.test-status{font-size:13px;color:#888;margin-top:8px}
+.complete-sub{font-size:14px;color:#666;margin-bottom:24px}
+.test-status{font-size:13px;color:#666;margin-top:8px}
 .test-status.testing{color:#fbbf24}
 .test-status.success{color:#34d399}
 .test-status.fail{color:#f87171}
