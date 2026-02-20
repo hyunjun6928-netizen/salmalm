@@ -39,9 +39,8 @@ EXEC_ALLOWLIST = {
     'tr', 'cut', 'tee', 'xargs', 'diff', 'patch', 'env', 'pwd', 'whoami',
     'uname', 'hostname', 'id', 'dirname', 'basename', 'realpath', 'readlink',
     'md5sum', 'sha256sum', 'base64', 'xxd', 'hexdump', 'yes', 'true', 'false',
-    # Dev tools (safe)
-    'git', 'gh', 'cargo', 'rustc', 'go', 'java', 'javac', 'gcc', 'g++', 'make',
-    'cmake',
+    # Dev tools (read-only / query only)
+    'git', 'gh',
     # Network (read-only)
     'ping', 'dig', 'nslookup', 'host', 'traceroute', 'ss', 'ip',
     # curl/wget removed: SSRF bypass risk (use web_fetch/http_request tools instead)
@@ -56,6 +55,8 @@ EXEC_ALLOWLIST = {
 # Interpreters (python/node/deno/bun) removed — use python_eval tool instead.
 # They bypass allowlist by executing arbitrary code via -c, -m, file args, stdin.
 EXEC_ELEVATED = {
+    # Build tools: can execute arbitrary code via Makefiles, build scripts, hooks
+    'cargo', 'rustc', 'go', 'java', 'javac', 'gcc', 'g++', 'make', 'cmake',
     'docker', 'kubectl', 'terraform',
     'pip', 'pip3', 'npm', 'npx',  # install hooks can run arbitrary code
 }

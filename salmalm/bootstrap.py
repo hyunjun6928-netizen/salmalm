@@ -99,9 +99,12 @@ async def run_server():
 
     # ── Phase 4: HTTP Server ──
     port = int(os.environ.get('SALMALM_PORT', 18800))
-    # WSL: bind 0.0.0.0 so Windows browser can reach the server
-    _default_bind = '0.0.0.0' if 'microsoft' in os.uname().release.lower() else '127.0.0.1'
-    bind_addr = os.environ.get('SALMALM_BIND', _default_bind)
+    # Always default to 127.0.0.1 (loopback only).
+    # WSL users: set SALMALM_BIND=0.0.0.0 to allow Windows browser access.
+    bind_addr = os.environ.get('SALMALM_BIND', '127.0.0.1')
+    if bind_addr == '0.0.0.0':
+        log.warning("[WARN] Binding to 0.0.0.0 — server is accessible from LAN. "
+                    "Set SALMALM_BIND=127.0.0.1 to restrict to localhost.")
     server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
 
     # Auto-generate self-signed cert for HTTPS (enables microphone, camera, etc.)
@@ -110,7 +113,7 @@ async def run_server():
         https_port = https_port or 18443
         try:
             import ssl
-            cert_dir = BASE_DIR / '.certs'
+            cert_dir = DATA_DIR / '.certs'
             cert_dir.mkdir(exist_ok=True)
             cert_file = cert_dir / 'salmalm.pem'
             key_file = cert_dir / 'salmalm-key.pem'
@@ -248,8 +251,8 @@ async def run_server():
     log.info(
         f"\n╔══════════════════════════════════════════════╗\n"
         f"║  😈 {APP_NAME} v{VERSION}                   ║\n"
-        f"║  Web UI:    http://127.0.0.1:{port:<5}           ║\n"
-        f"║  WebSocket: ws://127.0.0.1:{ws_port:<5}            ║\n"
+        f"║  Web UI:    http://{bind_addr}:{port:<5}           ║\n"
+        f"║  WebSocket: ws://{bind_addr}:{ws_port:<5}            ║\n"
         f"║  Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}         ║\n"
         f"║  Crypto:    {'AES-256-GCM' if HAS_CRYPTO else ('HMAC-CTR (fallback)' if os.environ.get('SALMALM_VAULT_FALLBACK') else 'Vault disabled')}            ║\n"
         f"║  Self-test: {st}                               ║\n"
