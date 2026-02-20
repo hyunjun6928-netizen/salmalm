@@ -20,7 +20,7 @@ class TestWebInternals(unittest.TestCase):
         handler.send_header = MagicMock()
         # Call the actual method
         if hasattr(WebHandler, '_security_headers'):
-            WebHandler._security_headers(handler, nonce='test123')
+            WebHandler._security_headers(handler)
             self.assertTrue(handler.send_header.called)
 
     def test_needs_onboarding(self):

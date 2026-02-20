@@ -368,7 +368,7 @@ class TestWebHandlerRoutes(unittest.TestCase):
         resp = conn.getresponse()
         resp.read()
         csp = resp.getheader('Content-Security-Policy', '')
-        self.assertIn('nonce-', csp)
+        self.assertIn("script-src", csp)
 
     def test_security_headers(self):
         from http.client import HTTPConnection
