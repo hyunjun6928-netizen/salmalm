@@ -1857,7 +1857,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 return
             if run_at:
                 # "Run at" mode: daily alarm at specific time
-                from datetime import datetime as _dt, timedelta as _td
                 if len(run_at) <= 5:  # HH:MM format → daily
                     schedule = {'kind': 'cron', 'expr': f'{run_at.split(":")[1]} {run_at.split(":")[0]} * * *'}
                 else:  # ISO datetime → one-shot
