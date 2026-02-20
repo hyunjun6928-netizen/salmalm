@@ -115,6 +115,7 @@ TELEGRAM_COMMANDS: List[Tuple[str, str]] = [
     ('send', 'Toggle auto-response'),
     ('allowlist', 'Manage allowed users'),
     ('skill', 'Run a skill'),
+    ('brave', 'Quick Brave web search'),
 ]
 
 _CONFIG_DIR = Path.home() / '.salmalm'
@@ -189,6 +190,7 @@ class CommandRouter:
             ('/oauth', self._cmd_oauth),
             ('/screen', self._cmd_screen),
             ('/mcp', self._cmd_mcp),
+            ('/brave', self._cmd_brave),
         ])
 
     # -- dispatch --
@@ -618,6 +620,17 @@ class CommandRouter:
         except Exception as e:
             return f'❌ MCP error: {e}'
         return '❓ Usage: /mcp install|list|catalog|remove|status|search'
+
+    def _cmd_brave(cmd, session, **_):
+        """Quick Brave web search."""
+        query = cmd[len('/brave'):].strip()
+        if not query:
+            return '❓ Usage: /brave <query>'
+        try:
+            from salmalm.tools.tools_brave import brave_web_search
+            return brave_web_search({'query': query, 'count': 5})
+        except Exception as e:
+            return f'❌ Brave search error: {e}'
 
 
 # ---------------------------------------------------------------------------

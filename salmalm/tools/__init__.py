@@ -5,7 +5,7 @@ import types as _types
 
 _real_mod = None
 _SUBMODULES = {'tools', 'tool_handlers', 'tool_registry',
-    'tools_agent', 'tools_browser', 'tools_calendar', 'tools_common',
+    'tools_agent', 'tools_brave', 'tools_browser', 'tools_calendar', 'tools_common',
     'tools_email', 'tools_exec', 'tools_file', 'tools_google',
     'tools_media', 'tools_memory', 'tools_misc', 'tools_patch',
     'tools_personal', 'tools_reaction', 'tools_reminder',

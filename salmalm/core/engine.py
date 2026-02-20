@@ -222,7 +222,8 @@ INTENT_TOOLS = {
              'python_eval', 'sub_agent', 'system_monitor', 'skill_manage'],
     'analysis': ['web_search', 'web_fetch', 'read_file', 'rag_search',
                  'python_eval', 'exec', 'http_request'],
-    'search': ['web_search', 'web_fetch', 'rag_search', 'http_request'],
+    'search': ['web_search', 'web_fetch', 'rag_search', 'http_request',
+               'brave_search', 'brave_context'],
     'system': ['exec', 'read_file', 'write_file', 'edit_file',
                'system_monitor', 'cron_manage', 'health_check', 'plugin_manage'],
 }

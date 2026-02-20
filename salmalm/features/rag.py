@@ -815,7 +815,13 @@ class RAGEngine:
             parts.append(snippet)
             total += len(snippet)
 
-        return '\n'.join(parts)
+        context = '\n'.join(parts)
+
+        # If local results are thin, try Brave web augmentation
+        if len(results) < 2:
+            context += brave_augment_context(query, max_chars=max_chars - total)
+
+        return context
 
     def get_stats(self) -> dict:
         """Return index statistics."""
@@ -851,6 +857,27 @@ def inject_rag_context(messages: list, system_prompt: str,
         return system_prompt
 
     return system_prompt + "\n\n" + context
+
+
+# ── Brave Web Augmentation ─────────────────────────────────────
+
+def brave_augment_context(query: str, max_chars: int = 2000) -> str:
+    """Augment RAG context with Brave LLM Context API when local results are thin.
+
+    Enable via config: ConfigManager.save('brave', {'rag_augment': True})
+    """
+    try:
+        from salmalm.config_manager import ConfigManager
+        cfg = ConfigManager.load('brave', {'rag_augment': False})
+        if not cfg.get('rag_augment', False):
+            return ''
+        from salmalm.tools.tools_brave import brave_llm_context
+        result = brave_llm_context({'query': query, 'count': 3})
+        if result and not result.startswith('❌') and not result.startswith('🔑'):
+            return f'\n[Web context (Brave)]\n{result[:max_chars]}'
+    except Exception as e:
+        log.debug(f'Brave RAG augment failed: {e}')
+    return ''
 
 
 # ── Module-level instance ──────────────────────────────────────
