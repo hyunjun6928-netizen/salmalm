@@ -244,7 +244,7 @@ class ResponseCache:
             del self._cache[k]
         return None
 
-    def put(self, model: str, messages: list, response: str, session_id: str = ''):
+    def put(self, model: str, messages: list, response: str, session_id: str = '') -> None:
         """Store a response in cache with TTL."""
         k = self._key(model, messages, session_id)
         self._cache[k] = {'response': response, 'ts': time.time()}
@@ -380,7 +380,7 @@ class ModelRouter:
         except Exception as e:
             log.debug(f"Suppressed: {e}")
 
-    def set_force_model(self, model: Optional[str]):
+    def set_force_model(self, model: Optional[str]) -> None:
         """Set and persist model preference."""
         self.force_model = model
         try:
@@ -713,7 +713,7 @@ class LLMCronManager:
     def __init__(self):
         self.jobs = []
 
-    def load_jobs(self):
+    def load_jobs(self) -> None:
         """Load persisted cron jobs from file."""
         try:
             if self._JOBS_FILE.exists():
@@ -723,7 +723,7 @@ class LLMCronManager:
             log.error(f"Failed to load cron jobs: {e}")
             self.jobs = []
 
-    def save_jobs(self):
+    def save_jobs(self) -> None:
         """Persist cron jobs to file."""
         try:
             self._JOBS_FILE.write_text(json.dumps(self.jobs, ensure_ascii=False, indent=2))
@@ -942,7 +942,7 @@ class Session:
         self.last_model = 'auto'  # Last used model (for UI display)
         self.last_complexity = 'auto'  # Last complexity level
 
-    def add_system(self, content: str):
+    def add_system(self, content: str) -> None:
         # Replace existing system message
         """Add a system message to the session."""
         self.messages = [m for m in self.messages if m['role'] != 'system']
@@ -976,7 +976,7 @@ class Session:
         except Exception as e:
             log.warning(f"Session persist error: {e}")
 
-    def add_user(self, content: str):
+    def add_user(self, content: str) -> None:
         """Add a user message to the session.
 
         Auto-compaction: if session exceeds 1000 messages, trim old ones.
@@ -990,7 +990,7 @@ class Session:
             self.messages = system_msgs + recent
             log.warning(f"[SESSION] Auto-trimmed session {self.id}: >1000 msgs → {len(self.messages)}")
 
-    def add_assistant(self, content: str):
+    def add_assistant(self, content: str) -> None:
         """Add an assistant response to the session."""
         self.messages.append({'role': 'assistant', 'content': content})
         self.last_active = time.time()
@@ -1001,7 +1001,7 @@ class Session:
         except Exception:
             pass
 
-    def add_tool_results(self, results: list):
+    def add_tool_results(self, results: list) -> None:
         """Add tool results as a single user message with all results.
         results: list of {'tool_use_id': str, 'content': str}
         """
@@ -1257,7 +1257,7 @@ class CronScheduler:
         self.jobs = []
         self._running = False
 
-    def add_job(self, name: str, interval_seconds: int, callback, **kwargs):
+    def add_job(self, name: str, interval_seconds: int, callback: object, **kwargs: object) -> None:
         """Add a new cron job with the given schedule and callback."""
         self.jobs.append({
             'name': name, 'interval': interval_seconds,
@@ -1265,7 +1265,7 @@ class CronScheduler:
             'last_run': 0, 'enabled': True
         })
 
-    async def run(self):
+    async def run(self) -> None:
         """Start the cron scheduler loop."""
         self._running = True
         log.info(f"[CRON] Cron scheduler started ({len(self.jobs)} jobs)")
@@ -1286,7 +1286,7 @@ class CronScheduler:
                         log.error(f"Cron error ({job['name']}): {e}")
             await asyncio.sleep(10)
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the cron scheduler loop."""
         self._running = False
 

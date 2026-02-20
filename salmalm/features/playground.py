@@ -4,10 +4,8 @@ stdlib-only. subprocess 기반 격리, 히스토리 저장.
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
-import resource
 import shutil
 import sqlite3
 import subprocess
@@ -16,7 +14,7 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from salmalm.constants import KST, BASE_DIR
 from salmalm.utils.db import connect as _connect_db
