@@ -780,6 +780,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     });
   };
   function addMsg(role,text,model){
+    if(text==null)text='';
     const row=document.createElement('div');row.className='msg-row '+role;
     const av=document.createElement('div');av.className='avatar';
     av.textContent=role==='user'?'👤':'😈';
