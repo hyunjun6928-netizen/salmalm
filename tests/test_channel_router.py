@@ -101,13 +101,13 @@ class TestChannelRouter(unittest.TestCase):
             return f"echo: {msg['text']}"
 
         self.router.set_handler('web', handler)
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             self.router.route_inbound('web', {'text': 'test'})
         )
         self.assertEqual(result, 'echo: test')
 
     def test_route_inbound_no_handler(self):
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             self.router.route_inbound('web', {'text': 'test'})
         )
         self.assertIsNone(result)
