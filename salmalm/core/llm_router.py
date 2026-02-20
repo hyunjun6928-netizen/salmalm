@@ -62,6 +62,14 @@ PROVIDERS: Dict[str, Dict[str, Any]] = {
             'mixtral-8x7b-32768', 'gemma2-9b-it',
         ],
     },
+    'xai': {
+        'env_key': 'XAI_API_KEY',
+        'base_url': 'https://api.x.ai/v1',
+        'chat_endpoint': '/chat/completions',
+        'models': [
+            'grok-4-0709', 'grok-3', 'grok-3-mini',
+        ],
+    },
     'ollama': {
         'env_key': '',  # no key needed
         'base_url': os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434'),
@@ -79,7 +87,7 @@ _PREFIX_MAP = {
     'google/': 'google',
     'groq/': 'groq',
     'ollama/': 'ollama',
-    'xai/': 'openai',  # xAI uses OpenAI-compatible API
+    'xai/': 'xai',
     'openrouter/': 'openai',  # OpenRouter uses OpenAI-compatible API
 }
 
