@@ -1722,16 +1722,51 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     chat.style.display='none';inputArea.style.display='none';settingsEl.style.display='none';dashView.style.display='block';
     var dc=document.getElementById('dashboard-content');dc.innerHTML='<p style="color:var(--text2)">Loading...</p>';
     fetch('/api/dashboard',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
-      var h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:20px">';
-      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:12px;color:var(--text2)">TOTAL COST</div><div style="font-size:28px;font-weight:700;color:var(--accent)">$'+(d.total_cost||0).toFixed(4)+'</div></div>';
-      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:12px;color:var(--text2)">TOTAL CALLS</div><div style="font-size:28px;font-weight:700;color:var(--accent)">'+(d.total_calls||0)+'</div></div>';
-      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:12px;color:var(--text2)">UPTIME</div><div style="font-size:28px;font-weight:700;color:var(--accent)">'+(d.uptime_hours||'?')+'h</div></div>';
+      var u=d.usage||{};var kr=_lang==='ko';
+      var totalCost=(u.total_cost||0).toFixed(4);
+      var totalCalls=0;var bm=u.by_model||{};
+      for(var k in bm)totalCalls+=bm[k].calls||0;
+      var uptime=(u.elapsed_hours||0).toFixed(1);
+      var sessions=d.sessions||[];
+      var totalMsgs=0;sessions.forEach(function(s){totalMsgs+=s.messages||0});
+      var crons=d.cron_jobs||[];
+      var h='';
+      /* Summary cards */
+      h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--text2);text-transform:uppercase">💰 '+(kr?'총 비용':'Total Cost')+'</div><div style="font-size:26px;font-weight:700;color:var(--accent)">$'+totalCost+'</div></div>';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--text2);text-transform:uppercase">📡 '+(kr?'API 호출':'API Calls')+'</div><div style="font-size:26px;font-weight:700;color:var(--accent)">'+totalCalls+'</div></div>';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--text2);text-transform:uppercase">💬 '+(kr?'세션/메시지':'Sessions / Messages')+'</div><div style="font-size:26px;font-weight:700;color:var(--accent)">'+sessions.length+' / '+totalMsgs+'</div></div>';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--text2);text-transform:uppercase">⏱️ '+(kr?'가동 시간':'Uptime')+'</div><div style="font-size:26px;font-weight:700;color:var(--accent)">'+uptime+'h</div></div>';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--text2);text-transform:uppercase">📥 '+(kr?'입력 토큰':'Input Tokens')+'</div><div style="font-size:26px;font-weight:700;color:var(--accent)">'+(u.total_input||0).toLocaleString()+'</div></div>';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px"><div style="font-size:11px;color:var(--text2);text-transform:uppercase">📤 '+(kr?'출력 토큰':'Output Tokens')+'</div><div style="font-size:26px;font-weight:700;color:var(--accent)">'+(u.total_output||0).toLocaleString()+'</div></div>';
       h+='</div>';
-      if(d.by_model&&Object.keys(d.by_model).length){
-        h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px"><h3 style="font-size:13px;color:var(--text2);margin-bottom:12px">MODEL BREAKDOWN</h3><table style="width:100%;font-size:13px;border-collapse:collapse">';
-        h+='<tr style="color:var(--text2)"><th style="text-align:left;padding:4px 8px">Model</th><th style="text-align:right;padding:4px 8px">Calls</th><th style="text-align:right;padding:4px 8px">Cost</th></tr>';
-        for(var m in d.by_model){var v=d.by_model[m];h+='<tr style="border-top:1px solid var(--border)"><td style="padding:4px 8px">'+m+'</td><td style="text-align:right;padding:4px 8px">'+v.calls+'</td><td style="text-align:right;padding:4px 8px">$'+v.cost.toFixed(4)+'</td></tr>'}
+      /* Model breakdown */
+      if(Object.keys(bm).length){
+        h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">';
+        h+='<h3 style="font-size:13px;color:var(--text2);margin-bottom:12px">🤖 '+(kr?'모델별 사용량':'Model Breakdown')+'</h3>';
+        h+='<table style="width:100%;font-size:13px;border-collapse:collapse">';
+        h+='<tr style="color:var(--text2)"><th style="text-align:left;padding:6px 8px">'+(kr?'모델':'Model')+'</th><th style="text-align:right;padding:6px 8px">'+(kr?'호출':'Calls')+'</th><th style="text-align:right;padding:6px 8px">'+(kr?'입력':'Input')+'</th><th style="text-align:right;padding:6px 8px">'+(kr?'출력':'Output')+'</th><th style="text-align:right;padding:6px 8px">'+(kr?'비용':'Cost')+'</th></tr>';
+        for(var m in bm){var v=bm[m];h+='<tr style="border-top:1px solid var(--border)"><td style="padding:6px 8px;font-weight:500">'+m+'</td><td style="text-align:right;padding:6px 8px">'+v.calls+'</td><td style="text-align:right;padding:6px 8px">'+(v.input||0).toLocaleString()+'</td><td style="text-align:right;padding:6px 8px">'+(v.output||0).toLocaleString()+'</td><td style="text-align:right;padding:6px 8px;color:var(--accent)">$'+v.cost.toFixed(4)+'</td></tr>'}
         h+='</table></div>';
+      }
+      /* Sessions list */
+      if(sessions.length){
+        h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">';
+        h+='<h3 style="font-size:13px;color:var(--text2);margin-bottom:12px">💬 '+(kr?'세션 목록':'Sessions')+'</h3>';
+        h+='<table style="width:100%;font-size:13px;border-collapse:collapse">';
+        h+='<tr style="color:var(--text2)"><th style="text-align:left;padding:6px 8px">ID</th><th style="text-align:right;padding:6px 8px">'+(kr?'메시지':'Messages')+'</th><th style="text-align:right;padding:6px 8px">'+(kr?'최근 활동':'Last Active')+'</th></tr>';
+        sessions.forEach(function(s){
+          var dt=s.last_active?new Date(s.last_active*1000).toLocaleString():'-';
+          h+='<tr style="border-top:1px solid var(--border)"><td style="padding:6px 8px;font-weight:500">'+s.id+'</td><td style="text-align:right;padding:6px 8px">'+s.messages+'</td><td style="text-align:right;padding:6px 8px;color:var(--text2);font-size:12px">'+dt+'</td></tr>';
+        });
+        h+='</table></div>';
+      }
+      /* Cron jobs */
+      if(crons.length){
+        h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">';
+        h+='<h3 style="font-size:13px;color:var(--text2);margin-bottom:12px">⏰ '+(kr?'예약 작업':'Cron Jobs')+'</h3>';
+        crons.forEach(function(c){h+='<div style="padding:4px 0;font-size:13px">• '+c.name+' — '+c.schedule+'</div>'});
+        h+='</div>';
       }
       dc.innerHTML=h;
     }).catch(function(e){dc.innerHTML='<p style="color:var(--red)">Failed to load: '+e.message+'</p>'});
