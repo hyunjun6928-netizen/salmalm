@@ -63,10 +63,18 @@ from pathlib import Path as _Path
 
 # Model name corrections: constants.py has outdated names → map to real API IDs
 _MODEL_NAME_FIXES = {
+    # Anthropic
     'claude-haiku-3.5-20241022': 'claude-haiku-4-5-20251001',
     'anthropic/claude-haiku-3.5-20241022': 'anthropic/claude-haiku-4-5-20251001',
+    'claude-haiku-4-5-20250414': 'claude-haiku-4-5-20251001',
     'claude-sonnet-4-20250514': 'claude-sonnet-4-6',
     'anthropic/claude-sonnet-4-20250514': 'anthropic/claude-sonnet-4-6',
+    # OpenAI (gpt-5.3-codex doesn't exist; latest codex is 5.2)
+    'gpt-5.3-codex': 'gpt-5.2-codex',
+    'openai/gpt-5.3-codex': 'openai/gpt-5.2-codex',
+    # xAI (grok-4 alias may not resolve; use dated version)
+    'grok-4': 'grok-4-0709',
+    'xai/grok-4': 'xai/grok-4-0709',
 }
 
 
@@ -515,6 +523,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
     async def _try_llm_call(self, messages, model, tools, max_tokens, thinking, on_token):
         """Single LLM call attempt. Delegates to llm_loop."""
+        model = _fix_model_name(model)
         return await _try_llm_call_fn(messages, model, tools, max_tokens, thinking, on_token)
 
     async def run(self, session: object, user_message: str,
