@@ -31,6 +31,7 @@ def _get_db() -> sqlite3.Connection:
     """Get thread-local SQLite connection (reused across calls, WAL mode)."""
     conn = getattr(_thread_local, 'audit_conn', None)
     if conn is None:
+        AUDIT_DB.parent.mkdir(parents=True, exist_ok=True)  # noqa: F405
         conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=True)  # noqa: F405
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
