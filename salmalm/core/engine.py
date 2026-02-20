@@ -861,7 +861,8 @@ async def process_message(session_id: str, user_message: str,
                           image_data: Optional[Tuple[str, str]] = None,
                           on_tool: Optional[Callable[[str, Any], None]] = None,
                           on_token: Optional[Callable] = None,
-                          on_status: Optional[Callable] = None) -> str:
+                          on_status: Optional[Callable] = None,
+                          lang: Optional[str] = None) -> str:
     """Process a user message through the Intelligence Engine pipeline.
 
     Edge cases:
@@ -883,7 +884,8 @@ async def process_message(session_id: str, user_message: str,
                                             image_data=image_data,
                                             on_tool=on_tool,
                                             on_token=on_token,
-                                            on_status=on_status)
+                                            on_status=on_status,
+                                            lang=lang)
     except Exception as e:
         log.error(f"[ENGINE] Unhandled error: {type(e).__name__}: {e}")
         import traceback
@@ -1701,7 +1703,8 @@ async def _process_message_inner(session_id: str, user_message: str,
                                  image_data: Optional[Tuple[str, str]] = None,
                                  on_tool: Optional[Callable[[str, Any], None]] = None,
                                  on_token: Optional[Callable] = None,
-                                 on_status: Optional[Callable] = None) -> str:
+                                 on_status: Optional[Callable] = None,
+                                 lang: Optional[str] = None) -> str:
     """Inner implementation of process_message."""
     # Input sanitization
     if not _SESSION_ID_RE.match(session_id):
@@ -1755,6 +1758,12 @@ async def _process_message_inner(session_id: str, user_message: str,
         session.messages.append({'role': 'user', 'content': content})
     else:
         session.add_user(user_message)
+
+    # Language directive — match UI language setting
+    if lang and lang in ('en', 'ko'):
+        lang_directive = 'Respond in English.' if lang == 'en' else '한국어로 응답하세요.'
+        # Inject as lightweight system hint (not persisted)
+        session.messages.append({'role': 'system', 'content': f'[Language: {lang_directive}]'})
 
     # Context management
     session.messages = compact_messages(session.messages, session=session)

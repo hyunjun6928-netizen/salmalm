@@ -2214,6 +2214,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             session_id = body.get('session', 'web')
             image_b64 = body.get('image_base64')
             image_mime = body.get('image_mime', 'image/png')
+            ui_lang = body.get('lang', '')
             use_stream = self.path.endswith('/stream')
 
             if use_stream:
@@ -2269,7 +2270,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                         process_message(session_id, message,
                                         image_data=(image_b64, image_mime) if image_b64 else None,
                                         on_tool=on_tool_sse,
-                                        on_token=on_token_sse)
+                                        on_token=on_token_sse,
+                                        lang=ui_lang)
                     )
                     loop.close()
                 except Exception as e:
@@ -2290,7 +2292,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     loop = asyncio.new_event_loop()
                     response = loop.run_until_complete(
                         process_message(session_id, message,
-                                        image_data=(image_b64, image_mime) if image_b64 else None)
+                                        image_data=(image_b64, image_mime) if image_b64 else None,
+                                        lang=ui_lang)
                     )
                     loop.close()
                 except Exception as e:
