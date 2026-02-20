@@ -67,7 +67,7 @@ _ROUTING_CONFIG_FILE = _Path.home() / '.salmalm' / 'routing.json'
 
 def _load_routing_config() -> dict:
     """Load user's model routing config. Returns {simple, moderate, complex} model IDs."""
-    defaults = {'simple': _MODELS['haiku'], 'moderate': _MODELS['sonnet'], 'complex': _MODELS['opus']}
+    defaults = {'simple': '', 'moderate': '', 'complex': ''}
     try:
         if _ROUTING_CONFIG_FILE.exists():
             cfg = _json.loads(_ROUTING_CONFIG_FILE.read_text(encoding='utf-8'))
@@ -113,6 +113,11 @@ def _select_model(message: str, session) -> tuple:
             return override, 'manual'
 
     rc = _load_routing_config()
+    # If routing not configured, use default model
+    _default_fallback = getattr(session, '_default_model', None) or _MODELS.get('sonnet', '')
+    for k in ('simple', 'moderate', 'complex'):
+        if not rc[k]:
+            rc[k] = _default_fallback
     msg_lower = message.lower()
     msg_len = len(message)
 
