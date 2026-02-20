@@ -1100,30 +1100,13 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(svg.encode())
 
         elif self.path == '/sw.js':
-            _ver = VERSION  # already imported via wildcard at module level  # noqa: F405
-            sw_js = f'''const CACHE='salmalm-v{_ver}';
-const STATIC_URLS=['/','/manifest.json','/icon-192.svg','/icon-512.svg'];
-self.addEventListener('install',e=>{{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC_URLS)).then(()=>self.skipWaiting()))
-}});
-self.addEventListener('activate',e=>{{
-  e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim()))
-}});
-self.addEventListener('fetch',e=>{{
-  if(e.request.method!=='GET')return;
-  const url=new URL(e.request.url);
-  if(url.pathname.startsWith('/api/')||url.pathname==='/sw.js'||url.pathname==='/'||url.pathname==='/index.html'){{
-    e.respondWith(fetch(e.request).then(r=>{{
-      if(r.ok){{const cl=r.clone();caches.open(CACHE).then(ca=>ca.put(e.request,cl))}}return r
-    }}).catch(()=>caches.match(e.request)));return
-  }}
-  e.respondWith(caches.match(e.request).then(c=>c||fetch(e.request).then(r=>{{
-    if(r.ok){{const cl=r.clone();caches.open(CACHE).then(ca=>ca.put(e.request,cl))}}return r
-  }})))
-}});'''
+            # Return self-uninstalling SW — clears old caches and unregisters itself
+            sw_js = '''self.addEventListener("install",()=>self.skipWaiting());
+self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).then(()=>self.registration.unregister()))});'''
             self.send_response(200)
             self._cors()
             self.send_header('Content-Type', 'application/javascript')
+            self.send_header('Cache-Control', 'no-cache, no-store')
             self.end_headers()
             self.wfile.write(sw_js.encode())
 

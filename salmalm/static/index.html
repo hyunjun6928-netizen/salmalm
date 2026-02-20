@@ -2328,7 +2328,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* PWA Service Worker */
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/sw.js').catch(function(){});
+    /* Unregister any existing SW and clear caches — no offline cache needed */
+    navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister()})});
+    caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k)})});
   }
 })();
 
