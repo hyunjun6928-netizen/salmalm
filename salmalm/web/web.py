@@ -346,6 +346,28 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         models = model_detector.detect_all(force=force)
         self._json({'models': models, 'count': len(models)})
 
+    def _get_llm_router_providers(self):
+        if not self._require_auth('user'): return
+        from salmalm.core.llm_router import PROVIDERS, is_provider_available, list_available_models, llm_router
+        providers = []
+        for name, cfg in PROVIDERS.items():
+            providers.append({
+                'name': name,
+                'available': is_provider_available(name),
+                'env_key': cfg.get('env_key', ''),
+                'models': [{'name': m, 'full': f'{name}/{m}'} for m in cfg['models']],
+            })
+        self._json({
+            'providers': providers,
+            'current_model': llm_router.current_model,
+            'all_models': list_available_models(),
+        })
+
+    def _get_llm_router_current(self):
+        if not self._require_auth('user'): return
+        from salmalm.core.llm_router import llm_router
+        self._json({'current_model': llm_router.current_model})
+
     def _get_soul(self):
         if not self._require_auth('user'): return
         from salmalm.prompt import get_user_soul, USER_SOUL_FILE
@@ -524,6 +546,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         '/api/usage/models': '_get_usage_models',
         '/api/groups': '_get_groups',
         '/api/models': '_get_models',
+        '/api/llm-router/providers': '_get_llm_router_providers',
+        '/api/llm-router/current': '_get_llm_router_current',
         '/api/soul': '_get_soul',
         '/api/routing': '_get_routing',
         '/api/failover': '_get_failover',
@@ -2240,6 +2264,60 @@ self.addEventListener('fetch',e=>{{
             mood = body.get('mood', 'neutral')
             tid = thought_stream.add(content, mood=mood)
             self._json({'ok': True, 'id': tid})
+
+        elif self.path in ('/api/llm-router/switch', '/api/model/switch'):
+            if not self._require_auth('user'): return
+            from salmalm.core.llm_router import llm_router
+            model = body.get('model', '')
+            if not model:
+                self._json({'error': 'model required'}, 400)
+                return
+            msg = llm_router.switch_model(model)
+            self._json({'ok': '✅' in msg, 'message': msg, 'current_model': llm_router.current_model})
+
+        elif self.path in ('/api/llm-router/test-key', '/api/test-provider'):
+            if not self._require_auth('user'): return
+            provider = body.get('provider', '')
+            api_key = body.get('api_key', '')
+            if not provider or not api_key:
+                self._json({'error': 'provider and api_key required'}, 400)
+                return
+            # Test by setting env temporarily and making a minimal call
+            from salmalm.core.llm_router import PROVIDERS
+            prov_cfg = PROVIDERS.get(provider)
+            if not prov_cfg:
+                self._json({'ok': False, 'message': f'Unknown provider: {provider}'})
+                return
+            env_key = prov_cfg.get('env_key', '')
+            if env_key:
+                old_val = os.environ.get(env_key)
+                os.environ[env_key] = api_key
+            try:
+                import urllib.request, urllib.error
+                if provider == 'anthropic':
+                    url = f"{prov_cfg['base_url']}/messages"
+                    req = urllib.request.Request(url,
+                        data=json.dumps({'model': 'claude-haiku-3.5-20241022', 'max_tokens': 1, 'messages': [{'role': 'user', 'content': 'hi'}]}).encode(),
+                        headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'},
+                        method='POST')
+                elif provider == 'ollama':
+                    url = f"{prov_cfg['base_url']}/api/tags"
+                    req = urllib.request.Request(url)
+                else:
+                    url = f"{prov_cfg['base_url']}/models"
+                    req = urllib.request.Request(url, headers={'Authorization': f'Bearer {api_key}'})
+                urllib.request.urlopen(req, timeout=10)
+                self._json({'ok': True, 'message': f'✅ {provider} key is valid'})
+            except urllib.error.HTTPError as e:
+                self._json({'ok': False, 'message': f'❌ HTTP {e.code}: Invalid key'})
+            except Exception as e:
+                self._json({'ok': False, 'message': f'❌ Connection failed: {e}'})
+            finally:
+                if env_key:
+                    if old_val is not None:
+                        os.environ[env_key] = old_val
+                    elif env_key in os.environ:
+                        del os.environ[env_key]
 
         elif self.path.startswith('/api/thoughts/search'):
             from salmalm.thoughts import thought_stream

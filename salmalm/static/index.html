@@ -281,6 +281,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:16px;position:sticky;top:0;background:var(--bg);z-index:10;padding-top:8px">
     <button class="settings-tab active" data-settings-tab="general" style="padding:10px 20px;border:none;background:none;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-general">⚙️ General</button>
     <button class="settings-tab" data-settings-tab="features" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-features">📖 Features</button>
+    <button class="settings-tab" data-settings-tab="model-router" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px">🤖 Model</button>
   </div>
   <div id="settings-general">
   <div class="settings-card">
@@ -498,6 +499,25 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div style="margin-bottom:16px"><input id="features-search" type="text" placeholder="Search features..." data-i18n="features-search-ph" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:14px"></div>
     <div id="features-list"></div>
     <div id="features-empty" style="display:none;text-align:center;padding:40px;color:var(--text2);font-size:14px" data-i18n="features-empty">No features found.</div>
+  </div>
+  <div id="settings-model-router" style="display:none">
+    <div class="settings-card">
+      <h3>🤖 Model Router</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Select a model with one click. Active model is highlighted.</p>
+      <div id="mr-current" style="margin-bottom:16px;padding:12px;border-radius:8px;background:var(--accent-dim);display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">🎯</span>
+        <div>
+          <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px">Active Model</div>
+          <div id="mr-current-name" style="font-size:15px;font-weight:600;color:var(--accent2)">Auto</div>
+        </div>
+      </div>
+      <div id="mr-providers"></div>
+    </div>
+    <div class="settings-card">
+      <h3>🔑 API Keys</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Enter API keys to enable providers. Keys are tested in real-time.</p>
+      <div id="mr-keys"></div>
+    </div>
   </div>
 </div>
 
@@ -1459,7 +1479,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       var which=tab.getAttribute('data-settings-tab');
       document.getElementById('settings-general').style.display=which==='general'?'block':'none';
       document.getElementById('settings-features').style.display=which==='features'?'block':'none';
+      document.getElementById('settings-model-router').style.display=which==='model-router'?'block':'none';
       if(which==='features'&&!window._featuresLoaded){window._featuresLoaded=true;loadFeatures()}
+      if(which==='model-router'){window._loadModelRouter()}
     });
   });
 
@@ -2232,4 +2254,86 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     navigator.serviceWorker.register('/sw.js').catch(function(){});
   }
 })();
+
+  /* ── Model Router Tab ── */
+  window._loadModelRouter=function(){
+    fetch('/api/llm-router/providers',{headers:{'X-Session-Token':_tok}})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var cur=d.current_model||'auto';
+      document.getElementById('mr-current-name').textContent=cur;
+      var provEl=document.getElementById('mr-providers');
+      var keysEl=document.getElementById('mr-keys');
+      provEl.innerHTML='';keysEl.innerHTML='';
+      d.providers.forEach(function(p){
+        var sec=document.createElement('div');
+        sec.style.cssText='margin-bottom:20px';
+        var hdr=document.createElement('div');
+        hdr.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:10px';
+        hdr.innerHTML='<span style="font-size:16px">'+(p.available?'✅':'❌')+'</span>'+
+          '<span style="font-size:14px;font-weight:600">'+p.name.charAt(0).toUpperCase()+p.name.slice(1)+'</span>'+
+          '<span style="font-size:11px;color:var(--text2)">'+(p.available?'Connected':'No API key')+'</span>';
+        sec.appendChild(hdr);
+        var grid=document.createElement('div');
+        grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px';
+        p.models.forEach(function(m){
+          var btn=document.createElement('button');
+          var isActive=cur&&(cur===m.full||cur===m.name||cur.indexOf(m.name)!==-1);
+          btn.style.cssText='padding:10px 14px;border-radius:8px;border:1px solid '+(isActive?'var(--accent)':'var(--border)')+
+            ';background:'+(isActive?'var(--accent-dim)':'var(--bg)')+
+            ';color:'+(isActive?'var(--accent2)':'var(--text)')+
+            ';cursor:pointer;font-size:13px;text-align:left;transition:all 0.15s;position:relative';
+          btn.innerHTML='<div style="font-weight:500">'+m.name+'</div>'+
+            '<div style="font-size:11px;color:var(--text2)">'+m.full+'</div>'+
+            (isActive?'<div style="position:absolute;top:6px;right:8px;font-size:10px;color:var(--accent2)">● active</div>':'');
+          btn.onmouseover=function(){if(!isActive)this.style.borderColor='var(--accent)';this.style.background='var(--accent-dim)'};
+          btn.onmouseout=function(){if(!isActive){this.style.borderColor='var(--border)';this.style.background='var(--bg)'}};
+          btn.onclick=function(){
+            fetch('/api/llm-router/switch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+              body:JSON.stringify({model:m.full})})
+            .then(function(r){return r.json()})
+            .then(function(res){
+              if(res.ok){window._loadModelRouter()}
+              else{alert(res.message)}
+            });
+          };
+          grid.appendChild(btn);
+        });
+        sec.appendChild(grid);
+        provEl.appendChild(sec);
+        /* Key input */
+        if(p.env_key){
+          var row=document.createElement('div');
+          row.style.cssText='margin-bottom:12px';
+          row.innerHTML='<label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;margin-bottom:4px">'+
+            (p.available?'✅':'❌')+' '+p.name.charAt(0).toUpperCase()+p.name.slice(1)+' ('+p.env_key+')</label>'+
+            '<div style="display:flex;gap:6px">'+
+            '<input type="password" id="mr-key-'+p.name+'" placeholder="Enter API key..." style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">'+
+            '<button class="btn" style="white-space:nowrap" data-mr-test="'+p.name+'">Test</button>'+
+            '</div><div id="mr-key-result-'+p.name+'" style="font-size:12px;margin-top:4px"></div>';
+          keysEl.appendChild(row);
+        }
+      });
+      /* Test key buttons */
+      document.querySelectorAll('[data-mr-test]').forEach(function(btn){
+        btn.onclick=function(){
+          var prov=this.getAttribute('data-mr-test');
+          var keyInput=document.getElementById('mr-key-'+prov);
+          var resultEl=document.getElementById('mr-key-result-'+prov);
+          if(!keyInput.value){resultEl.innerHTML='<span style="color:var(--red)">Enter a key first</span>';return}
+          resultEl.innerHTML='<span style="color:var(--text2)">Testing...</span>';
+          fetch('/api/llm-router/test-key',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+            body:JSON.stringify({provider:prov,api_key:keyInput.value})})
+          .then(function(r){return r.json()})
+          .then(function(res){
+            resultEl.innerHTML='<span style="color:'+(res.ok?'var(--green)':'var(--red)')+'">'+res.message+'</span>';
+          })
+          .catch(function(){resultEl.innerHTML='<span style="color:var(--red)">Network error</span>'});
+        };
+      });
+    })
+    .catch(function(e){
+      document.getElementById('mr-providers').innerHTML='<p style="color:var(--red)">Failed to load: '+e+'</p>';
+    });
+  };
 </script></body></html>
