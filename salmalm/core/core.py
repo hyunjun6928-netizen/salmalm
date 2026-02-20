@@ -182,6 +182,30 @@ def audit_log(
         conn.commit()
 
 
+def audit_checkpoint() -> Optional[str]:
+    """Append current audit chain head hash to a checkpoint file.
+
+    This provides tamper-evidence: if someone modifies the SQLite DB,
+    the checkpoint file (append-only) will show a divergence.
+    Returns the head hash or None on failure.
+    """
+    try:
+        conn = _get_db()
+        row = conn.execute(
+            "SELECT hash, id FROM audit_log ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if not row:
+            return None
+        head_hash, head_id = row[0], row[1]
+        checkpoint_file = AUDIT_DB.parent / "audit_checkpoint.log"  # noqa: F405
+        ts = datetime.now(KST).isoformat()  # noqa: F405
+        with open(checkpoint_file, "a") as f:
+            f.write(f"{ts} id={head_id} hash={head_hash}\n")
+        return head_hash  # type: ignore[no-any-return]
+    except Exception:
+        return None
+
+
 def audit_log_cleanup(days: int = 30) -> None:
     """Delete audit_log_v2 entries older than `days` days."""
     from datetime import timedelta

@@ -13,6 +13,7 @@ from salmalm.constants import VAULT_FILE, PBKDF2_ITER, VAULT_VERSION
 from salmalm import log
 
 HAS_CRYPTO: bool = False
+_ALLOW_FALLBACK: bool = bool(os.environ.get("SALMALM_VAULT_FALLBACK"))
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.primitives import hashes as crypto_hashes
@@ -21,9 +22,17 @@ try:
     HAS_CRYPTO = True
     log.info("[OK] cryptography available -- AES-256-GCM enabled")
 except ImportError:
-    log.warning(
-        "[WARN] cryptography not installed -- using HMAC-CTR fallback (stdlib). Install 'cryptography' for AES-256-GCM."
-    )
+    if _ALLOW_FALLBACK:
+        log.warning(
+            "[WARN] cryptography not installed -- HMAC-CTR fallback enabled (SALMALM_VAULT_FALLBACK=1). "
+            "This is NOT a standard cipher; install 'cryptography' for AES-256-GCM."
+        )
+    else:
+        log.warning(
+            "[WARN] cryptography not installed -- vault DISABLED. "
+            "Use environment variables for API keys, or install 'cryptography' for encrypted vault. "
+            "Set SALMALM_VAULT_FALLBACK=1 to force HMAC-CTR fallback (not recommended for production)."
+        )
 
 
 def _derive_key(password: str, salt: bytes, length: int = 32) -> bytes:
@@ -62,6 +71,10 @@ class Vault:
 
     def create(self, password: str) -> None:
         """Create a new vault with the given master password."""
+        if not HAS_CRYPTO and not _ALLOW_FALLBACK:
+            raise RuntimeError(
+                "Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1"
+            )
         self._password = password
         self._salt = secrets.token_bytes(16)
         self._data = {}
@@ -125,13 +138,17 @@ class Vault:
             nonce = secrets.token_bytes(12)
             ct = AESGCM(key).encrypt(nonce, plaintext, None)
             VAULT_FILE.write_bytes(VAULT_VERSION + self._salt + nonce + ct)
-        else:
+        elif _ALLOW_FALLBACK:
             iv = secrets.token_bytes(16)
             enc_key = _derive_key(self._password, self._salt + b"enc" + iv, 32)
             ct = self._ctr_encrypt(enc_key, plaintext)
             hmac_key = _derive_key(self._password, self._salt + b"hmac", 32)
             tag = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
             VAULT_FILE.write_bytes(b"\x02" + self._salt + tag + iv + ct)
+        else:
+            raise RuntimeError(
+                "Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1"
+            )
 
     @staticmethod
     def _ctr_encrypt(key: bytes, data: bytes) -> bytes:
