@@ -208,9 +208,11 @@ Discord  ──►             ├── RAG Engine (TF-IDF + cosine similarity)
                          └── Vault (PBKDF2 encrypted)
 ```
 
-- **216 modules**, **43K+ lines**, **78 test files**, **1,598 tests**
+- **218 modules**, **42K+ lines**, **80 test files**, **1,649 tests**
 - Pure Python 3.10+ stdlib — no frameworks, no heavy dependencies
 - Single `pip install`, runs anywhere Python runs
+- Route-table architecture (85 GET + 59 POST handlers)
+- Default bind `127.0.0.1` (explicit opt-in for network exposure)
 
 ---
 

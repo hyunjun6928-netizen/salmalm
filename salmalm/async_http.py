@@ -1,4 +1,5 @@
 # Backward-compatibility shim — real module is salmalm.utils.async_http
+import warnings as _w; _w.warn("async_http is a shim; use salmalm.utils.async_http directly", DeprecationWarning, stacklevel=2)
 import importlib as _importlib
 import sys as _sys
 _real = _importlib.import_module("salmalm.utils.async_http")
