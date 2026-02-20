@@ -464,8 +464,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         <label style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="exp-data" checked> Data (notes/expenses)</label>
         <label style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="exp-vault"> Vault (API keys)</label>
       </div>
-      <button class="btn" data-action="exportAgent" style="font-size:12px">📥 Export Agent</button>
-      <button class="btn" data-action="quickSyncExport" style="background:var(--bg3);color:var(--text2);font-size:12px;margin-left:4px">⚡ Quick Sync</button>
+      <button class="btn" data-action="exportAgent" style="font-size:12px" disabled title="Coming soon">📥 Export Agent (Coming Soon)</button>
+      <button class="btn" data-action="quickSyncExport" style="background:var(--bg3);color:var(--text2);font-size:12px;margin-left:4px" disabled title="Coming soon">⚡ Quick Sync (Coming Soon)</button>
     </div>
     <div style="border-top:1px solid var(--border);padding-top:12px">
       <strong style="font-size:12px;color:var(--text)">Import / 가져오기</strong>
@@ -1718,8 +1718,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
         h+='<td>';
         if(u.role!=='admin'){
           var toggleLabel=u.enabled?'Disable':'Enable';
-          h+='<button onclick="window.toggleUser('+u.id+','+(!u.enabled)+')" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text2);cursor:pointer">'+toggleLabel+'</button> ';
-          h+='<button onclick="window.deleteUser(\''+u.username+'\')" style="font-size:11px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;background:var(--bg3);color:var(--red);cursor:pointer">Delete</button>';
+          h+='<button data-action="toggleUser" data-uid="'+u.id+'" data-enabled="'+(!u.enabled)+'" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg3);color:var(--text2);cursor:pointer">'+toggleLabel+'</button> ';
+          h+='<button data-action="deleteUser" data-username="'+u.username+'" style="font-size:11px;padding:2px 8px;border:1px solid var(--red);border-radius:4px;background:var(--bg3);color:var(--red);cursor:pointer">Delete</button>';
         }
         h+='</td></tr>';
       });
@@ -2165,6 +2165,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='exportAgent')window.exportAgent();
     else if(a==='importAgent')window.importAgent();
     else if(a==='quickSyncExport')window.quickSyncExport();
+    else if(a==='toggleUser'){var uid=parseInt(el.getAttribute('data-uid'));var en=el.getAttribute('data-enabled')==='true';window.toggleUser(uid,en)}
+    else if(a==='deleteUser'){window.deleteUser(el.getAttribute('data-username'))}
     else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){addMsg('assistant','✅ Saved')})}
     else if(a==='saveRouting'){var rc={simple:document.getElementById('route-simple').value,moderate:document.getElementById('route-moderate').value,complex:document.getElementById('route-complex').value};fetch('/api/routing',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify(rc)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('route-status');if(st){st.textContent='✅ Saved!';setTimeout(function(){st.textContent=''},2000)}}).catch(function(){var st=document.getElementById('route-status');if(st)st.textContent='❌ Error'})}
     else if(a==='saveSoul'){

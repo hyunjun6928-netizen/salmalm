@@ -57,6 +57,19 @@ class UserManager:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
 
+        # users table (created by auth.py, but ensure it exists here too)
+        conn.execute('''CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash BLOB NOT NULL DEFAULT x'',
+            password_salt BLOB NOT NULL DEFAULT x'',
+            role TEXT NOT NULL DEFAULT 'user',
+            api_key TEXT UNIQUE,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            last_login TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1
+        )''')
+
         # user_quotas table
         conn.execute('''CREATE TABLE IF NOT EXISTS user_quotas (
             user_id INTEGER PRIMARY KEY,
