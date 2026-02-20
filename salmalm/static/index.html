@@ -662,11 +662,15 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       localStorage.removeItem(_storageKey(sid));
       delete _sessionCache[sid];
       if(sid===_currentSession){
+        /* Switch back to 'web' session and restore its messages */
         _currentSession='web';
         localStorage.setItem('salm_active_session','web');
-        localStorage.removeItem('salm_chat');
+        var webData=localStorage.getItem(_storageKey('web'))||'[]';
+        localStorage.setItem('salm_chat',webData);
         chat.innerHTML='';
-        addMsg('system',t('new-session-msg'));
+        var hist=JSON.parse(webData);
+        if(hist.length){window._restoring=true;hist.forEach(function(m){if(m&&m.role)addMsg(m.role,m.text,m.model)});window._restoring=false}
+        else{addMsg('system',t('new-session-msg'))}
       }
       loadSessionList();
     }).catch(function(){});
