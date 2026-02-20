@@ -251,7 +251,7 @@ async def run_server():
         f"║  Web UI:    http://127.0.0.1:{port:<5}           ║\n"
         f"║  WebSocket: ws://127.0.0.1:{ws_port:<5}            ║\n"
         f"║  Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}         ║\n"
-        f"║  Crypto:    {'AES-256-GCM' if HAS_CRYPTO else 'HMAC-CTR (fallback)'}            ║\n"
+        f"║  Crypto:    {'AES-256-GCM' if HAS_CRYPTO else ('HMAC-CTR (fallback)' if os.environ.get('SALMALM_VAULT_FALLBACK') else 'Vault disabled')}            ║\n"
         f"║  Self-test: {st}                               ║\n"
         f"╚══════════════════════════════════════════════╝"
     )
