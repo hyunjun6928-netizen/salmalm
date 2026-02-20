@@ -1707,7 +1707,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             from salmalm.core import _get_db
             conn = _get_db()
             try:
-                conn.execute('INSERT OR IGNORE INTO session_store (session_id, data, updated_at, title) VALUES (?, ?, datetime("now"), ?)',
+                conn.execute('INSERT OR IGNORE INTO session_store (session_id, messages, updated_at, title) VALUES (?, ?, datetime("now"), ?)',
                              (sid, '[]', 'New Chat'))
                 conn.commit()
             except Exception:
