@@ -204,11 +204,11 @@ def test_cost_estimation_haiku():
     usage = {'input': 500_000, 'output': 50_000,
              'cache_creation_input_tokens': 100_000,
              'cache_read_input_tokens': 0}
-    cost = estimate_cost('claude-haiku-3.5', usage)
-    # regular: (500K - 100K) * $0.25/M = $0.10
-    # cache_write: 100K * $0.3/M = $0.03
-    # output: 50K * $1.25/M = $0.0625
-    expected = 0.10 + 0.03 + 0.0625
+    cost = estimate_cost('claude-haiku-4-5', usage)
+    # regular: (500K - 100K) * $1.0/M = $0.40
+    # cache_write: 100K * $1.25/M = $0.125
+    # output: 50K * $5.0/M = $0.25
+    expected = 0.40 + 0.125 + 0.25
     assert abs(cost - expected) < 0.001, f"Expected ~${expected}, got ${cost}"
 
 

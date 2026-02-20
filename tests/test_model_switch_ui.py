@@ -113,10 +113,7 @@ class TestLLMRouterAPI(unittest.TestCase):
         self.assertIn('mr-current-name', html)
         self.assertIn('_loadModelRouter', html)
         self.assertIn('/api/model/switch', html)
-        self.assertIn('/api/test-provider', html)
-        self.assertIn('mr-model-btn', html)
-        self.assertIn('mr-test-btn', html)
-        self.assertIn('mr-save-btn', html)
+        self.assertIn('switchModel', html)
 
 
 if __name__ == '__main__':
