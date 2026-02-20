@@ -12,8 +12,6 @@ Config: ~/.salmalm/plugins.json (enabled/disabled state)
 
 import importlib.util
 import json
-import os
-import sys
 import threading
 from pathlib import Path
 from typing import Dict, List, Optional

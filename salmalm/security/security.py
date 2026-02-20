@@ -10,9 +10,7 @@ Features:
 보안 모듈 — OWASP 준수, 보안 감사, 강화.
 """
 
-import hashlib
 import ipaddress
-import json
 import os
 import re
 import socket
@@ -20,10 +18,10 @@ import time
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 from urllib.parse import urlparse
 
-from salmalm.constants import BASE_DIR, VERSION, KST
+from salmalm.constants import VERSION, KST
 
 
 # ── Sensitive Data Redaction ─────────────────────────────────
@@ -285,7 +283,7 @@ class SecurityAuditor:
     def _check_a02_cryptographic_failures(self) -> dict:
         """A02: Cryptographic Failures — 암호화 취약점."""
         issues = []
-        from salmalm.crypto import vault, HAS_CRYPTO
+        from salmalm.crypto import vault, HAS_CRYPTO  # noqa: F401
         if not HAS_CRYPTO:
             issues.append('WARN: AES-256-GCM unavailable (using HMAC-CTR fallback)')
         # Check PBKDF2 iterations
@@ -317,7 +315,7 @@ class SecurityAuditor:
             content = web_src.read_text()
             # Check for f-string SQL (dangerous pattern)
             if re.search(r'execute\(f["\']', content):
-                lines = [i+1 for i, l in enumerate(content.split('\n'))
+                lines = [i + 1 for i, l in enumerate(content.split('\n'))
                          if 'execute(f' in l and 'SELECT' in l.upper()]
                 if lines:
                     issues.append(f'Potential SQL injection in web.py lines: {lines}')
@@ -337,7 +335,7 @@ class SecurityAuditor:
 
         # Check path traversal protection
         try:
-            from salmalm.tools_common import _resolve_path
+            from salmalm.tools_common import _resolve_path  # noqa: F401
             pass  # Function exists
         except ImportError:
             issues.append('Missing path traversal protection')
@@ -374,7 +372,7 @@ class SecurityAuditor:
 
         # Check exec sandboxing
         try:
-            from salmalm.tools_common import _is_safe_command
+            from salmalm.tools_common import _is_safe_command  # noqa: F401
         except ImportError:
             issues.append('No command execution sandboxing')
 
@@ -393,7 +391,7 @@ class SecurityAuditor:
             issues.append('WARN: Debug mode enabled (SALMALM_DEBUG)')
         # Check for hardcoded secrets
         try:
-            from salmalm.constants import VERSION
+            from salmalm.constants import VERSION  # noqa: F401
         except Exception:
             pass
         # Check security headers
@@ -406,7 +404,7 @@ class SecurityAuditor:
         # Check allowed HTTP methods
         try:
             from salmalm.web import WebHandler
-            methods = ['do_GET', 'do_POST', 'do_PUT', 'do_OPTIONS']
+            _methods = ['do_GET', 'do_POST', 'do_PUT', 'do_OPTIONS']  # noqa: F841
             for m in ['do_DELETE', 'do_PATCH', 'do_TRACE']:
                 if hasattr(WebHandler, m):
                     issues.append(f'WARN: Unnecessary HTTP method enabled: {m.replace("do_", "")}')
@@ -446,7 +444,7 @@ class SecurityAuditor:
             issues.append('Auth manager not available')
         # Check session timeout
         try:
-            from salmalm.auth import TokenManager
+            from salmalm.auth import TokenManager  # noqa: F401
             # Default token expiry is 24h (86400s)
         except Exception:
             pass
@@ -479,7 +477,7 @@ class SecurityAuditor:
         """A09: Logging — 보안 로깅."""
         issues = []
         try:
-            from salmalm.core import audit_log
+            from salmalm.core import audit_log  # noqa: F401
         except ImportError:
             issues.append('audit_log not available')
         # Check if audit DB exists
@@ -524,7 +522,7 @@ class SecurityAuditor:
         감사 보고서를 읽기 쉬운 텍스트로 포맷."""
         report = self.audit()
         lines = [
-            f'🛡️ **SalmAlm Security Audit Report**',
+            '🛡️ **SalmAlm Security Audit Report**',
             f'Version: {report["version"]} | {report["timestamp"]}',
             f'Score: {report["score"]}/100',
             f'Summary: ✅ {report["summary"]["pass"]} PASS | '

@@ -5,7 +5,6 @@ stdlib-only (polling, no watchdog dependency).
 """
 from __future__ import annotations
 
-import os
 import threading
 import time
 from pathlib import Path

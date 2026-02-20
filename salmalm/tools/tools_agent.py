@@ -84,7 +84,7 @@ def handle_plugin_manage(args: dict) -> str:
     from salmalm.core import PluginLoader
     action = args.get('action', 'list')
     if action == 'list':
-        tools = PluginLoader.get_all_tools()
+        _tools = PluginLoader.get_all_tools()  # noqa: F841
         plugins = PluginLoader._plugins
         if not plugins:
             return '🔌 No plugins loaded. Add .py files to plugins/ directory.'
@@ -194,7 +194,7 @@ def handle_node_manage(args: dict) -> str:
             return '📡 No nodes registered. node_manage(action="add", name="...", host="...") to add'
         lines = ['📡 **Nodes:**']
         for n in nodes:
-            lines.append(f"  {'🔗' if n['type']=='ssh' else '🌐'} {n['name']} ({n.get('host', n.get('url', '?'))})")
+            lines.append(f"  {'🔗' if n['type'] == 'ssh' else '🌐'} {n['name']} ({n.get('host', n.get('url', '?'))})")
         return '\n'.join(lines)
     elif action == 'add':
         nname = args.get('name', '')

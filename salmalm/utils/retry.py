@@ -16,7 +16,7 @@ import functools
 import random
 import time
 import urllib.error
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional
 
 from salmalm.crypto import log
 
@@ -132,10 +132,10 @@ def retry_with_backoff(fn: Optional[Callable] = None, *,
 
 
 async def async_retry_with_backoff(coro_fn: Callable, *args,
-                                    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-                                    base_delay: float = DEFAULT_BASE_DELAY,
-                                    max_delay: float = DEFAULT_MAX_DELAY,
-                                    **kwargs) -> Any:
+                                   max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+                                   base_delay: float = DEFAULT_BASE_DELAY,
+                                   max_delay: float = DEFAULT_MAX_DELAY,
+                                   **kwargs) -> Any:
     """Async version: retry an async callable with exponential backoff.
 
     Usage:

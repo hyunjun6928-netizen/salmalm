@@ -10,7 +10,6 @@ Supported events:
 Config: ~/.salmalm/hooks.json
 """
 
-import asyncio
 import json
 import os
 import subprocess

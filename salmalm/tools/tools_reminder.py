@@ -8,7 +8,6 @@ Strengthens the existing reminder system in tools_misc.py with:
 """
 import re
 from datetime import datetime, timedelta
-from salmalm.constants import KST
 
 
 # Korean weekday names

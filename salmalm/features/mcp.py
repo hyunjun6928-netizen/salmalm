@@ -27,9 +27,7 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.request
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from salmalm.constants import VERSION, BASE_DIR
 from salmalm.crypto import log
@@ -38,10 +36,12 @@ from salmalm.crypto import log
 
 _rpc_id = 0
 
+
 def _next_id() -> int:
     global _rpc_id
     _rpc_id += 1
     return _rpc_id
+
 
 def _rpc_request(method: str, params: Optional[dict] = None, id: Optional[int] = None) -> dict:
     msg = {"jsonrpc": "2.0", "method": method}
@@ -50,6 +50,7 @@ def _rpc_request(method: str, params: Optional[dict] = None, id: Optional[int] =
     if id is not None:
         msg["id"] = id  # type: ignore[assignment]
     return msg
+
 
 def _rpc_response(id: int, result: Optional[Any] = None, error: Optional[dict] = None) -> dict:
     msg = {"jsonrpc": "2.0", "id": id}
@@ -120,7 +121,7 @@ class MCPServer:
         # ── Tools ──
         if method == "tools/list":
             tools = [self._convert_tool_to_mcp(t) for t in self._tools]
-            cursor = params.get("cursor")
+            _cursor = params.get("cursor")  # noqa: F841
             # Simple pagination: return all (SalmAlm has ~30 tools, no pagination needed)
             return _rpc_response(msg_id, {"tools": tools})  # type: ignore[arg-type]
 

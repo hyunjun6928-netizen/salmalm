@@ -9,11 +9,10 @@ stdlib-only. Provides:
 from __future__ import annotations
 
 import logging
-import math
 import re
 import time
 from collections import Counter
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 log = logging.getLogger(__name__)
 

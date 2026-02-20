@@ -1,5 +1,8 @@
 """Exec approval system — allowlist/denylist + dangerous command detection."""
-import json, re, threading, time, os
+import re
+import threading
+import time
+import os
 from pathlib import Path
 from salmalm.crypto import log
 
@@ -129,7 +132,8 @@ class BackgroundSession:
 
     def start(self):
         """Start the background process."""
-        import subprocess, shlex
+        import subprocess
+        import shlex
 
         # Env var security check
         if self._env:
@@ -187,7 +191,7 @@ class BackgroundSession:
                     pass
 
         self._thread = threading.Thread(target=_run, daemon=True,
-                                         name=f'bg-exec-{self.session_id}')
+                                        name=f'bg-exec-{self.session_id}')
         self._thread.start()
         BackgroundSession._sessions[self.session_id] = self
         return self.session_id

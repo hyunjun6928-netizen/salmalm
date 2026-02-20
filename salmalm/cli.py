@@ -65,13 +65,17 @@ def _run_node_mode():
     i = 0
     while i < len(args):
         if args[i] == '--gateway' and i + 1 < len(args):
-            gateway_url = args[i + 1]; i += 2
+            gateway_url = args[i + 1]
+            i += 2
         elif args[i] == '--port' and i + 1 < len(args):
-            port = int(args[i + 1]); i += 2
+            port = int(args[i + 1])
+            i += 2
         elif args[i] == '--name' and i + 1 < len(args):
-            name = args[i + 1]; i += 2
+            name = args[i + 1]
+            i += 2
         elif args[i] == '--token' and i + 1 < len(args):
-            token = args[i + 1]; i += 2
+            token = args[i + 1]
+            i += 2
         else:
             i += 1
 

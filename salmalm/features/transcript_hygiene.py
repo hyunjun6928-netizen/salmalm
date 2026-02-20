@@ -6,8 +6,7 @@ original history is never modified.
 import copy
 import re
 import secrets
-import json
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 from salmalm import log
 

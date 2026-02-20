@@ -44,7 +44,7 @@ def handle_memory_search(args: dict) -> str:
 @register('usage_report')
 def handle_usage_report(args: dict) -> str:
     report = get_usage_report()
-    lines = [f"SalmAlm Usage Report",
+    lines = ["SalmAlm Usage Report",
              f"Uptime: {report['elapsed_hours']}h",
              f"Input: {report['total_input']:,} tokens",
              f"Output: {report['total_output']:,} tokens",

@@ -12,18 +12,17 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import threading
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
+from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 
 from salmalm.crypto import log
 
 # ── Enums ──
+
 
 class QueueMode(str, Enum):
     COLLECT = "collect"
@@ -300,11 +299,14 @@ class QueueLane:
 
 class _SemaphoreContext:
     """Async context manager for semaphore."""
+
     def __init__(self, sem: asyncio.Semaphore):
         self._sem = sem
+
     async def __aenter__(self):
         await self._sem.acquire()
         return self
+
     async def __aexit__(self, *args):
         self._sem.release()
 

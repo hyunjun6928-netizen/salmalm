@@ -17,13 +17,11 @@ Usage:
 """
 
 import json
-import os
 import sqlite3
 import threading
-import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 from salmalm.constants import BASE_DIR, KST
 from salmalm.crypto import log
@@ -34,6 +32,7 @@ _USERS_DIR = Path.home() / '.salmalm' / 'users'
 
 class QuotaExceeded(Exception):
     """Raised when a user exceeds their daily or monthly cost quota."""
+
     def __init__(self, message: str = "사용량 한도를 초과했습니다 / Quota exceeded"):
         super().__init__(message)
         self.message = message

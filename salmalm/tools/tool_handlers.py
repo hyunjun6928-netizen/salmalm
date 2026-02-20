@@ -3,16 +3,21 @@
 Keeps shared utilities (_resolve_path, _is_safe_command, _is_subpath) that other
 modules import, plus _legacy_execute for tools_media.py bridge.
 """
-import subprocess, sys, os, re, time, json, traceback, uuid, secrets
-import urllib.request, base64, mimetypes, difflib, threading
-from datetime import datetime
+import subprocess
+import re
+import time
+import json
+import secrets
+import urllib.request
+import base64
+import threading  # noqa: F401
 from pathlib import Path
 
-from salmalm.constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, EXEC_ELEVATED,
-                        PROTECTED_FILES, WORKSPACE_DIR, VERSION, KST, MEMORY_FILE, MEMORY_DIR, AUDIT_DB)
+from salmalm.constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, EXEC_ELEVATED,  # noqa: F401
+                               PROTECTED_FILES, WORKSPACE_DIR, VERSION, KST, MEMORY_FILE, MEMORY_DIR, AUDIT_DB)
 from salmalm.crypto import vault, log
 from salmalm.core import audit_log
-from salmalm.llm import _http_post, _http_get
+from salmalm.llm import _http_post
 
 # Re-export symbols that tests and other modules import from here
 from salmalm.tools_misc import (  # noqa: F401 — re-export for tests and other modules
@@ -94,7 +99,8 @@ def _resolve_path(path: str, writing: bool = False) -> Path:
 
 def _is_private_url(url: str):
     """Check if URL resolves to a private/internal IP. Returns (blocked, reason)."""
-    import ipaddress, socket
+    import ipaddress
+    import socket
     from urllib.parse import urlparse
     hostname = urlparse(url).hostname or ''
     if not hostname:

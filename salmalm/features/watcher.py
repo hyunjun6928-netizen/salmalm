@@ -4,7 +4,6 @@ Monitors specified directories for file changes (created/modified/deleted)
 using mtime polling. Triggers debounced RAG re-indexing on changes.
 stdlib-only.
 """
-import json
 import os
 import threading
 import time
@@ -169,7 +168,7 @@ class FileWatcher:
 
         # Bulk change detection
         BULK_THRESHOLD = 20
-        is_bulk = len(changes) >= BULK_THRESHOLD
+        _is_bulk = len(changes) >= BULK_THRESHOLD  # noqa: F841
 
         for change in changes:
             try:

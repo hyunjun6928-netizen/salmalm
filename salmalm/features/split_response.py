@@ -6,7 +6,6 @@ import asyncio
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from salmalm.crypto import log
 
 # Split modes with (label_a, label_b, system_prompt_a, system_prompt_b)
 SPLIT_MODES: Dict[str, Tuple[str, str, str, str]] = {

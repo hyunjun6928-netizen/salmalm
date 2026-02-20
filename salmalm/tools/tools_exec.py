@@ -1,10 +1,15 @@
 """Exec tools: exec, python_eval, background session management."""
-import subprocess, sys, json, re, os, time
+import subprocess
+import sys
+import json
+import re
+import os
+import time
 from salmalm.tool_registry import register
 from salmalm.tools_common import _is_safe_command
 from salmalm.constants import WORKSPACE_DIR
-from salmalm.exec_approvals import (check_approval, check_env_override, BackgroundSession,
-                              BLOCKED_ENV_OVERRIDES)
+from salmalm.exec_approvals import (check_approval, check_env_override, BackgroundSession,  # noqa: F401
+                                    BLOCKED_ENV_OVERRIDES)
 
 
 @register('exec')
@@ -165,7 +170,7 @@ def handle_python_eval(args: dict) -> str:
             return f'Security blocked: `{blocked}` not allowed.'
     if re.search(r'__\w+__', code):
         _dangerous_dunders = ['__import__', '__builtins__', '__class__',
-                               '__subclasses__', '__bases__', '__mro__', '__loader__']
+                              '__subclasses__', '__bases__', '__mro__', '__loader__']
         for dd in _dangerous_dunders:
             if dd in code.lower():
                 return f'Security blocked: `{dd}` not allowed.'
@@ -181,6 +186,7 @@ if _result is not None:
 else:
     print(json.dumps({{"result": "(no _result set)"}}))
 '''
+
     def _set_limits():
         try:
             import resource

@@ -1,7 +1,8 @@
 """SalmAlm Reaction Tools — Send emoji reactions across channels."""
 from __future__ import annotations
 
-import json, urllib.request
+import json
+import urllib.request
 from typing import Any, Dict, Optional
 
 from salmalm import log
@@ -77,7 +78,7 @@ def _react_discord(channel_id: str, message_id: str, emoji: str,
     req.add_header('Authorization', f'Bot {token}')
     req.add_header('Content-Length', '0')
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10) as _resp:  # noqa: F841
             return {'ok': True}
     except urllib.error.HTTPError as e:
         err = e.read().decode('utf-8', errors='replace')

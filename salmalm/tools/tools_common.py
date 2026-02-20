@@ -1,9 +1,10 @@
 """Shared helper functions for tool modules."""
-import re, threading
+import re
+import threading
 from pathlib import Path
 
 from salmalm.constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS,
-                        EXEC_ELEVATED, PROTECTED_FILES, WORKSPACE_DIR)
+                               EXEC_ELEVATED, PROTECTED_FILES, WORKSPACE_DIR)
 from salmalm.crypto import log
 
 _clipboard_lock = threading.Lock()
@@ -69,7 +70,8 @@ def _is_subpath(path: Path, parent: Path) -> bool:
 
 def _is_private_url(url: str):
     """Check if URL resolves to a private/internal IP."""
-    import ipaddress, socket
+    import ipaddress
+    import socket
     from urllib.parse import urlparse
     hostname = urlparse(url).hostname or ''
     if not hostname:

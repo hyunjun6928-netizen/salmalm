@@ -1,5 +1,7 @@
 """Browser tool."""
-import json, time, base64
+import json
+import time
+import base64
 from salmalm.tool_registry import register
 from salmalm.constants import WORKSPACE_DIR
 
@@ -11,7 +13,7 @@ def handle_browser(args: dict) -> str:
 
     def _run_async(coro):
         try:
-            loop = asyncio.get_running_loop()
+            _loop = asyncio.get_running_loop()  # noqa: F841
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor(1) as pool:
                 return pool.submit(lambda: asyncio.run(coro)).result(timeout=30)
@@ -43,7 +45,7 @@ def handle_browser(args: dict) -> str:
             save_dir.mkdir(exist_ok=True)
             fname = f'screenshot_{int(time.time())}.png'
             (save_dir / fname).write_bytes(base64.b64decode(b64))
-            return f'📸 Screenshot saved: uploads/{fname} ({len(b64)//1024}KB base64)'
+            return f'📸 Screenshot saved: uploads/{fname} ({len(b64) // 1024}KB base64)'
         return '❌ Screenshot failed (not connected?)'
     elif action == 'evaluate':
         expr = args.get('expression', '')

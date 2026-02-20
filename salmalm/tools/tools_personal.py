@@ -3,11 +3,17 @@
 All data stored in SQLite DB at BASE_DIR/personal.db.
 Pure stdlib only.
 """
-import json, re, sqlite3, threading, time, secrets, urllib.request
+import json
+import re
+import sqlite3
+import threading
+import time
+import secrets
+import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 from salmalm.tool_registry import register
-from salmalm.constants import WORKSPACE_DIR, KST, BASE_DIR
+from salmalm.constants import KST, BASE_DIR
 from salmalm.crypto import log
 from salmalm.utils.db import connect as _connect_db
 

@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import Any, Dict
 
 from salmalm.constants import KST
-from salmalm.crypto import log
 
 
 class ProviderHealthCheck:

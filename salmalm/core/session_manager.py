@@ -7,7 +7,6 @@ from __future__ import annotations
 import copy
 import time as _time
 
-from salmalm.crypto import log
 
 # ============================================================
 # Session Pruning — soft-trim / hard-clear old tool results
@@ -19,7 +18,7 @@ _CACHE_TTL_SECONDS = 300  # 5 minutes default
 
 def _should_prune_for_cache() -> bool:
     """Only prune if cache TTL has expired since last API call."""
-    global _last_api_call_time
+    global _last_api_call_time  # noqa: F824
     if _last_api_call_time == 0:
         return True
     return (_time.time() - _last_api_call_time) >= _CACHE_TTL_SECONDS

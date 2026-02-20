@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import os
-import re
 from pathlib import Path
 from typing import List, Tuple
 
@@ -91,7 +89,7 @@ def apply_patch(patch_text: str, base_dir: str = '.') -> str:
             content_lines = []
             i += 1
             while i < len(lines) and not lines[i].strip().startswith('***'):
-                l = lines[i]
+                l = lines[i]  # noqa: E741
                 if l.startswith('+'):
                     content_lines.append(l[1:])
                 i += 1
@@ -123,13 +121,13 @@ def apply_patch(patch_text: str, base_dir: str = '.') -> str:
             pos = 0  # current position in file
 
             while i < len(lines) and not lines[i].strip().startswith('***'):
-                l = lines[i]
+                l = lines[i]  # noqa: E741
                 if l.strip() == '@@':
                     # New hunk
                     i += 1
                     old_lines_hunk: List[str] = []
                     new_lines_hunk: List[str] = []
-                    context_before: List[str] = []
+                    _context_before: List[str] = []  # noqa: F841
 
                     while i < len(lines) and not lines[i].strip().startswith('***') and lines[i].strip() != '@@':
                         hl = lines[i]

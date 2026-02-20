@@ -10,12 +10,9 @@ Architecture:
 from __future__ import annotations
 
 import re
-import time
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Optional
 
-from salmalm.constants import MEMORY_FILE, MEMORY_DIR, BASE_DIR, KST
+from salmalm.constants import MEMORY_FILE, MEMORY_DIR, KST
 from salmalm import log
 
 
@@ -155,14 +152,14 @@ class MemoryManager:
         recent_user = [m['content'] for m in session.messages[-10:]
                        if m.get('role') == 'user' and isinstance(m.get('content'), str)]
         recent_assistant = [m['content'] for m in session.messages[-10:]
-                           if m.get('role') == 'assistant' and isinstance(m.get('content'), str)]
+                            if m.get('role') == 'assistant' and isinstance(m.get('content'), str)]
 
         if not recent_user:
             return ''
 
         from salmalm.core import write_daily_log
-        today = datetime.now(KST).strftime('%Y-%m-%d')
-        ts = datetime.now(KST).strftime('%H:%M')
+        _today = datetime.now(KST).strftime('%Y-%m-%d')  # noqa: F841
+        _ts = datetime.now(KST).strftime('%H:%M')  # noqa: F841
         summary_parts = []
         for msg in recent_user[-3:]:
             summary_parts.append(f"  Q: {msg[:100]}")

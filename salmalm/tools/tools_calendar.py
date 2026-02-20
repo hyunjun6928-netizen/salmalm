@@ -1,8 +1,8 @@
 """Google Calendar tools — granular calendar_list, calendar_add, calendar_delete."""
-import json, urllib.request
+import json
+import urllib.request
 from datetime import datetime, timedelta
 from salmalm.tool_registry import register
-from salmalm.crypto import vault, log
 from salmalm.tools_google import _google_oauth_headers
 
 

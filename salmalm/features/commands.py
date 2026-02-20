@@ -305,6 +305,7 @@ class CommandRouter:
         log.info('Restart requested via /restart')
         # Schedule restart after response
         import threading
+
         def _do_restart():
             time.sleep(1)
             os.execv(sys.executable, [sys.executable] + sys.argv)

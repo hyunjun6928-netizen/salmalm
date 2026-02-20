@@ -1,7 +1,8 @@
 """SalmAlm Presence System — Track connected clients."""
 from __future__ import annotations
 
-import time, threading
+import time
+import threading
 from typing import Any, Dict, List, Optional
 
 from salmalm import log

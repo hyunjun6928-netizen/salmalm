@@ -14,16 +14,14 @@ Upgrades from basic logging to:
 import json
 import logging
 import logging.handlers
-import os
 import threading
-import time
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from salmalm.constants import BASE_DIR, KST, LOG_FILE
+from salmalm.constants import KST, LOG_FILE
 
 # ── Structured JSON Formatter ────────────────────────────────
+
 
 class JSONFormatter(logging.Formatter):
     """Format log records as JSON lines."""
@@ -45,7 +43,7 @@ class JSONFormatter(logging.Formatter):
             }
         # Add extra fields
         for key in ('correlation_id', 'user', 'duration_ms', 'status_code',
-                     'method', 'path', 'ip'):
+                    'method', 'path', 'ip'):
             val = getattr(record, key, None)
             if val is not None:
                 log_entry[key] = val
@@ -55,7 +53,7 @@ class JSONFormatter(logging.Formatter):
 # ── Rotating File Handler ────────────────────────────────────
 
 def setup_production_logging(json_log: bool = True, max_bytes: int = 10_000_000,
-                              backup_count: int = 5):
+                             backup_count: int = 5):
     """Configure production-grade logging with rotation."""
     logger = logging.getLogger('salmalm')
 
@@ -135,13 +133,13 @@ class RequestLogger:
 
         if status_code >= 500:
             self._logger.error(f"{method} {path} -> {status_code} ({duration_ms:.0f}ms)",
-                              extra=extra)
+                               extra=extra)
         elif status_code >= 400:
             self._logger.warning(f"{method} {path} -> {status_code} ({duration_ms:.0f}ms)",
-                                extra=extra)
+                                 extra=extra)
         else:
             self._logger.info(f"{method} {path} -> {status_code} ({duration_ms:.0f}ms)",
-                             extra=extra)
+                              extra=extra)
 
         # Update metrics
         with self._lock:

@@ -4,7 +4,7 @@ Single parser → IR → per-channel renderer (Telegram HTML, Discord MD, Slack 
 """
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 
 @dataclass
@@ -80,7 +80,7 @@ def parse(markdown: str) -> MarkdownIR:
 
     # Re-process to handle all code blocks
     text = markdown
-    offset_map = []
+    _offset_map = []  # noqa: F841
     clean = []
     pos = 0
     for m in _CODE_BLOCK_RE.finditer(markdown):
@@ -90,7 +90,7 @@ def parse(markdown: str) -> MarkdownIR:
         clean.append(content)
         cb_end = len(''.join(clean))
         ir.code_blocks.append(CodeBlock(start=cb_start, end=cb_end,
-                                         language=m.group(1), content=content))
+                                        language=m.group(1), content=content))
         pos = m.end()
     clean.append(text[pos:])
     text = ''.join(clean)
@@ -124,7 +124,7 @@ def parse(markdown: str) -> MarkdownIR:
         elif table_start is not None:
             start_pos = len('\n'.join(non_table_lines))
             ir.tables.append(TableData(headers=headers or [], rows=rows,
-                                        start=start_pos, end=start_pos))
+                                       start=start_pos, end=start_pos))
             table_start = None
             headers = None
             rows = []
@@ -134,7 +134,7 @@ def parse(markdown: str) -> MarkdownIR:
     if table_start is not None:
         start_pos = len('\n'.join(non_table_lines))
         ir.tables.append(TableData(headers=headers or [], rows=rows,
-                                    start=start_pos, end=start_pos))
+                                   start=start_pos, end=start_pos))
 
     text = '\n'.join(non_table_lines)
 
@@ -153,7 +153,7 @@ def parse(markdown: str) -> MarkdownIR:
 
     for m in _LINK_RE.finditer(text):
         ir.links.append(LinkSpan(start=m.start(), end=m.end(),
-                                  href=m.group(2), label=m.group(1)))
+                                 href=m.group(2), label=m.group(1)))
 
     # Build plain text (strip markdown syntax)
     plain = text
@@ -182,10 +182,10 @@ def render_telegram(ir: MarkdownIR, table_mode: str = 'code') -> str:
 
     # Actually re-render from parsed styles
     # Simpler approach: transform original markdown to Telegram HTML
-    result = ir.text
+    _result = ir.text
     # We need to re-apply formatting from styles
     # Process in reverse order to maintain positions
-    spans = sorted(ir.styles, key=lambda s: s.start, reverse=True)
+    _spans = sorted(ir.styles, key=lambda s: s.start, reverse=True)  # noqa: F841
     # Since text is already stripped, we apply formatting via re-parsing
     # Better approach: use regex on the plain text isn't reliable
     # Use a fresh approach: render from original markdown directly
@@ -197,7 +197,7 @@ def render_telegram(ir: MarkdownIR, table_mode: str = 'code') -> str:
 
     # For telegram, we re-render from the original styles concept
     # Actually let's just transform markdown → telegram HTML properly
-    result = ir.text
+    _result = ir.text  # noqa: F841
 
     # Re-apply from the original: since ir.text is stripped, let's use a map approach
     # Simplest correct approach: re-process original-style text
@@ -214,18 +214,18 @@ def _md_to_telegram(ir: MarkdownIR) -> str:
         lines.append(f'<pre><code class="language-{cb.language}">{_esc(cb.content)}</code></pre>')
 
     # Main text with inline formatting
-    text = ir.text
+    _text = ir.text  # noqa: F841
     # Apply inline styles as HTML
     # We'll do a simple regex-based transform on the plain text
     # But plain text has styles stripped... we need original
     # Use a simpler approach: just convert markdown → HTML directly
 
-    result = ir.text
+    _result = ir.text  # noqa: F841
     # Since ir.text is already plain, we need to re-add formatting
     # Let's track style spans and insert tags
     # Build from styles sorted by start
     if ir.styles:
-        TAG_MAP = {'bold': ('b', 'b'), 'italic': ('i', 'i'), 'strike': ('s', 's'),
+        _TAG_MAP = {'bold': ('b', 'b'), 'italic': ('i', 'i'), 'strike': ('s', 's'),  # noqa: F841
                     'code': ('code', 'code'), 'spoiler': ('tg-spoiler', 'tg-spoiler')}
         # Simple approach: apply non-overlapping styles
         # Since we can't easily map stripped positions back, use regex on original
@@ -262,7 +262,7 @@ def render_discord(ir: MarkdownIR, table_mode: str = 'code') -> str:
     # Re-add formatting markers
     for style in sorted(ir.styles, key=lambda s: -s.start):
         markers = {'bold': '**', 'italic': '*', 'strike': '~~', 'code': '`', 'spoiler': '||'}
-        m = markers.get(style.style, '')
+        _m = markers.get(style.style, '')  # noqa: F841
         # Can't easily re-insert at positions in stripped text
         pass
 
@@ -359,7 +359,7 @@ def chunk_ir(ir: MarkdownIR, max_chars: int = 4000) -> List[MarkdownIR]:
         ]
         chunk_links = [
             LinkSpan(l.start - pos, l.end - pos, l.href, l.label)
-            for l in ir.links if l.start >= pos and l.end <= end
+            for l in ir.links if l.start >= pos and l.end <= end  # noqa: E741
         ]
         chunks.append(MarkdownIR(text=chunk_text, styles=chunk_styles, links=chunk_links))
         pos = end

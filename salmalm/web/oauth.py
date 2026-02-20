@@ -16,7 +16,7 @@ import secrets
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from salmalm.utils.http import request as _http_request
 

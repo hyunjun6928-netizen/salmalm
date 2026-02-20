@@ -5,11 +5,8 @@ in engine.py.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import threading
-import time
-from typing import Optional
 
 log = logging.getLogger('salmalm')
 
@@ -53,7 +50,7 @@ class ShutdownManager:
         # Phase 2: Drain active LLM requests (streaming)
         log.info("[SHUTDOWN] Phase 2: Drain active LLM requests")
         try:
-            from salmalm.core.engine import wait_for_active_requests
+            from salmalm.core.engine import wait_for_active_requests  # noqa: F811
             drained = wait_for_active_requests(timeout=min(timeout, 15.0))
             if not drained:
                 log.warning("[SHUTDOWN] Some LLM requests did not complete in time")

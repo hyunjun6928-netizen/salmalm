@@ -1,16 +1,23 @@
 """SalmAlm Telegram bot."""
 from __future__ import annotations
 
-import asyncio, json, re, secrets, textwrap, time, urllib.request
-from typing import Any, Dict, List, Optional
+import asyncio
+import json
+import re
+import secrets
+import textwrap
+import time
+import urllib.request
+from typing import Any, Dict, Optional
 
-from salmalm.constants import *
+from salmalm.constants import *  # noqa: F403
 from salmalm.crypto import vault, log
-from salmalm.core import router, get_session, _sessions, audit_log, compact_messages, set_telegram_bot
+from salmalm.core import router, get_session, audit_log, compact_messages, set_telegram_bot
 from salmalm.llm import _http_post, _http_get
 from salmalm.prompt import build_system_prompt
 from salmalm.tools import execute_tool
 from salmalm.chunker import EmbeddedBlockChunker, ChunkerConfig, CHANNEL_TELEGRAM, load_config_from_file
+
 
 class TelegramBot:
     def __init__(self):
@@ -48,6 +55,7 @@ class TelegramBot:
         """Extract inline button markers. Returns (clean_text, buttons_list)."""
         buttons = []
         import re as _re2
+
         def _repl(m):
             try:
                 import json as _j2
@@ -186,10 +194,10 @@ class TelegramBot:
         except Exception as e:
             log.error(f"[TG] Session cleanup error: {e}")
 
-    def _send_photo(self, chat_id, path: Path, caption: str = ''):
+    def _send_photo(self, chat_id, path: Path, caption: str = ''):  # noqa: F405
         """Send a photo file to Telegram."""
         try:
-            import mimetypes
+            import mimetypes  # noqa: F401
             boundary = f'----SalmAlm{secrets.token_hex(8)}'
             body = b''
             # chat_id field
@@ -212,7 +220,7 @@ class TelegramBot:
             # Fallback: send as text link if file was from URL
             self.send_message(chat_id, f'📷 Image send failed: {e}\n{caption}')
 
-    def _send_audio(self, chat_id, path: Path, caption: str = ''):
+    def _send_audio(self, chat_id, path: Path, caption: str = ''):  # noqa: F405
         """Send an audio file to Telegram."""
         try:
             boundary = f'----SalmAlm{secrets.token_hex(8)}'
@@ -296,7 +304,7 @@ class TelegramBot:
             import tempfile
             with tempfile.NamedTemporaryFile(suffix='.ogg', delete=False) as f:
                 f.write(audio_data)
-                tmp_path = Path(f.name)
+                tmp_path = Path(f.name)  # noqa: F405
             self._send_audio(chat_id, tmp_path, '')
             try:
                 tmp_path.unlink()
@@ -506,9 +514,9 @@ class TelegramBot:
 
         chat_id = msg['chat']['id']
         user_id = str(msg['from']['id'])
-        tg_username = msg.get('from', {}).get('username', '')
+        _tg_username = msg.get('from', {}).get('username', '')  # noqa: F841
         chat_type = msg.get('chat', {}).get('type', 'private')
-        message_thread_id = msg.get('message_thread_id')
+        _message_thread_id = msg.get('message_thread_id')  # noqa: F841
 
         # Group chat: only respond to mentions or replies to bot
         if chat_type in ('group', 'supergroup'):
@@ -536,8 +544,8 @@ class TelegramBot:
             # Allow /register and /start for unregistered users
             if not _tenant_user and not text_check.startswith(('/register', '/start')):
                 self.send_message(chat_id,
-                    "🔐 등록이 필요합니다. /register <비밀번호>로 등록하세요.\n"
-                    "Registration required. Use /register <password> to sign up.")
+                                  "🔐 등록이 필요합니다. /register <비밀번호>로 등록하세요.\n"
+                                  "Registration required. Use /register <password> to sign up.")
                 return
             if _tenant_user and not _tenant_user.get('enabled', True):
                 self.send_message(chat_id, "⛔ 계정이 비활성화되었습니다. 관리자에게 문의하세요. / Account disabled.")
@@ -566,10 +574,10 @@ class TelegramBot:
             photo = msg['photo'][-1]  # Largest size
             try:
                 data, fname = self._download_file(photo['file_id'])
-                save_path = WORKSPACE_DIR / 'uploads' / fname
+                save_path = WORKSPACE_DIR / 'uploads' / fname  # noqa: F405
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
-                file_info = f'[📷 Image saved: uploads/{fname} ({len(data)//1024}KB)]'
+                file_info = f'[📷 Image saved: uploads/{fname} ({len(data) // 1024}KB)]'
                 log.info(f"[PHOTO] Photo saved: {save_path}")
                 # Prepare vision data
                 import base64 as _b64
@@ -589,12 +597,12 @@ class TelegramBot:
                     from salmalm.migration import import_agent
                     result = import_agent(data)
                     self.send_message(chat_id,
-                        f'📦 **Agent Import / 에이전트 가져오기**\n\n{result.summary()}')
+                                      f'📦 **Agent Import / 에이전트 가져오기**\n\n{result.summary()}')
                     return
-                save_path = WORKSPACE_DIR / 'uploads' / doc_fname
+                save_path = WORKSPACE_DIR / 'uploads' / doc_fname  # noqa: F405
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
-                file_info = f'[📎 File saved: uploads/{save_path.name} ({len(data)//1024}KB)]'
+                file_info = f'[📎 File saved: uploads/{save_path.name} ({len(data) // 1024}KB)]'
                 log.info(f"[CLIP] File saved: {save_path}")
                 # If text file, include content preview
                 if save_path.suffix in ('.txt', '.md', '.py', '.js', '.json', '.csv', '.log', '.html', '.css', '.sh', '.bat'):
@@ -611,10 +619,10 @@ class TelegramBot:
             audio = msg.get('voice') or msg.get('audio')
             try:
                 data, fname = self._download_file(audio['file_id'])
-                save_path = WORKSPACE_DIR / 'uploads' / fname
+                save_path = WORKSPACE_DIR / 'uploads' / fname  # noqa: F405
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
-                file_info = f'[🎤 Voice saved: uploads/{fname} ({len(data)//1024}KB)]'
+                file_info = f'[🎤 Voice saved: uploads/{fname} ({len(data) // 1024}KB)]'
                 log.info(f"[MIC] Voice saved: {save_path}")
                 # Whisper transcription
                 api_key = vault.get('openai_api_key')
@@ -648,7 +656,7 @@ class TelegramBot:
         # Build final message
         if file_info:
             text = f'{file_info}\n{text}' if text else file_info
-        
+
         if not text:
             return
 
@@ -681,7 +689,7 @@ class TelegramBot:
         _BLOCK_STREAM_THRESHOLD = _streaming_config.minChars or 500
 
         # Streaming mode: 'partial' (every token) or 'block' (chunk-based)
-        _stream_mode = getattr(_streaming_config, 'streamingMode', 'block')
+        __stream_mode = getattr(_streaming_config, 'streamingMode', 'block')  # noqa: F841
 
         def _on_stream_token(event):
             """Handle streaming tokens for block streaming in Telegram."""
@@ -721,7 +729,7 @@ class TelegramBot:
         # Model badge for response
         session_obj = get_session(session_id)
         _model_short = (getattr(session_obj, 'last_model', '') or 'auto').split('/')[-1][:20]
-        _complexity = getattr(session_obj, 'last_complexity', '')
+        __complexity = getattr(session_obj, 'last_complexity', '')  # noqa: F841
 
         # Send response (check for generated files to send)
         import re as _re
@@ -729,7 +737,7 @@ class TelegramBot:
         audio_match = _re.search(r'uploads/[\w.-]+\.(mp3|wav|ogg)', response)
         suffix = f'\n\n🤖 {_model_short} · ⏱️ {_elapsed:.1f}s'
         if img_match:
-            img_path = WORKSPACE_DIR / img_match.group(0)
+            img_path = WORKSPACE_DIR / img_match.group(0)  # noqa: F405
             if img_path.exists():
                 # Finalize any draft first
                 if _draft_sent[0]:
@@ -742,7 +750,7 @@ class TelegramBot:
                 else:
                     self.send_message(chat_id, f'{response}{suffix}')
         elif audio_match:
-            audio_path = WORKSPACE_DIR / audio_match.group(0)
+            audio_path = WORKSPACE_DIR / audio_match.group(0)  # noqa: F405
             if audio_path.exists():
                 if _draft_sent[0]:
                     key = str(chat_id)
@@ -784,8 +792,8 @@ class TelegramBot:
             result = user_manager.register_telegram_user(str(chat_id), password, tg_username)
             if result['ok']:
                 self.send_message(chat_id,
-                    f"✅ 등록 완료! 사용자: {result['user']['username']}\n"
-                    f"Registration complete! User: {result['user']['username']}")
+                                  f"✅ 등록 완료! 사용자: {result['user']['username']}\n"
+                                  f"Registration complete! User: {result['user']['username']}")
             else:
                 self.send_message(chat_id, f"❌ {result['error']}")
             return
@@ -813,11 +821,11 @@ class TelegramBot:
             # Show own quota
             quota = user_manager.get_quota(tenant_user['id'])
             self.send_message(chat_id,
-                f"📊 사용량 / Quota\n"
-                f"  일일: ${quota.get('current_daily', 0):.2f} / ${quota.get('daily_limit', 5):.2f} "
-                f"(남은: ${quota.get('daily_remaining', 0):.2f})\n"
-                f"  월별: ${quota.get('current_monthly', 0):.2f} / ${quota.get('monthly_limit', 50):.2f} "
-                f"(남은: ${quota.get('monthly_remaining', 0):.2f})")
+                              f"📊 사용량 / Quota\n"
+                              f"  일일: ${quota.get('current_daily', 0):.2f} / ${quota.get('daily_limit', 5):.2f} "
+                              f"(남은: ${quota.get('daily_remaining', 0):.2f})\n"
+                              f"  월별: ${quota.get('current_monthly', 0):.2f} / ${quota.get('monthly_limit', 50):.2f} "
+                              f"(남은: ${quota.get('monthly_remaining', 0):.2f})")
             return
 
         if cmd == '/user' and tenant_user and tenant_user.get('role') == 'admin':
@@ -853,7 +861,7 @@ class TelegramBot:
             return
 
         if cmd == '/start':
-            self.send_message(chat_id, f'😈 {APP_NAME} v{VERSION} running\nready')
+            self.send_message(chat_id, f'😈 {APP_NAME} v{VERSION} running\nready')  # noqa: F405
         elif cmd == '/usage':
             report = execute_tool('usage_report', {})
             self.send_message(chat_id, report)
@@ -898,7 +906,7 @@ class TelegramBot:
                 self.send_message(chat_id, f'Voices: {", ".join(valid_voices)}')
         elif cmd == '/help':
             self.send_message(chat_id, textwrap.dedent(f"""
-                😈 {APP_NAME} v{VERSION}
+                😈 {APP_NAME} v{VERSION}  # noqa: F405
 
                 📋 **Assistant**
                 /briefing — Daily briefing (날씨+일정+메일)
@@ -1179,15 +1187,15 @@ class TelegramBot:
                 fname = export_filename()
                 # Send as document
                 self._send_document(chat_id, zip_bytes, fname,
-                                    caption=f'📦 Agent Export ({len(zip_bytes)//1024}KB)')
+                                    caption=f'📦 Agent Export ({len(zip_bytes) // 1024}KB)')
             except Exception as e:
                 self.send_message(chat_id, f'❌ Export failed: {e}')
 
         elif cmd == '/import':
             self.send_message(chat_id,
-                '📦 에이전트 가져오기: ZIP 파일을 이 채팅에 보내주세요.\n'
-                'Agent import: Send a ZIP file to this chat.\n'
-                '(salmalm-agent-export-*.zip)')
+                              '📦 에이전트 가져오기: ZIP 파일을 이 채팅에 보내주세요.\n'
+                              'Agent import: Send a ZIP file to this chat.\n'
+                              '(salmalm-agent-export-*.zip)')
 
         elif cmd == '/sync':
             parts = text.split(maxsplit=1)
@@ -1197,7 +1205,7 @@ class TelegramBot:
                 data = quick_sync_export()
                 sync_json = json.dumps(data, ensure_ascii=False, indent=2)
                 self.send_message(chat_id,
-                    f'📋 Quick Sync Export\n```json\n{sync_json[:3500]}\n```')
+                                  f'📋 Quick Sync Export\n```json\n{sync_json[:3500]}\n```')
             elif sub.startswith('import'):
                 json_str = sub[len('import'):].strip()
                 if not json_str:

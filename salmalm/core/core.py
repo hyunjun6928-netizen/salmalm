@@ -1,12 +1,20 @@
 """SalmAlm core — audit, cache, usage, router, compaction, search,
 subagent, skills, session, cron, daily."""
-import asyncio, hashlib, json, math, os, re, sqlite3, textwrap, threading, time
+import asyncio
+import hashlib
+import json
+import math
+import os
+import re
+import sqlite3
+import threading
+import time
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from salmalm.constants import *
+from salmalm.constants import *  # noqa: F403
 from salmalm.crypto import vault, log
 
 # ============================================================
@@ -23,7 +31,7 @@ def _get_db() -> sqlite3.Connection:
     """Get thread-local SQLite connection (reused across calls, WAL mode)."""
     conn = getattr(_thread_local, 'audit_conn', None)
     if conn is None:
-        conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=True)
+        conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=True)  # noqa: F405
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
@@ -128,7 +136,7 @@ def audit_log(event: str, detail: str = '', session_id: str = '',
     """
     with _audit_lock:
         conn = _get_db()
-        ts = datetime.now(KST).isoformat()
+        ts = datetime.now(KST).isoformat()  # noqa: F405
 
         # v1: hash-chain audit log (backwards compat)
         row = conn.execute(
@@ -155,7 +163,7 @@ def audit_log(event: str, detail: str = '', session_id: str = '',
 def audit_log_cleanup(days: int = 30) -> None:
     """Delete audit_log_v2 entries older than `days` days."""
     from datetime import timedelta
-    cutoff = (datetime.now(KST) - timedelta(days=days)).isoformat()
+    cutoff = (datetime.now(KST) - timedelta(days=days)).isoformat()  # noqa: F405
     try:
         conn = _get_db()
         _ensure_audit_v2_table()
@@ -218,11 +226,10 @@ def close_all_db_connections() -> None:
     log.info("[DB] All database connections closed")
 
 
-
 class ResponseCache:
     """Simple TTL cache for LLM responses to avoid duplicate calls."""
 
-    def __init__(self, max_size=100, ttl=CACHE_TTL):
+    def __init__(self, max_size=100, ttl=CACHE_TTL):  # noqa: F405
         self._cache: OrderedDict = OrderedDict()
         self._max_size = max_size
         self._ttl = ttl
@@ -239,7 +246,7 @@ class ResponseCache:
             entry = self._cache[k]
             if time.time() - entry['ts'] < self._ttl:
                 self._cache.move_to_end(k)
-                log.info(f"[COST] Cache hit -- saved API call")
+                log.info("[COST] Cache hit -- saved API call")
                 return entry['response']  # type: ignore[no-any-return]
             del self._cache[k]
         return None
@@ -271,6 +278,7 @@ class CostCapExceeded(Exception):
     """Raised when cumulative API spend exceeds the cost cap."""
     pass
 
+
 def _restore_usage():
     """Restore cumulative usage from SQLite on startup."""
     try:
@@ -282,7 +290,7 @@ def _restore_usage():
             _usage['total_output'] += (out or 0)  # type: ignore[operator]
             _usage['total_cost'] += (cost or 0)  # type: ignore[operator]
             _usage['by_model'][short] = {'input': inp or 0, 'output': out or 0,  # type: ignore[index]
-                                          'cost': cost or 0, 'calls': calls or 0}
+                                         'cost': cost or 0, 'calls': calls or 0}
         if _usage['total_cost'] > 0:  # type: ignore[operator]
             log.info(f"[STAT] Usage restored: ${_usage['total_cost']:.4f} total")
     except Exception as e:
@@ -318,7 +326,7 @@ def track_usage(model: str, input_tokens: int, output_tokens: int,
         user_id = get_current_user_id()
     with _usage_lock:
         short = model.split('/')[-1] if '/' in model else model
-        cost_info = MODEL_COSTS.get(short, {'input': 1.0, 'output': 5.0})
+        cost_info = MODEL_COSTS.get(short, {'input': 1.0, 'output': 5.0})  # noqa: F405
         cost = (input_tokens * cost_info['input'] + output_tokens * cost_info['output']) / 1_000_000
         _usage['total_input'] += input_tokens  # type: ignore[operator]
         _usage['total_output'] += output_tokens  # type: ignore[operator]
@@ -338,7 +346,7 @@ def track_usage(model: str, input_tokens: int, output_tokens: int,
             except Exception:
                 pass
             conn.execute('INSERT INTO usage_stats (ts, model, input_tokens, output_tokens, cost, user_id) VALUES (?,?,?,?,?,?)',
-                         (datetime.now(KST).isoformat(), model, input_tokens, output_tokens, cost, user_id))
+                         (datetime.now(KST).isoformat(), model, input_tokens, output_tokens, cost, user_id))  # noqa: F405
             conn.commit()
         except Exception as e:
             log.debug(f"Suppressed: {e}")
@@ -358,14 +366,13 @@ def get_usage_report() -> dict:
         return {**_usage, 'elapsed_hours': round(elapsed / 3600, 2)}
 
 
-
 class ModelRouter:
     """Routes queries to appropriate models based on complexity."""
 
     # Tier pools sourced from constants.py MODEL_TIERS (single source of truth)
-    TIERS = MODEL_TIERS
+    TIERS = MODEL_TIERS  # noqa: F405
 
-    _MODEL_PREF_FILE = BASE_DIR / '.model_pref'
+    _MODEL_PREF_FILE = BASE_DIR / '.model_pref'  # noqa: F405
 
     def __init__(self):
         self.default_tier = 2
@@ -405,8 +412,8 @@ class ModelRouter:
             return self._pick_available(2)
 
         # Tier 3: complex tasks
-        complex_score = sum(1 for kw in COMPLEX_INDICATORS if kw in msg)
-        tool_hint_score = sum(1 for kw in TOOL_HINT_KEYWORDS if kw in msg)
+        complex_score = sum(1 for kw in COMPLEX_INDICATORS if kw in msg)  # noqa: F405
+        tool_hint_score = sum(1 for kw in TOOL_HINT_KEYWORDS if kw in msg)  # noqa: F405
         if complex_score >= 2 or msg_len > 1000 or (complex_score >= 1 and tool_hint_score >= 1):
             return self._pick_available(3)
 
@@ -415,7 +422,7 @@ class ModelRouter:
             return self._pick_available(2)
 
         # Tier 1: simple queries only
-        if msg_len < SIMPLE_QUERY_MAX_CHARS and not has_tools and complex_score == 0:
+        if msg_len < SIMPLE_QUERY_MAX_CHARS and not has_tools and complex_score == 0:  # noqa: F405
             return self._pick_available(1)
 
         # Tier 2: default
@@ -473,7 +480,7 @@ def compact_messages(messages: list, model: Optional[str] = None,
 
     # OpenClaw-style: pre-compaction memory flush
     total_chars_check = sum(len(_msg_content_str(m)) for m in messages)
-    if session and total_chars_check > COMPACTION_THRESHOLD * 0.8:
+    if session and total_chars_check > COMPACTION_THRESHOLD * 0.8:  # noqa: F405
         try:
             memory_manager.flush_before_compaction(session)
         except Exception as e:
@@ -496,7 +503,7 @@ def compact_messages(messages: list, model: Optional[str] = None,
         total_chars = sum(len(_msg_content_str(m)) for m in messages)
         log.warning(f"[CUT] Hard char limit: truncated to {len(messages)} msgs ({total_chars} chars)")
 
-    if total_chars < COMPACTION_THRESHOLD:
+    if total_chars < COMPACTION_THRESHOLD:  # noqa: F405
         return messages
 
     log.info(f"[PKG] Compacting {len(messages)} messages ({total_chars} chars)")
@@ -519,7 +526,7 @@ def compact_messages(messages: list, model: Optional[str] = None,
             trimmed.append(m)
 
     total_after_trim = sum(len(_msg_content_str(m)) for m in trimmed)
-    if total_after_trim < COMPACTION_THRESHOLD:
+    if total_after_trim < COMPACTION_THRESHOLD:  # noqa: F405
         log.info(f"[PKG] Stage 1 sufficient: {total_chars} -> {total_after_trim} chars")
         return trimmed
 
@@ -534,7 +541,7 @@ def compact_messages(messages: list, model: Optional[str] = None,
 
     stage2 = system_msgs + old_important + recent
     total_after_drop = sum(len(_msg_content_str(m)) for m in stage2)
-    if total_after_drop < COMPACTION_THRESHOLD:
+    if total_after_drop < COMPACTION_THRESHOLD:  # noqa: F405
         log.info(f"[PKG] Stage 2 sufficient: {total_chars} -> {total_after_drop} chars")
         return stage2
 
@@ -567,9 +574,9 @@ def compact_messages(messages: list, model: Optional[str] = None,
     return compacted
 
 
-
 # ============================================================
-import math
+import math  # noqa: F811
+
 
 class TFIDFSearch:
     """Lightweight TF-IDF + cosine similarity search. No external deps."""
@@ -604,18 +611,18 @@ class TFIDFSearch:
         doc_freq: dict = {}  # term -> number of docs containing it  # type: ignore[var-annotated]
         search_files = []
 
-        if MEMORY_FILE.exists():
-            search_files.append(('MEMORY.md', MEMORY_FILE))
-        for f in sorted(MEMORY_DIR.glob('*.md')):
+        if MEMORY_FILE.exists():  # noqa: F405
+            search_files.append(('MEMORY.md', MEMORY_FILE))  # noqa: F405
+        for f in sorted(MEMORY_DIR.glob('*.md')):  # noqa: F405
             search_files.append((f'memory/{f.name}', f))
-        uploads_dir = WORKSPACE_DIR / 'uploads'
+        uploads_dir = WORKSPACE_DIR / 'uploads'  # noqa: F405
         if uploads_dir.exists():
             for f in uploads_dir.glob('*'):
                 if f.suffix.lower() in ('.txt', '.md', '.py', '.js', '.json', '.csv',
-                                         '.html', '.css', '.log', '.xml', '.yaml', '.yml'):
+                                        '.html', '.css', '.log', '.xml', '.yaml', '.yml'):
                     search_files.append((f'uploads/{f.name}', f))
         # Also index skills
-        skills_dir = WORKSPACE_DIR / 'skills'
+        skills_dir = WORKSPACE_DIR / 'skills'  # noqa: F405
         if skills_dir.exists():
             for f in skills_dir.glob('**/*.md'):
                 search_files.append((f'skills/{f.relative_to(skills_dir)}', f))
@@ -626,7 +633,7 @@ class TFIDFSearch:
                 lines = text.splitlines()
                 # Index in chunks of 3 lines for context
                 for i in range(0, len(lines), 2):
-                    chunk = '\n'.join(lines[i:i+3])
+                    chunk = '\n'.join(lines[i:i + 3])
                     if not chunk.strip():
                         continue
                     tokens = self._tokenize(chunk)
@@ -708,7 +715,7 @@ class LLMCronManager:
     Completed tasks announce results to configured channels.
     """
 
-    _JOBS_FILE = BASE_DIR / '.cron_jobs.json'
+    _JOBS_FILE = BASE_DIR / '.cron_jobs.json'  # noqa: F405
 
     def __init__(self):
         self.jobs = []
@@ -747,7 +754,7 @@ class LLMCronManager:
             'model': model,
             'notify': notify,
             'enabled': True,
-            'created': datetime.now(KST).isoformat(),
+            'created': datetime.now(KST).isoformat(),  # noqa: F405
             'last_run': None,
             'run_count': 0
         }
@@ -776,7 +783,7 @@ class LLMCronManager:
         if not job['enabled']:
             return False
         sched = job['schedule']
-        now = datetime.now(KST)
+        now = datetime.now(KST)  # noqa: F405
 
         if sched['kind'] == 'every':
             if not job['last_run']:
@@ -849,7 +856,7 @@ class LLMCronManager:
                 MAX_CRON_JOB_COST = 2.0  # $2 max per cron execution
                 if cron_cost > MAX_CRON_JOB_COST:
                     log.warning(f"[CRON] Job {job['name']} cost ${cron_cost:.2f} — exceeds ${MAX_CRON_JOB_COST} cap")
-                job['last_run'] = datetime.now(KST).isoformat()
+                job['last_run'] = datetime.now(KST).isoformat()  # noqa: F405
                 job['run_count'] = job.get('run_count', 0) + 1
                 self.save_jobs()
                 log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
@@ -911,7 +918,7 @@ class LLMCronManager:
 
             except Exception as e:
                 log.error(f"LLM cron error ({job['name']}): {e}")
-                job['last_run'] = datetime.now(KST).isoformat()
+                job['last_run'] = datetime.now(KST).isoformat()  # noqa: F405
                 self.save_jobs()
 
 
@@ -971,7 +978,7 @@ class Session:
             except Exception:
                 pass
             conn.execute('INSERT OR REPLACE INTO session_store (session_id, messages, updated_at, user_id) VALUES (?,?,?,?)',
-                         (self.id, json.dumps(saveable, ensure_ascii=False), datetime.now(KST).isoformat(), self.user_id))
+                         (self.id, json.dumps(saveable, ensure_ascii=False), datetime.now(KST).isoformat(), self.user_id))  # noqa: F405
             conn.commit()
         except Exception as e:
             log.warning(f"Session persist error: {e}")
@@ -1006,7 +1013,7 @@ class Session:
         results: list of {'tool_use_id': str, 'content': str}
         """
         content = [{'type': 'tool_result', 'tool_use_id': r['tool_use_id'],
-                     'content': r['content']} for r in results]
+                    'content': r['content']} for r in results]
         self.messages.append({'role': 'user', 'content': content})
 
 
@@ -1022,6 +1029,8 @@ def set_telegram_bot(bot: object) -> None:
     """Set the Telegram bot instance (called during startup)."""
     global _tg_bot
     _tg_bot = bot
+
+
 _llm_cron = None  # Set during startup by __main__ (LLMCron instance)
 _sessions = {}  # type: ignore[var-annotated]
 _session_lock = threading.Lock()  # Protects _sessions dict
@@ -1086,7 +1095,7 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
             _sessions[session_id].add_system(build_system_prompt(full=True))
             log.info(f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)")
             audit_log('session_create', f'new session: {session_id}', session_id=session_id,
-                       detail_dict={'session_id': session_id})
+                      detail_dict={'session_id': session_id})
         return _sessions[session_id]
 
 
@@ -1126,7 +1135,7 @@ def rollback_session(session_id: str, count: int) -> dict:
     conn.execute(
         'INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)',
         (session_id, json.dumps(removed_msgs, ensure_ascii=False),
-         datetime.now(KST).isoformat(), 'rollback'))
+         datetime.now(KST).isoformat(), 'rollback'))  # noqa: F405
     conn.commit()
 
     for i in sorted(indices_to_remove, reverse=True):
@@ -1307,8 +1316,8 @@ class HeartbeatManager:
     Tracks check state in heartbeat-state.json.
     """
 
-    _HEARTBEAT_FILE = BASE_DIR / 'HEARTBEAT.md'
-    _STATE_FILE = MEMORY_DIR / 'heartbeat-state.json'
+    _HEARTBEAT_FILE = BASE_DIR / 'HEARTBEAT.md'  # noqa: F405
+    _STATE_FILE = MEMORY_DIR / 'heartbeat-state.json'  # noqa: F405
     _DEFAULT_INTERVAL = 1800  # 30 minutes
     _last_beat = 0.0
     _enabled = True
@@ -1328,7 +1337,7 @@ class HeartbeatManager:
     def _save_state(cls, state: dict):
         """Persist heartbeat state to JSON file."""
         try:
-            MEMORY_DIR.mkdir(exist_ok=True)
+            MEMORY_DIR.mkdir(exist_ok=True)  # noqa: F405
             cls._STATE_FILE.write_text(
                 json.dumps(state, indent=2, ensure_ascii=False), encoding='utf-8')
         except Exception as e:
@@ -1355,7 +1364,7 @@ class HeartbeatManager:
         if now - cls._last_beat < cls._DEFAULT_INTERVAL:
             return False
         # Respect quiet hours (23:00-08:00 KST)
-        hour = datetime.now(KST).hour
+        hour = datetime.now(KST).hour  # noqa: F405
         if hour >= 23 or hour < 8:
             return False
         return True
@@ -1409,7 +1418,7 @@ class HeartbeatManager:
             for name, ts in state['lastChecks'].items():
                 ago = int((time.time() - ts) / 60)
                 checks.append(f"  {name}: {ago}min ago")
-            state_ctx = f"\n\nLast checks:\n" + '\n'.join(checks)
+            state_ctx = "\n\nLast checks:\n" + '\n'.join(checks)
 
         try:
             from salmalm.engine import process_message
@@ -1604,13 +1613,14 @@ def auto_title_session(session_id: str, first_message: str) -> None:
 
 def write_daily_log(entry: str) -> None:
     """Append to today's memory log."""
-    today = datetime.now(KST).strftime('%Y-%m-%d')
-    log_file = MEMORY_DIR / f'{today}.md'
-    MEMORY_DIR.mkdir(exist_ok=True)
+    today = datetime.now(KST).strftime('%Y-%m-%d')  # noqa: F405
+    log_file = MEMORY_DIR / f'{today}.md'  # noqa: F405
+    MEMORY_DIR.mkdir(exist_ok=True)  # noqa: F405
     header = f'# {today} Daily Log\n\n' if not log_file.exists() else ''
     with open(log_file, 'a', encoding='utf-8') as f:
-        ts = datetime.now(KST).strftime('%H:%M')
+        ts = datetime.now(KST).strftime('%H:%M')  # noqa: F405
         f.write(f'{header}- [{ts}] {entry}\n')
+
 
 def edit_message(session_id: str, message_index: int, new_content: str) -> dict:
     """Edit a message at the given index in a session.
@@ -1629,7 +1639,7 @@ def edit_message(session_id: str, message_index: int, new_content: str) -> dict:
     conn.execute(
         'INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)',
         (session_id, json.dumps(session.messages, ensure_ascii=False),
-         datetime.now(KST).isoformat(), 'edit'))
+         datetime.now(KST).isoformat(), 'edit'))  # noqa: F405
     conn.commit()
     # Update the message content
     session.messages[message_index]['content'] = new_content
@@ -1668,7 +1678,7 @@ def delete_message(session_id: str, message_index: int) -> dict:
     conn.execute(
         'INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)',
         (session_id, json.dumps(removed_msgs, ensure_ascii=False),
-         datetime.now(KST).isoformat(), 'delete'))
+         datetime.now(KST).isoformat(), 'delete'))  # noqa: F405
     conn.commit()
     # Remove in reverse order
     for i in sorted(indices_to_remove, reverse=True):

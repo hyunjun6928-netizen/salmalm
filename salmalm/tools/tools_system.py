@@ -1,5 +1,6 @@
 """System tools: system_monitor, health_check."""
-import os, subprocess
+import os
+import subprocess
 from salmalm.tool_registry import register
 from salmalm.core import _sessions
 
@@ -25,7 +26,7 @@ def handle_system_monitor(args: dict) -> str:
             try:
                 mem = subprocess.run(['free', '-h'], capture_output=True, text=True, timeout=5)
                 if mem.stdout:
-                    for l in mem.stdout.strip().split('\n'):
+                    for l in mem.stdout.strip().split('\n'):  # noqa: E741
                         lines.append(f'💾 {l}')
             except (FileNotFoundError, OSError):
                 pass
@@ -33,7 +34,7 @@ def handle_system_monitor(args: dict) -> str:
             try:
                 disk = subprocess.run(['df', '-h', '/'], capture_output=True, text=True, timeout=5)
                 if disk.stdout:
-                    for l in disk.stdout.strip().split('\n'):
+                    for l in disk.stdout.strip().split('\n'):  # noqa: E741
                         lines.append(f'💿 {l}')
             except (FileNotFoundError, OSError):
                 pass
@@ -41,8 +42,8 @@ def handle_system_monitor(args: dict) -> str:
             try:
                 net = subprocess.run(['ss', '-s'], capture_output=True, text=True, timeout=5)
                 if net.stdout:
-                    lines.append(f'🌐 Network:')
-                    for l in net.stdout.strip().split('\n')[:5]:
+                    lines.append('🌐 Network:')
+                    for l in net.stdout.strip().split('\n')[:5]:  # noqa: E741
                         lines.append(f'   {l}')
             except (FileNotFoundError, OSError):
                 pass
@@ -52,7 +53,7 @@ def handle_system_monitor(args: dict) -> str:
             except (FileNotFoundError, OSError):
                 ps = None
             if ps and ps.stdout:
-                for l in ps.stdout.strip().split('\n')[:20]:
+                for l in ps.stdout.strip().split('\n')[:20]:  # noqa: E741
                     lines.append(l)
         if detail in ('overview',):
             try:
@@ -83,7 +84,7 @@ def handle_health_check(args: dict) -> str:
         if sys_info.get('memory_mb'):
             lines.append(f"💾 Memory: {sys_info['memory_mb']}MB")
         if sys_info.get('disk_free_mb'):
-            lines.append(f"💿 Disk: {sys_info['disk_free_mb']}MB free ({sys_info.get('disk_pct',0)}% used)")
+            lines.append(f"💿 Disk: {sys_info['disk_free_mb']}MB free ({sys_info.get('disk_pct', 0)}% used)")
         lines.append(f"🧵 Threads: {sys_info.get('threads', '?')}")
         lines.append("")
         for comp, status in report['components'].items():
@@ -100,7 +101,7 @@ def handle_health_check(args: dict) -> str:
     elif action == 'recover':
         import asyncio
         try:
-            loop = asyncio.get_running_loop()
+            _loop = asyncio.get_running_loop()  # noqa: F841
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor(1) as pool:
                 recovered = pool.submit(lambda: asyncio.run(health_monitor.auto_recover())).result(timeout=30)

@@ -33,7 +33,7 @@ def _derive_key(password: str, salt: bytes, length: int = 32) -> bytes:
         return kdf.derive(password.encode('utf-8'))
     else:
         return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'),
-                                    salt, PBKDF2_ITER, dklen=length)
+                                   salt, PBKDF2_ITER, dklen=length)
 
 
 class Vault:

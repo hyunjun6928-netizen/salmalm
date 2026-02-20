@@ -19,15 +19,15 @@ except ImportError:
     resource = None  # type: ignore[assignment]  # Windows
 import threading
 import time
-import traceback
 from collections import deque
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict
 
 from salmalm.constants import VERSION, KST, BASE_DIR, AUDIT_DB
 from salmalm.crypto import log
 
 # ── Error tracking ──────────────────────────────────────────
+
 
 class CircuitBreaker:
     """Track error rates per component. Trip after threshold."""
@@ -76,7 +76,7 @@ class CircuitBreaker:
             if recent >= self.threshold:
                 self._tripped[component] = now
                 log.warning(f"[FAST] Circuit breaker tripped: {component} "
-                           f"({recent} errors in {self.window_sec}s)")
+                            f"({recent} errors in {self.window_sec}s)")
                 return True
             return False
 

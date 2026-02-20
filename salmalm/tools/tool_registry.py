@@ -14,10 +14,10 @@ def _ensure_modules():
     if _modules_loaded:
         return
     _modules_loaded = True
-    from salmalm import (tools_file, tools_web, tools_exec, tools_memory,
-                   tools_misc, tools_system, tools_util, tools_agent,
-                   tools_browser, tools_google, tools_media,
-                   tools_calendar, tools_email, tools_personal)  # noqa: F401
+    from salmalm import (tools_file, tools_web, tools_exec, tools_memory,  # noqa: F401
+                         tools_misc, tools_system, tools_util, tools_agent,
+                         tools_browser, tools_google, tools_media,
+                         tools_calendar, tools_email, tools_personal)
     from salmalm.tools import tools_brave  # noqa: F401
     # Register apply_patch tool
     from salmalm.tools_patch import apply_patch as _apply_patch_fn

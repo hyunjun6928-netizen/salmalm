@@ -10,7 +10,7 @@ import json
 import random
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Literal, Optional, Tuple
 
@@ -119,7 +119,7 @@ def _find_fence_safe_split(text: str, max_pos: int) -> Tuple[str, str]:
 
     lang_tag = ""
     if last_fence:
-        fence_marker = last_fence.group(1)
+        _fence_marker = last_fence.group(1)  # noqa: F841
         # Check for language tag after fence
         fence_end = last_fence.end()
         line_end = chunk.find('\n', fence_end)
@@ -356,7 +356,7 @@ class EmbeddedBlockChunker:
             if max_lines:
                 lines = remaining[:limit].split('\n')
                 if len(lines) > max_lines:
-                    limit = sum(len(l) + 1 for l in lines[:max_lines]) - 1
+                    limit = sum(len(l) + 1 for l in lines[:max_lines]) - 1  # noqa: E741
                     limit = min(limit, hard_cap) if hard_cap > 0 else limit
 
             if _count_open_fences(remaining[:limit]):

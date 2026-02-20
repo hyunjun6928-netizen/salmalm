@@ -1,7 +1,7 @@
 """Conversation Summary Card (대화 요약 카드) — BIG-AGI style."""
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 
 def get_summary_card(session_id: str) -> Optional[Dict]:

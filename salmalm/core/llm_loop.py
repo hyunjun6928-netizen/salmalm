@@ -92,7 +92,7 @@ def _record_model_failure(model: str):
             'failures': failures + 1,
         }
         _save_cooldowns(cd)
-        log.warning(f"[FAILOVER] {model} cooled down for {cooldown_secs}s (failure #{failures+1})")
+        log.warning(f"[FAILOVER] {model} cooled down for {cooldown_secs}s (failure #{failures + 1})")
 
 
 def _clear_model_cooldown(model: str):
@@ -136,12 +136,12 @@ async def _call_llm_async(*args, **kwargs):
 
 
 async def _call_google_streaming(messages, model=None, tools=None,
-                                  max_tokens=4096, on_token=None):
+                                 max_tokens=4096, on_token=None):
     """Streaming Google Gemini call — yields tokens via on_token callback, returns final result."""
     def _run():
         final_result = None
         for event in _stream_google(messages, model=model, tools=tools,
-                                     max_tokens=max_tokens):
+                                    max_tokens=max_tokens):
             if on_token:
                 on_token(event)
             if event.get('type') == 'message_end':
@@ -151,14 +151,14 @@ async def _call_google_streaming(messages, model=None, tools=None,
                         'tool_calls': [], 'usage': {'input': 0, 'output': 0},
                         'model': model or '?'}
         return final_result or {'content': '', 'tool_calls': [],
-                                 'usage': {'input': 0, 'output': 0},
-                                 'model': model or '?'}
+                                'usage': {'input': 0, 'output': 0},
+                                'model': model or '?'}
     return await asyncio.to_thread(_run)
 
 
 async def _call_llm_streaming(messages, model=None, tools=None,
-                               max_tokens=4096, thinking=False,
-                               on_token=None):
+                              max_tokens=4096, thinking=False,
+                              on_token=None):
     """Streaming LLM call — yields tokens via on_token callback, returns final result.
 
     on_token: callback(event_dict) called for each streaming event.
@@ -167,7 +167,7 @@ async def _call_llm_streaming(messages, model=None, tools=None,
     def _run():
         final_result = None
         for event in _stream_anthropic(messages, model=model, tools=tools,
-                                        max_tokens=max_tokens, thinking=thinking):
+                                       max_tokens=max_tokens, thinking=thinking):
             if on_token:
                 on_token(event)
             if event.get('type') == 'message_end':
@@ -177,8 +177,8 @@ async def _call_llm_streaming(messages, model=None, tools=None,
                         'tool_calls': [], 'usage': {'input': 0, 'output': 0},
                         'model': model or '?'}
         return final_result or {'content': '', 'tool_calls': [],
-                                 'usage': {'input': 0, 'output': 0},
-                                 'model': model or '?'}
+                                'usage': {'input': 0, 'output': 0},
+                                'model': model or '?'}
     return await asyncio.to_thread(_run)
 
 
@@ -187,9 +187,9 @@ async def _call_llm_streaming(messages, model=None, tools=None,
 # ============================================================
 
 async def call_with_failover(messages: list, model: str, tools: Optional[list] = None,
-                              max_tokens: int = 4096, thinking: bool = False,
-                              on_token: Optional[object] = None,
-                              on_status: Optional[object] = None) -> Tuple[Dict[str, Any], Optional[str]]:
+                             max_tokens: int = 4096, thinking: bool = False,
+                             on_token: Optional[object] = None,
+                             on_status: Optional[object] = None) -> Tuple[Dict[str, Any], Optional[str]]:
     """LLM call with automatic failover on failure.
 
     on_status: optional callback(status_type, detail_str) for typing indicators.
@@ -233,7 +233,7 @@ async def call_with_failover(messages: list, model: str, tools: Optional[list] =
         _record_model_failure(fb)
 
     # All failed — return the last error
-    return result, f"⚠️ All models failed"
+    return result, "⚠️ All models failed"
 
 
 async def try_llm_call(messages: list, model: str, tools: Optional[list],

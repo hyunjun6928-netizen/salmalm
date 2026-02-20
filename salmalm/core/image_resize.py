@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import base64
 import io
-from typing import Optional, Tuple
+from typing import Tuple
 
 MAX_DIMENSION = 1024
 

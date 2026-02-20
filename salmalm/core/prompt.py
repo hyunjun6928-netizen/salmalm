@@ -4,9 +4,9 @@ import textwrap
 from pathlib import Path
 from datetime import datetime
 
-from salmalm.constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, TOOLS_FILE, MEMORY_DIR, BASE_DIR, VERSION, KST
+from salmalm.constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, MEMORY_DIR, BASE_DIR, VERSION, KST
 from salmalm.core import SkillLoader
-from salmalm import log
+from typing import Optional
 
 # User-customizable SOUL.md (takes priority over project SOUL.md)
 USER_SOUL_FILE = Path.home() / '.salmalm' / 'SOUL.md'
@@ -116,7 +116,6 @@ def reset_user_soul() -> None:
         pass
 
 
-
 # ── Token optimization constants ──
 MAX_FILE_CHARS = 15_000       # Per-file truncation limit
 MAX_MEMORY_CHARS = 5_000      # MEMORY.md cap (even in full mode)
@@ -155,10 +154,10 @@ def build_system_prompt(full: bool = True, mode: str = 'full') -> str:
         now = datetime.now(KST)
         parts.append(f"Current: {now.strftime('%Y-%m-%d %H:%M')} KST")
         parts.append("You are a sub-agent. Complete your assigned task. "
-                      "Stay focused, be concise, and return results.")
+                     "Stay focused, be concise, and return results.")
         # Tool instructions (abbreviated)
         parts.append("Use tools as needed. exec for shell, read_file/write_file/edit_file for files, "
-                      "web_search/web_fetch for web. Verify results after writing.")
+                     "web_search/web_fetch for web. Verify results after writing.")
         result = '\n\n'.join(parts)
         try:
             from salmalm.edge_cases import substitute_prompt_variables

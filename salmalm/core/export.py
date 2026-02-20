@@ -7,11 +7,7 @@ from __future__ import annotations
 
 import html as _html
 import json
-import os
-import time
 from datetime import datetime
-from pathlib import Path
-from typing import Optional
 
 from salmalm.constants import VERSION, KST, BASE_DIR
 from salmalm.crypto import log
@@ -82,15 +78,15 @@ def _msg_text(msg: dict) -> str:
 def _export_markdown(session, now: datetime) -> str:
     """Export session as Markdown."""
     lines = [
-        f'# SalmAlm Conversation Export',
-        f'',
+        '# SalmAlm Conversation Export',
+        '',
         f'- **Session ID**: {session.id}',
         f'- **Date**: {now.isoformat()}',
         f'- **Version**: SalmAlm v{VERSION}',
         f'- **Messages**: {len(session.messages)}',
-        f'',
-        f'---',
-        f'',
+        '',
+        '---',
+        '',
     ]
     for msg in session.messages:
         role = msg.get('role', '')

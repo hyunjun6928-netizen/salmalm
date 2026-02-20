@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Dict, List
+from typing import Dict, List
 
 
 async def compare_models(session_id: str, message: str,
@@ -17,7 +17,7 @@ async def compare_models(session_id: str, message: str,
         models = [MODELS.get('haiku', ''), MODELS.get('sonnet', '')]
         models = [m for m in models if m]
 
-    session = get_session(session_id)
+    _session = get_session(session_id)  # noqa: F841
     system_prompt = build_system_prompt(full=False)
     messages = [
         {'role': 'system', 'content': system_prompt},

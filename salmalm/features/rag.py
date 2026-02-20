@@ -25,14 +25,13 @@ Usage:
 import hashlib
 import json
 import math
-import os
 import re
 import sqlite3
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from salmalm.constants import MEMORY_DIR, WORKSPACE_DIR, MEMORY_FILE, BASE_DIR, KST
+from salmalm.constants import MEMORY_DIR, WORKSPACE_DIR, MEMORY_FILE, BASE_DIR
 from salmalm.crypto import log
 
 # ── BM25 Parameters ──
@@ -328,14 +327,14 @@ class RAGEngine:
                 unigrams.append(t)
 
         # Bigrams
-        bigrams = [f"{unigrams[i]}_{unigrams[i+1]}"
+        bigrams = [f"{unigrams[i]}_{unigrams[i + 1]}"
                    for i in range(len(unigrams) - 1)]
 
         # Character 3-grams (especially useful for Korean)
         char_trigrams = []
         clean = re.sub(r'\s+', '', text_lower)
         for i in range(len(clean) - 2):
-            tri = clean[i:i+3]
+            tri = clean[i:i + 3]
             if re.match(r'^[\w가-힣]{3}$', tri):
                 char_trigrams.append(f"c3:{tri}")
 
@@ -443,8 +442,8 @@ class RAGEngine:
         if uploads.exists():
             for f in uploads.glob('*'):
                 if f.suffix.lower() in ('.txt', '.md', '.py', '.js', '.json', '.csv',
-                                         '.html', '.css', '.log', '.xml', '.yaml', '.yml',
-                                         '.sql', '.sh', '.bat', '.toml', '.cfg', '.ini'):
+                                        '.html', '.css', '.log', '.xml', '.yaml', '.yml',
+                                        '.sql', '.sh', '.bat', '.toml', '.cfg', '.ini'):
                     files.append((f'uploads/{f.name}', f))
         skills = WORKSPACE_DIR / 'skills'
         if skills.exists():

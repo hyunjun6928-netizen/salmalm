@@ -17,12 +17,11 @@ import asyncio
 import base64
 import hashlib
 import json
-import os
 import struct
 import time
-from typing import Dict, Optional, Set
+from typing import Dict, Optional
 
-from salmalm.constants import VERSION, KST
+from salmalm.constants import VERSION
 from salmalm.crypto import log
 
 # WebSocket opcodes
@@ -183,7 +182,7 @@ class WebSocketServer:
         for client in list(self.clients.values()):
             try:
                 await client.send_json({"type": "shutdown",
-                                         "message": "Server is shutting down..."})
+                                        "message": "Server is shutting down..."})
             except Exception:
                 pass
         # Brief pause so clients can process the message
@@ -214,7 +213,7 @@ class WebSocketServer:
         return len(self.clients)
 
     async def _handle_connection(self, reader: asyncio.StreamReader,
-                                  writer: asyncio.StreamWriter):
+                                 writer: asyncio.StreamWriter):
         """Handle incoming TCP connection — perform WS upgrade, then message loop."""
         # Read HTTP upgrade request
         try:
@@ -393,7 +392,7 @@ class WebSocketServer:
                 c = self.clients.pop(cid, None)
                 if c:
                     c.connected = False
-                    log.info(f"[FAST] WS client dropped (timeout)")
+                    log.info("[FAST] WS client dropped (timeout)")
 
 
 # ── Streaming response helper ──────────────────────────────────

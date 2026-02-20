@@ -1,6 +1,13 @@
 from typing import Optional
 """SalmAlm agents — SubAgent, SkillLoader, PluginLoader."""
-import asyncio, importlib, json, os, re, shutil, subprocess, threading, time
+import asyncio
+import json
+import os
+import re
+import shutil
+import subprocess
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -113,7 +120,7 @@ class SubAgent:
 
                 # Collect token usage from session metrics
                 try:
-                    from salmalm.edge_cases import usage_tracker
+                    from salmalm.edge_cases import usage_tracker  # noqa: F401
                     # Rough estimate from result length
                     out_tokens = len(result) // 3
                     in_tokens = len(task) // 3
@@ -386,7 +393,7 @@ class SkillLoader:
             # No frontmatter — fall back to heading/paragraph parsing
             return meta
 
-        in_fm = True
+        _in_fm = True  # noqa: F841
         for i, line in enumerate(lines[1:], 1):
             if line.strip() == '---':
                 break
@@ -474,7 +481,7 @@ class SkillLoader:
                         if line.startswith('# '):
                             name = line[2:].strip()
                         elif line.startswith('> ') or (line.strip() and not line.startswith('#')
-                                                        and not line.startswith('---')):
+                                                       and not line.startswith('---')):
                             description = line.lstrip('> ').strip()
                             break
 
@@ -925,4 +932,3 @@ agent_manager = AgentManager()
 
 # Global telegram bot reference (set during startup)
 _llm_cron = None
-

@@ -6,7 +6,6 @@ On other platforms, falls back to normal server execution.
 from __future__ import annotations
 
 import logging
-import os
 import sys
 import threading
 import webbrowser
@@ -46,7 +45,7 @@ def _run_windows_tray(port: int = 18800):
     WM_LBUTTONDBLCLK = 0x0203
 
     NIM_ADD = 0x00000000
-    NIM_MODIFY = 0x00000001
+    _NIM_MODIFY = 0x00000001  # noqa: F841
     NIM_DELETE = 0x00000002
     NIF_MESSAGE = 0x00000001
     NIF_ICON = 0x00000002
@@ -57,7 +56,7 @@ def _run_windows_tray(port: int = 18800):
     LR_SHARED = 0x8000
 
     WS_OVERLAPPED = 0x00000000
-    CW_USEDEFAULT = -2147483648  # 0x80000000 as signed
+    _CW_USEDEFAULT = -2147483648  # 0x80000000 as signed  # noqa: F841
 
     MF_STRING = 0x0000
     MF_SEPARATOR = 0x0800
@@ -119,7 +118,7 @@ def _run_windows_tray(port: int = 18800):
         ]
 
     # ── Server thread ──
-    server_ref = [None]
+    _server_ref = [None]  # noqa: F841
     base_url = f'http://127.0.0.1:{port}'
 
     def start_server():
@@ -151,7 +150,7 @@ def _run_windows_tray(port: int = 18800):
         user32.GetCursorPos(ctypes.byref(pt))
         user32.SetForegroundWindow(hwnd)
         cmd = user32.TrackPopupMenu(menu, TPM_LEFTALIGN | TPM_RETURNCMD | TPM_NONOTIFY,
-                                     pt.x, pt.y, 0, hwnd, None)
+                                    pt.x, pt.y, 0, hwnd, None)
         user32.DestroyMenu(menu)
 
         if cmd == ID_OPEN_UI:

@@ -1,5 +1,9 @@
 """Web tools: web_search, web_fetch, http_request."""
-import json, re, urllib.request, urllib.parse, urllib.error
+import json
+import re
+import urllib.request
+import urllib.parse
+import urllib.error
 from salmalm.tool_registry import register
 from salmalm.tools_common import _is_private_url
 from salmalm.constants import VERSION
@@ -43,17 +47,21 @@ def handle_web_fetch(args: dict) -> str:
             self._parts: list = []
             self._skip = False
             self._skip_tags = {'script', 'style', 'noscript', 'svg'}
+
         def handle_starttag(self, tag, attrs):
             if tag.lower() in self._skip_tags:
                 self._skip = True
             elif tag.lower() in ('br', 'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr'):
                 self._parts.append('\n')
+
         def handle_endtag(self, tag):
             if tag.lower() in self._skip_tags:
                 self._skip = False
+
         def handle_data(self, data):
             if not self._skip:
                 self._parts.append(data)
+
         def get_text(self) -> str:
             return re.sub(r'\n{3,}', '\n\n', ''.join(self._parts)).strip()
 

@@ -1,12 +1,17 @@
 """Utility tools: hash_text, regex_test, json_query, clipboard, qr_code, translate."""
-import json, re, hashlib, secrets, string, threading
+import json
+import re
+import hashlib
+import secrets
+import string
 from datetime import datetime
 from pathlib import Path
 from salmalm.tool_registry import register
 from salmalm.tools_common import _resolve_path, _clipboard_lock
 from salmalm.constants import WORKSPACE_DIR, KST
 
-import urllib.request, urllib.parse
+import urllib.request
+import urllib.parse
 
 
 @register('hash_text')
@@ -80,7 +85,7 @@ def handle_regex_test(args: dict) -> str:
             for i, m in enumerate(matches[:50], 1):
                 lines.append(f'  {i}. {m}')
             if len(matches) > 50:
-                lines.append(f'  ... and {len(matches)-50} more')
+                lines.append(f'  ... and {len(matches) - 50} more')
             return '\n'.join(lines)
         elif action == 'replace':
             replacement = args.get('replacement', '')
@@ -247,7 +252,7 @@ def handle_qr_code(args: dict) -> str:
         output = str(output_dir / fname)
 
     encoded = urllib.parse.quote(data)
-    qr_url = f'https://chart.googleapis.com/chart?cht=qr&chs={size*25}x{size*25}&chl={encoded}&choe=UTF-8'
+    qr_url = f'https://chart.googleapis.com/chart?cht=qr&chs={size * 25}x{size * 25}&chl={encoded}&choe=UTF-8'
 
     if fmt == 'text':
         try:
@@ -263,7 +268,7 @@ def handle_qr_code(args: dict) -> str:
             return f'❌ QR generation failed: {e}'
     else:
         try:
-            api_url = f'https://api.qrserver.com/v1/create-qr-code/?size={size*25}x{size*25}&data={encoded}&format=svg'
+            api_url = f'https://api.qrserver.com/v1/create-qr-code/?size={size * 25}x{size * 25}&data={encoded}&format=svg'
             req = urllib.request.Request(api_url, headers={'User-Agent': 'SalmAlm/1.0'})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 svg_data = resp.read().decode('utf-8')

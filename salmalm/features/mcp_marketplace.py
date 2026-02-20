@@ -151,7 +151,7 @@ class MCPMarketplace:
                     # Needs user input
                     desc = entry.get('params', {}).get(param_name, param_name)
                     return f'⚠️ `{name}` requires parameter `{param_name}`: {desc}\n' \
-                           f'Use: `/mcp install {name}` and set `{param_name}` in config.'
+                        f'Use: `/mcp install {name}` and set `{param_name}` in config.'
             else:
                 command.append(part)
 
@@ -167,7 +167,7 @@ class MCPMarketplace:
                 else:
                     desc = entry.get('params', {}).get(param_name, param_name)
                     return f'⚠️ `{name}` requires env `{k}`: {desc}\n' \
-                           f'Set environment variable `{k}` or provide via params.'
+                        f'Set environment variable `{k}` or provide via params.'
             else:
                 env[k] = v
 
@@ -237,7 +237,7 @@ class MCPMarketplace:
             for e in entries:
                 installed = '✅' if e['name'] in self._installed else '  '
                 lines.append(f'  {installed} `{e["name"]}` — {e["description"]}')
-        lines.append(f'\nInstall: `/mcp install <name>`')
+        lines.append('\nInstall: `/mcp install <name>`')
         return '\n'.join(lines)
 
     def status(self) -> str:

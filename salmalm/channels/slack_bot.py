@@ -1,7 +1,9 @@
 """SalmAlm Slack Bot — Pure stdlib Slack integration."""
 from __future__ import annotations
 
-import json, time, urllib.request, urllib.parse
+import json
+import urllib.request
+import urllib.parse
 from typing import Any, Callable, Dict, Optional
 
 from salmalm import log
@@ -84,7 +86,8 @@ class SlackBot:
         """Verify Slack request signature."""
         if not self.signing_secret:
             return True  # No secret configured, skip verification
-        import hashlib, hmac
+        import hashlib
+        import hmac
         base = f'v0:{timestamp}:{body.decode("utf-8")}'
         computed = 'v0=' + hmac.new(
             self.signing_secret.encode(), base.encode(), hashlib.sha256
@@ -93,7 +96,7 @@ class SlackBot:
 
     def handle_event(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Handle an incoming Slack event.
-        
+
         Returns response dict (e.g. challenge response) or None.
         """
         # URL verification challenge

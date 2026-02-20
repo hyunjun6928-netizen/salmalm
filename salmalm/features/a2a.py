@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 import time
 import uuid
 import urllib.error
@@ -148,7 +147,7 @@ class A2AProtocol:
             return {"status": "error", "message": f"Unsupported protocol: {protocol}"}
 
         signature = body.pop("signature", "")
-        sender_id = body.get("from", {}).get("instance_id", "")
+        _sender_id = body.get("from", {}).get("instance_id", "")  # noqa: F841
 
         # Find matching peer by instance_id or try all secrets
         peer_secret = None

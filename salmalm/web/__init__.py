@@ -7,22 +7,27 @@ _real_mod = None
 # Known submodules in this package (to avoid triggering _get_real during import)
 _SUBMODULES = {'web', 'auth', 'oauth', 'templates', 'ws'}
 
+
 def _get_real():
     global _real_mod
     if _real_mod is None:
         _real_mod = _importlib.import_module('salmalm.web.web')
     return _real_mod
 
+
 class _PkgProxy(_types.ModuleType):
     def __getattr__(self, name):
         return getattr(_get_real(), name)
+
     def __setattr__(self, name, value):
         if name.startswith('_') or name in _SUBMODULES:
             super().__setattr__(name, value)
         else:
             setattr(_get_real(), name, value)
+
     def __delattr__(self, name):
         delattr(_get_real(), name)
+
 
 _proxy = _PkgProxy(__name__)
 _proxy.__path__ = __path__

@@ -5,7 +5,6 @@ import urllib.request
 import urllib.parse
 import urllib.error
 from salmalm.tools.tool_registry import register
-from salmalm.crypto import log
 
 _BASE_URL = 'https://api.search.brave.com/res/v1'
 

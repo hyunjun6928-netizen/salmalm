@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import json
-import os
 import re
 import sqlite3
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from salmalm.constants import KST
 
@@ -202,7 +200,7 @@ class ThoughtStream:
             time_str = d['created_at'][11:16] if len(d['created_at']) > 16 else ''
             tags = f' `{d["tags"]}`' if d['tags'] else ''
             mood_emoji = {'happy': '😊', 'sad': '😢', 'angry': '😠', 'anxious': '😰',
-                         'excited': '🎉', 'tired': '😴', 'frustrated': '😤'}.get(d['mood'], '')
+                          'excited': '🎉', 'tired': '😴', 'frustrated': '😤'}.get(d['mood'], '')
             lines.append(f'- **{time_str}** {mood_emoji} {d["content"]}{tags}')
 
         return '\n'.join(lines)
@@ -226,7 +224,7 @@ def _format_thoughts(thoughts: List[Dict], title: str = '') -> str:
         dt = t['created_at'][:16] if len(t['created_at']) > 16 else t['created_at']
         tags = f' [{t["tags"]}]' if t.get('tags') else ''
         mood_emoji = {'happy': '😊', 'sad': '😢', 'angry': '😠', 'anxious': '😰',
-                     'excited': '🎉', 'tired': '😴', 'frustrated': '😤'}.get(t.get('mood', ''), '')
+                      'excited': '🎉', 'tired': '😴', 'frustrated': '😤'}.get(t.get('mood', ''), '')
         lines.append(f'#{t["id"]} {dt} {mood_emoji} {t["content"]}{tags}')
     return '\n'.join(lines)
 

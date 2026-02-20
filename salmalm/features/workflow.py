@@ -5,17 +5,13 @@ Supports: variable substitution, conditionals, parallel steps, error handling,
 triggers (cron, manual, webhook, event).
 """
 import json
-import os
 import re
 import threading
-import time
-import concurrent.futures
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from salmalm.constants import BASE_DIR, KST
-from salmalm.crypto import log
+from salmalm.constants import KST
 
 WORKFLOWS_DIR = Path.home() / '.salmalm' / 'workflows'
 WORKFLOW_LOG_DIR = WORKFLOWS_DIR / 'logs'
@@ -68,12 +64,18 @@ def _eval_condition(cond: str, context: Dict[str, Any]) -> bool:
                 parts = resolved.split(op, 1)
                 left = _to_num(parts[0].strip())
                 right = _to_num(parts[1].strip())
-                if op == '>': return left > right
-                if op == '<': return left < right
-                if op == '>=': return left >= right
-                if op == '<=': return left <= right
-                if op == '==': return left == right
-                if op == '!=': return left != right
+                if op == '>':
+                    return left > right
+                if op == '<':
+                    return left < right
+                if op == '>=':
+                    return left >= right
+                if op == '<=':
+                    return left <= right
+                if op == '==':
+                    return left == right
+                if op == '!=':
+                    return left != right
         return bool(resolved)
     except Exception:
         return False

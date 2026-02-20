@@ -19,7 +19,7 @@ def detect_paste_type(text: str) -> Dict[str, Any]:
         }
 
     lines = text.split('\n')
-    urls = [l.strip() for l in lines if url_pattern.match(l.strip())]
+    urls = [l.strip() for l in lines if url_pattern.match(l.strip())]  # noqa: E741
     if len(urls) > 1:
         return {
             'type': 'urls',

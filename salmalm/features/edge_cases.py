@@ -6,7 +6,7 @@ from salmalm.features.fork import ConversationFork, conversation_fork
 from salmalm.features.provider_health import ProviderHealthCheck, provider_health
 from salmalm.features.model_detect import ModelDetector, model_detector
 from salmalm.features.file_upload import (ALLOWED_UPLOAD_EXTENSIONS, validate_upload,
-                                           extract_pdf_text, process_uploaded_file)
+                                          extract_pdf_text, process_uploaded_file)
 from salmalm.features.session_groups import SessionGroupManager, session_groups
 from salmalm.features.bookmarks import BookmarkManager, bookmark_manager
 from salmalm.features.prompt_vars import substitute_prompt_variables

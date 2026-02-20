@@ -1,11 +1,17 @@
 """SalmAlm Web UI — HTML + WebHandler."""
 import warnings
 warnings.filterwarnings('ignore', category=SyntaxWarning, module='web')
-import asyncio, gzip, http.server, json, os, re, secrets, sys, time
+import http.server
+import json
+import os
+import re
+import secrets
+import sys
+import time
 from pathlib import Path
 from typing import Optional
 
-from salmalm.constants import *
+from salmalm.constants import *  # noqa: F403
 from salmalm.crypto import vault, log
 from salmalm.core import get_usage_report, router, audit_log
 from salmalm.auth import auth_manager, rate_limiter, extract_auth, RateLimitExceeded
@@ -70,16 +76,16 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()')
         script_src = f"'nonce-{nonce}'" if nonce else "'self'"
         self.send_header('Content-Security-Policy',
-            f"default-src 'self'; "
-            f"script-src {script_src}; "
-            f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "
-            f"img-src 'self' data: blob:; "
-            f"connect-src 'self' ws://127.0.0.1:* ws://localhost:* wss://127.0.0.1:* wss://localhost:*; "
-            f"font-src 'self' data: https://fonts.gstatic.com; "
-            f"object-src 'none'; "
-            f"base-uri 'self'; "
-            f"form-action 'self'"
-        )
+                         f"default-src 'self'; "
+                         f"script-src {script_src}; "
+                         f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "
+                         f"img-src 'self' data: blob:; "
+                         f"connect-src 'self' ws://127.0.0.1:* ws://localhost:* wss://127.0.0.1:* wss://localhost:*; "
+                         f"font-src 'self' data: https://fonts.gstatic.com; "
+                         f"object-src 'none'; "
+                         f"base-uri 'self'; "
+                         f"form-action 'self'"
+                         )
 
     def _html(self, content: str):
         import secrets as _sec
@@ -172,8 +178,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         finally:
             duration = (time.time() - _start) * 1000
             request_logger.log_request('PUT', self.path.split('?')[0],
-                                        ip=self._get_client_ip(),
-                                        duration_ms=duration)
+                                       ip=self._get_client_ip(),
+                                       duration_ms=duration)
 
     def _do_put_inner(self):
         length = int(self.headers.get('Content-Length', 0))
@@ -181,7 +187,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         # PUT /api/sessions/{id}/title
         m = re.match(r'^/api/sessions/([^/]+)/title$', self.path)
         if m:
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             sid = m.group(1)
             title = body.get('title', '').strip()[:60]
             if not title:
@@ -224,8 +231,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         finally:
             duration = (time.time() - _start) * 1000
             request_logger.log_request('GET', self.path.split('?')[0],
-                                        ip=self._get_client_ip(),
-                                        duration_ms=duration)
+                                       ip=self._get_client_ip(),
+                                       duration_ms=duration)
 
     def _needs_onboarding(self) -> bool:
         """Check if first-run onboarding is needed (no API keys or Ollama configured)."""
@@ -244,7 +251,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         if ip not in ('127.0.0.1', '::1', 'localhost'):
             return False
         pw = os.environ.get('SALMALM_VAULT_PW', '')
-        if VAULT_FILE.exists():
+        if VAULT_FILE.exists():  # noqa: F405
             # Try env password first, then empty password (no-password vault)
             if pw and vault.unlock(pw):
                 return True
@@ -261,10 +268,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
     def _needs_first_run(self) -> bool:
         """True if vault file doesn't exist and no env password — brand new install."""
-        return not VAULT_FILE.exists() and not os.environ.get('SALMALM_VAULT_PW', '')
-
+        return not VAULT_FILE.exists() and not os.environ.get('SALMALM_VAULT_PW', '')  # noqa: F405
 
     # ── Extracted GET handlers ────────────────────────────────
+
     def _get_uptime(self):
         from salmalm.sla import uptime_monitor
         self._json(uptime_monitor.get_stats())
@@ -295,7 +302,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self._json({'nodes': gateway.list_nodes()})
 
     def _get_status(self):
-        self._json({'app': APP_NAME, 'version': VERSION,
+        self._json({'app': APP_NAME, 'version': VERSION,  # noqa: F405
                     'unlocked': vault.is_unlocked,
                     'usage': get_usage_report(),
                     'model': router.force_model or 'auto'})
@@ -320,34 +327,40 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         })
 
     def _get_usage_daily(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.edge_cases import usage_tracker
         self._json({'report': usage_tracker.daily_report()})
 
     def _get_usage_monthly(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.edge_cases import usage_tracker
         self._json({'report': usage_tracker.monthly_report()})
 
     def _get_usage_models(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.edge_cases import usage_tracker
         self._json({'breakdown': usage_tracker.model_breakdown()})
 
     def _get_groups(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.edge_cases import session_groups
         self._json({'groups': session_groups.list_groups()})
 
     def _get_models(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.edge_cases import model_detector
         force = '?force' in self.path
         models = model_detector.detect_all(force=force)
         self._json({'models': models, 'count': len(models)})
 
     def _get_llm_router_providers(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.core.llm_router import PROVIDERS, is_provider_available, list_available_models, llm_router
         providers = []
         for name, cfg in PROVIDERS.items():
@@ -364,40 +377,47 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         })
 
     def _get_llm_router_current(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.core.llm_router import llm_router
         self._json({'current_model': llm_router.current_model})
 
     def _get_soul(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.prompt import get_user_soul, USER_SOUL_FILE
         self._json({'content': get_user_soul(), 'path': str(USER_SOUL_FILE)})
 
     def _get_routing(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.engine import get_routing_config
         from salmalm.constants import MODELS
         self._json({'config': get_routing_config(), 'available_models': MODELS})
 
     def _get_failover(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.engine import get_failover_config, _load_cooldowns
         self._json({'config': get_failover_config(), 'cooldowns': _load_cooldowns()})
 
     def _get_cron(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.core import _llm_cron
         self._json({'jobs': _llm_cron.list_jobs() if _llm_cron else []})
 
     def _get_mcp(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.mcp import mcp_manager
         servers = mcp_manager.list_servers()
         all_tools = mcp_manager.get_all_tools()
         self._json({'servers': servers, 'total_tools': len(all_tools)})
 
     def _get_rag(self):
-        if not self._require_auth('user'): return
+        if not self._require_auth('user'):
+            return
         from salmalm.rag import rag_engine
         self._json(rag_engine.get_stats())
 
@@ -426,70 +446,70 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
     def _get_features(self):
         cats = [
-            {"id":"core","icon":"🤖","title":"Core AI","title_kr":"핵심 AI","features":[
-                {"name":"Multi-model Routing","name_kr":"멀티 모델 라우팅","desc":"Auto-routes to haiku/sonnet/opus based on complexity","desc_kr":"복잡도에 따라 haiku/sonnet/opus 자동 선택","command":"/model"},
-                {"name":"Extended Thinking","name_kr":"확장 사고","desc":"Deep reasoning for complex tasks","desc_kr":"복잡한 작업을 위한 심층 추론","command":"/thinking on"},
-                {"name":"Context Compaction","name_kr":"컨텍스트 압축","desc":"Auto-summarize long sessions","desc_kr":"긴 세션 자동 요약","command":"/compact"},
-                {"name":"Prompt Caching","name_kr":"프롬프트 캐싱","desc":"Anthropic cache for cost savings","desc_kr":"Anthropic 캐시로 비용 절감","command":"/context"},
-                {"name":"Self-Evolving Prompt","name_kr":"자가 진화 프롬프트","desc":"AI learns your preferences over time","desc_kr":"대화할수록 선호도 자동 학습","command":"/evolve status"},
-                {"name":"Mood-Aware Response","name_kr":"기분 감지 응답","desc":"Adjusts tone based on your emotion","desc_kr":"감정에 따라 톤 자동 조절","command":"/mood on"},
-                {"name":"A/B Split Response","name_kr":"A/B 분할 응답","desc":"Two perspectives on one question","desc_kr":"하나의 질문에 두 관점 동시 응답","command":"/split"},
+            {"id": "core", "icon": "🤖", "title": "Core AI", "title_kr": "핵심 AI", "features": [
+                {"name": "Multi-model Routing", "name_kr": "멀티 모델 라우팅", "desc": "Auto-routes to haiku/sonnet/opus based on complexity", "desc_kr": "복잡도에 따라 haiku/sonnet/opus 자동 선택", "command": "/model"},
+                {"name": "Extended Thinking", "name_kr": "확장 사고", "desc": "Deep reasoning for complex tasks", "desc_kr": "복잡한 작업을 위한 심층 추론", "command": "/thinking on"},
+                {"name": "Context Compaction", "name_kr": "컨텍스트 압축", "desc": "Auto-summarize long sessions", "desc_kr": "긴 세션 자동 요약", "command": "/compact"},
+                {"name": "Prompt Caching", "name_kr": "프롬프트 캐싱", "desc": "Anthropic cache for cost savings", "desc_kr": "Anthropic 캐시로 비용 절감", "command": "/context"},
+                {"name": "Self-Evolving Prompt", "name_kr": "자가 진화 프롬프트", "desc": "AI learns your preferences over time", "desc_kr": "대화할수록 선호도 자동 학습", "command": "/evolve status"},
+                {"name": "Mood-Aware Response", "name_kr": "기분 감지 응답", "desc": "Adjusts tone based on your emotion", "desc_kr": "감정에 따라 톤 자동 조절", "command": "/mood on"},
+                {"name": "A/B Split Response", "name_kr": "A/B 분할 응답", "desc": "Two perspectives on one question", "desc_kr": "하나의 질문에 두 관점 동시 응답", "command": "/split"},
             ]},
-            {"id":"tools","icon":"🔧","title":"Tools","title_kr":"도구","features":[
-                {"name":"Web Search","name_kr":"웹 검색","desc":"Search the internet","desc_kr":"인터넷 검색"},
-                {"name":"Code Execution","name_kr":"코드 실행","desc":"Run code with sandbox protection","desc_kr":"샌드박스 보호 하에 코드 실행","command":"/bash"},
-                {"name":"File Operations","name_kr":"파일 작업","desc":"Read, write, edit files","desc_kr":"파일 읽기/쓰기/편집"},
-                {"name":"Browser Automation","name_kr":"브라우저 자동화","desc":"Control Chrome via CDP","desc_kr":"Chrome DevTools Protocol 제어","command":"/screen"},
-                {"name":"Image Vision","name_kr":"이미지 분석","desc":"Analyze images with AI","desc_kr":"AI로 이미지 분석"},
-                {"name":"TTS / STT","name_kr":"음성 입출력","desc":"Text-to-speech and speech-to-text","desc_kr":"텍스트↔음성 변환"},
-                {"name":"PDF Extraction","name_kr":"PDF 추출","desc":"Extract text from PDFs","desc_kr":"PDF에서 텍스트 추출"},
+            {"id": "tools", "icon": "🔧", "title": "Tools", "title_kr": "도구", "features": [
+                {"name": "Web Search", "name_kr": "웹 검색", "desc": "Search the internet", "desc_kr": "인터넷 검색"},
+                {"name": "Code Execution", "name_kr": "코드 실행", "desc": "Run code with sandbox protection", "desc_kr": "샌드박스 보호 하에 코드 실행", "command": "/bash"},
+                {"name": "File Operations", "name_kr": "파일 작업", "desc": "Read, write, edit files", "desc_kr": "파일 읽기/쓰기/편집"},
+                {"name": "Browser Automation", "name_kr": "브라우저 자동화", "desc": "Control Chrome via CDP", "desc_kr": "Chrome DevTools Protocol 제어", "command": "/screen"},
+                {"name": "Image Vision", "name_kr": "이미지 분석", "desc": "Analyze images with AI", "desc_kr": "AI로 이미지 분석"},
+                {"name": "TTS / STT", "name_kr": "음성 입출력", "desc": "Text-to-speech and speech-to-text", "desc_kr": "텍스트↔음성 변환"},
+                {"name": "PDF Extraction", "name_kr": "PDF 추출", "desc": "Extract text from PDFs", "desc_kr": "PDF에서 텍스트 추출"},
             ]},
-            {"id":"personal","icon":"👤","title":"Personal Assistant","title_kr":"개인 비서","features":[
-                {"name":"Daily Briefing","name_kr":"데일리 브리핑","desc":"Morning/evening digest","desc_kr":"아침/저녁 종합 브리핑","command":"/life"},
-                {"name":"Smart Reminders","name_kr":"스마트 리마인더","desc":"Natural language time parsing","desc_kr":"자연어 시간 파싱"},
-                {"name":"Expense Tracker","name_kr":"가계부","desc":"Track spending by category","desc_kr":"카테고리별 지출 추적"},
-                {"name":"Pomodoro Timer","name_kr":"포모도로 타이머","desc":"25min focus sessions","desc_kr":"25분 집중 세션"},
-                {"name":"Notes & Links","name_kr":"메모 & 링크","desc":"Save and search notes/links","desc_kr":"메모와 링크 저장/검색"},
-                {"name":"Routines","name_kr":"루틴","desc":"Daily habit tracking","desc_kr":"일일 습관 추적"},
-                {"name":"Google Calendar","name_kr":"구글 캘린더","desc":"View, add, delete events","desc_kr":"일정 보기/추가/삭제"},
-                {"name":"Gmail","name_kr":"지메일","desc":"Read, send, search emails","desc_kr":"이메일 읽기/보내기/검색"},
-                {"name":"Life Dashboard","name_kr":"인생 대시보드","desc":"All-in-one life overview","desc_kr":"원페이지 인생 현황판","command":"/life"},
+            {"id": "personal", "icon": "👤", "title": "Personal Assistant", "title_kr": "개인 비서", "features": [
+                {"name": "Daily Briefing", "name_kr": "데일리 브리핑", "desc": "Morning/evening digest", "desc_kr": "아침/저녁 종합 브리핑", "command": "/life"},
+                {"name": "Smart Reminders", "name_kr": "스마트 리마인더", "desc": "Natural language time parsing", "desc_kr": "자연어 시간 파싱"},
+                {"name": "Expense Tracker", "name_kr": "가계부", "desc": "Track spending by category", "desc_kr": "카테고리별 지출 추적"},
+                {"name": "Pomodoro Timer", "name_kr": "포모도로 타이머", "desc": "25min focus sessions", "desc_kr": "25분 집중 세션"},
+                {"name": "Notes & Links", "name_kr": "메모 & 링크", "desc": "Save and search notes/links", "desc_kr": "메모와 링크 저장/검색"},
+                {"name": "Routines", "name_kr": "루틴", "desc": "Daily habit tracking", "desc_kr": "일일 습관 추적"},
+                {"name": "Google Calendar", "name_kr": "구글 캘린더", "desc": "View, add, delete events", "desc_kr": "일정 보기/추가/삭제"},
+                {"name": "Gmail", "name_kr": "지메일", "desc": "Read, send, search emails", "desc_kr": "이메일 읽기/보내기/검색"},
+                {"name": "Life Dashboard", "name_kr": "인생 대시보드", "desc": "All-in-one life overview", "desc_kr": "원페이지 인생 현황판", "command": "/life"},
             ]},
-            {"id":"unique","icon":"✨","title":"Unique Features","title_kr":"독자 기능","features":[
-                {"name":"Thought Stream","name_kr":"생각 스트림","desc":"Quick thought timeline with tags","desc_kr":"해시태그 기반 생각 타임라인","command":"/think"},
-                {"name":"Time Capsule","name_kr":"타임캡슐","desc":"Messages to your future self","desc_kr":"미래의 나에게 보내는 메시지","command":"/capsule"},
-                {"name":"Dead Man's Switch","name_kr":"데드맨 스위치","desc":"Emergency actions on inactivity","desc_kr":"비활동 시 긴급 조치","command":"/deadman"},
-                {"name":"Shadow Mode","name_kr":"분신술","desc":"AI replies in your style when away","desc_kr":"부재 시 내 말투로 대리 응답","command":"/shadow on"},
-                {"name":"Encrypted Vault","name_kr":"비밀 금고","desc":"Double-encrypted private chat","desc_kr":"이중 암호화 비밀 대화","command":"/vault open"},
-                {"name":"Agent-to-Agent","name_kr":"AI간 통신","desc":"Negotiate with other SalmAlm instances","desc_kr":"다른 SalmAlm과 자동 협상","command":"/a2a"},
+            {"id": "unique", "icon": "✨", "title": "Unique Features", "title_kr": "독자 기능", "features": [
+                {"name": "Thought Stream", "name_kr": "생각 스트림", "desc": "Quick thought timeline with tags", "desc_kr": "해시태그 기반 생각 타임라인", "command": "/think"},
+                {"name": "Time Capsule", "name_kr": "타임캡슐", "desc": "Messages to your future self", "desc_kr": "미래의 나에게 보내는 메시지", "command": "/capsule"},
+                {"name": "Dead Man's Switch", "name_kr": "데드맨 스위치", "desc": "Emergency actions on inactivity", "desc_kr": "비활동 시 긴급 조치", "command": "/deadman"},
+                {"name": "Shadow Mode", "name_kr": "분신술", "desc": "AI replies in your style when away", "desc_kr": "부재 시 내 말투로 대리 응답", "command": "/shadow on"},
+                {"name": "Encrypted Vault", "name_kr": "비밀 금고", "desc": "Double-encrypted private chat", "desc_kr": "이중 암호화 비밀 대화", "command": "/vault open"},
+                {"name": "Agent-to-Agent", "name_kr": "AI간 통신", "desc": "Negotiate with other SalmAlm instances", "desc_kr": "다른 SalmAlm과 자동 협상", "command": "/a2a"},
             ]},
-            {"id":"infra","icon":"⚙️","title":"Infrastructure","title_kr":"인프라","features":[
-                {"name":"Workflow Engine","name_kr":"워크플로우 엔진","desc":"Multi-step automation pipelines","desc_kr":"다단계 자동화 파이프라인","command":"/workflow"},
-                {"name":"MCP Marketplace","name_kr":"MCP 마켓","desc":"One-click MCP server install","desc_kr":"MCP 서버 원클릭 설치","command":"/mcp catalog"},
-                {"name":"Plugin System","name_kr":"플러그인","desc":"Extend with custom plugins","desc_kr":"커스텀 플러그인으로 확장"},
-                {"name":"Multi-Agent","name_kr":"다중 에이전트","desc":"Isolated sub-agents for parallel work","desc_kr":"병렬 작업용 격리 서브에이전트","command":"/subagents"},
-                {"name":"Sandboxing","name_kr":"샌드박싱","desc":"Docker/subprocess isolation","desc_kr":"Docker/subprocess 격리 실행"},
-                {"name":"OAuth Auth","name_kr":"OAuth 인증","desc":"Anthropic/OpenAI subscription auth","desc_kr":"API 키 없이 구독 인증","command":"/oauth"},
-                {"name":"Prompt Caching","name_kr":"프롬프트 캐싱","desc":"Reduce API costs with caching","desc_kr":"캐싱으로 API 비용 절감","command":"/context"},
+            {"id": "infra", "icon": "⚙️", "title": "Infrastructure", "title_kr": "인프라", "features": [
+                {"name": "Workflow Engine", "name_kr": "워크플로우 엔진", "desc": "Multi-step automation pipelines", "desc_kr": "다단계 자동화 파이프라인", "command": "/workflow"},
+                {"name": "MCP Marketplace", "name_kr": "MCP 마켓", "desc": "One-click MCP server install", "desc_kr": "MCP 서버 원클릭 설치", "command": "/mcp catalog"},
+                {"name": "Plugin System", "name_kr": "플러그인", "desc": "Extend with custom plugins", "desc_kr": "커스텀 플러그인으로 확장"},
+                {"name": "Multi-Agent", "name_kr": "다중 에이전트", "desc": "Isolated sub-agents for parallel work", "desc_kr": "병렬 작업용 격리 서브에이전트", "command": "/subagents"},
+                {"name": "Sandboxing", "name_kr": "샌드박싱", "desc": "Docker/subprocess isolation", "desc_kr": "Docker/subprocess 격리 실행"},
+                {"name": "OAuth Auth", "name_kr": "OAuth 인증", "desc": "Anthropic/OpenAI subscription auth", "desc_kr": "API 키 없이 구독 인증", "command": "/oauth"},
+                {"name": "Prompt Caching", "name_kr": "프롬프트 캐싱", "desc": "Reduce API costs with caching", "desc_kr": "캐싱으로 API 비용 절감", "command": "/context"},
             ]},
-            {"id":"channels","icon":"📱","title":"Channels","title_kr":"채널","features":[
-                {"name":"Web UI","name_kr":"웹 UI","desc":"Full-featured web interface","desc_kr":"풀기능 웹 인터페이스"},
-                {"name":"Telegram","name_kr":"텔레그램","desc":"Bot with topics, reactions, groups","desc_kr":"토픽/반응/그룹 지원 봇"},
-                {"name":"Discord","name_kr":"디스코드","desc":"Bot with threads and reactions","desc_kr":"스레드/반응 지원 봇"},
-                {"name":"Slack","name_kr":"슬랙","desc":"Event API + Web API","desc_kr":"Event API + Web API"},
-                {"name":"PWA","name_kr":"PWA","desc":"Install as desktop/mobile app","desc_kr":"데스크톱/모바일 앱 설치"},
+            {"id": "channels", "icon": "📱", "title": "Channels", "title_kr": "채널", "features": [
+                {"name": "Web UI", "name_kr": "웹 UI", "desc": "Full-featured web interface", "desc_kr": "풀기능 웹 인터페이스"},
+                {"name": "Telegram", "name_kr": "텔레그램", "desc": "Bot with topics, reactions, groups", "desc_kr": "토픽/반응/그룹 지원 봇"},
+                {"name": "Discord", "name_kr": "디스코드", "desc": "Bot with threads and reactions", "desc_kr": "스레드/반응 지원 봇"},
+                {"name": "Slack", "name_kr": "슬랙", "desc": "Event API + Web API", "desc_kr": "Event API + Web API"},
+                {"name": "PWA", "name_kr": "PWA", "desc": "Install as desktop/mobile app", "desc_kr": "데스크톱/모바일 앱 설치"},
             ]},
-            {"id":"commands","icon":"⌨️","title":"Commands","title_kr":"명령어","features":[
-                {"name":"/help","desc":"Show help","desc_kr":"도움말"},
-                {"name":"/status","desc":"Session status","desc_kr":"세션 상태"},
-                {"name":"/model","desc":"Switch model","desc_kr":"모델 전환"},
-                {"name":"/compact","desc":"Compress context","desc_kr":"컨텍스트 압축"},
-                {"name":"/context","desc":"Token breakdown","desc_kr":"토큰 분석"},
-                {"name":"/usage","desc":"Token/cost tracking","desc_kr":"토큰/비용 추적"},
-                {"name":"/think","desc":"Record a thought / set thinking level","desc_kr":"생각 기록 / 사고 레벨"},
-                {"name":"/persona","desc":"Switch persona","desc_kr":"페르소나 전환"},
-                {"name":"/branch","desc":"Branch conversation","desc_kr":"대화 분기"},
-                {"name":"/rollback","desc":"Rollback messages","desc_kr":"메시지 롤백"},
+            {"id": "commands", "icon": "⌨️", "title": "Commands", "title_kr": "명령어", "features": [
+                {"name": "/help", "desc": "Show help", "desc_kr": "도움말"},
+                {"name": "/status", "desc": "Session status", "desc_kr": "세션 상태"},
+                {"name": "/model", "desc": "Switch model", "desc_kr": "모델 전환"},
+                {"name": "/compact", "desc": "Compress context", "desc_kr": "컨텍스트 압축"},
+                {"name": "/context", "desc": "Token breakdown", "desc_kr": "토큰 분석"},
+                {"name": "/usage", "desc": "Token/cost tracking", "desc_kr": "토큰/비용 추적"},
+                {"name": "/think", "desc": "Record a thought / set thinking level", "desc_kr": "생각 기록 / 사고 레벨"},
+                {"name": "/persona", "desc": "Switch persona", "desc_kr": "페르소나 전환"},
+                {"name": "/branch", "desc": "Branch conversation", "desc_kr": "대화 분기"},
+                {"name": "/rollback", "desc": "Rollback messages", "desc_kr": "메시지 롤백"},
             ]},
         ]
         self._json({"categories": cats})
@@ -510,22 +530,22 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
     def _get_commands(self):
         cmds = [
-            {"name":"/help","desc":"Show help"},{"name":"/status","desc":"Session status"},
-            {"name":"/model","desc":"Switch model"},{"name":"/compact","desc":"Compress context"},
-            {"name":"/context","desc":"Token breakdown"},{"name":"/usage","desc":"Token/cost tracking"},
-            {"name":"/think","desc":"Record thought / thinking level"},{"name":"/persona","desc":"Switch persona"},
-            {"name":"/branch","desc":"Branch conversation"},{"name":"/rollback","desc":"Rollback messages"},
-            {"name":"/life","desc":"Life dashboard"},{"name":"/remind","desc":"Set reminder"},
-            {"name":"/expense","desc":"Track expense"},{"name":"/pomodoro","desc":"Pomodoro timer"},
-            {"name":"/note","desc":"Save note"},{"name":"/link","desc":"Save link"},
-            {"name":"/routine","desc":"Manage routines"},{"name":"/shadow","desc":"Shadow mode"},
-            {"name":"/vault","desc":"Encrypted vault"},{"name":"/capsule","desc":"Time capsule"},
-            {"name":"/deadman","desc":"Dead man's switch"},{"name":"/a2a","desc":"Agent-to-agent"},
-            {"name":"/workflow","desc":"Workflow engine"},{"name":"/mcp","desc":"MCP management"},
-            {"name":"/subagents","desc":"Sub-agents"},{"name":"/oauth","desc":"OAuth setup"},
-            {"name":"/bash","desc":"Run shell command"},{"name":"/screen","desc":"Browser control"},
-            {"name":"/evolve","desc":"Evolving prompt"},{"name":"/mood","desc":"Mood detection"},
-            {"name":"/split","desc":"A/B split response"},
+            {"name": "/help", "desc": "Show help"}, {"name": "/status", "desc": "Session status"},
+            {"name": "/model", "desc": "Switch model"}, {"name": "/compact", "desc": "Compress context"},
+            {"name": "/context", "desc": "Token breakdown"}, {"name": "/usage", "desc": "Token/cost tracking"},
+            {"name": "/think", "desc": "Record thought / thinking level"}, {"name": "/persona", "desc": "Switch persona"},
+            {"name": "/branch", "desc": "Branch conversation"}, {"name": "/rollback", "desc": "Rollback messages"},
+            {"name": "/life", "desc": "Life dashboard"}, {"name": "/remind", "desc": "Set reminder"},
+            {"name": "/expense", "desc": "Track expense"}, {"name": "/pomodoro", "desc": "Pomodoro timer"},
+            {"name": "/note", "desc": "Save note"}, {"name": "/link", "desc": "Save link"},
+            {"name": "/routine", "desc": "Manage routines"}, {"name": "/shadow", "desc": "Shadow mode"},
+            {"name": "/vault", "desc": "Encrypted vault"}, {"name": "/capsule", "desc": "Time capsule"},
+            {"name": "/deadman", "desc": "Dead man's switch"}, {"name": "/a2a", "desc": "Agent-to-agent"},
+            {"name": "/workflow", "desc": "Workflow engine"}, {"name": "/mcp", "desc": "MCP management"},
+            {"name": "/subagents", "desc": "Sub-agents"}, {"name": "/oauth", "desc": "OAuth setup"},
+            {"name": "/bash", "desc": "Run shell command"}, {"name": "/screen", "desc": "Browser control"},
+            {"name": "/evolve", "desc": "Evolving prompt"}, {"name": "/mood", "desc": "Mood detection"},
+            {"name": "/split", "desc": "A/B split response"},
         ]
         self._json({"commands": cmds, "count": len(cmds)})
 
@@ -562,7 +582,6 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         '/api/commands': '_get_commands',
     }
 
-
     def _do_get_inner(self):
         # Route table dispatch for simple API endpoints
         _clean_path = self.path.split('?')[0]
@@ -586,7 +605,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self._html(ONBOARDING_HTML)
 
         elif self.path == '/api/sessions':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.core import _get_db
             conn = _get_db()
             # Ensure title column exists
@@ -627,7 +647,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self._json({'sessions': sessions})
 
         elif self.path == '/api/notifications':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.core import _sessions
             web_session = _sessions.get('web')
             notifications = []
@@ -636,7 +657,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 web_session._notifications = []  # clear after read
             self._json({'notifications': notifications})
         elif self.path == '/api/presence':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.presence import presence_manager
             self._json({
                 'clients': presence_manager.list_all(),
@@ -645,14 +667,16 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             })
 
         elif self.path == '/api/channels':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.channel_router import channel_router
             self._json({
                 'channels': channel_router.list_channels(),
             })
 
         elif self.path == '/api/dashboard':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             # Dashboard data: sessions, costs, tools, cron jobs
             from salmalm.core import _sessions, _llm_cron, PluginLoader, SubAgent  # type: ignore[attr-defined]
             sessions_info = [
@@ -669,7 +693,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             cost_timeline = []
             try:
                 import sqlite3 as _sq
-                _conn = _sq.connect(str(AUDIT_DB))
+                _conn = _sq.connect(str(AUDIT_DB))  # noqa: F405
                 cur = _conn.execute(
                     "SELECT substr(ts,1,13) as hour, COUNT(*) as cnt "
                     "FROM audit_log WHERE event='tool_exec' "
@@ -688,11 +712,12 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             })
 
         elif self.path == '/api/plugins':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.core import PluginLoader
             legacy_tools = PluginLoader.get_all_tools()
             legacy = [{'name': n, 'tools': len(p['tools']), 'path': p['path']}
-                       for n, p in PluginLoader._plugins.items()]
+                      for n, p in PluginLoader._plugins.items()]
             from salmalm.plugin_manager import plugin_manager
             new_plugins = plugin_manager.list_plugins()
             self._json({
@@ -701,23 +726,25 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 'directory_total_tools': len(plugin_manager.get_all_tools()),
             })
         elif self.path == '/api/agents':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.agents import agent_manager
             self._json({
                 'agents': agent_manager.list_agents(),
                 'bindings': agent_manager.list_bindings(),
             })
         elif self.path == '/api/hooks':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.hooks import hook_manager, VALID_EVENTS
             self._json({
                 'hooks': hook_manager.list_hooks(),
                 'valid_events': list(VALID_EVENTS),
             })
 
-
         elif self.path.startswith('/api/search'):
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             import urllib.parse
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
@@ -731,7 +758,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self._json({'query': query, 'results': results, 'count': len(results)})
 
         elif self.path.startswith('/api/sessions/') and '/export' in self.path:
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             import urllib.parse
             m = re.match(r'^/api/sessions/([^/]+)/export', self.path)
             if not m:
@@ -750,7 +778,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             msgs = json.loads(row[0])
             updated_at = row[1]
             if fmt == 'md':
-                lines = [f'# SalmAlm Chat Export', f'Session: {sid}', f'Date: {updated_at}', '']
+                lines = ['# SalmAlm Chat Export', 'Session: {sid}', 'Date: {updated_at}', '']
                 for msg in msgs:
                     role = msg.get('role', '')
                     if role == 'system':
@@ -787,7 +815,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             return
 
         elif self.path.startswith('/api/rag/search'):
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.rag import rag_engine
             import urllib.parse
             parsed = urllib.parse.urlparse(self.path)
@@ -799,7 +828,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 results = rag_engine.search(query, max_results=int(params.get('n', ['5'])[0]))
                 self._json({'query': query, 'results': results})
         elif self.path.startswith('/api/audit'):
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             import urllib.parse
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
@@ -811,20 +841,23 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self._json({'entries': entries, 'count': len(entries)})
 
         elif self.path == '/api/security/report':
-            if not self._require_auth('admin'): return
+            if not self._require_auth('admin'):
+                return
             from salmalm.security import security_auditor
             self._json(security_auditor.audit())
 
         elif self.path == '/api/health/providers':
             # Provider health check — Open WebUI style (프로바이더 상태 확인)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.edge_cases import provider_health
             force = '?force' in self.path or 'force=1' in self.path
             self._json(provider_health.check_all(force=force))
 
         elif self.path == '/api/bookmarks':
             # Message bookmarks — LobeChat style (메시지 북마크)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.edge_cases import bookmark_manager
             import urllib.parse
             parsed = urllib.parse.urlparse(self.path)
@@ -836,7 +869,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'bookmarks': bookmark_manager.list_all()})
         elif self.path.startswith('/api/sessions/') and '/summary' in self.path:
             # Conversation summary card — BIG-AGI style (대화 요약 카드)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             m = re.match(r'^/api/sessions/([^/]+)/summary', self.path)
             if m:
                 from salmalm.edge_cases import get_summary_card
@@ -846,7 +880,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 self._json({'error': 'Invalid path'}, 400)
         elif self.path.startswith('/api/sessions/') and '/alternatives' in self.path:
             # Conversation fork alternatives — LibreChat style (대화 포크)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             m = re.match(r'^/api/sessions/([^/]+)/alternatives/(\d+)', self.path)
             if m:
                 from salmalm.edge_cases import conversation_fork
@@ -855,12 +890,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self._json({'error': 'Invalid path'}, 400)
 
-
-
         elif self.path == '/api/paste/detect':
             # Smart paste detection — BIG-AGI style (스마트 붙여넣기)
             # GET version reads from query param
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             import urllib.parse
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
@@ -871,8 +905,6 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self._json({'error': 'Missing text parameter'}, 400)
 
-
-
         elif self.path == '/api/health':
             # K8s readiness/liveness probe compatible: 200=healthy, 503=unhealthy
             from salmalm.core.health import get_health_report
@@ -880,38 +912,34 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             status_code = 200 if report.get('status') == 'healthy' else 503
             self._json(report, status=status_code)
 
-
-
         elif self.path == '/api/check-update':
             try:
                 import urllib.request
                 resp = urllib.request.urlopen('https://pypi.org/pypi/salmalm/json', timeout=10)
                 data = json.loads(resp.read().decode())
-                latest = data.get('info', {}).get('version', VERSION)
+                latest = data.get('info', {}).get('version', VERSION)  # noqa: F405
                 is_exe = getattr(sys, 'frozen', False)
-                result = {'current': VERSION, 'latest': latest, 'exe': is_exe}
+                result = {'current': VERSION, 'latest': latest, 'exe': is_exe}  # noqa: F405
                 if is_exe:
                     result['download_url'] = 'https://github.com/hyunjun6928-netizen/salmalm/releases/latest'
                 self._json(result)
             except Exception as e:
-                self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
+                self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})  # noqa: F405
         elif self.path == '/api/update/check':
             # Alias for /api/check-update
             try:
                 import urllib.request
                 resp = urllib.request.urlopen('https://pypi.org/pypi/salmalm/json', timeout=10)
                 data = json.loads(resp.read().decode())
-                latest = data.get('info', {}).get('version', VERSION)
+                latest = data.get('info', {}).get('version', VERSION)  # noqa: F405
                 is_exe = getattr(sys, 'frozen', False)
-                result = {'current': VERSION, 'latest': latest, 'exe': is_exe,
-                          'update_available': latest != VERSION}
+                result = {'current': VERSION, 'latest': latest, 'exe': is_exe,  # noqa: F405
+                          'update_available': latest != VERSION}  # noqa: F405
                 if is_exe:
                     result['download_url'] = 'https://github.com/hyunjun6928-netizen/salmalm/releases/latest'
                 self._json(result)
             except Exception as e:
-                self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})
-
-
+                self._json({'current': VERSION, 'latest': None, 'error': str(e)[:100]})  # noqa: F405
 
         elif self.path == '/api/auth/users':
             user = extract_auth(dict(self.headers))
@@ -968,7 +996,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     'telegram_allowlist': user_manager.get_telegram_allowlist_mode(),
                 })
         elif self.path == '/api/google/auth':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             client_id = vault.get('google_client_id') or ''
             if not client_id:
                 self._json({'error': 'Set google_client_id in vault first (Settings > Vault)'}, 400)
@@ -1065,8 +1094,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         elif self.path in ('/icon-192.svg', '/icon-512.svg'):
             size = 192 if '192' in self.path else 512
             svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}">
-<rect width="{size}" height="{size}" rx="{size//6}" fill="#6366f1"/>
-<text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="{size//2}">😈</text>
+<rect width="{size}" height="{size}" rx="{size // 6}" fill="#6366f1"/>
+<text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="{size // 2}">😈</text>
 </svg>'''
             self.send_response(200)
             self._cors()
@@ -1075,7 +1104,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(svg.encode())
 
         elif self.path == '/sw.js':
-            _ver = VERSION  # already imported via wildcard at module level
+            _ver = VERSION  # already imported via wildcard at module level  # noqa: F405
             sw_js = f'''const CACHE='salmalm-v{_ver}';
 const STATIC_URLS=['/','/manifest.json','/icon-192.svg','/icon-512.svg'];
 self.addEventListener('install',e=>{{
@@ -1101,7 +1130,8 @@ self.addEventListener('fetch',e=>{{
             self.wfile.write(sw_js.encode())
 
         elif self.path == '/dashboard':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.templates import DASHBOARD_HTML
             self._html(DASHBOARD_HTML)
 
@@ -1112,8 +1142,9 @@ self.addEventListener('fetch',e=>{{
             # Serve uploaded files (images, audio) — basename-only to prevent traversal
             fname = Path(self.path.split('/uploads/', 1)[-1]).name
             if not fname:
-                self.send_error(400); return
-            upload_dir = (WORKSPACE_DIR / 'uploads').resolve()
+                self.send_error(400)
+                return
+            upload_dir = (WORKSPACE_DIR / 'uploads').resolve()  # noqa: F405
             fpath = (upload_dir / fname).resolve()
             if not str(fpath).startswith(str(upload_dir)) or not fpath.exists():
                 self.send_error(404)
@@ -1178,8 +1209,8 @@ self.addEventListener('fetch',e=>{{
         finally:
             duration = (time.time() - _start) * 1000
             request_logger.log_request('POST', self.path,
-                                        ip=self._get_client_ip(),
-                                        duration_ms=duration)
+                                       ip=self._get_client_ip(),
+                                       duration_ms=duration)
 
     # Max POST body size: 10MB
     _MAX_POST_SIZE = 10 * 1024 * 1024
@@ -1343,7 +1374,7 @@ self.addEventListener('fetch',e=>{{
 
         if self.path == '/api/setup':
             # First-run setup — create vault with or without password
-            if VAULT_FILE.exists():
+            if VAULT_FILE.exists():  # noqa: F405
                 self._json({'error': 'Already set up'}, 400)
                 return
             use_pw = body.get('use_password', False)
@@ -1362,11 +1393,14 @@ self.addEventListener('fetch',e=>{{
             return
 
         if self.path == '/api/do-update':
-            if not self._require_auth('admin'): return
+            if not self._require_auth('admin'):
+                return
             if self._get_client_ip() not in ('127.0.0.1', '::1', 'localhost'):
-                self._json({'error': 'Update only allowed from localhost'}, 403); return
+                self._json({'error': 'Update only allowed from localhost'}, 403)
+                return
             try:
-                import subprocess, sys
+                import subprocess
+                import sys
                 result = subprocess.run(
                     [sys.executable, '-m', 'pip', 'install', '--upgrade', '--no-cache-dir', 'salmalm'],
                     capture_output=True, text=True, timeout=60)
@@ -1385,10 +1419,13 @@ self.addEventListener('fetch',e=>{{
             return
 
         if self.path == '/api/restart':
-            if not self._require_auth('admin'): return
+            if not self._require_auth('admin'):
+                return
             if self._get_client_ip() not in ('127.0.0.1', '::1', 'localhost'):
-                self._json({'error': 'Restart only allowed from localhost'}, 403); return
-            import sys, subprocess
+                self._json({'error': 'Restart only allowed from localhost'}, 403)
+                return
+            import sys
+            import subprocess
             audit_log('restart', 'user-initiated restart')
             self._json({'ok': True, 'message': 'Restarting...'})
             # Restart the server process
@@ -1397,9 +1434,11 @@ self.addEventListener('fetch',e=>{{
 
         if self.path == '/api/update':
             # Alias for /api/do-update with WebSocket progress
-            if not self._require_auth('admin'): return
+            if not self._require_auth('admin'):
+                return
             if self._get_client_ip() not in ('127.0.0.1', '::1', 'localhost'):
-                self._json({'error': 'Update only allowed from localhost'}, 403); return
+                self._json({'error': 'Update only allowed from localhost'}, 403)
+                return
             try:
                 import subprocess
                 # Broadcast update start via WebSocket
@@ -1431,11 +1470,13 @@ self.addEventListener('fetch',e=>{{
             session_id = body.get('session_id', self.headers.get('X-Session-Id', 'web'))
             name = body.get('name', '')
             if not name:
-                self._json({'error': 'name required'}, 400); return
+                self._json({'error': 'name required'}, 400)
+                return
             from salmalm.prompt import switch_persona
             content = switch_persona(session_id, name)
             if content is None:
-                self._json({'error': f'Persona "{name}" not found'}, 404); return
+                self._json({'error': f'Persona "{name}" not found'}, 404)
+                return
             self._json({'ok': True, 'name': name, 'content': content})
             return
 
@@ -1443,7 +1484,8 @@ self.addEventListener('fetch',e=>{{
             name = body.get('name', '')
             content = body.get('content', '')
             if not name or not content:
-                self._json({'error': 'name and content required'}, 400); return
+                self._json({'error': 'name and content required'}, 400)
+                return
             from salmalm.prompt import create_persona
             ok = create_persona(name, content)
             if ok:
@@ -1455,7 +1497,8 @@ self.addEventListener('fetch',e=>{{
         if self.path == '/api/persona/delete':
             name = body.get('name', '')
             if not name:
-                self._json({'error': 'name required'}, 400); return
+                self._json({'error': 'name required'}, 400)
+                return
             from salmalm.prompt import delete_persona
             ok = delete_persona(name)
             if ok:
@@ -1472,23 +1515,23 @@ self.addEventListener('fetch',e=>{{
                     'https://api.anthropic.com/v1/messages',
                     {'x-api-key': vault.get('anthropic_api_key') or '',
                      'content-type': 'application/json', 'anthropic-version': '2023-06-01'},
-                    {'model': TEST_MODELS['anthropic'], 'max_tokens': 10,
+                    {'model': TEST_MODELS['anthropic'], 'max_tokens': 10,  # noqa: F405
                      'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
                 'openai': lambda: _http_post(
                     'https://api.openai.com/v1/chat/completions',
                     {'Authorization': 'Bearer ' + (vault.get('openai_api_key') or ''),
                      'Content-Type': 'application/json'},
-                    {'model': TEST_MODELS['openai'], 'max_tokens': 10,
+                    {'model': TEST_MODELS['openai'], 'max_tokens': 10,  # noqa: F405
                      'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
                 'xai': lambda: _http_post(
                     'https://api.x.ai/v1/chat/completions',
                     {'Authorization': 'Bearer ' + (vault.get('xai_api_key') or ''),
                      'Content-Type': 'application/json'},
-                    {'model': TEST_MODELS['xai'], 'max_tokens': 10,
+                    {'model': TEST_MODELS['xai'], 'max_tokens': 10,  # noqa: F405
                      'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
                 'google': lambda: (lambda k: __import__('urllib.request', fromlist=['urlopen']).urlopen(
                     __import__('urllib.request', fromlist=['Request']).Request(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={k}",
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={k}",  # noqa: F405
                         data=json.dumps({'contents': [{'parts': [{'text': 'ping'}]}]}).encode(),
                         headers={'Content-Type': 'application/json'}), timeout=15))(vault.get('google_api_key') or ''),
             }
@@ -1508,7 +1551,7 @@ self.addEventListener('fetch',e=>{{
 
         if self.path == '/api/unlock':
             password = body.get('password', '')
-            if VAULT_FILE.exists():
+            if VAULT_FILE.exists():  # noqa: F405
                 ok = vault.unlock(password)
             else:
                 vault.create(password)
@@ -1522,7 +1565,8 @@ self.addEventListener('fetch',e=>{{
                 self._json({'ok': False, 'error': 'Wrong password'}, 401)
 
         elif self.path == '/api/stt':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             audio_b64 = body.get('audio_base64', '')
             lang = body.get('language', 'ko')
             if not audio_b64:
@@ -1537,7 +1581,8 @@ self.addEventListener('fetch',e=>{{
                 self._json({'ok': False, 'error': str(e)}, 500)
 
         elif self.path == '/api/sessions/delete':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             sid = body.get('session_id', '')
             if not sid:
                 self._json({'ok': False, 'error': 'Missing session_id'}, 400)
@@ -1553,7 +1598,8 @@ self.addEventListener('fetch',e=>{{
             self._json({'ok': True})
 
         elif self.path == '/api/soul':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             content = body.get('content', '')
             from salmalm.prompt import set_user_soul, reset_user_soul
             if content.strip():
@@ -1565,7 +1611,8 @@ self.addEventListener('fetch',e=>{{
             return
 
         elif self.path == '/api/routing':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.engine import _save_routing_config, get_routing_config
             cfg = get_routing_config()
             for k in ('simple', 'moderate', 'complex'):
@@ -1576,14 +1623,16 @@ self.addEventListener('fetch',e=>{{
             return
 
         elif self.path == '/api/failover':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.engine import save_failover_config, get_failover_config
             save_failover_config(body)
             self._json({'ok': True, 'config': get_failover_config()})
             return
 
         elif self.path == '/api/sessions/rename':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             sid = body.get('session_id', '')
             title = body.get('title', '').strip()[:60]
             if not sid or not title:
@@ -1602,7 +1651,8 @@ self.addEventListener('fetch',e=>{{
             self._json({'ok': True})
 
         elif self.path == '/api/sessions/rollback':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             sid = body.get('session_id', '')
             count = int(body.get('count', 1))
             if not sid:
@@ -1613,7 +1663,8 @@ self.addEventListener('fetch',e=>{{
             self._json(result)
 
         elif self.path == '/api/messages/edit':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             sid = body.get('session_id', '')
             idx = body.get('message_index')
             content = body.get('content', '')
@@ -1625,7 +1676,8 @@ self.addEventListener('fetch',e=>{{
             self._json(result)
 
         elif self.path == '/api/messages/delete':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             sid = body.get('session_id', '')
             idx = body.get('message_index')
             if not sid or idx is None:
@@ -1636,7 +1688,8 @@ self.addEventListener('fetch',e=>{{
             self._json(result)
 
         elif self.path == '/api/sessions/branch':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             sid = body.get('session_id', '')
             message_index = body.get('message_index')
             if not sid or message_index is None:
@@ -1647,7 +1700,8 @@ self.addEventListener('fetch',e=>{{
             self._json(result)
 
         elif self.path == '/api/agents':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.agents import agent_manager
             action = body.get('action', '')
             if action == 'create':
@@ -1666,7 +1720,8 @@ self.addEventListener('fetch',e=>{{
                 self._json({'error': 'Unknown action. Use: create, delete, bind, switch'}, 400)
 
         elif self.path == '/api/hooks':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.hooks import hook_manager
             action = body.get('action', '')
             if action == 'add':
@@ -1685,7 +1740,8 @@ self.addEventListener('fetch',e=>{{
                 self._json({'error': 'Unknown action'}, 400)
 
         elif self.path == '/api/plugins/manage':
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.plugin_manager import plugin_manager
             action = body.get('action', '')
             if action == 'reload':
@@ -1702,7 +1758,8 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/chat/abort':
             # Abort generation — LibreChat style (생성 중지)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             session_id = body.get('session', body.get('session_id', 'web'))
             from salmalm.edge_cases import abort_controller
             abort_controller.set_abort(session_id)
@@ -1711,7 +1768,8 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/chat/regenerate':
             # Regenerate response — LibreChat style (응답 재생성)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             session_id = body.get('session_id', 'web')
             message_index = body.get('message_index')
             if message_index is None:
@@ -1733,7 +1791,8 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/chat/compare':
             # Compare models — BIG-AGI style (응답 비교)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             message = body.get('message', '')
             models = body.get('models', [])
             session_id = body.get('session_id', 'web')
@@ -1753,7 +1812,8 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/alternatives/switch':
             # Switch alternative — LibreChat style (대안 전환)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             session_id = body.get('session_id', '')
             message_index = body.get('message_index')
             alt_id = body.get('alt_id')
@@ -1779,7 +1839,8 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/bookmarks':
             # Add/remove bookmark — LobeChat style (북마크 추가/제거)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             action = body.get('action', 'add')
             session_id = body.get('session_id', '')
             message_index = body.get('message_index')
@@ -1802,7 +1863,8 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/groups':
             # Session group CRUD — LobeChat style (그룹 관리)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             action = body.get('action', 'create')
             from salmalm.edge_cases import session_groups
             if action == 'create':
@@ -1838,7 +1900,8 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/paste/detect':
             # Smart paste detection — BIG-AGI style (스마트 붙여넣기 감지)
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             text = body.get('text', '')
             if not text:
                 self._json({'error': 'Missing text'}, 400)
@@ -1877,6 +1940,7 @@ self.addEventListener('fetch',e=>{{
 
                 send_sse('status', {'text': '🤔 Thinking...'})
                 tool_count = [0]
+
                 def on_tool_sse(name, args):
                     tool_count[0] += 1
                     send_sse('tool', {'name': name, 'args': str(args)[:200], 'count': tool_count[0]})
@@ -1884,6 +1948,7 @@ self.addEventListener('fetch',e=>{{
 
                 # Token-by-token streaming callback (OpenClaw-style)
                 streamed_text = ['']
+
                 def on_token_sse(event):
                     try:
                         etype = event.get('type', '')
@@ -1918,8 +1983,8 @@ self.addEventListener('fetch',e=>{{
                 from salmalm.core import get_session as _gs2
                 _sess2 = _gs2(session_id)
                 send_sse('done', {'response': response,
-                                   'model': getattr(_sess2, 'last_model', router.force_model or 'auto'),
-                                   'complexity': getattr(_sess2, 'last_complexity', 'auto')})
+                                  'model': getattr(_sess2, 'last_model', router.force_model or 'auto'),
+                                  'complexity': getattr(_sess2, 'last_complexity', 'auto')})
                 try:
                     self.wfile.write(b"event: close\ndata: {}\n\n")
                     self.wfile.flush()
@@ -1939,7 +2004,7 @@ self.addEventListener('fetch',e=>{{
                 from salmalm.core import get_session as _gs
                 _sess = _gs(session_id)
                 self._json({'response': response, 'model': getattr(_sess, 'last_model', router.force_model or 'auto'),
-                             'complexity': getattr(_sess, 'last_complexity', 'auto')})
+                            'complexity': getattr(_sess, 'last_complexity', 'auto')})
 
         elif self.path == '/api/vault':
             if not vault.is_unlocked:
@@ -1988,7 +2053,8 @@ self.addEventListener('fetch',e=>{{
             try:
                 raw = self.rfile.read(length)
                 # Parse multipart using stdlib email.parser (robust edge-case handling)
-                import email.parser, email.policy
+                import email.parser
+                import email.policy
                 header_bytes = f"Content-Type: {content_type}\r\n\r\n".encode()
                 msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(header_bytes + raw)
                 for part in msg.walk():
@@ -2014,13 +2080,13 @@ self.addEventListener('fetch',e=>{{
                         self._json({'error': 'File too large (max 50MB)'}, 413)
                         return
                     # Save
-                    save_dir = WORKSPACE_DIR / 'uploads'
+                    save_dir = WORKSPACE_DIR / 'uploads'  # noqa: F405
                     save_dir.mkdir(exist_ok=True)
                     save_path = save_dir / fname
                     save_path.write_bytes(file_data)  # type: ignore[arg-type]
                     size_kb = len(file_data) / 1024
-                    is_image = any(fname.lower().endswith(ext) for ext in ('.png','.jpg','.jpeg','.gif','.webp','.bmp'))
-                    is_text = any(fname.lower().endswith(ext) for ext in ('.txt','.md','.py','.js','.json','.csv','.log','.html','.css','.sh','.bat','.yaml','.yml','.xml','.sql'))
+                    is_image = any(fname.lower().endswith(ext) for ext in ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'))
+                    is_text = any(fname.lower().endswith(ext) for ext in ('.txt', '.md', '.py', '.js', '.json', '.csv', '.log', '.html', '.css', '.sh', '.bat', '.yaml', '.yml', '.xml', '.sql'))
                     is_pdf = fname.lower().endswith('.pdf')
                     info = f'[{"🖼️ Image" if is_image else "📎 File"} uploaded: uploads/{fname} ({size_kb:.1f}KB)]'
                     if is_pdf:
@@ -2040,7 +2106,7 @@ self.addEventListener('fetch',e=>{{
                     log.info(f"[SEND] Web upload: {fname} ({size_kb:.1f}KB)")
                     audit_log('web_upload', fname)
                     resp = {'ok': True, 'filename': fname, 'size': len(file_data),
-                                'info': info, 'is_image': is_image}
+                            'info': info, 'is_image': is_image}
                     if is_image:
                         import base64
                         ext = fname.rsplit('.', 1)[-1].lower()
@@ -2077,33 +2143,33 @@ self.addEventListener('fetch',e=>{{
                 vault.set('ollama_url', ollama_url)
                 saved.append('ollama')
             # Test all provided keys
-            from salmalm.llm import _http_post
+            from salmalm.llm import _http_post  # noqa: F811
             test_results = []
             if body.get('anthropic_api_key'):
                 try:
                     _http_post('https://api.anthropic.com/v1/messages',
-                        {'x-api-key': body['anthropic_api_key'], 'content-type': 'application/json',
-                         'anthropic-version': '2023-06-01'},
-                        {'model': TEST_MODELS['anthropic'], 'max_tokens': 10,
-                         'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
+                               {'x-api-key': body['anthropic_api_key'], 'content-type': 'application/json',
+                                'anthropic-version': '2023-06-01'},
+                               {'model': TEST_MODELS['anthropic'], 'max_tokens': 10,  # noqa: F405
+                                'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
                     test_results.append('✅ Anthropic OK')
                 except Exception as e:
                     test_results.append(f'⚠️ Anthropic: {str(e)[:80]}')
             if body.get('openai_api_key'):
                 try:
                     _http_post('https://api.openai.com/v1/chat/completions',
-                        {'Authorization': f'Bearer {body["openai_api_key"]}', 'Content-Type': 'application/json'},
-                        {'model': TEST_MODELS['openai'], 'max_tokens': 10,
-                         'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
+                               {'Authorization': f'Bearer {body["openai_api_key"]}', 'Content-Type': 'application/json'},
+                               {'model': TEST_MODELS['openai'], 'max_tokens': 10,  # noqa: F405
+                                'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
                     test_results.append('✅ OpenAI OK')
                 except Exception as e:
                     test_results.append(f'⚠️ OpenAI: {str(e)[:80]}')
             if body.get('xai_api_key'):
                 try:
                     _http_post('https://api.x.ai/v1/chat/completions',
-                        {'Authorization': f'Bearer {body["xai_api_key"]}', 'Content-Type': 'application/json'},
-                        {'model': TEST_MODELS['xai'], 'max_tokens': 10,
-                         'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
+                               {'Authorization': f'Bearer {body["xai_api_key"]}', 'Content-Type': 'application/json'},
+                               {'model': TEST_MODELS['xai'], 'max_tokens': 10,  # noqa: F405
+                                'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
                     test_results.append('✅ xAI OK')
                 except Exception as e:
                     test_results.append(f'⚠️ xAI: {str(e)[:80]}')
@@ -2112,7 +2178,7 @@ self.addEventListener('fetch',e=>{{
                     import urllib.request
                     gk = body['google_api_key']
                     req = urllib.request.Request(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={gk}",
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={gk}",  # noqa: F405
                         data=json.dumps({'contents': [{'parts': [{'text': 'ping'}]}]}).encode(),
                         headers={'Content-Type': 'application/json'})
                     urllib.request.urlopen(req, timeout=15)
@@ -2264,7 +2330,8 @@ self.addEventListener('fetch',e=>{{
 
         elif self.path == '/api/sla/config':
             # Update SLA config (SLA 설정 업데이트)
-            if not self._require_auth('admin'): return
+            if not self._require_auth('admin'):
+                return
             from salmalm.sla import sla_config
             sla_config.update(body)
             self._json({'ok': True, 'config': sla_config.get_all()})
@@ -2294,7 +2361,8 @@ self.addEventListener('fetch',e=>{{
             self._json({'ok': True, 'id': tid})
 
         elif self.path in ('/api/llm-router/switch', '/api/model/switch'):
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             from salmalm.core.llm_router import llm_router
             model = body.get('model', '')
             if not model:
@@ -2304,7 +2372,8 @@ self.addEventListener('fetch',e=>{{
             self._json({'ok': '✅' in msg, 'message': msg, 'current_model': llm_router.current_model})
 
         elif self.path in ('/api/llm-router/test-key', '/api/test-provider'):
-            if not self._require_auth('user'): return
+            if not self._require_auth('user'):
+                return
             provider = body.get('provider', '')
             api_key = body.get('api_key', '')
             if not provider or not api_key:
@@ -2321,13 +2390,14 @@ self.addEventListener('fetch',e=>{{
                 old_val = os.environ.get(env_key)
                 os.environ[env_key] = api_key
             try:
-                import urllib.request, urllib.error
+                import urllib.request
+                import urllib.error
                 if provider == 'anthropic':
                     url = f"{prov_cfg['base_url']}/messages"
                     req = urllib.request.Request(url,
-                        data=json.dumps({'model': 'claude-haiku-3.5-20241022', 'max_tokens': 1, 'messages': [{'role': 'user', 'content': 'hi'}]}).encode(),
-                        headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'},
-                        method='POST')
+                                                 data=json.dumps({'model': 'claude-haiku-3.5-20241022', 'max_tokens': 1, 'messages': [{'role': 'user', 'content': 'hi'}]}).encode(),
+                                                 headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'},
+                                                 method='POST')
                 elif provider == 'ollama':
                     url = f"{prov_cfg['base_url']}/api/tags"
                     req = urllib.request.Request(url)
@@ -2358,8 +2428,3 @@ self.addEventListener('fetch',e=>{{
 
         else:
             self._json({'error': 'Not found'}, 404)
-
-
-
-
-

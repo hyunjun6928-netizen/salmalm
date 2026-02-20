@@ -13,15 +13,13 @@ from __future__ import annotations
 import json
 import math
 import os
-import shutil
 import sqlite3
 import threading
 import time
-import traceback
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from salmalm.constants import VERSION, KST, AUDIT_DB
 from salmalm.crypto import log
@@ -398,10 +396,10 @@ class LatencyTracker:
 
         if ttft_ms > ttft_target:
             log.warning(f"[SLA] TTFT {ttft_ms:.0f}ms exceeds target {ttft_target}ms "
-                       f"(model={model})")
+                        f"(model={model})")
         if total_ms > resp_target:
             log.warning(f"[SLA] Total response {total_ms:.0f}ms exceeds target {resp_target}ms "
-                       f"(model={model})")
+                        f"(model={model})")
 
     def should_failover(self) -> bool:
         """Check if consecutive timeouts warrant a model failover."""
@@ -615,7 +613,7 @@ class Watchdog:
 
     def _handle_issues(self, report: dict):
         """Handle detected issues: log, alert, attempt recovery."""
-        status = report['status']
+        _status = report['status']  # noqa: F841
         checks = report['checks']
 
         for name, check in checks.items():

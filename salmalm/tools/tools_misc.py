@@ -1,9 +1,16 @@
 """Misc tools: reminder, workflow, file_index, notification, weather, rss_reader."""
-import json, re, time, secrets, threading, subprocess, sys, urllib.request
+import json
+import re
+import time
+import secrets
+import threading
+import subprocess
+import sys
+import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 from salmalm.tool_registry import register
-from salmalm.constants import WORKSPACE_DIR, KST
+from salmalm.constants import WORKSPACE_DIR
 from salmalm.crypto import vault, log
 from salmalm.core import _tg_bot
 
@@ -154,12 +161,12 @@ def _send_notification_impl(message: str, title: str = '', channel: str = 'all',
         try:
             if sys.platform == 'darwin':
                 subprocess.run(['osascript', '-e',
-                    f'display notification "{message}" with title "{title or "SalmAlm"}"'],
-                    timeout=5, capture_output=True)
+                                f'display notification "{message}" with title "{title or "SalmAlm"}"'],
+                               timeout=5, capture_output=True)
                 results.append('desktop: ✅')
             elif sys.platform == 'linux':
                 subprocess.run(['notify-send', title or 'SalmAlm', message],
-                    timeout=5, capture_output=True)
+                               timeout=5, capture_output=True)
                 results.append('desktop: ✅')
             elif sys.platform == 'win32':
                 ps_cmd = f'''
@@ -171,7 +178,7 @@ def _send_notification_impl(message: str, title: str = '', channel: str = 'all',
                 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("SalmAlm").Show($toast)
                 '''
                 subprocess.run(['powershell', '-Command', ps_cmd],
-                    timeout=10, capture_output=True)
+                               timeout=10, capture_output=True)
                 results.append('desktop: ✅')
             else:
                 results.append('desktop: ⚠️ unsupported platform')
@@ -273,7 +280,7 @@ def handle_reminder(args: dict) -> str:
             _reminders.append(reminder)
             _save_reminders()
         return f"⏰ Reminder set: **{message}** at {trigger_time.strftime('%Y-%m-%d %H:%M')}" + \
-               (f" (repeat: {args['repeat']})" if args.get('repeat') else '')
+            (f" (repeat: {args['repeat']})" if args.get('repeat') else '')
 
     elif action == 'list':
         _load_reminders()
@@ -304,6 +311,7 @@ def handle_reminder(args: dict) -> str:
 
 _workflows_file = WORKSPACE_DIR / 'workflows.json'
 
+
 def _load_workflows() -> dict:
     if _workflows_file.exists():
         try:
@@ -311,6 +319,7 @@ def _load_workflows() -> dict:
         except Exception:
             pass
     return {}
+
 
 def _save_workflows(wf: dict):
     _workflows_file.write_text(json.dumps(wf, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -372,8 +381,8 @@ def handle_workflow(args: dict) -> str:
                     if var_name in context:
                         step_args[k] = context[var_name]
             result = execute_tool(tool_name, step_args)
-            results.append(f"Step {i+1} ({tool_name}): {result[:200]}")
-            output_var = step.get('output_var', f'step_{i+1}')
+            results.append(f"Step {i + 1} ({tool_name}): {result[:200]}")
+            output_var = step.get('output_var', f'step_{i + 1}')
             context[output_var] = result
         return '🔄 **Workflow Complete:**\n' + '\n'.join(results)
 
@@ -523,7 +532,7 @@ def handle_weather(args: dict) -> str:
                 hourly = day.get('hourly', [])
                 desc_day = ''
                 if hourly:
-                    mid = hourly[len(hourly)//2]
+                    mid = hourly[len(hourly) // 2]
                     desc_day = mid.get('lang_ko', [{}])[0].get('value', '') if lang == 'ko' else ''
                     desc_day = desc_day or mid.get('weatherDesc', [{}])[0].get('value', '')
                 lines.append(f'  • {date}: {min_t}~{max_t}°C {desc_day}')
@@ -537,6 +546,7 @@ def handle_weather(args: dict) -> str:
 
 _feeds_file = WORKSPACE_DIR / 'rss_feeds.json'
 
+
 def _load_feeds() -> dict:
     if _feeds_file.exists():
         try:
@@ -544,6 +554,7 @@ def _load_feeds() -> dict:
         except Exception:
             pass
     return {}
+
 
 def _save_feeds(feeds: dict):
     _feeds_file.write_text(json.dumps(feeds, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -572,7 +583,7 @@ def _parse_rss(xml_text: str) -> list:
             if t is not None and t.text:
                 title = t.text.strip()
             link = ''
-            l = entry.find('{http://www.w3.org/2005/Atom}link')
+            l = entry.find('{http://www.w3.org/2005/Atom}link')  # noqa: E741
             if l is not None:
                 link = l.get('href', '')
             pub = ''

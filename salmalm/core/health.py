@@ -9,15 +9,13 @@ from __future__ import annotations
 import os
 import threading
 import time
-from typing import Optional
 
 try:
     import resource as _resource
 except ImportError:
     _resource = None  # type: ignore[assignment]
 
-from salmalm.constants import VERSION, BASE_DIR, KST
-from salmalm.crypto import log
+from salmalm.constants import VERSION, BASE_DIR
 
 _start_time = time.time()
 

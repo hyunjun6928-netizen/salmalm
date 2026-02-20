@@ -342,7 +342,7 @@ class LLMRouter:
                 errors.append(f'{fb_prov}/{fb_model}: {e2}')
 
         return {
-            'content': f'❌ All providers failed:\n' + '\n'.join(errors),
+            'content': '❌ All providers failed:\n' + '\n'.join(errors),
             'tool_calls': [],
             'usage': {'input': 0, 'output': 0},
             'model': target_model,

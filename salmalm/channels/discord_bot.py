@@ -3,13 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-import hashlib
-import hmac
 import os
 import struct
 import ssl
-import threading
-import time
 import urllib.request
 import urllib.parse
 from typing import Optional, Dict, Any, Callable

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import time
 import threading
-from typing import Dict, Optional
+from typing import Dict
 
 
 class MessageDeduplicator:

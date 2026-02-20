@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
+from typing import Any, Dict, Generator, List, Optional
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -38,10 +38,10 @@ def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120
             log.error(f"HTTP {e.code}: {err_body[:300]}")
             if e.code == 401:
                 from salmalm.core.exceptions import AuthError
-                raise AuthError(f'Invalid API key (401). Please check your key.') from e
+                raise AuthError('Invalid API key (401). Please check your key.') from e
             elif e.code == 402:
                 from salmalm.core.exceptions import LLMError
-                raise LLMError(f'Insufficient API credits (402). Check billing info.') from e
+                raise LLMError('Insufficient API credits (402). Check billing info.') from e
             raise  # Let retry logic handle 429, 5xx, 529
 
     return retry_call(_do_post, max_attempts=3)
@@ -140,7 +140,7 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
             fb_model_id = FALLBACK_MODELS.get(fb_provider)
             if not fb_model_id:
                 continue
-            log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id} [after {time.time()-_t0:.2f}s]")
+            log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id} [after {time.time() - _t0:.2f}s]")
             try:
                 if not tools:
                     fb_tools = None
@@ -170,15 +170,15 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
 
 
 def _call_provider(provider: str, api_key: str, model_id: str,
-                    messages: List[Dict[str, Any]],
-                    tools: Optional[List[dict]], max_tokens: int,
-                    thinking: bool = False,
-                    timeout: int = 0) -> Dict[str, Any]:
+                   messages: List[Dict[str, Any]],
+                   tools: Optional[List[dict]], max_tokens: int,
+                   thinking: bool = False,
+                   timeout: int = 0) -> Dict[str, Any]:
     if not timeout:
         timeout = _LLM_TIMEOUT
     if provider == 'anthropic':
         return _call_anthropic(api_key, model_id, messages, tools, max_tokens,
-                                thinking=thinking, timeout=timeout)
+                               thinking=thinking, timeout=timeout)
     elif provider in ('openai', 'xai'):
         base_url = 'https://api.x.ai/v1' if provider == 'xai' else 'https://api.openai.com/v1'
         return _call_openai(api_key, model_id, messages, tools, max_tokens, base_url)
@@ -201,8 +201,8 @@ def _call_provider(provider: str, api_key: str, model_id: str,
 
 
 def _call_anthropic(api_key: str, model_id: str, messages: List[Dict[str, Any]],
-                     tools: Optional[List[dict]], max_tokens: int,
-                     thinking: bool = False, timeout: int = 0) -> Dict[str, Any]:
+                    tools: Optional[List[dict]], max_tokens: int,
+                    thinking: bool = False, timeout: int = 0) -> Dict[str, Any]:
     system_msgs = [m['content'] for m in messages if m['role'] == 'system']
     chat_msgs = [m for m in messages if m['role'] != 'system']
 
@@ -279,8 +279,8 @@ def _call_anthropic(api_key: str, model_id: str, messages: List[Dict[str, Any]],
 
 
 def _call_openai(api_key: str, model_id: str, messages: List[Dict[str, Any]],
-                  tools: Optional[List[dict]], max_tokens: int,
-                  base_url: str) -> Dict[str, Any]:
+                 tools: Optional[List[dict]], max_tokens: int,
+                 base_url: str) -> Dict[str, Any]:
     # Convert Anthropic-style image blocks to OpenAI format
     converted_msgs = []
     for m in messages:
@@ -325,7 +325,7 @@ def _call_openai(api_key: str, model_id: str, messages: List[Dict[str, Any]],
 
 
 def _call_google(api_key: str, model_id: str, messages: List[Dict[str, Any]],
-                  max_tokens: int, tools: Optional[List[dict]] = None) -> Dict[str, Any]:
+                 max_tokens: int, tools: Optional[List[dict]] = None) -> Dict[str, Any]:
     # Gemini API — with optional tool support
     merged = _build_gemini_contents(messages)
     body: dict = {
@@ -348,7 +348,7 @@ def _call_google(api_key: str, model_id: str, messages: List[Dict[str, Any]],
             elif 'functionCall' in part:
                 fc = part['functionCall']
                 tool_calls.append({
-                    'id': f"google_{fc['name']}_{int(time.time()*1000)}",
+                    'id': f"google_{fc['name']}_{int(time.time() * 1000)}",
                     'name': fc['name'],
                     'arguments': fc.get('args', {})
                 })
@@ -468,7 +468,7 @@ def stream_google(messages: List[Dict[str, Any]], model: Optional[str] = None,
                             yield {'type': 'text_delta', 'text': text}
                         elif 'functionCall' in part:
                             fc = part['functionCall']
-                            tc_id = f"google_{fc['name']}_{int(time.time()*1000)}"
+                            tc_id = f"google_{fc['name']}_{int(time.time() * 1000)}"
                             args = fc.get('args', {})
                             tool_calls.append({
                                 'id': tc_id, 'name': fc['name'],

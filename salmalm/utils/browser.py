@@ -29,7 +29,6 @@ import base64
 import json
 import os
 import struct
-import hashlib
 import subprocess
 import tempfile
 import time
@@ -492,7 +491,7 @@ class BrowserManager:
 
     async def launch(self, url: str = "about:blank", headless: bool = True) -> bool:
         """Launch Chrome and connect via CDP."""
-        import os as _os
+        import os as _os  # noqa: F401
         chrome = self.find_chrome()
         if not chrome:
             log.error("[BROWSER] No Chrome/Chromium found")

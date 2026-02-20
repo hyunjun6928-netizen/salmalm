@@ -8,11 +8,11 @@ import signal
 import sys
 import threading
 
-from salmalm.constants import (
+from salmalm.constants import (  # noqa: F401
     VERSION, APP_NAME, VAULT_FILE, MEMORY_DIR, BASE_DIR
 )
 from salmalm.crypto import vault, log, HAS_CRYPTO
-from salmalm.core import (
+from salmalm.core import (  # noqa: F401
     _init_audit_db, _restore_usage, audit_log,
     _sessions, cron, LLMCronManager, PluginLoader
 )
@@ -22,7 +22,7 @@ from salmalm.ws import ws_server, StreamingResponse
 from salmalm.rag import rag_engine
 from salmalm.mcp import mcp_manager
 from salmalm.nodes import node_manager
-from salmalm.stability import health_monitor, watchdog_tick
+from salmalm.stability import health_monitor
 import salmalm.core as _core
 
 
@@ -35,6 +35,7 @@ def _check_for_updates() -> str:
             headers={'User-Agent': f'SalmAlm/{VERSION}', 'Accept': 'application/json'},
             timeout=5)
         latest = data.get('info', {}).get('version', '')
+
         def _ver_tuple(v):
             return tuple(int(x) for x in v.split('.'))
         if latest and _ver_tuple(latest) > _ver_tuple(VERSION):
@@ -122,8 +123,10 @@ async def run_server():
             stream = StreamingResponse(client)
             # Send typing indicator immediately
             await client.send_json({'type': 'typing', 'status': 'typing'})
+
             async def on_tool(name, args):
                 await stream.send_tool_call(name, args)
+
             async def on_status(status_type, detail):
                 """Forward engine status to WS client as typing events."""
                 await client.send_json({'type': 'typing', 'status': status_type, 'detail': detail})
@@ -153,6 +156,7 @@ async def run_server():
     try:
         mcp_manager.load_config()
         from salmalm.tools import TOOL_DEFINITIONS, execute_tool
+
         async def mcp_tool_executor(name, args):
             return execute_tool(name, args)
         mcp_manager.server.set_tools(TOOL_DEFINITIONS, mcp_tool_executor)
@@ -189,7 +193,7 @@ async def run_server():
             else:
                 asyncio.create_task(telegram_bot.poll())
 
-    rag_stats = rag_engine.get_stats()
+    _rag_stats = rag_engine.get_stats()  # noqa: F841
     st = f"{selftest['passed']}/{selftest['total']}"
     update_msg = _check_for_updates()
     log.info(

@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import json
-import os
 import re
-import time
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -57,7 +55,7 @@ class PatternAnalyzer:
     @staticmethod
     def analyze_length_preference(messages: List[Dict]) -> str:
         """Analyze if user prefers concise or detailed responses.
-        
+
         Looks at user message lengths and feedback signals about length.
         Returns 'concise', 'detailed', or 'mixed'.
         """
@@ -100,13 +98,13 @@ class PatternAnalyzer:
     @staticmethod
     def analyze_time_patterns(messages: List[Dict]) -> Dict[str, str]:
         """Analyze conversation tone by time of day.
-        
+
         Returns dict like {hour_range: mood_tendency}.
         """
         time_moods: Dict[str, List[str]] = {
             'dawn': [],      # 0-6
             'morning': [],   # 7-11
-            'afternoon': [], # 12-17
+            'afternoon': [],  # 12-17
             'evening': [],   # 18-23
         }
 
@@ -198,7 +196,7 @@ class PatternAnalyzer:
     @staticmethod
     def analyze_code_comment_preference(messages: List[Dict]) -> Optional[str]:
         """Detect if user prefers or dislikes code comments.
-        
+
         Returns 'prefer', 'dislike', or None.
         """
         prefer = 0
@@ -243,7 +241,7 @@ class PromptEvolver:
     def _save_state(self):
         _ensure_dir()
         EVOLUTION_FILE.write_text(json.dumps(self.state, ensure_ascii=False, indent=2),
-                                   encoding='utf-8')
+                                  encoding='utf-8')
 
     def record_conversation(self, messages: List[Dict]):
         """Record a conversation for pattern analysis."""
@@ -266,7 +264,7 @@ class PromptEvolver:
         prefs['topic_frequency'] = existing_topics
 
         prefs['language_ratio'] = self.analyzer.analyze_language_ratio(messages)
-        
+
         feedback = self.analyzer.analyze_feedback_signals(messages)
         existing_fb = prefs.get('feedback', {'positive': 0, 'negative': 0})
         prefs['feedback'] = {
@@ -351,8 +349,8 @@ class PromptEvolver:
         section = (
             '\n\n<!-- auto-evolved-begin -->\n'
             '## 🧬 Auto-Evolved Rules\n'
-            + '\n'.join(rule_lines) +
-            '\n<!-- auto-evolved-end -->\n'
+            + '\n'.join(rule_lines)
+            + '\n<!-- auto-evolved-end -->\n'
         )
 
         content = content.rstrip() + section

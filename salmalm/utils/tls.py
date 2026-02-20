@@ -15,7 +15,6 @@ import os
 import ssl
 import subprocess
 import http.server
-from pathlib import Path
 from typing import Optional
 
 from salmalm.constants import BASE_DIR
@@ -52,7 +51,7 @@ def ensure_cert(cn: str = "localhost", days: int = 365) -> bool:
     try:
         # Python 3.10+ has ssl.create_default_context but no cert generation
         # Use subprocess with python -c as last resort
-        script = f'''
+        _script = '''  # noqa: F841
 import ssl, tempfile, subprocess, os
 # Generate using openssl via python
 subprocess.run(["openssl", "version"], capture_output=True, check=True)

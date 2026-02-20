@@ -9,17 +9,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import shutil
-import sqlite3
-import time
 import zipfile
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from salmalm.constants import VERSION, BASE_DIR, MEMORY_DIR, SOUL_FILE, VAULT_FILE, KST
+from salmalm.constants import VERSION, BASE_DIR, MEMORY_DIR, VAULT_FILE, KST
 from salmalm.crypto import log
 
 # ── Paths ──────────────────────────────────────────────────────
@@ -163,7 +159,7 @@ class AgentExporter:
     def _export_soul(self, zf: zipfile.ZipFile):
         """Export SOUL.md."""
         try:
-            from salmalm.prompt import get_user_soul, USER_SOUL_FILE
+            from salmalm.prompt import get_user_soul, USER_SOUL_FILE  # noqa: F401
             soul = get_user_soul()
             if soul:
                 zf.writestr('soul/SOUL.md', soul)
@@ -312,6 +308,7 @@ class AgentExporter:
 
 class ImportResult:
     """Result of an import operation."""
+
     def __init__(self):
         self.ok: bool = True
         self.imported: List[str] = []
@@ -648,7 +645,7 @@ def quick_sync_export() -> dict:
 
     # Active persona
     try:
-        from salmalm.prompt import get_active_persona
+        from salmalm.prompt import get_active_persona  # noqa: F811
         data['persona'] = get_active_persona('default')
     except Exception:
         data['persona'] = 'default'

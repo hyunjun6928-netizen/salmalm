@@ -1,7 +1,7 @@
 """SalmAlm Channel Router — Multi-channel message routing."""
 from __future__ import annotations
 
-import json, os, time, textwrap
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -10,10 +10,10 @@ from salmalm import log
 # ── Channel format rules ──
 CHANNEL_FORMAT: Dict[str, Dict[str, Any]] = {
     'telegram': {'max_chars': 4096, 'markdown': 'MarkdownV2', 'code_fence': True},
-    'discord':  {'max_chars': 2000, 'max_lines': 17, 'markdown': 'discord', 'no_tables': True},
-    'slack':    {'max_chars': 40000, 'markdown': 'mrkdwn', 'no_tables': True},
-    'web':      {'max_chars': None, 'markdown': 'full'},
-    'webhook':  {'max_chars': 65536, 'markdown': 'full'},
+    'discord': {'max_chars': 2000, 'max_lines': 17, 'markdown': 'discord', 'no_tables': True},
+    'slack': {'max_chars': 40000, 'markdown': 'mrkdwn', 'no_tables': True},
+    'web': {'max_chars': None, 'markdown': 'full'},
+    'webhook': {'max_chars': 65536, 'markdown': 'full'},
 }
 
 CONFIG_DIR = Path.home() / '.salmalm'
@@ -38,7 +38,7 @@ def format_for_channel(text: str, channel: str) -> str:
 
     # Strip tables if channel doesn't support them
     if fmt.get('no_tables'):
-        import re
+        import re  # noqa: F401
         lines = text.split('\n')
         out: List[str] = []
         for line in lines:

@@ -71,29 +71,29 @@ def process_uploaded_file(filename: str, data: bytes) -> str:
 
     if ext == 'pdf':
         text = extract_pdf_text(data)
-        return f'📄 **{filename}** ({len(data)/1024:.1f}KB)\n```\n{text[:10000]}\n```'
+        return f'📄 **{filename}** ({len(data) / 1024:.1f}KB)\n```\n{text[:10000]}\n```'
 
     if ext in ('txt', 'md', 'log', 'sh', 'bat', 'sql'):
         text = data.decode('utf-8', errors='replace')[:10000]
-        return f'📄 **{filename}** ({len(data)/1024:.1f}KB)\n```\n{text}\n```'
+        return f'📄 **{filename}** ({len(data) / 1024:.1f}KB)\n```\n{text}\n```'
 
     if ext in ('py', 'js', 'ts', 'html', 'css', 'yaml', 'yml', 'xml'):
         text = data.decode('utf-8', errors='replace')[:10000]
-        return f'📄 **{filename}** ({len(data)/1024:.1f}KB)\n```{ext}\n{text}\n```'
+        return f'📄 **{filename}** ({len(data) / 1024:.1f}KB)\n```{ext}\n{text}\n```'
 
     if ext == 'csv':
         text = data.decode('utf-8', errors='replace')
         lines = text.split('\n')[:100]
         preview = '\n'.join(lines)
-        return f'📊 **{filename}** ({len(data)/1024:.1f}KB, {len(text.split(chr(10)))} rows)\n```csv\n{preview}\n```'
+        return f'📊 **{filename}** ({len(data) / 1024:.1f}KB, {len(text.split(chr(10)))} rows)\n```csv\n{preview}\n```'
 
     if ext == 'json':
         text = data.decode('utf-8', errors='replace')
         try:
             parsed = json.loads(text)
             pretty = json.dumps(parsed, indent=2, ensure_ascii=False)[:10000]
-            return f'📋 **{filename}** ({len(data)/1024:.1f}KB)\n```json\n{pretty}\n```'
+            return f'📋 **{filename}** ({len(data) / 1024:.1f}KB)\n```json\n{pretty}\n```'
         except json.JSONDecodeError:
-            return f'📋 **{filename}** ({len(data)/1024:.1f}KB)\n```json\n{text[:10000]}\n```'
+            return f'📋 **{filename}** ({len(data) / 1024:.1f}KB)\n```json\n{text[:10000]}\n```'
 
-    return f'📎 **{filename}** ({len(data)/1024:.1f}KB) — binary file, content not displayed.'
+    return f'📎 **{filename}** ({len(data) / 1024:.1f}KB) — binary file, content not displayed.'

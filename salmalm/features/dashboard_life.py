@@ -6,13 +6,11 @@ mood, and saved links into a single dashboard view (JSON + HTML + chat commands)
 import json
 import sqlite3
 import threading
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from salmalm.constants import BASE_DIR, KST
-from salmalm import log
 from salmalm.utils.db import connect as _connect_db
 
 _DB_PATH = BASE_DIR / 'personal.db'
@@ -83,7 +81,7 @@ class LifeDashboard:
             with open(reminders_path) as f:
                 data = json.load(f)
             pending = []
-            now = datetime.now(KST).isoformat()
+            _now = datetime.now(KST).isoformat()  # noqa: F841
             for r in data if isinstance(data, list) else data.get('reminders', []):
                 if not r.get('done', False):
                     pending.append({
@@ -241,12 +239,12 @@ class LifeDashboard:
 
         task_items = ''.join(f'<li>{_esc(t["text"][:80])}</li>' for t in tasks[:10])
         thought_items = ''.join(
-            f'<li>{_esc(t["content"][:120])}<br><small>{_esc(t.get("created_at",""))}</small></li>'
+            f'<li>{_esc(t["content"][:120])}<br><small>{_esc(t.get("created_at", ""))}</small></li>'
             for t in thoughts
         )
         link_items = ''.join(
             f'<li><a href="{_esc(l["url"])}">{_esc(l["title"] or l["url"][:40])}</a></li>'
-            for l in links
+            for l in links  # noqa: E741
         )
         cat_rows = ''.join(
             f'<tr><td>{_esc(c)}</td><td>{a:,.0f}원</td></tr>'

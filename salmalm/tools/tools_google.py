@@ -1,8 +1,10 @@
 """Google tools: google_calendar, gmail."""
-import json, base64, urllib.request
+import json
+import base64
+import urllib.request
 from datetime import datetime
 from salmalm.tool_registry import register
-from salmalm.crypto import vault, log
+from salmalm.crypto import vault
 
 
 def _google_oauth_headers() -> dict:

@@ -5,11 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple  # noqa: F401
 
 from salmalm.constants import (VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG,
-                        INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN,
-                        MODEL_ALIASES as _CONST_ALIASES, COMMAND_MODEL)
+                               INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN,
+                               MODEL_ALIASES as _CONST_ALIASES, COMMAND_MODEL)
 import re as _re
 import threading as _threading
 import time as _time
@@ -20,17 +20,17 @@ _shutting_down = False
 _active_requests = 0
 _active_requests_lock = _threading.Lock()
 _active_requests_event = _threading.Event()  # signaled when _active_requests == 0
-from salmalm.core import router, compact_messages, get_session, _sessions, _metrics, compact_session, auto_compact_if_needed, audit_log
+from salmalm.core import router, compact_messages, get_session, _sessions, _metrics, compact_session, auto_compact_if_needed, audit_log  # noqa: F401
 from salmalm.prompt import build_system_prompt
 from salmalm.tool_handlers import execute_tool
 
 # ── Imports from extracted modules ──
-from salmalm.session_manager import (
+from salmalm.session_manager import (  # noqa: F401
     _should_prune_for_cache, _record_api_call_time, prune_context,
     _has_image_block, _soft_trim,
     _PRUNE_KEEP_LAST_ASSISTANTS, _PRUNE_SOFT_LIMIT, _PRUNE_HARD_LIMIT, _PRUNE_HEAD,
 )
-from salmalm.llm_loop import (
+from salmalm.llm_loop import (  # noqa: F401
     _call_llm_async, _call_llm_streaming,
     _load_failover_config, _load_cooldowns, _save_cooldowns,
     _is_model_cooled_down, _record_model_failure, _clear_model_cooldown,
@@ -52,10 +52,10 @@ _SIMPLE_PATTERNS = _re.compile(
     r'^(안녕|hi|hello|hey|ㅎㅇ|ㅎㅎ|ㄱㅅ|고마워|감사|ㅋㅋ|ㅎㅎ|ok|lol|yes|no|네|아니|응|ㅇㅇ|뭐해|잘자|굿|bye|잘가|좋아|ㅠㅠ|ㅜㅜ|오|와|대박|진짜|뭐|어|음|흠|뭐야|왜|어떻게|언제|어디|누구|얼마)[\?!？！.\s]*$',
     _re.IGNORECASE)
 _MODERATE_KEYWORDS = ['분석', '리뷰', '요약', '코드', 'code', 'analyze', 'review', 'summarize',
-                       'summary', 'compare', '비교', 'refactor', '리팩', 'debug', '디버그',
-                       'explain', '설명', '번역', 'translate']
+                      'summary', 'compare', '비교', 'refactor', '리팩', 'debug', '디버그',
+                      'explain', '설명', '번역', 'translate']
 _COMPLEX_KEYWORDS = ['설계', '아키텍처', 'architecture', 'design', 'system design',
-                      'from scratch', '처음부터', '전체', 'migration', '마이그레이션']
+                     'from scratch', '처음부터', '전체', 'migration', '마이그레이션']
 
 from salmalm.constants import MODELS as _MODELS
 import json as _json
@@ -63,6 +63,7 @@ from pathlib import Path as _Path
 
 # Routing config: user can override which model to use for each complexity level
 _ROUTING_CONFIG_FILE = _Path.home() / '.salmalm' / 'routing.json'
+
 
 def _load_routing_config() -> dict:
     """Load user's model routing config. Returns {simple, moderate, complex} model IDs."""
@@ -77,6 +78,7 @@ def _load_routing_config() -> dict:
         pass
     return defaults
 
+
 def _save_routing_config(config: dict):
     """Save user's model routing config."""
     try:
@@ -85,9 +87,11 @@ def _save_routing_config(config: dict):
     except Exception:
         pass
 
+
 def get_routing_config() -> dict:
     """Public getter for routing config (used by web API)."""
     return _load_routing_config()
+
 
 def _select_model(message: str, session) -> tuple:
     """Select optimal model based on message complexity.
@@ -146,25 +150,25 @@ class TaskClassifier:
     # Intent categories with weighted keywords
     INTENTS = {
         'code': {'keywords': ['code', '코드', 'implement', '구현', 'function', 'class',
-                               'bug', '버그', 'fix', '수정', 'refactor', '리팩', 'debug', '디버그',
-                               'API', 'server', '서버', 'deploy', '배포', 'build', '빌드',
-                               '개발', '코딩', '프로그래밍'],
+                              'bug', '버그', 'fix', '수정', 'refactor', '리팩', 'debug', '디버그',
+                              'API', 'server', '서버', 'deploy', '배포', 'build', '빌드',
+                              '개발', '코딩', '프로그래밍'],
                  'tier': 3, 'thinking': True},
         'analysis': {'keywords': ['analyze', '분석', 'compare', '비교', 'review', '리뷰',
-                                   'audit', '감사', 'security', '보안', 'performance', '성능',
-                                   '검토', '조사', '평가', '진단'],
+                                  'audit', '감사', 'security', '보안', 'performance', '성능',
+                                  '검토', '조사', '평가', '진단'],
                      'tier': 3, 'thinking': True},
         'creative': {'keywords': ['write', '작성', 'story', '이야기', 'poem', '시',
-                                   'translate', '번역', 'summarize', '요약', '글'],
+                                  'translate', '번역', 'summarize', '요약', '글'],
                      'tier': 2, 'thinking': False},
         'search': {'keywords': ['search', '검색', 'find', '찾', 'news', '뉴스',
-                                 'latest', '최신', 'weather', '날씨', 'price', '가격'],
+                                'latest', '최신', 'weather', '날씨', 'price', '가격'],
                    'tier': 2, 'thinking': False},
         'system': {'keywords': ['file', '파일', 'exec', 'run', '실행', 'install', '설치',
-                                 'process', '프로세스', 'disk', '디스크', 'memory', '메모리'],
+                                'process', '프로세스', 'disk', '디스크', 'memory', '메모리'],
                    'tier': 2, 'thinking': False},
         'memory': {'keywords': ['remember', '기억', 'memo', '메모', 'record', '기록',
-                                 'diary', '일지', 'learn', '학습'],
+                                'diary', '일지', 'learn', '학습'],
                    'tier': 1, 'thinking': False},
         'chat': {'keywords': [], 'tier': 1, 'thinking': False},
     }
@@ -484,8 +488,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         return False
 
     async def _call_with_failover(self, messages, model, tools=None,
-                                   max_tokens=4096, thinking=False,
-                                   on_token=None, on_status=None):
+                                  max_tokens=4096, thinking=False,
+                                  on_token=None, on_status=None):
         """LLM call with automatic failover on failure. Delegates to llm_loop."""
         return await _call_with_failover_fn(
             messages, model, tools=tools, max_tokens=max_tokens,
@@ -529,12 +533,13 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         # PHASE 2: EXECUTE — tool loop
         try:
-          return await self._execute_loop(session, user_message, model_override,  # type: ignore[no-any-return]
-                                           on_tool, classification, tier,
-                                           on_token=on_token, on_status=on_status)
+            return await self._execute_loop(session, user_message, model_override,  # type: ignore[no-any-return]
+                                            on_tool, classification, tier,
+                                            on_token=on_token, on_status=on_status)
         except Exception as e:
             log.error(f"Engine.run error: {e}")
-            import traceback; traceback.print_exc()
+            import traceback
+            traceback.print_exc()
             error_msg = f'❌ Processing error: {type(e).__name__}: {e}'
             session.add_assistant(error_msg)
             # Fire on_error hook (에러 발생 훅)
@@ -550,10 +555,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     MAX_CONSECUTIVE_ERRORS = 3
 
     async def _execute_loop(self, session, user_message, model_override,
-                             on_tool, classification, tier, on_token=None,
-                             on_status=None):
+                            on_tool, classification, tier, on_token=None,
+                            on_status=None):
         use_thinking = classification['thinking'] or getattr(session, 'thinking_enabled', False)
-        thinking_budget = classification['thinking_budget'] or (10000 if use_thinking else 0)
+        _thinking_budget = classification['thinking_budget'] or (10000 if use_thinking else 0)  # noqa: F841
         iteration = 0
         consecutive_errors = 0
         _session_id = getattr(session, 'id', '')
@@ -637,7 +642,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     log.warning(f"[CUT] Force-truncated: {msg_count} -> {len(session.messages)} msgs")
                     # Retry with truncated context
                     result = await _call_llm_async(session.messages, model=model, tools=tools,
-                                      thinking=think_this_call)
+                                                   thinking=think_this_call)
                     if result.get('error') == 'token_overflow':
                         # Still too long — nuclear option: keep only last 4
                         session.messages = (system_msgs or []) + session.messages[-4:]
@@ -668,7 +673,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 'iteration': iteration,
             }
             if usage.get('input', 0) or usage.get('output', 0):
-                audit_log('api_call', f"{model} in={usage.get('input',0)} out={usage.get('output',0)}",
+                audit_log('api_call', f"{model} in={usage.get('input', 0)} out={usage.get('output', 0)}",
                           detail_dict=api_detail)
                 # Detailed usage tracking (LibreChat style)
                 try:
@@ -777,8 +782,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     {'role': 'user', 'content': 'Evaluate and improve if needed.'}
                 ]
                 reflect_result = await _call_llm_async(reflect_msgs,
-                                           model=router._pick_available(2),
-                                           max_tokens=4000)
+                                                       model=router._pick_available(2),
+                                                       max_tokens=4000)
                 improved = reflect_result.get('content', '')
                 if improved and len(improved) > len(response) * 0.5 and len(improved) > 50:
                     # Only use reflection if it's substantive and not a degradation
@@ -847,21 +852,21 @@ async def process_message(session_id: str, user_message: str,
 
     try:
         return await _process_message_inner(session_id, user_message,
-                                             model_override=model_override,
-                                             image_data=image_data,
-                                             on_tool=on_tool,
-                                             on_token=on_token,
-                                             on_status=on_status)
+                                            model_override=model_override,
+                                            image_data=image_data,
+                                            on_tool=on_tool,
+                                            on_token=on_token,
+                                            on_status=on_status)
     except Exception as e:
         log.error(f"[ENGINE] Unhandled error: {type(e).__name__}: {e}")
-        import traceback; traceback.print_exc()
+        import traceback
+        traceback.print_exc()
         return f'❌ Internal error / 내부 오류: {type(e).__name__}. Please try again.'
     finally:
         with _active_requests_lock:
             _active_requests -= 1
             if _active_requests == 0:
                 _active_requests_event.set()
-
 
 
 # ============================================================
@@ -871,6 +876,7 @@ async def process_message(session_id: str, user_message: str,
 def _cmd_clear(cmd, session, **_):
     session.messages = [m for m in session.messages if m['role'] == 'system'][:1]
     return 'Conversation cleared.'
+
 
 def _cmd_help(cmd, session, **_):
     from salmalm.tools import TOOL_DEFINITIONS
@@ -907,8 +913,10 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
 
 💡 **Tip**: Just speak naturally. Read a file, search the web, write code, etc."""
 
+
 def _cmd_status(cmd, session, **_):
     return execute_tool('usage_report', {})
+
 
 def _cmd_tools(cmd, session, **_):
     from salmalm.tools import TOOL_DEFINITIONS
@@ -916,6 +924,7 @@ def _cmd_tools(cmd, session, **_):
     for t in TOOL_DEFINITIONS:
         lines.append(f"• **{t['name']}** — {t['description'][:60]}")
     return '\n'.join(lines)
+
 
 async def _cmd_think(cmd, session, *, on_tool=None, **_):
     think_msg = cmd[7:].strip()
@@ -931,8 +940,9 @@ async def _cmd_think(cmd, session, *, on_tool=None, **_):
     classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
                       'thinking_budget': 16000, 'score': 5}
     return await _engine.run(session, think_msg,
-                              model_override=COMMAND_MODEL,
-                              on_tool=on_tool, classification=classification)
+                             model_override=COMMAND_MODEL,
+                             on_tool=on_tool, classification=classification)
+
 
 async def _cmd_plan(cmd, session, *, model_override=None, on_tool=None, **_):
     plan_msg = cmd[6:].strip()
@@ -943,16 +953,17 @@ async def _cmd_plan(cmd, session, *, model_override=None, on_tool=None, **_):
     classification = {'intent': 'code', 'tier': 3, 'thinking': True,
                       'thinking_budget': 10000, 'score': 5}
     return await _engine.run(session, plan_msg, model_override=model_override,
-                              on_tool=on_tool, classification=classification)
+                             on_tool=on_tool, classification=classification)
+
 
 def _cmd_uptime(cmd, session, **_):
-    from salmalm.sla import uptime_monitor, sla_config
+    from salmalm.sla import uptime_monitor, sla_config  # noqa: F401
     stats = uptime_monitor.get_stats()
     target = stats['target_pct']
     pct = stats['monthly_uptime_pct']
     status_icon = '🟢' if pct >= target else ('🟡' if pct >= 99.0 else '🔴')
     lines = [
-        f'📊 **SalmAlm Uptime** / 업타임 현황\n',
+        '📊 **SalmAlm Uptime** / 업타임 현황\n',
         f'{status_icon} Current uptime: **{stats["uptime_human"]}**',
         f'📅 Month ({stats["month"]}): **{pct}%** (target: {target}%)',
         f'📅 Today: **{stats["daily_uptime_pct"]}%**',
@@ -965,6 +976,7 @@ def _cmd_uptime(cmd, session, **_):
             dur = f'{inc["duration_sec"]:.0f}s' if inc['duration_sec'] else '?'
             lines.append(f'  • {inc["start"][:19]} — {inc["reason"]} ({dur})')
     return '\n'.join(lines)
+
 
 def _cmd_latency(cmd, session, **_):
     from salmalm.sla import latency_tracker
@@ -987,6 +999,7 @@ def _cmd_latency(cmd, session, **_):
         lines.append(f'⚠️ Consecutive timeouts: {stats["consecutive_timeouts"]}')
     return '\n'.join(lines)
 
+
 def _cmd_health_detail(cmd, session, **_):
     from salmalm.sla import watchdog
     report = watchdog.get_detailed_health()
@@ -1006,6 +1019,7 @@ def _cmd_health_detail(cmd, session, **_):
         lines.append(f'{ci} {name}: {s}{extra}')
     return '\n'.join(lines)
 
+
 def _cmd_prune(cmd, session, **_):
     _, stats = prune_context(session.messages)
     total = stats['soft_trimmed'] + stats['hard_cleared'] + stats['unchanged']
@@ -1014,6 +1028,7 @@ def _cmd_prune(cmd, session, **_):
             f"• Hard-cleared: {stats['hard_cleared']}\n"
             f"• Unchanged: {stats['unchanged']}\n"
             f"• Total tool results scanned: {total}")
+
 
 def _cmd_usage_daily(cmd, session, **_):
     from salmalm.edge_cases import usage_tracker
@@ -1027,6 +1042,7 @@ def _cmd_usage_daily(cmd, session, **_):
                      f"${r['cost']:.4f} ({r['calls']} calls)")
     return '\n'.join(lines)
 
+
 def _cmd_usage_monthly(cmd, session, **_):
     from salmalm.edge_cases import usage_tracker
     report = usage_tracker.monthly_report()
@@ -1039,6 +1055,7 @@ def _cmd_usage_monthly(cmd, session, **_):
                      f"${r['cost']:.4f} ({r['calls']} calls)")
     return '\n'.join(lines)
 
+
 def _cmd_bookmarks(cmd, session, **_):
     from salmalm.edge_cases import bookmark_manager
     bms = bookmark_manager.list_all(limit=20)
@@ -1049,6 +1066,7 @@ def _cmd_bookmarks(cmd, session, **_):
         lines.append(f"• [{b['session_id']}#{b['message_index']}] "
                      f"{b['preview'][:60]}{'...' if len(b.get('preview', '')) > 60 else ''}")
     return '\n'.join(lines)
+
 
 def _cmd_compare(cmd, session, *, session_id='', **_):
     compare_msg = cmd[9:].strip()
@@ -1074,9 +1092,11 @@ def _cmd_compare(cmd, session, *, session_id='', **_):
             lines.append(f"### 🤖 {model_name} ({r['time_ms']}ms)\n{r['response'][:500]}\n")
     return '\n'.join(lines)
 
+
 def _cmd_security(cmd, session, **_):
     from salmalm.security import security_auditor
     return security_auditor.format_report()
+
 
 def estimate_tokens(text: str) -> int:
     """Estimate tokens: Korean /2, English /4, mixed weighted."""
@@ -1129,10 +1149,10 @@ def estimate_cost(model: str, usage: dict) -> float:
     # Subtract cached tokens from regular input
     regular_input = max(0, inp - cache_write - cache_read)
     cost = (
-        regular_input * pricing['input'] / 1_000_000 +
-        out * pricing['output'] / 1_000_000 +
-        cache_write * pricing['cache_write'] / 1_000_000 +
-        cache_read * pricing['cache_read'] / 1_000_000
+        regular_input * pricing['input'] / 1_000_000
+        + out * pricing['output'] / 1_000_000
+        + cache_write * pricing['cache_write'] / 1_000_000
+        + cache_read * pricing['cache_read'] / 1_000_000
     )
     return cost
 
@@ -1225,7 +1245,7 @@ def _cmd_context(cmd, session, **_):
         for label, chars, tokens in sorted(file_details, key=lambda x: -x[2]):
             lines.append(f'  • {label}: {chars:,} chars / ~{tokens:,} tokens')
 
-        lines.append(f'\n🔧 **Tool Schemas (top 10 by size)**')
+        lines.append('\n🔧 **Tool Schemas (top 10 by size)**')
         for name, chars, tokens in sorted(tool_details, key=lambda x: -x[2])[:10]:
             lines.append(f'  • {name}: {chars:,} chars / ~{tokens:,} tokens')
 
@@ -1291,11 +1311,13 @@ def _cmd_soul(cmd, session, **_):
         return f'📜 **SOUL.md** (`{USER_SOUL_FILE}`)\n\n{content}'
     return f'📜 SOUL.md is not set. Create `{USER_SOUL_FILE}` or edit via Settings.'
 
+
 def _cmd_soul_reset(cmd, session, **_):
     from salmalm.prompt import reset_user_soul
     reset_user_soul()
     session.add_system(build_system_prompt(full=True))
     return '📜 SOUL.md reset to default.'
+
 
 def _cmd_model(cmd, session, **_):
     model_name = cmd[7:].strip()
@@ -1317,6 +1339,7 @@ def _cmd_model(cmd, session, **_):
         return f'Model changed: {model_name} → {resolved} — saved ✅'
     return f'Unknown model: {model_name}\\nAvailable: auto, opus, sonnet, haiku, {", ".join(sorted(MODEL_ALIASES.keys()))}'
 
+
 def _cmd_tts(cmd, session, **_):
     arg = cmd[4:].strip()
     if arg == 'on':
@@ -1330,6 +1353,7 @@ def _cmd_tts(cmd, session, **_):
         voice = getattr(session, 'tts_voice', 'alloy')
         return f'🔊 TTS: **{status}** (voice: {voice})\n`/tts on` · `/tts off` · `/voice alloy|nova|echo|fable|onyx|shimmer`'
 
+
 def _cmd_voice(cmd, session, **_):
     arg = cmd[6:].strip()
     valid_voices = ('alloy', 'nova', 'echo', 'fable', 'onyx', 'shimmer')
@@ -1337,6 +1361,7 @@ def _cmd_voice(cmd, session, **_):
         session.tts_voice = arg
         return f'🎙️ Voice: **{arg}** — saved ✅'
     return f'Available voices: {", ".join(valid_voices)}'
+
 
 def _cmd_subagents(cmd, session, **_):
     """Handle /subagents commands: list, stop, log, info."""
@@ -1406,6 +1431,7 @@ def _cmd_agent(cmd, session, *, session_id='', **_):
         return '❌ Usage: /agent bind <chat_key> <agent_id>'
     return '❌ Usage: /agent list|create|switch|delete|bind <args>'
 
+
 def _cmd_hooks(cmd, session, **_):
     from salmalm.hooks import hook_manager
     parts = cmd.split(maxsplit=2)
@@ -1433,6 +1459,7 @@ def _cmd_hooks(cmd, session, **_):
         hook_manager.reload()
         return '🔄 Hooks reloaded'
     return '❌ Usage: /hooks list|test|add|reload'
+
 
 def _cmd_plugins(cmd, session, **_):
     from salmalm.plugin_manager import plugin_manager
@@ -1476,6 +1503,8 @@ def _cmd_evolve(cmd, session, **_):
     return '❌ Usage: /evolve status|apply|reset|history'
 
 # ── Mood-Aware commands ──
+
+
 def _cmd_mood(cmd, session, **_):
     parts = cmd.strip().split(None, 2)
     sub = parts[1] if len(parts) > 1 else 'status'
@@ -1496,6 +1525,8 @@ def _cmd_mood(cmd, session, **_):
     return '❌ Usage: /mood status|off|on|sensitive|report [week|month]'
 
 # ── Thought Stream commands ──
+
+
 def _cmd_thought(cmd, session, **_):
     from salmalm.thoughts import thought_stream, _format_thoughts, _format_stats
     text = cmd.strip()
@@ -1553,6 +1584,7 @@ def _cmd_thought(cmd, session, **_):
             tags = f' 🏷️ {", ".join("#" + t for t in found_tags)}'
         return f'💭 생각 #{tid} 기록됨{tags}'
 
+
 def _cmd_export_fn(cmd, session, **_):
     """Handle /export [md|json|html] command."""
     from salmalm.core.export import export_session
@@ -1566,6 +1598,7 @@ def _cmd_export_fn(cmd, session, **_):
                 f'Size: {result["size"]:,} bytes\n'
                 f'Path: `{result["path"]}`')
     return f'❌ Export failed: {result.get("error", "unknown error")}'
+
 
 # Public alias
 _cmd_export = _cmd_export_fn
@@ -1637,11 +1670,11 @@ async def _dispatch_slash_command(cmd, session, session_id, model_override, on_t
 
 
 async def _process_message_inner(session_id: str, user_message: str,
-                                  model_override: Optional[str] = None,
-                                  image_data: Optional[Tuple[str, str]] = None,
-                                  on_tool: Optional[Callable[[str, Any], None]] = None,
-                                  on_token: Optional[Callable] = None,
-                                  on_status: Optional[Callable] = None) -> str:
+                                 model_override: Optional[str] = None,
+                                 image_data: Optional[Tuple[str, str]] = None,
+                                 on_tool: Optional[Callable[[str, Any], None]] = None,
+                                 on_token: Optional[Callable] = None,
+                                 on_status: Optional[Callable] = None) -> str:
     """Inner implementation of process_message."""
     # Input sanitization
     if not _SESSION_ID_RE.match(session_id):
@@ -1684,7 +1717,7 @@ async def _process_message_inner(session_id: str, user_message: str,
 
     if image_data:
         b64, mime = image_data
-        log.info(f"[IMG] Image attached: {mime}, {len(b64)//1024}KB base64")
+        log.info(f"[IMG] Image attached: {mime}, {len(b64) // 1024}KB base64")
         # Auto-resize for token savings
         from salmalm.core.image_resize import resize_image_b64
         b64, mime = resize_image_b64(b64, mime)
@@ -1766,11 +1799,11 @@ async def _process_message_inner(session_id: str, user_message: str,
             _orig_on_token(event)
 
     response = await _engine.run(session, user_message,
-                              model_override=selected_model,
-                              on_tool=on_tool,
-                              classification=classification,
-                              on_token=_sla_on_token,
-                              on_status=on_status)
+                                 model_override=selected_model,
+                                 on_tool=on_tool,
+                                 classification=classification,
+                                 on_token=_sla_on_token,
+                                 on_status=on_status)
 
     # ── SLA: Record latency (레이턴시 기록) ──
     try:
@@ -1854,7 +1887,7 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
     # Web notification (if task came from telegram)
     if session_id == 'telegram':
         # Store notification for web polling
-        from salmalm.core import _sessions
+        from salmalm.core import _sessions  # noqa: F811
         web_session = _sessions.get('web')
         if web_session:
             if not hasattr(web_session, '_notifications'):
@@ -1881,6 +1914,3 @@ def wait_for_active_requests(timeout: float = 30.0) -> bool:
             return True
     log.info(f"[SHUTDOWN] Waiting for {_active_requests} active request(s) (timeout={timeout}s)")
     return _active_requests_event.wait(timeout=timeout)
-
-
-

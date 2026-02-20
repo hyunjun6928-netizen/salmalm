@@ -6,7 +6,7 @@ Serves an interactive API documentation page at /docs.
 
 
 from salmalm.constants import VERSION
-from salmalm.crypto import log
+
 
 def generate_api_docs_html() -> str:
     """Generate API documentation HTML page."""

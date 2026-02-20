@@ -2,11 +2,8 @@
 
 매일 아침 자동 요약: 날씨, 일정, 이메일, 미완료 작업.
 """
-import json
-from datetime import datetime, timedelta
-from pathlib import Path
-from salmalm.constants import WORKSPACE_DIR, KST
-from salmalm.crypto import log
+from datetime import datetime
+from salmalm.constants import KST
 
 # Default config
 _DEFAULT_CONFIG = {

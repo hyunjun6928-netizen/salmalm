@@ -1,15 +1,14 @@
 import logging
-import os
 import sys
 
 try:
-    from .constants import VERSION
     __version__ = '0.16.0'
 except Exception:
     __version__ = '0.16.0'
 
 log = logging.getLogger('salmalm')
 app = None  # Will be set below if runtime (not during build)
+
 
 def _register_services() -> None:
     """Register all service factories. Called once at import time."""
@@ -27,6 +26,7 @@ def _register_services() -> None:
     app.register('user_manager', lambda: __import__('salmalm.users', fromlist=['user_manager']).user_manager)
     app.register('discord_bot', lambda: __import__('salmalm.discord_bot', fromlist=['discord_bot']).discord_bot)
     app.register('ws_server', lambda: __import__('salmalm.ws', fromlist=['ws_server']).ws_server)
+
 
 try:
     from .constants import LOG_FILE

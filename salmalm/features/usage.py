@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Dict, List
 
 from salmalm.constants import KST
 from salmalm.crypto import log

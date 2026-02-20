@@ -2,3 +2,5 @@
 max-line-length = 120
 ignore = E501,W503,E402
 exclude = plugins/,scripts/,memory/,.git,__pycache__
+per-file-ignores =
+    salmalm/constants.py:F401,E127,W391
