@@ -4,132 +4,281 @@
 <title>SalmAlm — Setup Wizard</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,sans-serif;background:#0f1117;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.wizard{background:#1a1d27;padding:40px;border-radius:16px;border:1px solid #2a2d37;max-width:520px;width:100%}
-h1{color:#a78bfa;margin-bottom:4px;font-size:24px}
-.sub{color:#888;font-size:13px;margin-bottom:32px}
-.step{margin-bottom:20px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e0e0e0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.wizard{background:#1a1d27;padding:40px;border-radius:16px;border:1px solid #2a2d37;max-width:560px;width:100%;position:relative;overflow:hidden}
+h1{color:#a78bfa;margin-bottom:4px;font-size:26px}
+h2{color:#c4b5fd;font-size:20px;margin-bottom:8px}
+.sub{color:#888;font-size:13px;margin-bottom:24px;line-height:1.6}
+.step{display:none}
+.step.active{display:block}
 .step label{display:block;font-size:13px;color:#aaa;margin-bottom:6px;font-weight:500}
-.step input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f1117;color:#e0e0e0;font-size:14px;font-family:monospace}
-.step input:focus{border-color:#7c5cfc;outline:none}
+.step input,.step select{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f1117;color:#e0e0e0;font-size:14px;font-family:monospace}
+.step input:focus,.step select:focus{border-color:#7c5cfc;outline:none}
 .step .hint{font-size:11px;color:#666;margin-top:4px}
+.field{margin-bottom:16px}
 .required::after{content:" *";color:#f87171}
-.divider{border-top:1px solid #2a2d37;margin:24px 0}
-button{width:100%;padding:14px;border-radius:8px;border:none;background:#4f46e5;color:#fff;font-size:16px;cursor:pointer;font-weight:500;margin-top:8px}
-button:hover{background:#4338ca}
+.divider{border-top:1px solid #2a2d37;margin:20px 0}
+.btn-row{display:flex;gap:12px;margin-top:24px}
+button{padding:14px 24px;border-radius:8px;border:none;font-size:15px;cursor:pointer;font-weight:500;transition:all .2s}
+.btn-primary{background:#4f46e5;color:#fff;flex:1}
+.btn-primary:hover{background:#4338ca}
+.btn-secondary{background:#2a2d37;color:#aaa;padding:14px 20px}
+.btn-secondary:hover{background:#333;color:#e0e0e0}
 button:disabled{opacity:0.5;cursor:not-allowed}
-.skip{text-align:center;margin-top:16px}
-.skip a{color:#666;font-size:13px;cursor:pointer;text-decoration:underline}
-.skip a:hover{color:#aaa}
 .result{margin-top:16px;padding:12px;border-radius:8px;font-size:14px;display:none}
 .result.ok{background:#0f2a1f;border:1px solid #34d399;color:#34d399;display:block}
 .result.err{background:#2a0f0f;border:1px solid #f87171;color:#f87171;display:block}
-.progress{display:flex;gap:8px;margin-bottom:24px}
-.progress .dot{width:10px;height:10px;border-radius:50%;background:#333}
-.progress .dot.active{background:#7c5cfc}
+.progress{display:flex;gap:8px;margin-bottom:28px;justify-content:center}
+.progress .dot{width:10px;height:10px;border-radius:50%;background:#333;transition:all .3s}
+.progress .dot.active{background:#7c5cfc;transform:scale(1.2)}
 .progress .dot.done{background:#34d399}
+.welcome-emoji{font-size:64px;text-align:center;margin:20px 0}
+.welcome-text{text-align:center;font-size:18px;color:#ccc;line-height:1.6;margin-bottom:24px}
+.persona-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
+.persona-card{padding:16px 12px;border-radius:12px;border:2px solid #333;background:#0f1117;cursor:pointer;text-align:center;transition:all .2s}
+.persona-card:hover{border-color:#7c5cfc;background:#1e1b2e}
+.persona-card.selected{border-color:#7c5cfc;background:#1e1b2e}
+.persona-card .emoji{font-size:32px;margin-bottom:8px}
+.persona-card .name{font-size:14px;font-weight:600;color:#e0e0e0;margin-bottom:4px}
+.persona-card .desc{font-size:11px;color:#888}
+.model-option{display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;border:1px solid #333;background:#0f1117;cursor:pointer;margin-bottom:8px;transition:all .2s}
+.model-option:hover{border-color:#7c5cfc}
+.model-option.selected{border-color:#7c5cfc;background:#1e1b2e}
+.model-option .radio{width:18px;height:18px;border-radius:50%;border:2px solid #555;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.model-option.selected .radio{border-color:#7c5cfc}
+.model-option.selected .radio::after{content:'';width:10px;height:10px;border-radius:50%;background:#7c5cfc}
+.model-option .info{flex:1}
+.model-option .mname{font-size:14px;font-weight:500}
+.model-option .mdesc{font-size:11px;color:#888}
+.complete-box{text-align:center;padding:20px 0}
+.complete-emoji{font-size:72px;margin-bottom:16px}
+.complete-title{font-size:24px;color:#34d399;font-weight:600;margin-bottom:8px}
+.complete-sub{font-size:14px;color:#888;margin-bottom:24px}
+.test-status{font-size:13px;color:#888;margin-top:8px}
+.test-status.testing{color:#fbbf24}
+.test-status.success{color:#34d399}
+.test-status.fail{color:#f87171}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.step.active{animation:fadeIn .3s ease}
 </style></head><body>
 <div class="wizard">
-<h1>😈 <span data-i18n="title">SalmAlm Setup Wizard</span></h1>
-<p class="sub" data-i18n="sub">You need at least 1 API key to use the AI Gateway</p>
-<div class="progress"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
-
-<div class="step">
-<label class="required" data-i18n="lbl-anthropic">Anthropic API Key (Claude)</label>
-<input type="password" id="anthropic" placeholder="sk-ant-...">
-<div class="hint">Recommended. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
-</div>
-<div class="step">
-<label data-i18n="lbl-openai">OpenAI API Key (GPT)</label>
-<input type="password" id="openai" placeholder="sk-...">
-<div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
-</div>
-<div class="step">
-<labeldata-i18n="lbl-xai">xAI API Key (Grok)</label>
-<input type="password" id="xai" placeholder="xai-...">
-</div>
-<div class="step">
-<labeldata-i18n="lbl-google">Google API Key (Gemini)</label>
-<input type="password" id="google" placeholder="AIza...">
-</div>
-<div class="divider"></div>
-<div class="step">
-<label data-i18n="lbl-brave">Brave Search API Key (Web Search)</label>
-<input type="password" id="brave" placeholder="BSA...">
-<div class="hint">Optional. <a href="https://brave.com/search/api/" target="_blank" style="color:#7c5cfc">Get Free Key →</a></div>
-</div>
-<div class="divider"></div>
-<div class="step">
-<label>🎮 Discord Bot Token (Optional)</label>
-<input type="password" id="discord" placeholder="MTIz...">
-<div class="hint">Optional. <a href="https://discord.com/developers/applications" target="_blank" style="color:#7c5cfc">Create Bot →</a> MESSAGE CONTENT intent required</div>
-</div>
-<div class="divider"></div>
-<div class="step">
-<label>🦙 Ollama (Local LLM — No API key needed)</label>
-<input type="text" id="ollama" placeholder="http://localhost:11434/v1" value="">
-<div class="hint">If Ollama is installed, enter URL. Free without API keys! <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">Install →</a></div>
+<div class="progress" id="progress">
+  <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
 </div>
 
-<button id="btn" data-action="save" data-i18n="btn-save">Save & Test</button>
+<!-- Step 0: Welcome -->
+<div class="step active" id="step-0">
+  <div class="welcome-emoji">🎉</div>
+  <h1 style="text-align:center">Welcome to SalmAlm!</h1>
+  <div class="welcome-text">
+    Your personal AI gateway is ready.<br>
+    Let's get you set up in 4 quick steps.
+  </div>
+  <div class="btn-row"><button class="btn-primary" onclick="goStep(1)">Let's Go! →</button></div>
+</div>
+
+<!-- Step 1: API Keys -->
+<div class="step" id="step-1">
+  <h2>🔑 API Keys</h2>
+  <p class="sub">Enter at least one API key to connect to an AI provider.</p>
+  <div class="field">
+    <label class="required">Anthropic API Key (Claude)</label>
+    <input type="password" id="anthropic" placeholder="sk-ant-...">
+    <div class="hint">Recommended — Best for most tasks. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
+  </div>
+  <div class="field">
+    <label>OpenAI API Key (GPT)</label>
+    <input type="password" id="openai" placeholder="sk-...">
+    <div class="hint"><a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
+  </div>
+  <div class="field">
+    <label>Google API Key (Gemini)</label>
+    <input type="password" id="google" placeholder="AIza...">
+    <div class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
+  </div>
+  <div class="divider"></div>
+  <div class="field">
+    <label>🦙 Ollama URL (Local — no key needed)</label>
+    <input type="text" id="ollama" placeholder="http://localhost:11434/v1">
+    <div class="hint">Free local AI. <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">Install →</a></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn-secondary" onclick="goStep(0)">← Back</button>
+    <button class="btn-primary" onclick="goStep(2)">Next →</button>
+  </div>
+</div>
+
+<!-- Step 2: Model Selection + Test -->
+<div class="step" id="step-2">
+  <h2>🤖 Default Model</h2>
+  <p class="sub">Pick your preferred AI model. You can change anytime with <code>/model</code>.</p>
+  <div id="model-list">
+    <div class="model-option selected" data-model="auto" onclick="pickModel(this)">
+      <div class="radio"></div>
+      <div class="info"><div class="mname">🎯 Auto (Recommended)</div><div class="mdesc">Smart routing — picks the best model per task</div></div>
+    </div>
+    <div class="model-option" data-model="claude-sonnet-4-20250514" onclick="pickModel(this)">
+      <div class="radio"></div>
+      <div class="info"><div class="mname">Claude Sonnet 4</div><div class="mdesc">Fast & capable — best balance of speed and quality</div></div>
+    </div>
+    <div class="model-option" data-model="claude-opus-4-20250514" onclick="pickModel(this)">
+      <div class="radio"></div>
+      <div class="info"><div class="mname">Claude Opus 4</div><div class="mdesc">Most capable — complex reasoning & analysis</div></div>
+    </div>
+    <div class="model-option" data-model="gpt-4o" onclick="pickModel(this)">
+      <div class="radio"></div>
+      <div class="info"><div class="mname">GPT-4o</div><div class="mdesc">OpenAI's multimodal flagship</div></div>
+    </div>
+    <div class="model-option" data-model="gemini-2.5-pro" onclick="pickModel(this)">
+      <div class="radio"></div>
+      <div class="info"><div class="mname">Gemini 2.5 Pro</div><div class="mdesc">Google's most advanced model</div></div>
+    </div>
+  </div>
+  <div class="test-status" id="test-status"></div>
+  <div class="btn-row">
+    <button class="btn-secondary" onclick="goStep(1)">← Back</button>
+    <button class="btn-primary" id="btn-test" onclick="testAndNext()">Test Connection & Next →</button>
+  </div>
+</div>
+
+<!-- Step 3: Persona -->
+<div class="step" id="step-3">
+  <h2>🎭 AI Personality</h2>
+  <p class="sub">Choose a base personality for your AI. Customize later via SOUL.md.</p>
+  <div class="persona-grid">
+    <div class="persona-card selected" data-persona="expert" onclick="pickPersona(this)">
+      <div class="emoji">🧑‍💼</div>
+      <div class="name">Expert</div>
+      <div class="desc">Professional, precise, detail-oriented</div>
+    </div>
+    <div class="persona-card" data-persona="friend" onclick="pickPersona(this)">
+      <div class="emoji">😄</div>
+      <div class="name">Friend</div>
+      <div class="desc">Casual, warm, conversational</div>
+    </div>
+    <div class="persona-card" data-persona="assistant" onclick="pickPersona(this)">
+      <div class="emoji">🤖</div>
+      <div class="name">Assistant</div>
+      <div class="desc">Efficient, concise, task-focused</div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn-secondary" onclick="goStep(2)">← Back</button>
+    <button class="btn-primary" onclick="finishSetup()">Complete Setup →</button>
+  </div>
+</div>
+
+<!-- Step 4: Complete -->
+<div class="step" id="step-4">
+  <div class="complete-box">
+    <div class="complete-emoji">🚀</div>
+    <div class="complete-title">Setup Complete!</div>
+    <div class="complete-sub">Your AI gateway is ready. Redirecting to chat...</div>
+  </div>
+</div>
+
 <div class="result" id="result"></div>
-<div class="skip"><a data-action="reload" data-i18n="btn-skip">Skip (configure later)</a></div>
 </div>
-<script>
-const _i18n={
-  en:{
-    'title':'SalmAlm Setup Wizard','sub':'You need at least 1 API key to use the AI Gateway',
-    'lbl-anthropic':'Anthropic API Key (Claude)','lbl-openai':'OpenAI API Key (GPT)',
-    'lbl-xai':'xAI API Key (Grok)','lbl-google':'Google API Key (Gemini)',
-    'lbl-brave':'Brave Search API Key (Web Search)',
-    'btn-save':'Save & Test','btn-skip':'Skip (configure later)',
-    'err-empty':'Enter at least 1 API key or Ollama URL'
-  },
-  ko:{
-    'title':'삶앎 초기 설정','sub':'AI 게이트웨이를 사용하려면 최소 1개의 API 키가 필요합니다',
-    'lbl-anthropic':'Anthropic API 키 (Claude)','lbl-openai':'OpenAI API 키 (GPT)',
-    'lbl-xai':'xAI API 키 (Grok)','lbl-google':'Google API 키 (Gemini)',
-    'lbl-brave':'Brave Search API 키 (웹 검색)',
-    'btn-save':'저장 및 테스트','btn-skip':'건너뛰기 (나중에 설정)',
-    'err-empty':'최소 1개의 API 키 또는 Ollama URL을 입력하세요'
-  }
-};
-const _lang=localStorage.getItem('salmalm-lang')||'en';
-function t(k){return (_i18n[_lang]||_i18n.en)[k]||(_i18n.en[k]||k)}
-document.querySelectorAll('[data-i18n]').forEach(function(el){el.textContent=t(el.getAttribute('data-i18n'))});
 
-async function save(){
-  const btn=document.getElementById('btn');
-  btn.disabled=true; btn.textContent='Testing...';
+<script>
+let currentStep=0, selectedModel='auto', selectedPersona='expert';
+
+function goStep(n){
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('step-'+n).classList.add('active');
+  const dots=document.querySelectorAll('.progress .dot');
+  dots.forEach((d,i)=>{d.className='dot';if(i<n)d.classList.add('done');if(i===n)d.classList.add('active');});
+  currentStep=n;
+}
+
+function pickModel(el){
+  document.querySelectorAll('.model-option').forEach(m=>m.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedModel=el.dataset.model;
+}
+
+function pickPersona(el){
+  document.querySelectorAll('.persona-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedPersona=el.dataset.persona;
+}
+
+function getKeys(){
   const body={};
-  ['anthropic','openai','xai','google','brave'].forEach(k=>{
+  ['anthropic','openai','google'].forEach(k=>{
     const v=document.getElementById(k).value.trim();
     if(v) body[k+'_api_key']=v;
   });
-  const dc=document.getElementById('discord').value.trim();
-  if(dc) body.discord_token=dc;
   const ollama=document.getElementById('ollama').value.trim();
   if(ollama) body.ollama_url=ollama;
-  if(!Object.keys(body).length){
-    show(t('err-empty'),'err');
-    btn.disabled=false; btn.textContent='Save & Test'; return;
+  return body;
+}
+
+async function testAndNext(){
+  const btn=document.getElementById('btn-test');
+  const status=document.getElementById('test-status');
+  const keys=getKeys();
+  if(!Object.keys(keys).length){
+    status.textContent='⚠️ Please enter at least one API key first (Step 2)';
+    status.className='test-status fail';
+    return;
   }
+  btn.disabled=true;
+  status.textContent='🔄 Testing connection...';
+  status.className='test-status testing';
   try{
-    const r=await fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const r=await fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(keys)});
     const d=await r.json();
     if(d.ok){
       const isTestFail=d.test_result&&d.test_result.includes('fail');
-      show(d.test_result+' ('+d.saved.join(', ')+' Saved)',isTestFail?'err':'ok');
-      if(!isTestFail){btn.textContent='✅ Done! Redirecting in 3s...';setTimeout(()=>location.reload(),3000);}
-      else{btn.textContent='⚠️ Saved (verify key)';btn.disabled=false;}
-    }else{show(d.error,'err');btn.disabled=false;btn.textContent='Save & Test';}
-  }catch(e){show('Network error: '+e,'err');btn.disabled=false;btn.textContent='Save & Test';}
+      if(!isTestFail){
+        status.textContent='✅ Connection successful! ('+d.saved.join(', ')+' saved)';
+        status.className='test-status success';
+        setTimeout(()=>goStep(3),1000);
+      }else{
+        status.textContent='⚠️ Keys saved but test failed — check your keys';
+        status.className='test-status fail';
+      }
+    }else{
+      status.textContent='❌ '+d.error;
+      status.className='test-status fail';
+    }
+  }catch(e){
+    status.textContent='❌ Network error: '+e;
+    status.className='test-status fail';
+  }
+  btn.disabled=false;
 }
-function show(msg,type){const el=document.getElementById('result');el.textContent=msg;el.className='result '+type;}
-document.addEventListener('click',function(e){
-  var el=e.target.closest('[data-action]');if(!el)return;
-  var a=el.getAttribute('data-action');
-  if(a==='save')save();
-  else if(a==='reload')location.reload();
-});
+
+async function finishSetup(){
+  // Save model preference and persona
+  try{
+    const body={model:selectedModel,persona:selectedPersona};
+    await fetch('/api/onboarding/preferences',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  }catch(e){/* best effort */}
+  goStep(4);
+  setTimeout(()=>location.reload(),2500);
+}
+
+// i18n
+const _lang=localStorage.getItem('salmalm-lang')||'en';
+if(_lang==='ko'){
+  document.querySelector('#step-0 h1').textContent='삶앎에 오신 것을 환영합니다!';
+  document.querySelector('#step-0 .welcome-text').innerHTML='개인 AI 게이트웨이가 준비되었습니다.<br>4단계로 빠르게 설정해 봅시다.';
+  document.querySelector('#step-0 button').textContent='시작하기! →';
+  document.querySelector('#step-1 h2').textContent='🔑 API 키';
+  document.querySelector('#step-1 .sub').textContent='AI 제공자에 연결하려면 최소 1개의 API 키를 입력하세요.';
+  document.querySelector('#step-2 h2').textContent='🤖 기본 모델';
+  document.querySelector('#step-2 .sub').innerHTML='선호하는 AI 모델을 선택하세요. <code>/model</code>로 언제든 변경 가능합니다.';
+  document.querySelector('#step-3 h2').textContent='🎭 AI 성격';
+  document.querySelector('#step-3 .sub').textContent='AI의 기본 성격을 선택하세요. SOUL.md에서 나중에 커스터마이즈할 수 있습니다.';
+  document.querySelectorAll('.persona-card')[0].querySelector('.name').textContent='전문가';
+  document.querySelectorAll('.persona-card')[0].querySelector('.desc').textContent='전문적이고 정확하며 디테일 중심';
+  document.querySelectorAll('.persona-card')[1].querySelector('.name').textContent='친구';
+  document.querySelectorAll('.persona-card')[1].querySelector('.desc').textContent='캐주얼하고 따뜻한 대화 스타일';
+  document.querySelectorAll('.persona-card')[2].querySelector('.name').textContent='비서';
+  document.querySelectorAll('.persona-card')[2].querySelector('.desc').textContent='효율적이고 간결하며 작업 중심';
+  document.querySelector('.complete-title').textContent='설정 완료!';
+  document.querySelector('.complete-sub').textContent='AI 게이트웨이가 준비되었습니다. 채팅으로 이동합니다...';
+}
 </script></body></html>

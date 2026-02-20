@@ -302,7 +302,7 @@ class TestWebHandlerRoutes(unittest.TestCase):
         import threading
         cls._thread = threading.Thread(target=cls._server.serve_forever, daemon=True)
         cls._thread.start()
-        import time; time.sleep(0.5)
+        import time; time.sleep(0.1)
 
     @classmethod
     def tearDownClass(cls):

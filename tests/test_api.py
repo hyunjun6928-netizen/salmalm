@@ -33,7 +33,7 @@ class TestAPIEndpoints(unittest.TestCase):
         cls._server = HTTPServer(('127.0.0.1', cls._port), SalmAlmHandler)
         cls._thread = threading.Thread(target=cls._server.serve_forever, daemon=True)
         cls._thread.start()
-        time.sleep(0.5)  # Wait for server to start
+        time.sleep(0.1)  # Wait for server to start
 
     @classmethod
     def tearDownClass(cls):

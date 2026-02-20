@@ -56,6 +56,7 @@ COMMAND_DEFS: Dict[str, str] = {
     # MCP
     '/mcp': 'MCP marketplace (install|list|catalog|remove|status|search)',
     # Existing (delegated back to engine)
+    '/setup': 'Re-run the setup wizard (opens in browser)',
     '/status': 'Server/session status',
     '/compact': 'Compact context',
     '/context': 'Show context info',
@@ -166,6 +167,7 @@ class CommandRouter:
         self._handlers['/commands'] = self._cmd_commands
         self._handlers['/whoami'] = self._cmd_whoami
         self._handlers['/id'] = self._cmd_whoami
+        self._handlers['/setup'] = self._cmd_setup
         self._handlers['/restart'] = self._cmd_restart
         self._handlers['/reset'] = self._cmd_reset
         self._handlers['/stop'] = self._cmd_stop
@@ -292,6 +294,11 @@ class CommandRouter:
         uid = getattr(session, 'user_id', None) or 'unknown'
         sid = getattr(session, 'session_id', None) or 'unknown'
         return f'👤 User: `{uid}`\nSession: `{sid}`'
+
+    @staticmethod
+    def _cmd_setup(cmd, session, **_):
+        from salmalm.constants import PORT
+        return f'🔧 Setup Wizard: Open http://localhost:{PORT}/setup in your browser to re-run the setup wizard.'
 
     @staticmethod
     def _cmd_restart(cmd, session, **_):

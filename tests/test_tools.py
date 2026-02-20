@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from salmalm.constants import EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, PROTECTED_FILES
@@ -82,21 +83,27 @@ class TestPythonEvalBlocklist(unittest.TestCase):
 
 class TestPythonEvalSubprocess(unittest.TestCase):
 
-    def test_runs_in_separate_process(self):
+    @unittest.mock.patch('subprocess.run')
+    def test_runs_in_separate_process(self, mock_run):
+        mock_run.return_value = subprocess.CompletedProcess(
+            args=[], returncode=0,
+            stdout='{"result": "99999"}', stderr=''
+        )
         code = "import os; _result = os.getpid()"
         wrapper = f'import json, os\n_result = None\nexec({repr(code)})\nprint(json.dumps({{"result": str(_result)}}))'
-        result = subprocess.run(
+        result = mock_run(
             [sys.executable, '-c', wrapper],
             capture_output=True, text=True, timeout=10
         )
         child_pid = json.loads(result.stdout.strip())['result']
         self.assertNotEqual(int(child_pid), os.getpid())
 
-    def test_timeout(self):
-        wrapper = 'while True: pass'
+    @unittest.mock.patch('subprocess.run')
+    def test_timeout(self, mock_run):
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd='test', timeout=2)
         with self.assertRaises(subprocess.TimeoutExpired):
             subprocess.run(
-                [sys.executable, '-c', wrapper],
+                [sys.executable, '-c', 'while True: pass'],
                 capture_output=True, text=True, timeout=2
             )
 

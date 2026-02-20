@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 
 from salmalm.constants import BASE_DIR, KST
 from salmalm import log
+from salmalm.utils.db import connect as _connect_db
 
 _DB_PATH = BASE_DIR / 'personal.db'
 _DIGEST_PATH = Path.home() / '.salmalm' / 'digest.json'
@@ -20,9 +21,7 @@ _db_lock = threading.Lock()
 
 
 def _get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return _connect_db(_DB_PATH, wal=False, row_factory=True, check_same_thread=False)
 
 
 class LifeDashboard:

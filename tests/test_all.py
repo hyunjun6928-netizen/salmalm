@@ -218,11 +218,11 @@ class TestStability(unittest.TestCase):
     def test_circuit_breaker_reset(self):
         from salmalm.stability import CircuitBreaker
         # Errors with very short window so they expire
-        cb = CircuitBreaker(threshold=3, window_sec=1, cooldown_sec=0)
+        cb = CircuitBreaker(threshold=3, window_sec=0.01, cooldown_sec=0)
         for _ in range(3):
             cb.record_error('test2', 'err')
         self.assertTrue(cb.is_tripped('test2'))
-        import time; time.sleep(1.1)  # Wait for window to expire
+        import time; time.sleep(0.05)  # Wait for 0.01s window to expire
         self.assertFalse(cb.is_tripped('test2'))
 
     def test_health_monitor_system(self):

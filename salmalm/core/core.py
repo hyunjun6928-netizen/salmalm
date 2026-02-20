@@ -117,7 +117,7 @@ def _ensure_audit_v2_table():
 
 
 def audit_log(event: str, detail: str = '', session_id: str = '',
-              detail_dict: Optional[dict] = None):
+              detail_dict: Optional[dict] = None) -> None:
     """Write an audit event to the security log (v1 chain + v2 structured).
 
     Args:
@@ -152,7 +152,7 @@ def audit_log(event: str, detail: str = '', session_id: str = '',
         conn.commit()
 
 
-def audit_log_cleanup(days: int = 30):
+def audit_log_cleanup(days: int = 30) -> None:
     """Delete audit_log_v2 entries older than `days` days."""
     from datetime import timedelta
     cutoff = (datetime.now(KST) - timedelta(days=days)).isoformat()
@@ -206,7 +206,7 @@ def query_audit_log(limit: int = 50, event_type: Optional[str] = None,
         return []
 
 
-def close_all_db_connections():
+def close_all_db_connections() -> None:
     """Close all tracked SQLite connections (for graceful shutdown)."""
     with _db_connections_lock:
         for conn in _all_db_connections:
@@ -289,7 +289,7 @@ def _restore_usage():
         log.warning(f"Usage restore failed: {e}")
 
 
-def check_cost_cap():
+def check_cost_cap() -> None:
     """Raise CostCapExceeded if cumulative cost exceeds the cap. 0 = disabled."""
     if COST_CAP <= 0:
         return
@@ -311,7 +311,7 @@ def get_current_user_id() -> Optional[int]:
 
 
 def track_usage(model: str, input_tokens: int, output_tokens: int,
-                user_id: Optional[int] = None):
+                user_id: Optional[int] = None) -> None:
     """Record token usage and cost for a model call."""
     # Auto-detect user_id from thread-local if not provided
     if user_id is None:
@@ -1013,12 +1013,12 @@ class Session:
 _tg_bot = None  # Set during startup by telegram module
 
 
-def get_telegram_bot():
+def get_telegram_bot() -> Optional[object]:
     """Accessor for the Telegram bot instance (avoids direct global access)."""
     return _tg_bot
 
 
-def set_telegram_bot(bot):
+def set_telegram_bot(bot: object) -> None:
     """Set the Telegram bot instance (called during startup)."""
     global _tg_bot
     _tg_bot = bot
@@ -1187,7 +1187,7 @@ def branch_session(session_id: str, message_index: int) -> dict:
 _SESSIONS_DIR = Path.home() / '.salmalm' / 'sessions'
 
 
-def save_session_to_disk(session_id: str):
+def save_session_to_disk(session_id: str) -> None:
     """Serialize session state to ~/.salmalm/sessions/{id}.json."""
     with _session_lock:
         session = _sessions.get(session_id)
@@ -1237,7 +1237,7 @@ def restore_session(session_id: str) -> Optional[Session]:
         return None
 
 
-def restore_all_sessions_from_disk():
+def restore_all_sessions_from_disk() -> None:
     """On startup, restore all sessions from disk."""
     if not _SESSIONS_DIR.exists():
         return
@@ -1558,7 +1558,7 @@ def compact_session(session_id: str, force: bool = False) -> str:
     return f'✅ Compacted: ~{old_tokens:,} → ~{new_tokens:,} tokens ({len(old_msgs)} messages summarized).'
 
 
-def auto_compact_if_needed(session_id: str):
+def auto_compact_if_needed(session_id: str) -> None:
     """Check and auto-compact session if over token threshold."""
     session = get_session(session_id)
     est_tokens = _estimate_tokens(session.messages)
@@ -1570,7 +1570,7 @@ def auto_compact_if_needed(session_id: str):
 # ============================================================
 # DAILY MEMORY LOG
 # ============================================================
-def auto_title_session(session_id: str, first_message: str):
+def auto_title_session(session_id: str, first_message: str) -> None:
     """Generate a title from the first user message (first 50 chars, cleaned up).
     No LLM call — just text extraction for cost savings."""
     if not first_message or not first_message.strip():
@@ -1602,7 +1602,7 @@ def auto_title_session(session_id: str, first_message: str):
         log.warning(f"Auto-title error: {e}")
 
 
-def write_daily_log(entry: str):
+def write_daily_log(entry: str) -> None:
     """Append to today's memory log."""
     today = datetime.now(KST).strftime('%Y-%m-%d')
     log_file = MEMORY_DIR / f'{today}.md'

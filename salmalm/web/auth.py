@@ -230,13 +230,20 @@ class AuthManager:
             default_pw = base64.urlsafe_b64encode(os.urandom(18)).decode().rstrip('=')
             _, raw_api_key = self._create_user_db(conn, 'admin', default_pw, 'admin')
             # SECURITY: Never log passwords to file — console only via stderr
-            import sys
-            print(f"\n{'='*50}", file=sys.stderr)
-            print(f"[USER] Default admin created", file=sys.stderr)
-            print(f"   Username: admin", file=sys.stderr)
-            print(f"   Password: {default_pw}", file=sys.stderr)
-            print(f"[WARN]  Save this password! It won't be shown again.", file=sys.stderr)
-            print(f"{'='*50}\n", file=sys.stderr)
+            import sys, logging as _logging
+            _stderr_handler = _logging.StreamHandler(sys.stderr)
+            _stderr_handler.setFormatter(_logging.Formatter('%(message)s'))
+            _sec_logger = _logging.getLogger('salmalm.auth.setup')
+            _sec_logger.addHandler(_stderr_handler)
+            _sec_logger.propagate = False
+            _sec_logger.warning(
+                f"\n{'='*50}\n"
+                f"[USER] Default admin created\n"
+                f"   Username: admin\n"
+                f"   Password: {default_pw}\n"
+                f"[WARN]  Save this password! It won't be shown again.\n"
+                f"{'='*50}"
+            )
             log.info("[USER] Default admin user created (password shown in console only)")
         conn.close()
         self._initialized = True

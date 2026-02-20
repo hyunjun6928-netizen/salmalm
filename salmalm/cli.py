@@ -1,8 +1,11 @@
 """CLI argument parsing for SalmAlm."""
 from __future__ import annotations
 
+import logging
 import os
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_windows_shortcut():
@@ -28,23 +31,23 @@ pause
 '''
         with open(bat_path, 'w', encoding='utf-8') as f:
             f.write(bat_content)
-        print(f"[PIN] Created SalmAlm.bat on Desktop -- double-click to start!")
+        logger.info("[PIN] Created SalmAlm.bat on Desktop -- double-click to start!")
     except Exception as e:
-        print(f"[WARN]  Could not create desktop shortcut: {e}")
+        logger.warning(f"Could not create desktop shortcut: {e}")
 
 
 def _run_update():
     """Self-update via pip."""
     import subprocess as _sp
-    print("[UP]  Updating SalmAlm...")
+    logger.info("[UP] Updating SalmAlm...")
     result = _sp.run(
         [sys.executable, '-m', 'pip', 'install', '--upgrade', '--no-cache-dir',
          '--force-reinstall', 'salmalm'],
         capture_output=False)
     if result.returncode == 0:
-        print("\n[OK] Updated! Run 'salmalm' or 'python -m salmalm' to start.")
+        logger.info("Updated! Run 'salmalm' or 'python -m salmalm' to start.")
     else:
-        print("\n[FAIL] Update failed. Try manually: pip install --upgrade salmalm")
+        logger.error("Update failed. Try manually: pip install --upgrade salmalm")
     sys.exit(result.returncode)
 
 
@@ -86,27 +89,29 @@ def _run_node_mode():
     # Register with gateway
     result = agent.register()
     if 'error' in result:
-        print(f"[WARN]  Gateway registration failed: {result['error']}")
-        print(f"   Starting standalone anyway on :{port}")
+        logger.warning(f"Gateway registration failed: {result['error']}")
+        logger.warning(f"Starting standalone anyway on :{port}")
 
     # Start heartbeat
     agent.start_heartbeat(interval=30)
 
     # Start HTTP server for tool execution
     server = http.server.ThreadingHTTPServer(('0.0.0.0', port), WebHandler)
-    print(f"+==============================================+")
-    print(f"|  [NET] SalmAlm Node v{VERSION:<27s}|")
-    print(f"|  Name: {name:<37s}|")
-    print(f"|  Port: {port:<37s}|")
-    print(f"|  Gateway: {gateway_url:<34s}|")
-    print(f"+==============================================+")
+    logger.info(
+        f"+==============================================+\n"
+        f"|  [NET] SalmAlm Node v{VERSION:<27s}|\n"
+        f"|  Name: {name:<37s}|\n"
+        f"|  Port: {port:<37s}|\n"
+        f"|  Gateway: {gateway_url:<34s}|\n"
+        f"+==============================================+"
+    )
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         agent.stop()
         server.shutdown()
-        print("\n[NET] Node stopped.")
+        logger.info("[NET] Node stopped.")
 
 
 def setup_workdir():
@@ -129,7 +134,7 @@ def setup_workdir():
                 k, v = k.strip(), v.strip().strip('"').strip("'")
                 if k and v:
                     os.environ.setdefault(k, v)
-        print(f"[FILE] Loaded .env file")
+        logger.info("Loaded .env file")
 
     # Windows: create desktop shortcut on first run
     if sys.platform == 'win32' and not getattr(sys, 'frozen', False):
@@ -145,11 +150,11 @@ def dispatch_cli() -> bool:
         if sys.platform == 'win32':
             _ensure_windows_shortcut()
         else:
-            print("[INFO]  Desktop shortcuts are Windows-only.")
+            logger.info("Desktop shortcuts are Windows-only.")
         sys.exit(0)
     if '--version' in sys.argv or '-v' in sys.argv:
         from salmalm.constants import VERSION
-        print(f'SalmAlm v{VERSION}')
+        logger.info(f'SalmAlm v{VERSION}')
         sys.exit(0)
     if '--node' in sys.argv:
         _run_node_mode()

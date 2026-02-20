@@ -9,6 +9,7 @@ from pathlib import Path
 from salmalm.tool_registry import register
 from salmalm.constants import WORKSPACE_DIR, KST, BASE_DIR
 from salmalm.crypto import log
+from salmalm.utils.db import connect as _connect_db
 
 # ── Database ─────────────────────────────────────────────────
 
@@ -17,10 +18,7 @@ _db_lock = threading.Lock()
 
 
 def _get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA journal_mode=WAL')
-    return conn
+    return _connect_db(_DB_PATH, wal=True, row_factory=True, check_same_thread=False)
 
 
 def _init_db():

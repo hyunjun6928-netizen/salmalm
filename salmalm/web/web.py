@@ -99,7 +99,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     # Public endpoints (no auth required)
     _PUBLIC_PATHS = {
         '/', '/index.html', '/api/status', '/api/health', '/api/unlock',
-        '/api/auth/login', '/api/users/register', '/api/onboarding', '/api/setup', '/docs',
+        '/api/auth/login', '/api/users/register', '/api/onboarding', '/api/onboarding/preferences', '/api/setup', '/docs',
         '/api/google/callback', '/webhook/telegram', '/webhook/slack',
     }
 
@@ -581,7 +581,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self._html(WEB_HTML)
 
-
+        elif self.path == '/setup':
+            # Allow re-running the setup wizard anytime
+            self._html(ONBOARDING_HTML)
 
         elif self.path == '/api/sessions':
             if not self._require_auth('user'): return
@@ -2120,6 +2122,32 @@ self.addEventListener('fetch',e=>{{
             audit_log('onboarding', f'keys: {", ".join(saved)}')
             test_result = ' | '.join(test_results) if test_results else 'Keys saved.'
             self._json({'ok': True, 'saved': saved, 'test_result': test_result})
+            return
+
+        elif self.path == '/api/onboarding/preferences':
+            # Save model + persona preferences from setup wizard
+            model = body.get('model', 'auto')
+            persona = body.get('persona', 'expert')
+            if model and model != 'auto':
+                vault.set('default_model', model)
+            # Write SOUL.md persona template
+            persona_templates = {
+                'expert': '# SOUL.md\n\nYou are a professional AI expert. Be precise, detail-oriented, and thorough in your responses. Use technical language when appropriate and always provide well-structured answers.',
+                'friend': '# SOUL.md\n\nYou are a friendly and warm conversational partner. Be casual, use humor when appropriate, and make the user feel comfortable. Keep things light and engaging while still being helpful.',
+                'assistant': '# SOUL.md\n\nYou are an efficient personal assistant. Be concise, task-focused, and proactive. Prioritize actionable information and minimize unnecessary verbosity.',
+            }
+            template = persona_templates.get(persona, persona_templates['expert'])
+            try:
+                from salmalm.constants import DATA_DIR
+                soul_path = os.path.join(DATA_DIR, 'SOUL.md')
+                if not os.path.exists(soul_path):
+                    os.makedirs(os.path.dirname(soul_path), exist_ok=True)
+                    with open(soul_path, 'w', encoding='utf-8') as f:
+                        f.write(template)
+            except Exception:
+                pass
+            audit_log('onboarding', f'preferences: model={model}, persona={persona}')
+            self._json({'ok': True})
             return
 
         elif self.path == '/api/config/telegram':

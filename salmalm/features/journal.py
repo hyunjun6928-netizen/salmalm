@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from salmalm.constants import KST, BASE_DIR
+from salmalm.utils.db import connect as _connect_db
 
 log = logging.getLogger(__name__)
 
@@ -30,9 +31,7 @@ _MOOD_KEYWORDS = {
 
 
 def _get_db(db_path: Optional[Path] = None) -> sqlite3.Connection:
-    path = str(db_path or JOURNAL_DB)
-    conn = sqlite3.connect(path)
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn = _connect_db(db_path or JOURNAL_DB, wal=True)
     conn.execute("""CREATE TABLE IF NOT EXISTS journal_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL,

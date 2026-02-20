@@ -8,9 +8,10 @@ import logging
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from salmalm.constants import KST, BASE_DIR
+from salmalm.utils.db import connect as _connect_db
 
 log = logging.getLogger(__name__)
 
@@ -18,9 +19,7 @@ HABIT_DB = BASE_DIR / "habits.db"
 
 
 def _get_db(db_path: Optional[Path] = None) -> sqlite3.Connection:
-    path = str(db_path or HABIT_DB)
-    conn = sqlite3.connect(path)
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn = _connect_db(db_path or HABIT_DB, wal=True)
     conn.execute("""CREATE TABLE IF NOT EXISTS habits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,

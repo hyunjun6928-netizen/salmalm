@@ -29,12 +29,11 @@ import salmalm.core as _core
 def _check_for_updates() -> str:
     """Check PyPI for newer version. Returns update message or empty string."""
     try:
-        import urllib.request, json as _json
-        req = urllib.request.Request(
+        from salmalm.utils.http import request_json as _rj
+        data = _rj(
             'https://pypi.org/pypi/salmalm/json',
-            headers={'User-Agent': f'SalmAlm/{VERSION}', 'Accept': 'application/json'})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = _json.loads(resp.read())
+            headers={'User-Agent': f'SalmAlm/{VERSION}', 'Accept': 'application/json'},
+            timeout=5)
         latest = data.get('info', {}).get('version', '')
         def _ver_tuple(v):
             return tuple(int(x) for x in v.split('.'))
@@ -193,18 +192,18 @@ async def run_server():
     rag_stats = rag_engine.get_stats()
     st = f"{selftest['passed']}/{selftest['total']}"
     update_msg = _check_for_updates()
-    print(f"""
-╔══════════════════════════════════════════════╗
-║  😈 {APP_NAME} v{VERSION}                   ║
-║  Web UI:    http://127.0.0.1:{port:<5}           ║
-║  WebSocket: ws://127.0.0.1:{ws_port:<5}            ║
-║  Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}         ║
-║  Crypto:    {'AES-256-GCM' if HAS_CRYPTO else 'HMAC-CTR (fallback)'}            ║
-║  Self-test: {st}                               ║
-╚══════════════════════════════════════════════╝
-""")
+    log.info(
+        f"\n╔══════════════════════════════════════════════╗\n"
+        f"║  😈 {APP_NAME} v{VERSION}                   ║\n"
+        f"║  Web UI:    http://127.0.0.1:{port:<5}           ║\n"
+        f"║  WebSocket: ws://127.0.0.1:{ws_port:<5}            ║\n"
+        f"║  Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}         ║\n"
+        f"║  Crypto:    {'AES-256-GCM' if HAS_CRYPTO else 'HMAC-CTR (fallback)'}            ║\n"
+        f"║  Self-test: {st}                               ║\n"
+        f"╚══════════════════════════════════════════════╝"
+    )
     if update_msg:
-        print(f"  {update_msg}\n")
+        log.info(f"  {update_msg}")
 
     # Auto-open browser on first start
     try:

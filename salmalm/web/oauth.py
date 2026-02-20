@@ -15,9 +15,10 @@ import os
 import secrets
 import time
 import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from salmalm.utils.http import request as _http_request
 
 log = logging.getLogger(__name__)
 
@@ -71,12 +72,10 @@ class AnthropicOAuth:
             'client_id': self.client_id,
             'client_secret': self.client_secret,
         }).encode()
-        req = urllib.request.Request(
+        result = json.loads(_http_request(
             self.TOKEN_URL, data=data,
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read())
+        ))
         result['obtained_at'] = time.time()
         return result
 
@@ -87,12 +86,10 @@ class AnthropicOAuth:
             'client_id': self.client_id,
             'client_secret': self.client_secret,
         }).encode()
-        req = urllib.request.Request(
+        result = json.loads(_http_request(
             self.TOKEN_URL, data=data,
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read())
+        ))
         result['obtained_at'] = time.time()
         return result
 
@@ -145,12 +142,10 @@ class OpenAIOAuth:
             'client_id': self.client_id,
             'client_secret': self.client_secret,
         }).encode()
-        req = urllib.request.Request(
+        result = json.loads(_http_request(
             self.TOKEN_URL, data=data,
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read())
+        ))
         result['obtained_at'] = time.time()
         return result
 
@@ -161,12 +156,10 @@ class OpenAIOAuth:
             'client_id': self.client_id,
             'client_secret': self.client_secret,
         }).encode()
-        req = urllib.request.Request(
+        result = json.loads(_http_request(
             self.TOKEN_URL, data=data,
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read())
+        ))
         result['obtained_at'] = time.time()
         return result
 

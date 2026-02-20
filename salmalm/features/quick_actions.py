@@ -4,7 +4,6 @@ stdlib-only. SQLite 저장, 매크로 체인 지원.
 """
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 from datetime import datetime
@@ -12,6 +11,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from salmalm.constants import KST, BASE_DIR
+from salmalm.utils.db import connect as _connect_db
 
 log = logging.getLogger(__name__)
 
@@ -19,9 +19,7 @@ QA_DB = BASE_DIR / "quick_actions.db"
 
 
 def _get_db(db_path: Optional[Path] = None) -> sqlite3.Connection:
-    path = str(db_path or QA_DB)
-    conn = sqlite3.connect(path)
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn = _connect_db(db_path or QA_DB, wal=True)
     conn.execute("""CREATE TABLE IF NOT EXISTS quick_actions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,

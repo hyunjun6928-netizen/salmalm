@@ -5,10 +5,13 @@ On other platforms, falls back to normal server execution.
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import threading
 import webbrowser
+
+logger = logging.getLogger(__name__)
 
 
 def is_windows() -> bool:
@@ -21,7 +24,7 @@ def run_tray(port: int = 18800):
     On non-Windows platforms, starts the server normally.
     """
     if not is_windows():
-        print("[INFO] System tray is Windows-only. Starting normal server...")
+        logger.info("System tray is Windows-only. Starting normal server...")
         from .__main__ import main
         main()
         return
@@ -214,7 +217,7 @@ def _run_windows_tray(port: int = 18800):
 
     shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
 
-    print(f'[TRAY] System tray icon active (port {port})')
+    logger.info(f'[TRAY] System tray icon active (port {port})')
 
     # ── Message loop ──
     msg = MSG()
@@ -226,4 +229,4 @@ def _run_windows_tray(port: int = 18800):
         pass
     finally:
         shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
-        print('[TRAY] Tray icon removed. Goodbye!')
+        logger.info('[TRAY] Tray icon removed. Goodbye!')
