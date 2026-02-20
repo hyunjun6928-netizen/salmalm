@@ -234,8 +234,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       <button data-action="newSession" title="New Chat" style="background:var(--accent);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
     </div>
     <div id="session-list" style="max-height:240px;overflow-y:auto;padding:0 8px 4px"></div>
-    <div class="nav-section" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px">📡 Channels</div>
-    <div class="nav-item" data-action="showChannels" id="tg-status">📡 Telegram <span class="badge">ON</span></div>
+    <div class="nav-section" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px" data-i18n="sec-manage">Manage</div>
     <div class="nav-item" data-action="showSessions" data-i18n="nav-sessions">📋 Sessions</div>
     <div class="nav-section" data-action="toggleTools" style="cursor:pointer" id="tools-header">🛠️ Tools ▾</div>
     <div id="tools-list" style="display:none">
@@ -599,13 +598,6 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <button class="btn" data-action="refreshSessions" style="font-size:12px">🔄</button>
   </div>
   <div id="sessions-table" style="color:var(--text2)">Loading...</div>
-</div>
-
-<!-- Channels Panel -->
-<div id="channels-view" style="display:none;padding:20px;max-width:1200px;margin:0 auto">
-  <div style="margin-bottom:16px"><a href="#" data-action="showChat" style="color:var(--accent);text-decoration:none;font-size:13px">← Back to Chat</a></div>
-  <h2 style="margin-bottom:16px" data-i18n="ch-title">📡 Channels</h2>
-  <div id="channels-content">Loading...</div>
 </div>
 
 <!-- Docs Panel -->
@@ -1357,7 +1349,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'nav-weather':'Weather','nav-rss':'RSS','nav-remind':'Reminders','nav-translate':'Translate',
       'nav-workflow':'Workflows','nav-qr':'QR Code','nav-notify':'Notifications','nav-fileindex':'File Search',
       'btn-save-ollama':'Save Ollama URL','btn-newchat':'🗨 New Chat',
-      'sec-chats':'💬 Chats','sec-channels':'Channels','sec-admin':'Admin',
+      'sec-chats':'💬 Chats','sec-channels':'Channels','sec-admin':'Admin','sec-manage':'Manage',
       'h-password':'🔒 Master Password',
       'pw-current':'Current Password','pw-new':'New Password','pw-confirm':'Confirm New Password',
       'pw-new-hint':'New password (4+ chars, leave empty to remove)','pw-confirm-hint':'Re-enter new password',
@@ -1468,7 +1460,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'nav-weather':'날씨','nav-rss':'뉴스 피드','nav-remind':'리마인더','nav-translate':'번역',
       'nav-workflow':'워크플로우','nav-qr':'QR 코드','nav-notify':'알림','nav-fileindex':'파일 검색',
       'btn-save-ollama':'Ollama URL 저장','btn-newchat':'🗨 새 대화',
-      'sec-chats':'💬 대화','sec-channels':'채널','sec-admin':'관리',
+      'sec-chats':'💬 대화','sec-channels':'채널','sec-admin':'관리','sec-manage':'관리',
       'h-password':'🔒 마스터 비밀번호',
       'pw-current':'현재 비밀번호','pw-new':'새 비밀번호','pw-confirm':'새 비밀번호 확인',
       'pw-new-hint':'새 비밀번호 (4자 이상, 비우면 해제)','pw-confirm-hint':'새 비밀번호 다시 입력',
@@ -1675,14 +1667,14 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- Settings --- */
   var dashView=document.getElementById('dashboard-view');
   var sessView=document.getElementById('sessions-view');
-  var chView=document.getElementById('channels-view');
+  var chView=document.createElement('div');/* channels removed */
   var docsView=document.getElementById('docs-view');
   var cronView=document.getElementById('cron-view');
   var memView=document.getElementById('memory-view');
   function _hideAll(){settingsEl.style.display='none';dashView.style.display='none';sessView.style.display='none';chView.style.display='none';docsView.style.display='none';cronView.style.display='none';memView.style.display='none';chat.style.display='none';inputArea.style.display='none'}
   window.showChat=function(){_hideAll();chat.style.display='flex';inputArea.style.display='block'};
   window.showSessions=function(){_hideAll();sessView.style.display='block';window._loadSessions()};
-  window.showChannels=function(){_hideAll();chView.style.display='block';window._loadChannels()};
+  window.showChannels=function(){window.showSettings()};/* redirect to settings */
   window.showDocs=function(){_hideAll();docsView.style.display='block';window._renderDocs('')};
   window.showCron=function(){_hideAll();cronView.style.display='block';window._loadCron()};
   window.showMemory=function(){_hideAll();memView.style.display='block';window._loadMemory()};
