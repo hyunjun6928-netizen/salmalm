@@ -243,9 +243,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <div id="tools-items" style="max-height:320px;overflow-y:auto"></div>
     </div>
     <div class="nav-section" data-i18n="sec-admin">Admin</div>
-    <div class="nav-item" data-action="showSettings"data-i18n="nav-settings">⚙️ Settings</div>
-    <div class="nav-item" data-action="showUsage">📊 Usage</div>
-    <div class="nav-item" data-action="showDashboard">📈 Dashboard</div>
+    <div class="nav-item" data-action="showSettings" data-i18n="nav-settings">⚙️ Settings</div>
+    <div class="nav-item" data-action="showDashboard" data-i18n="nav-dashboard">📈 Dashboard</div>
     <div class="nav-item" data-action="showDocs" data-i18n="nav-docs">📖 Docs</div>
   </div>
   <div class="side-footer">
@@ -1296,7 +1295,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- i18n --- */
   var _i18n={
     en:{
-      'nav-chat':'💬 Chat','nav-settings':'⚙️ Settings',
+      'nav-chat':'💬 Chat','nav-settings':'⚙️ Settings','nav-dashboard':'📈 Dashboard',
       'tab-general':'⚙️ General','tab-features':'📖 Features',
       'features-search-ph':'Search features...','features-empty':'No features found.',
       'h-model':'🤖 Model Settings','h-keys':'🔑 API Key Management','h-update':'🔄 Update','h-lang':'🌐 Language',
@@ -1405,7 +1404,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'pwa-install-text':'Install SalmAlm as an app','pwa-install-btn':'Install','pwa-dismiss':'Later',
     },
     ko:{
-      'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정',
+      'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정','nav-dashboard':'📈 대시보드',
       'tab-general':'⚙️ 일반','tab-features':'📖 기능 가이드',
       'features-search-ph':'기능 검색...','features-empty':'검색 결과가 없습니다.',
       'h-model':'🤖 모델 설정','h-keys':'🔑 API 키 관리','h-update':'🔄 업데이트','h-lang':'🌐 언어',
@@ -2321,7 +2320,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     if(a==='newSession')window.newSession();
     else if(a==='showChat')window.showChat();
     else if(a==='showSettings')window.showSettings();
-    else if(a==='showUsage')window.showSettings();
+    else if(a==='showUsage')window.showDashboard();
     else if(a==='showDashboard')window.showDashboard();
     else if(a==='showSessions')window.showSessions();
     else if(a==='showChannels')window.showChannels();
