@@ -773,6 +773,29 @@ TOOL_DEFINITIONS = [
             'required': ['patch_text'],
         }
     },
+    {
+        'name': 'ui_control',
+        'description': 'Control the web UI settings. Change language, theme, model, navigate panels, or create cron jobs. '
+                       'UI 설정 제어: 언어, 테마, 모델 변경, 패널 이동, 크론 작업 생성.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {
+                    'type': 'string',
+                    'enum': ['set_lang', 'set_theme', 'set_model', 'new_session', 'show_panel', 'add_cron', 'toggle_debug'],
+                    'description': 'Action to perform'
+                },
+                'value': {
+                    'type': 'string',
+                    'description': 'Value for the action. set_lang: en/ko, set_theme: light/dark, set_model: model name, show_panel: chat/settings/dashboard/sessions/cron/memory/docs'
+                },
+                'name': {'type': 'string', 'description': 'For add_cron: job name'},
+                'interval': {'type': 'integer', 'description': 'For add_cron: interval in seconds'},
+                'prompt': {'type': 'string', 'description': 'For add_cron: AI prompt to execute'},
+            },
+            'required': ['action'],
+        }
+    },
 ]
 
 

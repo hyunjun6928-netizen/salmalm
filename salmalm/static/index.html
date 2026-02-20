@@ -1239,6 +1239,15 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
             }}
           }else if(etype==='chunk'){
             if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4.innerHTML=''}tb4.innerHTML+=edata.text.replace(/</g,'&lt;')}}
+          }else if(etype==='ui_cmd'){
+            /* AI-driven UI control */
+            var act=edata.action,val=edata.value||'';
+            if(act==='set_lang'){window.setLang(val)}
+            else if(act==='set_theme'){document.body.setAttribute('data-theme',val);localStorage.setItem('salmalm-theme',val)}
+            else if(act==='set_model'){fetch('/api/model/set',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({model:val})}).then(function(){modelBadge.textContent=val.split('/').pop()})}
+            else if(act==='new_session'){window.newSession&&window.newSession()}
+            else if(act==='show_panel'){var panelMap={chat:'showChat',settings:'showSettings',dashboard:'showDashboard',sessions:'showSessions',cron:'showCron',memory:'showMemory',docs:'showDocs'};var fn=panelMap[val];if(fn&&window[fn])window[fn]()}
+            else if(act==='add_cron'){fetch('/api/cron/add',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({name:edata.name||'ai-job',interval:edata.interval||3600,prompt:edata.prompt||''})}).then(function(){if(window._loadCron)window._loadCron()})}
           }else if(etype==='done'){
             gotDone=true;
             if(typingEl)typingEl.remove();
@@ -1640,7 +1649,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     web_fetch:{icon:'📥',en:'Web Fetch',kr:'웹 페이지 가져오기',cmd:'Fetch URL:'},
     web_search:{icon:'🔎',en:'Web Search',kr:'웹 검색',cmd:'Search the web for'},
     workflow:{icon:'⚙️',en:'Workflow',kr:'워크플로우',cmd:'/workflow list'},
-    write_file:{icon:'💾',en:'Write File',kr:'파일 쓰기',cmd:'Write file'}
+    write_file:{icon:'💾',en:'Write File',kr:'파일 쓰기',cmd:'Write file'},
+    ui_control:{icon:'🎛️',en:'UI Control',kr:'UI 제어',cmd:'Change theme to dark'}
   };
   var _allTools=[];
   /* Load dynamic tool list */

@@ -2279,6 +2279,13 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     response = f'❌ Internal error: {type(e).__name__}'
                 from salmalm.core import get_session as _gs2
                 _sess2 = _gs2(session_id)
+                # Send pending UI commands before done
+                try:
+                    from salmalm.tools.tools_ui import pop_pending_commands
+                    for cmd in pop_pending_commands():
+                        send_sse('ui_cmd', cmd)
+                except Exception:
+                    pass
                 send_sse('done', {'response': response,
                                   'model': getattr(_sess2, 'last_model', router.force_model or 'auto'),
                                   'complexity': getattr(_sess2, 'last_complexity', 'auto')})

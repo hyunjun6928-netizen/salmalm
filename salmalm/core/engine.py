@@ -293,6 +293,16 @@ _KEYWORD_TOOLS = {
     'workflow': ['workflow'],
     'file_index': ['file_index'],
     'clipboard': ['clipboard'],
+    'settings': ['ui_control'],
+    '설정': ['ui_control'],
+    'theme': ['ui_control'],
+    '테마': ['ui_control'],
+    'dark mode': ['ui_control'],
+    'light mode': ['ui_control'],
+    '다크모드': ['ui_control'],
+    '라이트모드': ['ui_control'],
+    'language': ['ui_control'],
+    '언어': ['ui_control'],
 }
 
 # Dynamic max_tokens per intent
