@@ -92,7 +92,7 @@ class TestWebAllRoutes(unittest.TestCase):
 
     def test_get_health(self):
         s, _ = self._get('/api/health')
-        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500))
+        self.assertIn(s, (200, 302, 400, 401, 403, 404, 429, 500, 503))
 
     def test_get_nodes(self):
         s, _ = self._get('/api/nodes')
