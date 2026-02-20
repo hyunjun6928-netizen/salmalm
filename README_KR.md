@@ -47,7 +47,7 @@ salmalm start
 | 🧩 | MCP 마켓플레이스 | ✅ | ❌ | ❌ | ✅ |
 | 📦 | 의존성 제로* | ✅ | 해당없음 | ❌ | ❌ |
 
-*\*표준 라이브러리만 사용; 선택적 연동은 표준 프로토콜 사용*
+*\*표준 라이브러리만 사용; 선택적으로 `cryptography` 패키지 사용 (없으면 순수 Python HMAC-CTR 폴백)*
 
 ---
 
@@ -62,6 +62,9 @@ salmalm start
 
 # 옵션 지정
 salmalm start --port 8080 --no-browser
+
+# 업데이트
+pip install salmalm --upgrade
 ```
 
 ### 지원 프로바이더
@@ -74,7 +77,7 @@ salmalm start --port 8080 --no-browser
 | xAI | Grok-4, Grok-3 | `XAI_API_KEY` |
 | Ollama | 로컬 모델 전부 | `OLLAMA_URL` |
 
-API 키는 환경변수 또는 웹 UI 설정 → API Keys에서 입력 가능합니다.
+API 키는 환경변수 또는 웹 UI **설정 → API Keys**에서 입력 가능합니다.
 
 ---
 
@@ -179,16 +182,47 @@ ChatGPT, OpenClaw, Open WebUI 어디에도 없는 삶앎만의 기능:
 
 ---
 
+## 🔒 보안
+
+삶앎은 **위험 기능 기본 OFF** 정책을 따릅니다:
+
+| 기능 | 기본값 | 활성화 방법 |
+|---|---|---|
+| 네트워크 바인딩 | `127.0.0.1` (루프백만) | `SALMALM_BIND=0.0.0.0` 또는 `--host 0.0.0.0` |
+| 셸 연산자 (파이프, 리다이렉트, 체인) | 차단 | `SALMALM_ALLOW_SHELL=1` |
+| 홈 디렉토리 파일 읽기 | 워크스페이스만 | `SALMALM_ALLOW_HOME_READ=1` |
+| 금고 (`cryptography` 없을 때) | 비활성 | `SALMALM_VAULT_FALLBACK=1` (HMAC-CTR) |
+| exec에서 인터프리터 실행 | 차단 | `/bash` 또는 `python_eval` 도구 사용 |
+
+추가 보안:
+
+- **SSRF 방어** — 모든 리다이렉트 홉에서 사설 IP 차단, 스킴 허용 목록, userinfo 차단
+- **토큰 보안** — JWT `kid` 키 순환, `jti` 폐기, PBKDF2-200K 비밀번호 해싱
+- **로그인 잠금** — DB 기반 영구 브루트포스 방어 + 자동 정리
+- **감사 추적** — 변조 방지용 추가 전용 체크포인트 로그
+- **WebSocket Origin 검증** — 크로스 사이트 WebSocket 하이재킹 방지
+- **CSP 호환 UI** — 인라인 이벤트 핸들러 없음, `data-action` 위임 전면 적용
+
+---
+
 ## 🔧 설정
 
 ```bash
-# 환경변수 (모두 선택사항)
+# 서버
 SALMALM_PORT=18800         # 웹 서버 포트
-SALMALM_BIND=127.0.0.1    # 바인드 주소
+SALMALM_BIND=127.0.0.1    # 바인드 주소 (기본: 루프백만)
 SALMALM_WS_PORT=18801     # 웹소켓 포트
-SALMALM_LLM_TIMEOUT=30    # LLM 요청 타임아웃
+SALMALM_HOME=~/SalmAlm    # 데이터 디렉토리 (DB, 금고, 로그, 메모리)
+
+# AI
+SALMALM_LLM_TIMEOUT=30    # LLM 요청 타임아웃 (초)
 SALMALM_COST_CAP=0        # 월간 비용 상한 (0=무제한)
+
+# 보안
 SALMALM_VAULT_PW=...      # 시작 시 금고 자동 잠금해제
+SALMALM_ALLOW_SHELL=1     # exec에서 셸 연산자 허용
+SALMALM_ALLOW_HOME_READ=1 # 워크스페이스 외부 파일 읽기 허용
+SALMALM_VAULT_FALLBACK=1  # cryptography 없이 HMAC-CTR 금고 허용
 ```
 
 모든 설정은 웹 UI에서도 가능합니다.
@@ -208,11 +242,11 @@ SALMALM_VAULT_PW=...      # 시작 시 금고 자동 잠금해제
                           └── 금고 (PBKDF2 암호화)
 ```
 
-- **218개 모듈**, **4만2천+ 줄**, **80개 테스트 파일**, **1,649개 테스트**
-- 라우트 테이블 아키텍처 (GET 85개 + POST 59개 핸들러)
-- 기본 바인딩 `127.0.0.1` (네트워크 노출은 명시적 opt-in)
+- **216개 모듈**, **4만3천+ 줄**, **78개 테스트 파일**, **1,785개 테스트**
 - 순수 Python 3.10+ 표준 라이브러리 — 프레임워크 없음, 무거운 의존성 없음
-- `pip install` 한 줄, Python이 있으면 어디서든 실행
+- 라우트 테이블 아키텍처 (GET 85개 + POST 59개 핸들러)
+- 기본 바인딩 `127.0.0.1` — 네트워크 노출은 명시적 opt-in
+- 런타임 데이터는 `~/SalmAlm`에 저장 (`SALMALM_HOME`으로 변경 가능)
 
 ---
 

@@ -47,7 +47,7 @@ First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 | 🧩 | MCP Marketplace | ✅ | ❌ | ❌ | ✅ |
 | 📦 | Zero dependencies* | ✅ | N/A | ❌ | ❌ |
 
-*\*stdlib-only core; optional integrations use standard protocols*
+*\*stdlib-only core; optional `cryptography` for vault, otherwise pure Python HMAC-CTR fallback*
 
 ---
 
@@ -62,6 +62,9 @@ salmalm start
 
 # Or with options
 salmalm start --port 8080 --no-browser
+
+# Update
+pip install salmalm --upgrade
 ```
 
 ### Supported Providers
@@ -74,7 +77,7 @@ salmalm start --port 8080 --no-browser
 | xAI | Grok-4, Grok-3 | `XAI_API_KEY` |
 | Ollama | Any local model | `OLLAMA_URL` |
 
-Set keys via environment variables or the web UI Settings → API Keys.
+Set keys via environment variables or the web UI **Settings → API Keys**.
 
 ---
 
@@ -179,16 +182,47 @@ These are SalmAlm-only — not found in ChatGPT, OpenClaw, Open WebUI, or any ot
 
 ---
 
+## 🔒 Security
+
+SalmAlm follows a **dangerous features default OFF** policy:
+
+| Feature | Default | Opt-in |
+|---|---|---|
+| Network bind | `127.0.0.1` (loopback only) | `SALMALM_BIND=0.0.0.0` or `--host 0.0.0.0` |
+| Shell operators (pipe, redirect, chain) | Blocked | `SALMALM_ALLOW_SHELL=1` |
+| Home directory file read | Workspace only | `SALMALM_ALLOW_HOME_READ=1` |
+| Vault (without `cryptography`) | Disabled | `SALMALM_VAULT_FALLBACK=1` for HMAC-CTR |
+| Interpreters in exec | Blocked | Use `/bash` or `python_eval` tool instead |
+
+Additional hardening:
+
+- **SSRF defense** — private IP blocklist on every redirect hop, scheme allowlist, userinfo block
+- **Token security** — JWT with `kid` key rotation, `jti` revocation, PBKDF2-200K password hashing
+- **Login lockout** — persistent DB-backed brute-force protection with auto-cleanup
+- **Audit trail** — append-only checkpoint log for tamper evidence
+- **WebSocket origin validation** — prevents cross-site WebSocket hijacking
+- **CSP-compatible UI** — no inline event handlers, `data-action` delegation throughout
+
+---
+
 ## 🔧 Configuration
 
 ```bash
-# Environment variables (all optional)
+# Server
 SALMALM_PORT=18800         # Web server port
-SALMALM_BIND=127.0.0.1    # Bind address
+SALMALM_BIND=127.0.0.1    # Bind address (default: loopback only)
 SALMALM_WS_PORT=18801     # WebSocket port
-SALMALM_LLM_TIMEOUT=30    # LLM request timeout
+SALMALM_HOME=~/SalmAlm    # Data directory (DB, vault, logs, memory)
+
+# AI
+SALMALM_LLM_TIMEOUT=30    # LLM request timeout (seconds)
 SALMALM_COST_CAP=0        # Monthly cost cap (0=unlimited)
+
+# Security
 SALMALM_VAULT_PW=...      # Auto-unlock vault on start
+SALMALM_ALLOW_SHELL=1     # Enable shell operators in exec
+SALMALM_ALLOW_HOME_READ=1 # Allow file read outside workspace
+SALMALM_VAULT_FALLBACK=1  # Allow HMAC-CTR vault without cryptography
 ```
 
 All configuration is also available through the web UI.
@@ -208,11 +242,11 @@ Discord  ──►             ├── RAG Engine (TF-IDF + cosine similarity)
                          └── Vault (PBKDF2 encrypted)
 ```
 
-- **218 modules**, **42K+ lines**, **80 test files**, **1,649 tests**
+- **216 modules**, **43K+ lines**, **78 test files**, **1,785 tests**
 - Pure Python 3.10+ stdlib — no frameworks, no heavy dependencies
-- Single `pip install`, runs anywhere Python runs
 - Route-table architecture (85 GET + 59 POST handlers)
-- Default bind `127.0.0.1` (explicit opt-in for network exposure)
+- Default bind `127.0.0.1` — explicit opt-in for network exposure
+- Runtime data under `~/SalmAlm` (configurable via `SALMALM_HOME`)
 
 ---
 
