@@ -817,7 +817,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* --- Quick command from sidebar --- */
   window.quickCmd=function(msg){
-    input.value=msg;doSend();
+    input.value=msg;input.focus();
+    input.dispatchEvent(new Event('input'));
     /* close sidebar on mobile */
     var sb=document.getElementById('sidebar');if(sb.classList.contains('open'))toggleSidebar();
   };
