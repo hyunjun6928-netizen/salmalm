@@ -654,7 +654,11 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     localStorage.removeItem('salm_chat');
     chat.innerHTML='';
     addMsg('system',t('new-session-msg'));
-    loadSessionList();
+    /* Register new session on server immediately so it appears in sidebar */
+    fetch('/api/sessions/create',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+      body:JSON.stringify({session_id:sid})})
+    .then(function(){loadSessionList()})
+    .catch(function(){loadSessionList()});
     var sb=document.getElementById('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();
   };
 

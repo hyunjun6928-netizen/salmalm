@@ -1578,6 +1578,23 @@ self.addEventListener('fetch',e=>{{
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)}, 500)
 
+        elif self.path == '/api/sessions/create':
+            if not self._require_auth('user'):
+                return
+            sid = body.get('session_id', '')
+            if not sid:
+                self._json({'ok': False, 'error': 'Missing session_id'}, 400)
+                return
+            from salmalm.core import _get_db
+            conn = _get_db()
+            try:
+                conn.execute('INSERT OR IGNORE INTO session_store (session_id, data, updated_at, title) VALUES (?, ?, datetime("now"), ?)',
+                             (sid, '[]', 'New Chat'))
+                conn.commit()
+            except Exception:
+                pass
+            self._json({'ok': True, 'session_id': sid})
+
         elif self.path == '/api/sessions/delete':
             if not self._require_auth('user'):
                 return
