@@ -222,3 +222,16 @@ class Vault:
 
 
 vault = Vault()
+
+
+# ── Fallback HMAC-CTR Encryption Notes ──
+# Version byte in .vault.enc header:
+#   b'\x03' = AES-256-GCM (requires `cryptography` package)
+#   b'\x02' = HMAC-CTR fallback (stdlib only, NOT a standard AEAD)
+#
+# HMAC-CTR uses HMAC-SHA256 as a PRF to generate keystream blocks:
+#   keystream[i] = HMAC(key, counter_i)  →  XOR with plaintext
+# Integrity is via a separate HMAC tag over (IV || ciphertext).
+#
+# This is safe for personal/dev use but NOT a peer-reviewed construction.
+# For production: install `cryptography` (AES-256-GCM).
