@@ -126,10 +126,12 @@ def _run_node_mode():
 
 
 def setup_workdir():
-    """Set working directory and load .env."""
+    """Set working directory and load .env.
+
+    Respects SALMALM_HOME env var; falls back to ~/SalmAlm.
+    """
     if not getattr(sys, 'frozen', False):
-        home = os.path.expanduser('~')
-        work_dir = os.path.join(home, 'SalmAlm')
+        work_dir = os.environ.get('SALMALM_HOME', '') or os.path.join(os.path.expanduser('~'), 'SalmAlm')
         os.makedirs(work_dir, exist_ok=True)
         os.chdir(work_dir)
 

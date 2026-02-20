@@ -16,9 +16,10 @@ def main() -> None:
     if dispatch_cli():
         return
 
-    # Ensure working directory has required folders
+    # Ensure DATA_DIR has required folders
+    from salmalm.constants import DATA_DIR
     for d in ('memory', 'workspace', 'uploads', 'plugins'):
-        os.makedirs(d, exist_ok=True)
+        os.makedirs(DATA_DIR / d, exist_ok=True)
 
     from salmalm.bootstrap import run_server
     asyncio.run(run_server())

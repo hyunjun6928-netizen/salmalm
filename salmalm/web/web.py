@@ -159,9 +159,12 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             return None
 
         # Fallback: if request is from loopback AND vault is unlocked, allow (single-user local mode)
+        # Disabled when binding to 0.0.0.0 (external exposure) for safety
         ip = self._get_client_ip()
-        if ip in ("127.0.0.1", "::1", "localhost") and vault.is_unlocked:
-            return {"username": "local", "role": "admin", "id": 0}
+        bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+        if bind in ("127.0.0.1", "localhost", "::1"):
+            if ip in ("127.0.0.1", "::1", "localhost") and vault.is_unlocked:
+                return {"username": "local", "role": "admin", "id": 0}
 
         self._json({"error": "Authentication required"}, 401)
         return None
@@ -1909,13 +1912,17 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 if soul_path.exists():
                     zf.writestr("soul.md", soul_path.read_text(encoding="utf-8"))
                 # Memory files
-                memory_dir = BASE_DIR / "memory"
-                if memory_dir.exists():
-                    for f in memory_dir.glob("*"):
+                from salmalm.constants import MEMORY_DIR as _mem_dir
+                if _mem_dir.exists():
+                    for f in _mem_dir.glob("*"):
                         if f.is_file():
                             zf.writestr(
                                 f"memory/{f.name}", f.read_text(encoding="utf-8")
                             )
+                # Also include memory.md from DATA_DIR
+                mem_md = DATA_DIR / "memory.md"
+                if mem_md.exists():
+                    zf.writestr("memory.md", mem_md.read_text(encoding="utf-8"))
                 # Config
                 config_path = DATA_DIR / "config.json"
                 if config_path.exists():
@@ -1955,7 +1962,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                         "journal.json",
                         "dashboard.json",
                     ):
-                        p = BASE_DIR / name
+                        p = DATA_DIR / name
                         if p.exists():
                             zf.writestr(f"data/{name}", p.read_text(encoding="utf-8"))
                 # Vault (API keys) — only if explicitly requested
@@ -1964,13 +1971,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
                     if _vault_mod.is_unlocked:
                         keys = {}
-                        for k in (
-                            "ANTHROPIC_API_KEY",
-                            "OPENAI_API_KEY",
-                            "XAI_API_KEY",
-                            "GOOGLE_API_KEY",
-                            "GEMINI_API_KEY",
-                        ):
+                        # Use internal vault key names (lowercase)
+                        for k in _vault_mod.keys():
                             v = _vault_mod.get(k)
                             if v:
                                 keys[k] = v

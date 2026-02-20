@@ -62,6 +62,9 @@ import json as _json
 from pathlib import Path as _Path
 
 # Model name corrections: constants.py has outdated names → map to real API IDs
+# Runtime model name corrections: maps deprecated/outdated model IDs to current ones.
+# Lives here (not constants.py) because these are API-layer fixes, not configuration.
+# Update when providers rename/deprecate models.
 _MODEL_NAME_FIXES = {
     # Anthropic
     'claude-haiku-3.5-20241022': 'claude-haiku-4-5-20251001',
