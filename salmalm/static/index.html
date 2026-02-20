@@ -937,16 +937,31 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       if(role==='user'&&hist.filter(function(m){return m.role==='user'}).length===1)setTimeout(loadSessionList,500);
     }
   }
+  var _currentAbort=null;
   function addTyping(statusText){
     const row=document.createElement('div');row.className='msg-row assistant';row.id='typing-row';
     const av=document.createElement('div');av.className='avatar';av.textContent='😈';
     const wrap=document.createElement('div');
-    const b=document.createElement('div');b.className='bubble';
+    const b=document.createElement('div');b.className='bubble';b.style.display='flex';b.style.alignItems='center';b.style.gap='8px';
     var label=statusText||'';
-    b.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div>'+(label?' '+label:'');
+    b.innerHTML='<div style="flex:1"><div class="typing-indicator"><span></span><span></span><span></span></div>'+(label?' '+label:'')+'</div>';
+    var cancelBtn=document.createElement('button');
+    cancelBtn.textContent='⏹';cancelBtn.title=t('btn-cancel-gen')||'Stop generating';
+    cancelBtn.style.cssText='border:none;background:var(--bg3);color:var(--red,#f87171);border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:14px;flex-shrink:0;transition:all 0.15s';
+    cancelBtn.onmouseenter=function(){cancelBtn.style.background='var(--red,#f87171)';cancelBtn.style.color='#fff'};
+    cancelBtn.onmouseleave=function(){cancelBtn.style.background='var(--bg3)';cancelBtn.style.color='var(--red,#f87171)'};
+    cancelBtn.onclick=function(){window._cancelGeneration()};
+    b.appendChild(cancelBtn);
     wrap.appendChild(b);row.appendChild(av);row.appendChild(wrap);
     chat.appendChild(row);chat.scrollTop=999999;
   }
+  window._cancelGeneration=function(){
+    if(_currentAbort){_currentAbort.abort();_currentAbort=null}
+    if(_ws&&_wsReady){try{_ws.send(JSON.stringify({type:'cancel'}))}catch(e){}}
+    var tr=document.getElementById('typing-row');if(tr)tr.remove();
+    addMsg('assistant','⏹ '+(t('gen-cancelled')||'Generation cancelled.'));
+    btn.disabled=false;input.focus();
+  };
   function updateTypingStatus(status, detail){
     var el=document.getElementById('typing-row');
     if(!el)return;
@@ -1081,8 +1096,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   async function _sendViaSse(chatBody,_sendStart){
     try{
+      _currentAbort=new AbortController();
       var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
-        body:JSON.stringify(chatBody)});
+        body:JSON.stringify(chatBody),signal:_currentAbort.signal});
       if(!r.ok||!r.body){throw new Error('stream unavailable')}
       var reader=r.body.getReader();var decoder=new TextDecoder();var buf='';var gotDone=false;
       var typingEl=document.getElementById('typing-row');
@@ -1310,6 +1326,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'cmd-search':'Search','cmd-theme':'Toggle Theme','cmd-sidebar':'Toggle Sidebar',
       'cmd-dashboard':'Dashboard',
       'shortcut-cmdpalette':'Command palette',
+      'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.',
       'pwa-install-text':'Install SalmAlm as an app','pwa-install-btn':'Install','pwa-dismiss':'Later',
     },
     ko:{
@@ -1412,6 +1429,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'cmd-search':'검색','cmd-theme':'테마 전환','cmd-sidebar':'사이드바 전환',
       'cmd-dashboard':'대시보드',
       'shortcut-cmdpalette':'커맨드 팔레트',
+      'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.',
       'pwa-install-text':'SalmAlm을 앱으로 설치','pwa-install-btn':'설치','pwa-dismiss':'나중에',
     }
   };
