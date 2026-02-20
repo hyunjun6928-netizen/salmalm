@@ -1155,11 +1155,11 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                             zf.writestr(f'data/{name}', p.read_text(encoding='utf-8'))
                 # Vault (API keys) — only if explicitly requested
                 if inc_vault:
-                    from salmalm.security.vault import vault
-                    if vault.is_unlocked:
+                    from salmalm.security.vault import vault as _vault_mod
+                    if _vault_mod.is_unlocked:
                         keys = {}
                         for k in ('ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY'):
-                            v = vault.get(k)
+                            v = _vault_mod.get(k)
                             if v:
                                 keys[k] = v
                         if keys:
