@@ -1485,6 +1485,88 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     });
   });
 
+  /* --- Model Router Tab --- */
+  window._loadModelRouter=function(){
+    var hdr={'X-Session-Token':_tok};
+    fetch('/api/llm-router/providers',{headers:hdr}).then(function(r){return r.json()}).then(function(d){
+      var cur=d.current_model||'(auto)';
+      document.getElementById('mr-current-name').textContent=cur;
+      /* Providers + models */
+      var provEl=document.getElementById('mr-providers');
+      var keysEl=document.getElementById('mr-keys');
+      var provHtml='';var keysHtml='';
+      d.providers.forEach(function(p){
+        var icon=p.available?'✅':'❌';
+        provHtml+='<div style="margin-bottom:20px"><div style="font-size:14px;font-weight:600;margin-bottom:8px">'+icon+' '+p.name+'</div>';
+        provHtml+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+        p.models.forEach(function(m){
+          var isActive=cur&&(cur===m.full||cur===m.name||cur.indexOf(m.name)!==-1);
+          var bg=isActive?'var(--accent)':'var(--bg3)';
+          var clr=isActive?'#fff':'var(--text)';
+          var badge=isActive?' 🟢':'';
+          var disabled=p.available?'':'opacity:0.4;pointer-events:none;';
+          provHtml+='<button class="mr-model-btn" data-model="'+m.full+'" style="'+disabled+'padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:'+bg+';color:'+clr+';cursor:pointer;font-size:13px;transition:all 0.15s">'+m.name+badge+'</button>';
+        });
+        provHtml+='</div></div>';
+        /* API key input */
+        if(p.env_key){
+          keysHtml+='<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">';
+          keysHtml+='<span style="min-width:80px;font-size:13px;font-weight:600">'+p.name+'</span>';
+          keysHtml+='<span>'+icon+'</span>';
+          keysHtml+='<input type="password" id="mr-key-'+p.name+'" placeholder="'+p.env_key+'" style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:13px">';
+          keysHtml+='<button class="mr-test-btn" data-provider="'+p.name+'" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text);cursor:pointer;font-size:12px;white-space:nowrap">Test</button>';
+          keysHtml+='<button class="mr-save-btn" data-provider="'+p.name+'" data-env-key="'+p.env_key+'" style="padding:6px 12px;border-radius:6px;border:1px solid var(--accent);background:var(--accent-dim);color:var(--accent2);cursor:pointer;font-size:12px;white-space:nowrap">Save</button>';
+          keysHtml+='</div>';
+        }
+      });
+      provEl.innerHTML=provHtml;
+      keysEl.innerHTML=keysHtml;
+      /* Model click → switch */
+      provEl.querySelectorAll('.mr-model-btn').forEach(function(btn){
+        btn.addEventListener('click',function(){
+          var model=btn.getAttribute('data-model');
+          btn.textContent='⏳';
+          fetch('/api/model/switch',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr),body:JSON.stringify({model:model})})
+            .then(function(r){return r.json()}).then(function(res){
+              if(res.ok)window._loadModelRouter();
+              else btn.textContent='❌ '+res.message;
+            }).catch(function(){btn.textContent='❌ Error'});
+        });
+      });
+      /* Test key */
+      keysEl.querySelectorAll('.mr-test-btn').forEach(function(btn){
+        btn.addEventListener('click',function(){
+          var prov=btn.getAttribute('data-provider');
+          var key=document.getElementById('mr-key-'+prov).value.trim();
+          if(!key){btn.textContent='❌ Empty';setTimeout(function(){btn.textContent='Test'},1500);return}
+          btn.textContent='⏳';
+          fetch('/api/test-provider',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr),body:JSON.stringify({provider:prov,api_key:key})})
+            .then(function(r){return r.json()}).then(function(res){
+              btn.textContent=res.ok?'✅':'❌';btn.title=res.message||'';
+              setTimeout(function(){btn.textContent='Test'},3000);
+            }).catch(function(){btn.textContent='❌';setTimeout(function(){btn.textContent='Test'},2000)});
+        });
+      });
+      /* Save key to vault */
+      keysEl.querySelectorAll('.mr-save-btn').forEach(function(btn){
+        btn.addEventListener('click',function(){
+          var prov=btn.getAttribute('data-provider');
+          var envKey=btn.getAttribute('data-env-key');
+          var key=document.getElementById('mr-key-'+prov).value.trim();
+          if(!key){btn.textContent='❌ Empty';setTimeout(function(){btn.textContent='Save'},1500);return}
+          btn.textContent='⏳';
+          fetch('/api/vault',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr),body:JSON.stringify({action:'set',key:envKey.toLowerCase(),value:key})})
+            .then(function(r){return r.json()}).then(function(res){
+              btn.textContent=res.ok?'✅ Saved':'❌';
+              setTimeout(function(){btn.textContent='Save';window._loadModelRouter()},1500);
+            }).catch(function(){btn.textContent='❌';setTimeout(function(){btn.textContent='Save'},2000)});
+        });
+      });
+    }).catch(function(e){
+      document.getElementById('mr-providers').innerHTML='<div style="color:var(--red)">Failed to load providers</div>';
+    });
+  };
+
   /* --- Features Guide --- */
   var FEATURE_CATEGORIES=[
     {id:'core',icon:'🤖',title:'Core AI',title_kr:'핵심 AI',features:[
