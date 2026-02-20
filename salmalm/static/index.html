@@ -282,6 +282,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <button class="settings-tab active" data-settings-tab="general" style="padding:10px 20px;border:none;background:none;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-general">⚙️ General</button>
     <button class="settings-tab" data-settings-tab="features" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-features">📖 Features</button>
     <button class="settings-tab" data-settings-tab="model-router" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px">🤖 Model</button>
+    <button class="settings-tab" data-settings-tab="logs" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-logs">📋 Logs</button>
   </div>
   <div id="settings-general">
   <div class="settings-card">
@@ -485,6 +486,29 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       <div style="display:flex;gap:6px"><input id="sk-brave" type="password" placeholder="BSA..."><button class="btn" data-action="save-brave">Save</button></div>
       <div id="key-test-result" style="margin-top:8px;font-size:12px"></div>
       <div id="vault-keys" style="margin-top:12px"></div>
+    </div>
+  </div>
+  <!-- Logs Tab -->
+  <div id="settings-logs" style="display:none">
+    <div class="settings-card">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <h3 style="margin:0" data-i18n="h-logs">📋 Server Logs</h3>
+        <select id="log-level" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px">
+          <option value="">All</option>
+          <option value="ERROR">❌ Error</option>
+          <option value="WARNING">⚠️ Warning</option>
+          <option value="INFO">ℹ️ Info</option>
+        </select>
+        <select id="log-lines" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px">
+          <option value="50">50 lines</option>
+          <option value="100" selected>100 lines</option>
+          <option value="300">300 lines</option>
+          <option value="500">500 lines</option>
+        </select>
+        <button class="btn" data-action="refreshLogs" style="font-size:12px">🔄 Refresh</button>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;margin-left:auto"><input type="checkbox" id="log-auto-refresh"> Auto (5s)</label>
+      </div>
+      <div id="log-viewer" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.6;max-height:600px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text)"></div>
     </div>
   </div>
 </div>
@@ -1034,7 +1058,22 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     if(data.type==='chunk'){
       if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb){if(!tb._streaming){tb._streaming=true;tb.innerHTML=''}tb.innerHTML+=data.text.replace(/</g,'&lt;')}}
     }else if(data.type==='tool'){
-      if(typingEl){var tb2=typingEl.querySelector('.bubble');if(tb2)tb2.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> 🔧 '+data.name+'...'}
+      if(typingEl){
+        var tb2=typingEl.querySelector('.bubble');
+        if(tb2){
+          /* Show tool execution detail */
+          var toolHtml='<div style="display:flex;align-items:center;gap:8px"><div class="typing-indicator"><span></span><span></span><span></span></div> <span style="font-weight:600">🔧 '+data.name+'</span></div>';
+          if(data.input){
+            var inputStr=typeof data.input==='string'?data.input:JSON.stringify(data.input,null,2);
+            if(inputStr.length>200)inputStr=inputStr.substring(0,200)+'...';
+            toolHtml+='<details style="margin-top:4px;font-size:11px"><summary style="cursor:pointer;color:var(--text2)">📥 Input</summary><pre style="background:var(--bg);padding:6px;border-radius:4px;margin:4px 0;overflow-x:auto;font-size:11px;max-height:150px">'+inputStr.replace(/</g,'&lt;')+'</pre></details>';
+          }
+          /* Append to tool log instead of replacing */
+          if(!tb2._toolLog){tb2._toolLog='';tb2.innerHTML=''}
+          tb2._toolLog+=toolHtml;
+          tb2.innerHTML=tb2._toolLog;
+        }
+      }
     }else if(data.type==='done'){
       if(typingEl)typingEl.remove();
       var _secs=((Date.now()-_wsSendStart)/1000).toFixed(1);
@@ -1087,7 +1126,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
           if(etype==='status'){
             if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb)tb.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> '+edata.text}
           }else if(etype==='tool'){
-            if(typingEl){var tb2=typingEl.querySelector('.bubble');if(tb2)tb2.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> 🔧 '+edata.name+(edata.count?' ('+edata.count+')':'')+'...'}
+            if(typingEl){var tb2=typingEl.querySelector('.bubble');if(tb2){
+              var toolH='<div style="display:flex;align-items:center;gap:8px"><div class="typing-indicator"><span></span><span></span><span></span></div> <span style="font-weight:600">🔧 '+edata.name+'</span>'+(edata.count?' <span style="font-size:11px;color:var(--text2)">('+edata.count+')</span>':'')+'</div>';
+              if(edata.input){var inp=typeof edata.input==='string'?edata.input:JSON.stringify(edata.input,null,2);if(inp.length>200)inp=inp.substring(0,200)+'...';toolH+='<details style="margin-top:4px;font-size:11px"><summary style="cursor:pointer;color:var(--text2)">📥 Input</summary><pre style="background:var(--bg);padding:6px;border-radius:4px;margin:4px 0;overflow-x:auto;font-size:11px;max-height:150px">'+inp.replace(/</g,'&lt;')+'</pre></details>'}
+              if(!tb2._toolLog){tb2._toolLog='';tb2.innerHTML=''}
+              tb2._toolLog+=toolH;tb2.innerHTML=tb2._toolLog;
+            }}
           }else if(etype==='chunk'){
             if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4.innerHTML=''}tb4.innerHTML+=edata.text.replace(/</g,'&lt;')}}
           }else if(etype==='done'){
@@ -1300,6 +1344,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-cmdpalette':'Command palette',
       'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.',
       'mr-active':'Active Model','mr-providers-title':'📦 Models by Provider','mr-providers-desc':'Click a model to switch. Pricing per 1M tokens (input / output).','mr-keys-desc':'Enter API keys to enable providers. Keys are tested in real-time.',
+      'tab-logs':'📋 Logs','h-logs':'📋 Server Logs',
       'pwa-install-text':'Install SalmAlm as an app','pwa-install-btn':'Install','pwa-dismiss':'Later',
     },
     ko:{
@@ -1404,6 +1449,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-cmdpalette':'커맨드 팔레트',
       'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.',
       'mr-active':'활성 모델','mr-providers-title':'📦 프로바이더별 모델','mr-providers-desc':'모델을 클릭하면 전환됩니다. 가격: 1M 토큰당 (입력 / 출력).','mr-keys-desc':'API 키를 입력하면 프로바이더가 활성화됩니다. 키는 실시간으로 테스트됩니다.',
+      'tab-logs':'📋 로그','h-logs':'📋 서버 로그',
       'pwa-install-text':'SalmAlm을 앱으로 설치','pwa-install-btn':'설치','pwa-dismiss':'나중에',
     }
   };
@@ -1483,8 +1529,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       document.getElementById('settings-general').style.display=which==='general'?'block':'none';
       document.getElementById('settings-features').style.display=which==='features'?'block':'none';
       document.getElementById('settings-model-router').style.display=which==='model-router'?'block':'none';
+      document.getElementById('settings-logs').style.display=which==='logs'?'block':'none';
       if(which==='features'&&!window._featuresLoaded){window._featuresLoaded=true;loadFeatures()}
       if(which==='model-router'){window._loadModelRouter()}
+      if(which==='logs'){window._loadLogs()}
     });
   });
 
@@ -2158,6 +2206,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='exportAgent')window.exportAgent();
     else if(a==='importAgent')window.importAgent();
     else if(a==='quickSyncExport')window.quickSyncExport();
+    else if(a==='refreshLogs'){window._loadLogs()}
     else if(a==='attachFile'){document.getElementById('file-input-hidden').click()}
     else if(a==='switchModel'){
       var model=el.getAttribute('data-model');
@@ -2368,6 +2417,34 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k)})});
   }
 })();
+
+  /* ── Logs Tab ── */
+  var _logAutoTimer=null;
+  window._loadLogs=function(){
+    var level=document.getElementById('log-level').value;
+    var lines=document.getElementById('log-lines').value;
+    var viewer=document.getElementById('log-viewer');
+    viewer.textContent='Loading...';
+    fetch('/api/logs?lines='+lines+'&level='+level,{headers:{'X-Session-Token':_tok}})
+    .then(function(r){return r.json()}).then(function(d){
+      var logs=d.logs||[];
+      if(!logs.length){viewer.textContent='No logs found.';return}
+      var html='';
+      logs.forEach(function(ln){
+        var cls='';
+        if(ln.indexOf('[ERROR]')!==-1)cls='color:#f87171;font-weight:600';
+        else if(ln.indexOf('[WARNING]')!==-1)cls='color:#fbbf24';
+        else if(ln.indexOf('[INFO]')!==-1)cls='color:var(--text2)';
+        html+='<div style="'+cls+';padding:1px 0;border-bottom:1px solid var(--border)">'+ln.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>';
+      });
+      viewer.innerHTML=html;
+      viewer.scrollTop=viewer.scrollHeight;
+    }).catch(function(e){viewer.textContent='Error: '+e.message});
+  };
+  document.getElementById('log-auto-refresh').addEventListener('change',function(){
+    if(this.checked){_logAutoTimer=setInterval(window._loadLogs,5000)}
+    else{clearInterval(_logAutoTimer);_logAutoTimer=null}
+  });
 
   /* ── Model Router Tab (v2) ── */
 </script></body></html>

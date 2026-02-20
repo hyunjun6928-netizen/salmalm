@@ -915,6 +915,23 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             else:
                 self._json({'error': 'Missing text parameter'}, 400)
 
+        elif self.path.startswith('/api/logs'):
+            if not self._require_auth('user'):
+                return
+            from urllib.parse import parse_qs, urlparse
+            qs = parse_qs(urlparse(self.path).query)
+            lines = int(qs.get('lines', ['100'])[0])
+            level = qs.get('level', [''])[0].upper()
+            log_path = BASE_DIR / 'salmalm.log'
+            entries = []
+            if log_path.exists():
+                all_lines = log_path.read_text(encoding='utf-8', errors='replace').strip().split('\n')
+                for ln in all_lines[-lines:]:
+                    if level and f'[{level}]' not in ln:
+                        continue
+                    entries.append(ln)
+            self._json({'logs': entries, 'total': len(entries)})
+
         elif self.path == '/api/health':
             # K8s readiness/liveness probe compatible: 200=healthy, 503=unhealthy
             from salmalm.core.health import get_health_report
