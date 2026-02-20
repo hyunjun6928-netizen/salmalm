@@ -23,9 +23,9 @@ _cooldown_lock = _threading.Lock()
 
 # Default fallback chains (no config needed)
 _DEFAULT_FALLBACKS = {
-    'anthropic/claude-opus-4-6': ['anthropic/claude-sonnet-4-20250514', 'anthropic/claude-haiku-3.5-20241022'],
-    'anthropic/claude-sonnet-4-20250514': ['anthropic/claude-haiku-3.5-20241022', 'anthropic/claude-opus-4-6'],
-    'anthropic/claude-haiku-3.5-20241022': ['anthropic/claude-sonnet-4-20250514'],
+    'anthropic/claude-opus-4-6': ['anthropic/claude-sonnet-4-6', 'anthropic/claude-haiku-4-5-20251001'],
+    'anthropic/claude-sonnet-4-6': ['anthropic/claude-haiku-4-5-20251001', 'anthropic/claude-opus-4-6'],
+    'anthropic/claude-haiku-4-5-20251001': ['anthropic/claude-sonnet-4-6'],
     'google/gemini-2.5-pro': ['google/gemini-2.5-flash', 'google/gemini-2.0-flash'],
     'google/gemini-2.5-flash': ['google/gemini-2.0-flash', 'google/gemini-2.5-pro'],
     'google/gemini-2.0-flash': ['google/gemini-2.5-flash'],

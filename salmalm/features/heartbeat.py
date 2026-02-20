@@ -115,7 +115,7 @@ class CacheWarmer:
         import urllib.error
 
         body = {
-            'model': 'claude-haiku-3.5-20241022',  # Cheapest model
+            'model': 'claude-haiku-4-5-20251001',  # Cheapest model
             'max_tokens': 1,
             'messages': [{'role': 'user', 'content': 'ping'}],
             'system': [

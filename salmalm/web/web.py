@@ -2393,7 +2393,7 @@ self.addEventListener('fetch',e=>{{
                 if provider == 'anthropic':
                     url = f"{prov_cfg['base_url']}/messages"
                     req = urllib.request.Request(url,
-                                                 data=json.dumps({'model': 'claude-haiku-3.5-20241022', 'max_tokens': 1, 'messages': [{'role': 'user', 'content': 'hi'}]}).encode(),
+                                                 data=json.dumps({'model': 'claude-haiku-4-5-20251001', 'max_tokens': 1, 'messages': [{'role': 'user', 'content': 'hi'}]}).encode(),
                                                  headers={'x-api-key': api_key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'},
                                                  method='POST')
                 elif provider == 'ollama':

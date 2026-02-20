@@ -265,7 +265,7 @@ def _execute_inner(name: str, args: dict) -> str:
                 resp = _http_post(
                     'https://api.anthropic.com/v1/messages',
                     {'x-api-key': api_key, 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01'},
-                    {'model': 'claude-sonnet-4-20250514', 'max_tokens': 1000,
+                    {'model': 'claude-sonnet-4-6', 'max_tokens': 1000,
                      'messages': [{'role': 'user', 'content': [img_block, {'type': 'text', 'text': question}]}]}
                 )
                 return resp['content'][0]['text']  # type: ignore[no-any-return]

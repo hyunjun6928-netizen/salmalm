@@ -61,6 +61,19 @@ from salmalm.constants import MODELS as _MODELS
 import json as _json
 from pathlib import Path as _Path
 
+# Model name corrections: constants.py has outdated names → map to real API IDs
+_MODEL_NAME_FIXES = {
+    'claude-haiku-3.5-20241022': 'claude-haiku-4-5-20251001',
+    'anthropic/claude-haiku-3.5-20241022': 'anthropic/claude-haiku-4-5-20251001',
+    'claude-sonnet-4-20250514': 'claude-sonnet-4-6',
+    'anthropic/claude-sonnet-4-20250514': 'anthropic/claude-sonnet-4-6',
+}
+
+
+def _fix_model_name(model: str) -> str:
+    """Correct outdated model names to actual API IDs."""
+    return _MODEL_NAME_FIXES.get(model, model)
+
 # Routing config: user can override which model to use for each complexity level
 _ROUTING_CONFIG_FILE = _Path.home() / '.salmalm' / 'routing.json'
 
@@ -1120,7 +1133,7 @@ def estimate_tokens(text: str) -> int:
 MODEL_PRICING = {
     'claude-opus-4': {'input': 15.0, 'output': 75.0, 'cache_read': 1.5, 'cache_write': 18.75},
     'claude-sonnet-4': {'input': 3.0, 'output': 15.0, 'cache_read': 0.3, 'cache_write': 3.75},
-    'claude-haiku-3.5': {'input': 0.25, 'output': 1.25, 'cache_read': 0.03, 'cache_write': 0.3},
+    'claude-haiku-4-5': {'input': 1.0, 'output': 5.0, 'cache_read': 0.1, 'cache_write': 1.25},
     'gemini-2.5-pro': {'input': 1.25, 'output': 10.0, 'cache_read': 0.315, 'cache_write': 1.25},
     'gemini-2.5-flash': {'input': 0.15, 'output': 0.60, 'cache_read': 0.0375, 'cache_write': 0.15},
     'gemini-2.0-flash': {'input': 0.10, 'output': 0.40, 'cache_read': 0.025, 'cache_write': 0.10},
@@ -1331,7 +1344,7 @@ def _cmd_model(cmd, session, **_):
         if model_name == 'auto':
             router.set_force_model(None)
             return 'Model: **auto** (cost-optimized routing) — saved ✅\n• simple → haiku ⚡ • moderate → sonnet • complex → opus 💎'
-        labels = {'opus': 'claude-opus-4 💎', 'sonnet': 'claude-sonnet-4', 'haiku': 'claude-haiku-3.5 ⚡'}
+        labels = {'opus': 'claude-opus-4-6 💎', 'sonnet': 'claude-sonnet-4-6', 'haiku': 'claude-haiku-4-5 ⚡'}
         return f'Model: **{model_name}** ({labels[model_name]}) — saved ✅'
     if '/' in model_name:
         router.set_force_model(model_name)
@@ -1791,6 +1804,8 @@ async def _process_message_inner(session_id: str, user_message: str,
     if not model_override:
         selected_model, complexity = _select_model(user_message, session)
         log.info(f"[ROUTE] Multi-model: {complexity} → {selected_model}")
+    # Fix outdated model names to actual API IDs
+    selected_model = _fix_model_name(selected_model)
 
     # ── SLA: Measure latency (레이턴시 측정) ──
     _sla_start = _time.time()
