@@ -1347,7 +1347,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'sidebar-channels':'📡 Channels',
       'sidebar-tools':'🛠️ Tools ▾',
       'filter-ph':'Search sessions...','filter-no-results':'No results',
-      'img-too-large':'Image too large (max 5MB)','mic-denied':'Microphone access denied',
+      'img-too-large':'Image too large (max 5MB)','mic-denied':'Microphone access denied.','mic-hint-localhost':'💡 Try accessing via http://localhost:18800 instead of 127.0.0.1 (Chrome requires secure context for microphone).',
       'rollback-done':'⏪ Rolled back','rollback-pairs':'message pair(s).',
       'rollback-fail':'❌ Rollback failed:','branch-fail':'❌ Branch failed:',
       'upload-fail':'❌ Upload failed:','upload-error':'❌ Upload error:',
@@ -1452,7 +1452,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'sidebar-channels':'📡 채널',
       'sidebar-tools':'🛠️ 도구 ▾',
       'filter-ph':'세션 검색...','filter-no-results':'결과 없음',
-      'img-too-large':'이미지가 너무 큽니다 (최대 5MB)','mic-denied':'마이크 접근이 거부되었습니다',
+      'img-too-large':'이미지가 너무 큽니다 (최대 5MB)','mic-denied':'마이크 접근이 거부되었습니다.','mic-hint-localhost':'💡 127.0.0.1 대신 http://localhost:18800 으로 접속해보세요 (Chrome은 보안 컨텍스트에서만 마이크를 허용합니다).',
       'rollback-done':'⏪ 되돌리기 완료:','rollback-pairs':'개의 메시지 쌍',
       'rollback-fail':'❌ 되돌리기 실패:','branch-fail':'❌ 분기 실패:',
       'upload-fail':'❌ 업로드 실패:','upload-error':'❌ 업로드 오류:',
@@ -2334,7 +2334,11 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       };
       _mediaRec.start();
       btn.style.background='var(--red)';btn.style.color='#fff';
-    }).catch(function(){addMsg('assistant',t('mic-denied'))});
+    }).catch(function(err){
+      var msg=t('mic-denied');
+      if(location.hostname==='127.0.0.1'){msg+=' '+t('mic-hint-localhost')}
+      addMsg('assistant',msg);
+    });
   };
 
   /* --- Double-click to rename session title --- */

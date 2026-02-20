@@ -86,6 +86,38 @@ async def run_server():
     port = int(os.environ.get('SALMALM_PORT', 18800))
     bind_addr = os.environ.get('SALMALM_BIND', '0.0.0.0')
     server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
+
+    # Auto-generate self-signed cert for HTTPS (enables microphone, camera, etc.)
+    https_port = int(os.environ.get('SALMALM_HTTPS_PORT', 0))
+    if https_port or os.environ.get('SALMALM_HTTPS', '').lower() in ('1', 'true', 'yes'):
+        https_port = https_port or 18443
+        try:
+            import ssl
+            cert_dir = BASE_DIR / '.certs'
+            cert_dir.mkdir(exist_ok=True)
+            cert_file = cert_dir / 'salmalm.pem'
+            key_file = cert_dir / 'salmalm-key.pem'
+            if not cert_file.exists():
+                # Generate self-signed cert using stdlib
+                import subprocess
+                subprocess.run([
+                    'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
+                    '-keyout', str(key_file), '-out', str(cert_file),
+                    '-days', '3650', '-nodes', '-batch',
+                    '-subj', '/CN=localhost'
+                ], capture_output=True, timeout=30)
+                log.info("[HTTPS] Self-signed certificate generated")
+            if cert_file.exists() and key_file.exists():
+                ssl_server = http.server.ThreadingHTTPServer((bind_addr, https_port), WebHandler)
+                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                ctx.load_cert_chain(str(cert_file), str(key_file))
+                ssl_server.socket = ctx.wrap_socket(ssl_server.socket, server_side=True)
+                ssl_thread = threading.Thread(target=ssl_server.serve_forever, daemon=True)
+                ssl_thread.start()
+                log.info(f"[HTTPS] Secure UI: https://localhost:{https_port}")
+        except Exception as e:
+            log.warning(f"[HTTPS] Failed to start: {e}")
+
     web_thread = threading.Thread(target=server.serve_forever, daemon=True)
     web_thread.start()
     log.info(f"[WEB] Web UI: http://{bind_addr}:{port}")
