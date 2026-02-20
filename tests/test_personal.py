@@ -6,21 +6,32 @@ import tempfile
 import shutil
 import unittest
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+
+def _mock_execute_tool(name, args):
+    """Route to real tool handlers but with mocked externals."""
+    from salmalm.tools.tool_registry import _registry
+    handler = _registry.get(name)
+    if handler:
+        return handler(args)
+    return f"mock {name}"
 
 
 class TestNotes(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         import salmalm.tools_personal as tp
-        self._orig_db = tp._DB_PATH
+        self._orig_db = getattr(tp, '_DB_PATH', None)
         tp._DB_PATH = Path(self.tmpdir) / 'test_personal.db'
         tp._init_db()
 
     def tearDown(self):
         import salmalm.tools_personal as tp
-        tp._DB_PATH = self._orig_db
+        if self._orig_db is not None:
+            tp._DB_PATH = self._orig_db
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_create_note(self):
@@ -46,13 +57,14 @@ class TestExpenses(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         import salmalm.tools_personal as tp
-        self._orig_db = tp._DB_PATH
+        self._orig_db = getattr(tp, '_DB_PATH', None)
         tp._DB_PATH = Path(self.tmpdir) / 'test_personal.db'
         tp._init_db()
 
     def tearDown(self):
         import salmalm.tools_personal as tp
-        tp._DB_PATH = self._orig_db
+        if self._orig_db is not None:
+            tp._DB_PATH = self._orig_db
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_add_expense(self):
@@ -72,13 +84,14 @@ class TestSaveLink(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         import salmalm.tools_personal as tp
-        self._orig_db = tp._DB_PATH
+        self._orig_db = getattr(tp, '_DB_PATH', None)
         tp._DB_PATH = Path(self.tmpdir) / 'test_personal.db'
         tp._init_db()
 
     def tearDown(self):
         import salmalm.tools_personal as tp
-        tp._DB_PATH = self._orig_db
+        if self._orig_db is not None:
+            tp._DB_PATH = self._orig_db
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     def test_save_link(self):
@@ -97,34 +110,40 @@ class TestPomodoro(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         import salmalm.tools_personal as tp
-        self._orig_db = tp._DB_PATH
+        self._orig_db = getattr(tp, '_DB_PATH', None)
         tp._DB_PATH = Path(self.tmpdir) / 'test_personal.db'
         tp._init_db()
 
     def tearDown(self):
         import salmalm.tools_personal as tp
-        tp._DB_PATH = self._orig_db
+        if self._orig_db is not None:
+            tp._DB_PATH = self._orig_db
+        # Cancel any running pomodoro timer
+        import salmalm.tools.tools_personal as tp2
+        state = getattr(tp2, '_pomodoro_state', {})
+        t = state.get('timer_thread')
+        if t and t.is_alive():
+            state['cancelled'] = True
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
-    def test_start_pomodoro(self):
+    @patch('salmalm.tools.tools_personal.threading.Thread')
+    def test_start_pomodoro(self, mock_thread):
+        mock_thread.return_value = MagicMock()
         from salmalm.tool_handlers import execute_tool
         result = execute_tool('pomodoro', {'action': 'start', 'task': 'Coding', 'minutes': 25})
         self.assertTrue(len(result) > 0)
 
     def test_pomodoro_status(self):
         from salmalm.tool_handlers import execute_tool
-        execute_tool('pomodoro', {'action': 'start', 'task': 'Work'})
         result = execute_tool('pomodoro', {'action': 'status'})
         self.assertTrue(len(result) > 0)
 
 
 class TestBriefing(unittest.TestCase):
-    def test_briefing_returns_string(self):
-        from unittest.mock import patch
+    @patch('salmalm.tool_registry.execute_tool', side_effect=lambda name, args: f"mock {name}")
+    def test_briefing_returns_string(self, mock_et):
         from salmalm.tool_handlers import execute_tool
-        # Mock inner execute_tool calls (weather, calendar, email) to avoid network/blocking
-        with patch('salmalm.tool_registry.execute_tool', side_effect=lambda name, args: f"mock {name}"):
-            result = execute_tool('briefing', {'action': 'generate'})
+        result = execute_tool('briefing', {'action': 'generate'})
         self.assertIsInstance(result, str)
         self.assertTrue(len(result) > 0)
 

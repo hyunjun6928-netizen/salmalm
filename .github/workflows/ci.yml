@@ -46,8 +46,8 @@ jobs:
       - name: Coverage
         if: matrix.python-version == '3.12'
         run: |
-          pip install pytest-cov
-          pytest tests/ --cov=salmalm --cov-report=xml -q --tb=short
+          pip install pytest-cov pytest-timeout
+          pytest tests/ --cov=salmalm --cov-report=xml -q --tb=short --timeout=30
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
