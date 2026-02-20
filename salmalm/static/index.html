@@ -362,21 +362,22 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     </div>
     <div id="pw-result" style="margin-top:8px;font-size:12px"></div>
   </div>
-  <div class="settings-card" id="users-card" style="display:none">
+  <div class="settings-card" id="users-card">
     <h3>👥 Users / 사용자 관리</h3>
     <div id="users-panel">
-      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-        <label style="font-size:13px;margin:0"><input type="checkbox" id="mt-toggle"> Multi-tenant / 멀티테넌트</label>
-        <select id="reg-mode" style="width:auto;margin:0;padding:4px 8px">
+      <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:13px;margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="mt-toggle" style="width:16px;height:16px"> Multi-tenant / 멀티테넌트</label>
+        <select id="reg-mode" style="width:auto;margin:0;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
           <option value="admin_only">Admin-only registration</option>
           <option value="open">Open registration</option>
         </select>
       </div>
-      <div id="user-list" style="font-size:13px;color:var(--text2);margin-bottom:12px">Loading...</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input id="new-user-name" placeholder="Username" style="width:120px;margin:0">
-        <input id="new-user-pw" type="password" placeholder="Password" style="width:120px;margin:0">
-        <select id="new-user-role" style="width:auto;margin:0;padding:4px 8px">
+      <div id="user-list" style="font-size:13px;color:var(--text2);margin-bottom:16px;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">Loading...</div>
+      <h4 style="font-size:13px;margin-bottom:8px;color:var(--text2)">➕ Add User</h4>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="new-user-name" placeholder="Username" style="width:140px;margin:0;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+        <input id="new-user-pw" type="password" placeholder="Password" style="width:140px;margin:0;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+        <select id="new-user-role" style="width:auto;margin:0;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
           <option value="user">user</option>
           <option value="admin">admin</option>
         </select>
