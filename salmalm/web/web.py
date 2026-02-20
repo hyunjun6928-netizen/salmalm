@@ -271,9 +271,14 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         try:
             self._do_get_inner()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
         except Exception as e:
             log.error(f"GET {self.path} error: {e}")
-            self._json({"error": "Internal server error"}, 500)
+            try:
+                self._json({"error": "Internal server error"}, 500)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass
         finally:
             duration = (time.time() - _start) * 1000
             request_logger.log_request(
@@ -2073,9 +2078,14 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
         try:
             self._do_post_inner()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # Client disconnected — nothing to send
         except Exception as e:
             log.error(f"POST {self.path} error: {e}")
-            self._json({"error": "Internal server error"}, 500)
+            try:
+                self._json({"error": "Internal server error"}, 500)
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                pass  # Client already gone
         finally:
             duration = (time.time() - _start) * 1000
             request_logger.log_request(

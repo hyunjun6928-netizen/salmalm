@@ -1,7 +1,7 @@
-"""SalmAlm tool handlers — thin shim delegating to tool_registry.
+"""SalmAlm tool handlers — delegates to tool_registry + re-exports shared utilities.
 
-Keeps shared utilities (_resolve_path, _is_safe_command, _is_subpath) that other
-modules import, plus _legacy_execute for tools_media.py bridge.
+Shared utilities live in tools_common.py (single source of truth).
+This module re-exports them for backward compatibility.
 """
 import os
 import subprocess
@@ -21,6 +21,11 @@ from salmalm.security.crypto import vault, log
 from salmalm.core import audit_log
 from salmalm.core.llm import _http_post
 
+# Re-export shared utilities from canonical location (tools_common.py)
+from salmalm.tools.tools_common import (  # noqa: F401
+    _is_safe_command, _resolve_path, _is_private_url, _is_subpath,
+)
+
 # Re-export symbols that tests and other modules import from here
 from salmalm.tools.tools_misc import (  # noqa: F401 — re-export for tests and other modules
     _reminders, _reminder_lock, _send_notification_impl,
@@ -31,110 +36,6 @@ from salmalm.tools.tools_misc import (  # noqa: F401 — re-export for tests and
 # clipboard lock (used by tools_util.py)
 _clipboard_lock = threading.Lock()
 telegram_bot = None
-
-
-# ── Shared Utilities ─────────────────────────────────────────
-
-def _is_safe_command(cmd: str):
-    """Check if command is safe to execute (allowlist + blocklist double defense)."""
-    if not cmd.strip():
-        return False, 'Empty command'
-
-    # Blocklist patterns first (catches dangerous combos)
-    for pattern in EXEC_BLOCKLIST_PATTERNS:
-        if re.search(pattern, cmd):
-            return False, f'Blocked pattern: {pattern}'
-
-    # Split on pipe/chain operators and check EVERY stage
-    stages = re.split(r'\s*(?:\|\||&&|;|\|)\s*', cmd)
-    for stage in stages:
-        words = stage.strip().split()
-        if not words:
-            continue
-        first_word = words[0].split('/')[-1]  # strip path prefix
-        if first_word in EXEC_BLOCKLIST:
-            return False, f'Blocked command in pipeline: {first_word}'
-        if first_word in EXEC_BLOCKED_INTERPRETERS:
-            return False, f'Interpreter blocked (use python_eval tool): {first_word}'
-        if first_word in EXEC_ELEVATED:
-            log.warning(f"[WARN] Elevated exec: {first_word} (can run arbitrary code)")
-        elif first_word not in EXEC_ALLOWLIST:
-            return False, f'Command not in allowlist: {first_word}'
-
-    # Check for subshell/backtick/process substitution bypasses
-    if re.search(r'`.*`|\$\(.*\)|<\(|>\(', cmd):
-        inner = re.findall(r'`([^`]+)`|\$\(([^)]+)\)', cmd)
-        for groups in inner:
-            inner_cmd = groups[0] or groups[1]
-            safe, reason = _is_safe_command(inner_cmd)
-            if not safe:
-                return False, f'Unsafe subcommand: {reason}'
-
-    return True, 'OK'
-
-
-def _resolve_path(path: str, writing: bool = False) -> Path:
-    """Resolve path, preventing traversal outside allowed directories.
-
-    Default: workspace only (read & write).
-    Set SALMALM_ALLOW_HOME_READ=1 to also allow reading from home directory.
-    """
-    p = Path(path)
-    if not p.is_absolute():
-        p = WORKSPACE_DIR / p
-    p = p.resolve()
-
-    if writing:
-        # Write operations: workspace only
-        try:
-            p.relative_to(WORKSPACE_DIR.resolve())
-        except ValueError:
-            raise PermissionError(f'Write denied (outside workspace): {p}')
-    else:
-        # Read operations: workspace only by default; home opt-in
-        allowed = [WORKSPACE_DIR.resolve()]
-        if os.environ.get('SALMALM_ALLOW_HOME_READ', '') in ('1', 'true', 'yes'):
-            allowed.append(Path.home().resolve())
-        if not any(_is_subpath(p, a) for a in allowed):
-            raise PermissionError(f'Access denied: {p}')
-
-    if writing and p.name in PROTECTED_FILES:
-        raise PermissionError(f'Protected file: {p.name}')
-    return p
-
-
-def _is_private_url(url: str):
-    """Check if URL resolves to a private/internal IP. Returns (blocked, reason)."""
-    import ipaddress
-    import socket
-    from urllib.parse import urlparse
-    hostname = urlparse(url).hostname or ''
-    if not hostname:
-        return True, 'No hostname'
-    _BLOCKED_HOSTS = frozenset([
-        'metadata.google.internal', '169.254.169.254', 'metadata.internal',
-        'metadata', 'instance-data', '100.100.100.200',
-    ])
-    if hostname in _BLOCKED_HOSTS or hostname.endswith('.internal'):
-        return True, f'Blocked metadata endpoint: {hostname}'
-    try:
-        addrs = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for family, _, _, _, sockaddr in addrs:
-            ip = ipaddress.ip_address(sockaddr[0])
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                return True, f'Internal IP blocked: {hostname} → {ip}'
-    except socket.gaierror:
-        return True, f'DNS resolution failed: {hostname}'
-    return False, ''
-
-
-def _is_subpath(path: Path, parent: Path) -> bool:
-    """Check if path is under parent (safe, no startswith tricks)."""
-    try:
-        path.relative_to(parent)
-        return True
-    except ValueError:
-        return False
 
 
 # ── Main Entry Point (thin shim) ────────────────────────────

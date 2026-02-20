@@ -62,15 +62,24 @@ urllib.request.urlopen = _guarded_urlopen
 # ---------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def _cleanup():
-    """GC + thread cleanup between tests."""
+    """GC + thread cleanup + DB connection cleanup between tests."""
     threads_before = set(threading.enumerate())
     yield
     gc.collect()
-    # Give daemon threads a moment to die, don't block on non-daemon ones
+    # Close accumulated DB connections to prevent SQLite lock contention
+    try:
+        from salmalm.core.core import close_all_db_connections
+        close_all_db_connections()
+    except Exception:
+        pass
+    # Kill stale daemon threads (server threads, background tasks)
     import time
-    for t in threading.enumerate():
-        if t not in threads_before and t is not threading.current_thread() and t.daemon:
-            t.join(timeout=0.5)
+    stale = [t for t in threading.enumerate()
+             if t not in threads_before and t is not threading.current_thread()]
+    for t in stale:
+        t.join(timeout=1.0)
+    # Force-close any lingering sockets from test HTTP servers
+    gc.collect()
 
 
 # ---------------------------------------------------------------------------

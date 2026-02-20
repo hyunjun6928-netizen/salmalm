@@ -43,7 +43,12 @@ def _is_safe_command(cmd: str):
 
 
 def _resolve_path(path: str, writing: bool = False) -> Path:
-    """Resolve path, preventing traversal outside allowed directories."""
+    """Resolve path, preventing traversal outside allowed directories.
+
+    Default: workspace only (read & write).
+    Set SALMALM_ALLOW_HOME_READ=1 to also allow reading from home directory.
+    """
+    import os as _os
     p = Path(path)
     if not p.is_absolute():
         p = WORKSPACE_DIR / p
@@ -54,7 +59,9 @@ def _resolve_path(path: str, writing: bool = False) -> Path:
         except ValueError:
             raise PermissionError(f'Write denied (outside workspace): {p}')
     else:
-        allowed = [WORKSPACE_DIR.resolve(), Path.home().resolve()]
+        allowed = [WORKSPACE_DIR.resolve()]
+        if _os.environ.get('SALMALM_ALLOW_HOME_READ', '') in ('1', 'true', 'yes'):
+            allowed.append(Path.home().resolve())
         if not any(_is_subpath(p, a) for a in allowed):
             raise PermissionError(f'Access denied: {p}')
     if writing and p.name in PROTECTED_FILES:
