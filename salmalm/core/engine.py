@@ -483,7 +483,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             return False
         if len(response) < 100:  # Too short to be code/analysis
             return False
-        if classification['score'] >= 3:  # High confidence complex task
+        if classification.get('score', 0) >= 3:  # High confidence complex task
             return True
         return False
 
@@ -514,10 +514,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         thinking_budget = classification['thinking_budget']
         log.info(f"[AI] Intent: {classification['intent']} (tier={tier}, "
                  f"think={use_thinking}, budget={thinking_budget}, "
-                 f"score={classification['score']})")
+                 f"score={classification.get('score', 0)})")
 
         # PHASE 1: PLANNING — inject plan prompt for complex tasks
-        if classification['intent'] in ('code', 'analysis') and classification['score'] >= 2:
+        if classification['intent'] in ('code', 'analysis') and classification.get('score', 0) >= 2:
             # Inject planning instruction before the last user message
             plan_msg = {'role': 'system', 'content': self.PLAN_PROMPT, '_plan_injected': True}
             # Find the last user message index to insert before it

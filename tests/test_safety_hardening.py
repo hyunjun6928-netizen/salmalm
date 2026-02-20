@@ -190,7 +190,7 @@ class TestMaxToolIterations(unittest.TestCase):
             return dict(fake_tool_call)
 
         classification = {'intent': 'code', 'tier': 2, 'thinking': False,
-                         'thinking_budget': 0}
+                         'thinking_budget': 0, 'score': 3}
 
         with patch('salmalm.engine._call_llm_async', side_effect=mock_call):
             loop = asyncio.new_event_loop()
