@@ -84,7 +84,7 @@ async def run_server():
 
     # ── Phase 4: HTTP Server ──
     port = int(os.environ.get('SALMALM_PORT', 18800))
-    bind_addr = os.environ.get('SALMALM_BIND', '127.0.0.1')
+    bind_addr = os.environ.get('SALMALM_BIND', '0.0.0.0')
     server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
     web_thread = threading.Thread(target=server.serve_forever, daemon=True)
     web_thread.start()
