@@ -1173,7 +1173,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 if inc_sessions:
                     from salmalm.core import _get_db
                     conn = _get_db()
-                    rows = conn.execute('SELECT session_id, data, title FROM session_store').fetchall()
+                    rows = conn.execute('SELECT session_id, messages, title FROM session_store').fetchall()
                     sessions = []
                     for r in rows:
                         sessions.append({'id': r[0], 'data': r[1], 'title': r[2] if len(r) > 2 else ''})
