@@ -42,13 +42,28 @@ jobs:
       - name: Test
         run: |
           pip install pytest-timeout
-          pytest tests/ -q --tb=short --timeout=30
+          failed=0
+          for f in tests/test_*.py; do
+            echo "::group::$f"
+            pytest "$f" -q --tb=short --timeout=30 || failed=$((failed+1))
+            echo "::endgroup::"
+          done
+          [ $failed -eq 0 ] || exit 1
 
       - name: Coverage
         if: matrix.python-version == '3.12'
         run: |
           pip install pytest-cov pytest-timeout
-          pytest tests/ --cov=salmalm --cov-report=xml -q --tb=short --timeout=30
+          cov_args=""
+          for f in tests/test_*.py; do
+            cov_args="$cov_args $f"
+          done
+          failed=0
+          for f in tests/test_*.py; do
+            pytest "$f" --cov=salmalm --cov-append -q --tb=short --timeout=30 || failed=$((failed+1))
+          done
+          coverage xml
+          [ $failed -eq 0 ] || exit 1
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
