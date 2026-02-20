@@ -1567,7 +1567,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     'https://api.anthropic.com/v1/messages',
                     {'x-api-key': vault.get('anthropic_api_key') or '',
                      'content-type': 'application/json', 'anthropic-version': '2023-06-01'},
-                    {'model': TEST_MODELS['anthropic'], 'max_tokens': 10,  # noqa: F405
+                    {'model': 'claude-haiku-4-5-20251001', 'max_tokens': 10,  # noqa: F405
                      'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15),
                 'openai': lambda: _http_post(
                     'https://api.openai.com/v1/chat/completions',
@@ -2284,7 +2284,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     _http_post('https://api.anthropic.com/v1/messages',
                                {'x-api-key': body['anthropic_api_key'], 'content-type': 'application/json',
                                 'anthropic-version': '2023-06-01'},
-                               {'model': TEST_MODELS['anthropic'], 'max_tokens': 10,  # noqa: F405
+                               {'model': 'claude-haiku-4-5-20251001', 'max_tokens': 10,  # noqa: F405
                                 'messages': [{'role': 'user', 'content': 'ping'}]}, timeout=15)
                     test_results.append('✅ Anthropic OK')
                 except Exception as e:
