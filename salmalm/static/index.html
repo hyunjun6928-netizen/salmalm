@@ -234,7 +234,10 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       <button data-action="newSession" title="New Chat" style="background:var(--accent);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
     </div>
     <div id="session-list" style="max-height:240px;overflow-y:auto;padding:0 8px 4px"></div>
-    <div class="nav-section" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px" data-i18n="sec-manage">Manage</div>
+    <div class="nav-section" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px" data-i18n="sec-channels">Channels</div>
+    <div class="nav-item" data-action="showSettings" id="tg-status" style="font-size:12px">📡 Telegram <span class="badge" style="font-size:10px">—</span></div>
+    <div class="nav-item" data-action="showSettings" id="dc-status" style="font-size:12px">🎮 Discord <span class="badge" style="font-size:10px">—</span></div>
+    <div class="nav-section" data-i18n="sec-manage">Manage</div>
     <div class="nav-item" data-action="showSessions" data-i18n="nav-sessions">📋 Sessions</div>
     <div class="nav-section" data-action="toggleTools" style="cursor:pointer" id="tools-header">🛠️ Tools ▾</div>
     <div id="tools-list" style="display:none">
@@ -2263,6 +2266,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       var sel=document.getElementById('s-model');
       if(sel){sel.value=d.model;modelBadge.textContent=d.model.split('/').pop()}
     }
+    /* Channel badges */
+    var ch=d.channels||{};
+    var tgB=document.querySelector('#tg-status .badge');
+    var dcB=document.querySelector('#dc-status .badge');
+    if(tgB){tgB.textContent=ch.telegram?'ON':'OFF';tgB.style.background=ch.telegram?'var(--accent)':'var(--bg3)';tgB.style.color=ch.telegram?'#fff':'var(--text2)'}
+    if(dcB){dcB.textContent=ch.discord?'ON':'OFF';dcB.style.background=ch.discord?'#5865F2':'var(--bg3)';dcB.style.color=ch.discord?'#fff':'var(--text2)'}
   }).catch(()=>{});
 
   /* --- Notification polling (30s) --- */

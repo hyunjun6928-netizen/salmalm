@@ -340,10 +340,15 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         })
 
     def _get_status(self):
+        channels = {}
+        if vault.is_unlocked:
+            channels['telegram'] = bool(vault.get('telegram_token'))
+            channels['discord'] = bool(vault.get('discord_token'))
         self._json({'app': APP_NAME, 'version': VERSION,  # noqa: F405
                     'unlocked': vault.is_unlocked,
                     'usage': get_usage_report(),
-                    'model': router.force_model or 'auto'})
+                    'model': router.force_model or 'auto',
+                    'channels': channels})
 
     def _get_metrics(self):
         from salmalm.core import _metrics
