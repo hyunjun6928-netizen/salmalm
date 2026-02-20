@@ -101,17 +101,17 @@ class TestBackgroundSessions:
     def test_start_and_poll(self):
         from unittest.mock import patch, MagicMock
         from salmalm.exec_approvals import BackgroundSession
-        mock_proc = MagicMock()
-        mock_proc.poll.return_value = 0
-        mock_proc.stdout = MagicMock()
-        mock_proc.stdout.read.return_value = b'hello\n'
-        mock_proc.returncode = 0
-        with patch('subprocess.Popen', return_value=mock_proc):
+        import subprocess
+        mock_result = MagicMock()
+        mock_result.stdout = 'hello\n'
+        mock_result.stderr = ''
+        mock_result.returncode = 0
+        with patch('subprocess.run', return_value=mock_result):
             session = BackgroundSession('echo hello', timeout=10)
             sid = session.start()
             assert sid.startswith('bg-')
-            # Force completion
-            session._process = mock_proc
+            # Wait for thread to finish
+            import time; time.sleep(0.2)
             poll = session.poll()
             assert poll['status'] in ('completed', 'running', 'timeout')
 

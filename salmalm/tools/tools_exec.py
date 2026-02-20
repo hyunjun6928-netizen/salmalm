@@ -74,7 +74,6 @@ def handle_exec(args: dict) -> str:
     # Foreground execution (original behavior)
     try:
         import shlex
-        needs_shell = any(c in cmd for c in ['|', '>', '<', '&&', '||', ';', '`', '$('])
 
         # Build environment
         run_env = None
@@ -82,13 +81,22 @@ def handle_exec(args: dict) -> str:
             run_env = dict(os.environ)
             run_env.update(env)
 
+        # shell=True is OFF by default. Pipe/redirect syntax is blocked by
+        # EXEC_BLOCKLIST_PATTERNS ($(...), backticks) and _is_safe_command.
+        # If shlex.split fails, reject rather than falling back to shell=True.
+        needs_shell = any(c in cmd for c in ['|', '>', '<', '&&', '||', ';'])
         if needs_shell:
+            # Validate: _is_safe_command already checked pipeline stages,
+            # but we still require SALMALM_ALLOW_SHELL=1 for shell mode.
+            if not os.environ.get('SALMALM_ALLOW_SHELL'):
+                return ('❌ Shell operators (|, >, <, &&, ;) require explicit opt-in.\n'
+                        'Set SALMALM_ALLOW_SHELL=1 or use individual commands.')
             run_args = {'args': cmd, 'shell': True}
         else:
             try:
                 run_args = {'args': shlex.split(cmd), 'shell': False}
             except ValueError:
-                run_args = {'args': cmd, 'shell': True}
+                return '❌ Failed to parse command. Check quoting/escaping.'
         extra_kwargs = {}
         if run_env:
             extra_kwargs['env'] = run_env

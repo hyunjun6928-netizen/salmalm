@@ -16,9 +16,22 @@ class TestExecTool(unittest.TestCase):
         self.assertIn('test_exec_ls_ok', result.lower() if isinstance(result, str) else str(result).lower())
     
     def test_exec_pipe(self):
+        import os
         from salmalm.tool_handlers import execute_tool
+        # Pipe requires SALMALM_ALLOW_SHELL=1
+        os.environ['SALMALM_ALLOW_SHELL'] = '1'
+        try:
+            result = execute_tool('exec', {'command': 'echo hello | cat'})
+            self.assertIn('hello', result)
+        finally:
+            os.environ.pop('SALMALM_ALLOW_SHELL', None)
+
+    def test_exec_pipe_blocked_without_env(self):
+        import os
+        from salmalm.tool_handlers import execute_tool
+        os.environ.pop('SALMALM_ALLOW_SHELL', None)
         result = execute_tool('exec', {'command': 'echo hello | cat'})
-        self.assertIn('hello', result)
+        self.assertIn('Shell operators', result)
     
     def test_exec_blocked(self):
         from salmalm.tool_handlers import execute_tool
@@ -76,8 +89,13 @@ class TestSafeCommand(unittest.TestCase):
     
     def test_elevated(self):
         from salmalm.tool_handlers import _is_safe_command
+        # python3 is now a blocked interpreter (use python_eval tool)
         ok, reason = _is_safe_command('python3 test.py')
-        self.assertTrue(ok)
+        self.assertFalse(ok)
+        self.assertIn('Interpreter blocked', reason)
+        # docker is still elevated (allowed with warning)
+        ok2, _ = _is_safe_command('docker ps')
+        self.assertTrue(ok2)
     
     def test_empty(self):
         from salmalm.tool_handlers import _is_safe_command

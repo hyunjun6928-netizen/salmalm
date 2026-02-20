@@ -5,7 +5,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 from salmalm.tool_registry import register
-from salmalm.tools_common import _is_private_url
+from salmalm.tools_common import _is_private_url, _is_private_url_follow_redirects
 from salmalm.constants import VERSION
 from salmalm.crypto import vault
 from salmalm.llm import _http_get
@@ -32,10 +32,10 @@ def handle_web_search(args: dict) -> str:
 def handle_web_fetch(args: dict) -> str:
     url = args['url']
     max_chars = args.get('max_chars', 10000)
-    blocked, reason = _is_private_url(url)
+    blocked, reason, final_url = _is_private_url_follow_redirects(url)
     if blocked:
         return f'{reason}'
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (SalmAlm/0.1)'})
+    req = urllib.request.Request(final_url, headers={'User-Agent': 'Mozilla/5.0 (SalmAlm/0.1)'})
     with urllib.request.urlopen(req, timeout=15) as resp:
         # Limit download to 2MB to prevent memory explosion
         raw = resp.read(2 * 1024 * 1024).decode('utf-8', errors='replace')
@@ -79,9 +79,16 @@ def handle_http_request(args: dict) -> str:
     timeout_sec = min(args.get('timeout', 15), 60)
     if not url:
         return 'URL is required'
-    blocked, reason = _is_private_url(url)
+    blocked, reason, final_url = _is_private_url_follow_redirects(url)
     if blocked:
         return f'{reason}'
+    url = final_url  # Use redirect-validated URL
+    # Block dangerous request headers (Host spoofing, auth forwarding)
+    _BLOCKED_HEADERS = frozenset({'host', 'transfer-encoding', 'te', 'proxy-authorization',
+                                   'proxy-connection', 'upgrade', 'connection'})
+    for h in list(headers.keys()):
+        if h.lower() in _BLOCKED_HEADERS:
+            return f'❌ Blocked request header: {h}'
     headers.setdefault('User-Agent', f'SalmAlm/{VERSION}')
     data = body_str.encode('utf-8') if body_str else None
     try:

@@ -41,10 +41,14 @@ class TestExecBlocklist(unittest.TestCase):
             self.assertIn(cmd, EXEC_ALLOWLIST, f"{cmd} should be in allowlist")
             self.assertNotIn(cmd, EXEC_BLOCKLIST, f"{cmd} should not be blocked")
         # Elevated commands should be in EXEC_ELEVATED, not in BLOCKLIST
-        elevated = ['python3', 'node', 'docker']
+        elevated = ['docker', 'pip', 'npm']
         for cmd in elevated:
             self.assertIn(cmd, EXEC_ELEVATED, f"{cmd} should be in elevated set")
             self.assertNotIn(cmd, EXEC_BLOCKLIST, f"{cmd} should not be blocked")
+        # Interpreters must be in EXEC_BLOCKED_INTERPRETERS (removed from elevated)
+        from salmalm.constants import EXEC_BLOCKED_INTERPRETERS
+        for cmd in ['python3', 'node', 'bash', 'sh', 'ruby', 'perl']:
+            self.assertIn(cmd, EXEC_BLOCKED_INTERPRETERS, f"{cmd} should be blocked interpreter")
 
     def test_allowlist_not_empty(self):
         self.assertGreater(len(EXEC_ALLOWLIST), 30)

@@ -53,10 +53,17 @@ EXEC_ALLOWLIST = {
     'ps', 'top', 'htop', 'free', 'uptime', 'lsof', 'nproc', 'lscpu', 'lsblk',
 }
 # Elevated commands: allowed but logged with warning (can run arbitrary code)
+# Interpreters (python/node/deno/bun) removed — use python_eval tool instead.
+# They bypass allowlist by executing arbitrary code via -c, -m, file args, stdin.
 EXEC_ELEVATED = {
-    'python3', 'python', 'node', 'deno', 'bun',
     'docker', 'kubectl', 'terraform',
     'pip', 'pip3', 'npm', 'npx',  # install hooks can run arbitrary code
+}
+# Interpreters: blocked from exec entirely (use python_eval / dedicated tools)
+EXEC_BLOCKED_INTERPRETERS = {
+    'python', 'python3', 'python3.10', 'python3.11', 'python3.12', 'python3.13', 'python3.14',
+    'node', 'deno', 'bun', 'ruby', 'perl', 'lua', 'php',
+    'bash', 'sh', 'zsh', 'fish', 'dash', 'csh', 'tcsh', 'ksh',
 }
 EXEC_BLOCKLIST = {
     'rm', 'rmdir', 'mkfs', 'dd', 'shutdown', 'reboot', 'halt', 'poweroff',
@@ -74,7 +81,6 @@ EXEC_BLOCKLIST_PATTERNS = [
     r'<\(',            # process substitution
     r'\beval\b',       # eval bypass
     r'\bsource\b',     # source bypass
-    r'\b(python3?|node|deno|bun)\s+.*(-c|--eval)\b',  # elevated inline code execution
 ]
 PROTECTED_FILES = {'.vault.enc', 'audit.db', 'auth.db', 'server.py', '.clipboard.json'}
 

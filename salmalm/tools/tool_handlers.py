@@ -15,6 +15,7 @@ import threading  # noqa: F401
 from pathlib import Path
 
 from salmalm.constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS, EXEC_ELEVATED,  # noqa: F401
+                               EXEC_BLOCKED_INTERPRETERS,
                                PROTECTED_FILES, WORKSPACE_DIR, VERSION, KST, MEMORY_FILE, MEMORY_DIR, AUDIT_DB)
 from salmalm.crypto import vault, log
 from salmalm.core import audit_log
@@ -53,6 +54,8 @@ def _is_safe_command(cmd: str):
         first_word = words[0].split('/')[-1]  # strip path prefix
         if first_word in EXEC_BLOCKLIST:
             return False, f'Blocked command in pipeline: {first_word}'
+        if first_word in EXEC_BLOCKED_INTERPRETERS:
+            return False, f'Interpreter blocked (use python_eval tool): {first_word}'
         if first_word in EXEC_ELEVATED:
             log.warning(f"[WARN] Elevated exec: {first_word} (can run arbitrary code)")
         elif first_word not in EXEC_ALLOWLIST:

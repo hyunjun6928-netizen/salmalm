@@ -143,10 +143,16 @@ class BackgroundSession:
                 self.stderr_data = f'Blocked env overrides: {", ".join(blocked)}'
                 return self.session_id
 
-        needs_shell = any(c in self.command for c in ['|', '>', '<', '&&', '||', ';', '`', '$('])
+        needs_shell = any(c in self.command for c in ['|', '>', '<', '&&', '||', ';'])
+        if needs_shell and not os.environ.get('SALMALM_ALLOW_SHELL'):
+            self.status = 'error'
+            self.stderr_data = 'Shell operators require SALMALM_ALLOW_SHELL=1'
+            return self.session_id
         run_env = dict(os.environ)
         if self._env:
             run_env.update(self._env)
+
+        from salmalm.constants import WORKSPACE_DIR as _ws
 
         def _run():
             try:
@@ -156,13 +162,15 @@ class BackgroundSession:
                     try:
                         run_args = {'args': shlex.split(self.command), 'shell': False}
                     except ValueError:
-                        run_args = {'args': self.command, 'shell': True}
+                        self.status = 'error'
+                        self.stderr_data = 'Failed to parse command'
+                        return
 
                 self.status = 'running'
                 result = subprocess.run(
                     **run_args, capture_output=True, text=True,
                     timeout=self.timeout, env=run_env,
-                    cwd=str(Path(__file__).resolve().parent.parent.parent)
+                    cwd=str(_ws)
                 )
                 self.stdout_data = result.stdout[-100_000:]  # Keep last 100KB
                 self.stderr_data = result.stderr[-10_000:]
