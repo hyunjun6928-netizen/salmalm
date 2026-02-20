@@ -513,15 +513,29 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     def _get_tools_list(self):
         tools = []
         try:
-            from salmalm.core import _build_tools
-            for t in _build_tools():
-                tools.append({"name": t.get("name", ""), "description": t.get("description", "")})
+            from salmalm.tools.tool_registry import _HANDLERS, _ensure_modules
+            _ensure_modules()
+            for name in sorted(_HANDLERS.keys()):
+                tools.append({"name": name, "description": ""})
         except Exception:
-            tools = [{"name": "web_search", "description": "Search the web"},
-                     {"name": "bash", "description": "Execute shell commands"},
-                     {"name": "file_read", "description": "Read files"},
-                     {"name": "file_write", "description": "Write files"},
-                     {"name": "browser", "description": "Browser automation"}]
+            pass
+        if not tools:
+            # Fallback: list all known tools from INTENT_TOOLS
+            try:
+                from salmalm.constants import INTENT_TOOLS
+                seen = set()
+                for cat_tools in INTENT_TOOLS.values():
+                    for t in cat_tools:
+                        n = t.get('function', {}).get('name', '')
+                        if n and n not in seen:
+                            seen.add(n)
+                            tools.append({"name": n, "description": t.get('function', {}).get('description', '')})
+            except Exception:
+                tools = [{"name": "web_search", "description": "Search the web"},
+                         {"name": "bash", "description": "Execute shell commands"},
+                         {"name": "file_read", "description": "Read files"},
+                         {"name": "file_write", "description": "Write files"},
+                         {"name": "browser", "description": "Browser automation"}]
         self._json({"tools": tools, "count": len(tools)})
 
     def _get_commands(self):
