@@ -1436,7 +1436,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var _lang=localStorage.getItem('salmalm-lang')||'en';
   function t(k){return (_i18n[_lang]||_i18n.en)[k]||(_i18n.en[k]||k)}
   /* Now that t() is defined, restore deferred chat history */
-  if(window._pendingRestore){window._pendingRestore();delete window._pendingRestore;}
+  if(window._pendingRestore){try{window._pendingRestore()}catch(e){console.warn('Chat restore failed:',e);localStorage.removeItem('salm_chat')}delete window._pendingRestore;}
   function applyLang(){
     document.querySelectorAll('[data-i18n]').forEach(function(el){
       var k=el.getAttribute('data-i18n');
