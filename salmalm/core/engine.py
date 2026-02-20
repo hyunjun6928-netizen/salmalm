@@ -780,7 +780,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
                 # Mid-loop compaction: 메시지 40개 넘으면 즉시 압축
                 if len(session.messages) > 40:
-                    session.messages = compact_messages(session.messages, session=session)
+                    session.messages = compact_messages(
+                        session.messages, session=session, on_status=on_status)
                     log.info(f"[CUT] Mid-loop compaction: -> {len(session.messages)} msgs")
 
                 iteration += 1
@@ -1780,7 +1781,8 @@ async def _process_message_inner(session_id: str, user_message: str,
         session.messages.append({'role': 'system', 'content': f'[Language: {lang_directive}]'})
 
     # Context management
-    session.messages = compact_messages(session.messages, session=session)
+    session.messages = compact_messages(session.messages, session=session,
+                                        on_status=on_status)
     if len(session.messages) % 20 == 0:
         session.add_system(build_system_prompt(full=False))
 

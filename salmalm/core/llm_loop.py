@@ -124,6 +124,7 @@ def save_failover_config(config: dict) -> None:
 STATUS_TYPING = 'typing'
 STATUS_THINKING = 'thinking'
 STATUS_TOOL_RUNNING = 'tool_running'
+STATUS_COMPACTING = 'compacting'
 
 
 # ============================================================

@@ -12,7 +12,7 @@ import time
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from salmalm.constants import *  # noqa: F403
 from salmalm.crypto import vault, log
@@ -467,7 +467,8 @@ def _msg_content_str(msg: dict) -> str:
 
 
 def compact_messages(messages: list, model: Optional[str] = None,
-                     session: Optional['Session'] = None) -> list:
+                     session: Optional['Session'] = None,
+                     on_status: Optional[Callable] = None) -> list:
     """Multi-stage compaction: trim tool results → drop old tools → summarize.
     Hard limit: max 100 messages, max 500K chars (≈125K tokens).
     OpenClaw-style: flush memory before compaction."""
@@ -505,6 +506,13 @@ def compact_messages(messages: list, model: Optional[str] = None,
 
     if total_chars < COMPACTION_THRESHOLD:  # noqa: F405
         return messages
+
+    # Notify UI that compaction is in progress
+    if on_status:
+        try:
+            on_status('compacting', '✨ Compacting context...')
+        except Exception:
+            pass
 
     log.info(f"[PKG] Compacting {len(messages)} messages ({total_chars} chars)")
 

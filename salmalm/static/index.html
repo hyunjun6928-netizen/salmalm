@@ -1092,6 +1092,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     if(!b||b._streaming)return;
     var label='';
     if(status==='thinking')label='🧠 Thinking...';
+    else if(status==='compacting')label='✨ Compacting context...';
     else if(status==='tool_running')label=detail||'🔧 Running tool...';
     else label=detail||'';
     b.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div>'+(label?' '+label:'');
