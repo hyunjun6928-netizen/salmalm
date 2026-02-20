@@ -106,7 +106,7 @@ def detect_provider(model: str) -> Tuple[str, str]:
 
 
 def get_api_key(provider: str) -> Optional[str]:
-    """Get API key for provider from environment."""
+    """Get API key for provider from environment or vault."""
     prov_cfg = PROVIDERS.get(provider, {})
     env_key = prov_cfg.get('env_key', '')
     if not env_key:
@@ -116,6 +116,17 @@ def get_api_key(provider: str) -> Optional[str]:
         alt_key = prov_cfg.get('alt_env_key', '')
         if alt_key:
             key = os.environ.get(alt_key)
+    # Fallback: check vault (web UI stores keys there)
+    if not key:
+        try:
+            from salmalm.security.vault import vault
+            if vault.is_unlocked:
+                vault_name = env_key.lower()  # ANTHROPIC_API_KEY -> anthropic_api_key
+                key = vault.get(vault_name)
+                if not key and prov_cfg.get('alt_env_key'):
+                    key = vault.get(prov_cfg['alt_env_key'].lower())
+        except Exception:
+            pass
     return key
 
 
