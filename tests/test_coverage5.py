@@ -147,7 +147,9 @@ class TestToolHandlersCoverage5(unittest.TestCase):
 
     def test_write_file(self):
         from salmalm.tool_handlers import execute_tool
-        p = os.path.join('.', '_test_cov5_write.txt')
+        from salmalm.constants import WORKSPACE_DIR
+        WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
+        p = str(WORKSPACE_DIR / '_test_cov5_write.txt')
         result = execute_tool('write_file', {'path': p, 'content': 'test content'})
         try:
             self.assertTrue(os.path.exists(p))
@@ -159,15 +161,18 @@ class TestToolHandlersCoverage5(unittest.TestCase):
 
     def test_edit_file(self):
         from salmalm.tool_handlers import execute_tool
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, dir='.') as f:
+        from salmalm.constants import WORKSPACE_DIR
+        WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
+        p = str(WORKSPACE_DIR / '_test_cov5_edit.txt')
+        with open(p, 'w') as f:
             f.write('hello world')
-            p = f.name
         try:
             result = execute_tool('edit_file', {'path': p, 'old_text': 'hello', 'new_text': 'goodbye'})
             with open(p) as f:
                 self.assertIn('goodbye', f.read())
         finally:
-            os.unlink(p)
+            if os.path.exists(p):
+                os.unlink(p)
 
     def test_skill_manage_list(self):
         from salmalm.tool_handlers import execute_tool

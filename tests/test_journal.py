@@ -131,7 +131,8 @@ def test_command_write():
 
 def test_auto_generated_flag(journal):
     journal.generate_today_summary(conversations=["대화 내용"])
-    today = datetime.now().strftime("%Y-%m-%d")
+    from salmalm.constants import KST
+    today = datetime.now(KST).strftime("%Y-%m-%d")
     entries = journal.get_entries_for_date(today)
     auto_entries = [e for e in entries if e["auto"]]
     assert len(auto_entries) >= 1

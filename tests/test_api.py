@@ -9,6 +9,11 @@ import unittest
 from http.client import HTTPConnection
 from pathlib import Path
 
+# Set SALMALM_HOME before any salmalm import (constants.py reads at import time)
+_test_tmpdir = tempfile.mkdtemp()
+os.environ['SALMALM_HOME'] = _test_tmpdir
+os.environ['SALMALM_VAULT_PW'] = 'testpass'
+
 # Ensure salmalm is importable
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -20,9 +25,7 @@ class TestAPIEndpoints(unittest.TestCase):
     def setUpClass(cls):
         """Start a test server on a random port."""
         # Use temp dirs to avoid touching real data
-        cls._tmpdir = tempfile.mkdtemp()
-        os.environ['SALMALM_DATA_DIR'] = cls._tmpdir
-        os.environ['SALMALM_VAULT_PW'] = 'testpass'
+        cls._tmpdir = _test_tmpdir
         os.environ['SALMALM_LOG_FILE'] = os.path.join(cls._tmpdir, 'test.log')
 
         # Import after env setup

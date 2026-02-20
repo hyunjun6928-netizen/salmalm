@@ -404,10 +404,21 @@ class TestCryptography(unittest.TestCase):
                 pass
 
     def test_pbkdf2_iterations(self):
-        """PBKDF2 should use sufficient iterations."""
-        from salmalm.constants import PBKDF2_ITER
-        self.assertGreaterEqual(PBKDF2_ITER, 100000,
-                                f"PBKDF2 iterations too low: {PBKDF2_ITER}")
+        """PBKDF2 default should use sufficient iterations (conftest may override for speed)."""
+        # Check the hardcoded default, not the runtime value (conftest overrides to 1K)
+        import ast
+        from pathlib import Path
+        src = (Path(__file__).parent.parent / 'salmalm' / 'constants.py').read_text()
+        tree = ast.parse(src)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for t in node.targets:
+                    if isinstance(t, ast.Name) and t.id == 'PBKDF2_ITER':
+                        val = ast.literal_eval(node.value)
+                        self.assertGreaterEqual(val, 100000,
+                                                f"PBKDF2 default too low: {val}")
+                        return
+        self.fail("PBKDF2_ITER not found in constants.py")
 
     def test_timing_safe_comparison(self):
         """Password verification should use constant-time comparison."""
