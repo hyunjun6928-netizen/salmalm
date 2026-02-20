@@ -1580,29 +1580,29 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* Tool i18n map: name -> {icon, en, kr, cmd} */
   var _toolI18n={
     apply_patch:{icon:'🩹',en:'Apply Patch',kr:'패치 적용',cmd:'/patch'},
-    brave_context:{icon:'🔍',en:'Brave Context',kr:'Brave 컨텍스트',cmd:'Search context with Brave'},
-    brave_images:{icon:'🖼️',en:'Brave Images',kr:'Brave 이미지 검색',cmd:'Search images'},
-    brave_news:{icon:'📰',en:'Brave News',kr:'Brave 뉴스 검색',cmd:'Search news'},
-    brave_search:{icon:'🔎',en:'Brave Search',kr:'Brave 웹 검색',cmd:'Search the web for'},
+    brave_context:{icon:'🔍',en:'Brave Context',kr:'Brave 컨텍스트',cmd:'Search context with Brave',req:'brave'},
+    brave_images:{icon:'🖼️',en:'Brave Images',kr:'Brave 이미지 검색',cmd:'Search images',req:'brave'},
+    brave_news:{icon:'📰',en:'Brave News',kr:'Brave 뉴스 검색',cmd:'Search news',req:'brave'},
+    brave_search:{icon:'🔎',en:'Brave Search',kr:'Brave 웹 검색',cmd:'Search the web for',req:'brave'},
     briefing:{icon:'📋',en:'Briefing',kr:'브리핑',cmd:'/briefing'},
     browser:{icon:'🌐',en:'Browser',kr:'브라우저 자동화',cmd:'Open browser'},
-    calendar_add:{icon:'📅',en:'Add Calendar',kr:'일정 추가',cmd:'Add calendar event'},
-    calendar_delete:{icon:'🗑️',en:'Delete Calendar',kr:'일정 삭제',cmd:'Delete calendar event'},
-    calendar_list:{icon:'📆',en:'List Calendar',kr:'일정 목록',cmd:'Show calendar'},
+    calendar_add:{icon:'📅',en:'Add Calendar',kr:'일정 추가',cmd:'Add calendar event',req:'google'},
+    calendar_delete:{icon:'🗑️',en:'Delete Calendar',kr:'일정 삭제',cmd:'Delete calendar event',req:'google'},
+    calendar_list:{icon:'📆',en:'List Calendar',kr:'일정 목록',cmd:'Show calendar',req:'google'},
     clipboard:{icon:'📋',en:'Clipboard',kr:'클립보드',cmd:'Copy to clipboard'},
     cron_manage:{icon:'⏰',en:'Cron Manager',kr:'크론 관리',cmd:'/cron list'},
     diff_files:{icon:'📊',en:'Diff Files',kr:'파일 비교',cmd:'Compare files'},
     edit_file:{icon:'✏️',en:'Edit File',kr:'파일 편집',cmd:'Edit file'},
-    email_inbox:{icon:'📬',en:'Email Inbox',kr:'이메일 수신함',cmd:'Check email inbox'},
-    email_read:{icon:'📧',en:'Read Email',kr:'이메일 읽기',cmd:'Read email'},
-    email_search:{icon:'🔍',en:'Search Email',kr:'이메일 검색',cmd:'Search email'},
-    email_send:{icon:'📤',en:'Send Email',kr:'이메일 발송',cmd:'Send email'},
+    email_inbox:{icon:'📬',en:'Email Inbox',kr:'이메일 수신함',cmd:'Check email inbox',req:'google'},
+    email_read:{icon:'📧',en:'Read Email',kr:'이메일 읽기',cmd:'Read email',req:'google'},
+    email_search:{icon:'🔍',en:'Search Email',kr:'이메일 검색',cmd:'Search email',req:'google'},
+    email_send:{icon:'📤',en:'Send Email',kr:'이메일 발송',cmd:'Send email',req:'google'},
     exec:{icon:'💻',en:'Shell Exec',kr:'셸 실행',cmd:'Run command:'},
     exec_session:{icon:'🖥️',en:'Exec Session',kr:'세션 실행',cmd:'Start exec session'},
     expense:{icon:'💳',en:'Expense',kr:'지출 기록',cmd:'Track expense'},
     file_index:{icon:'📁',en:'File Index',kr:'파일 인덱스',cmd:'Index files'},
-    gmail:{icon:'📧',en:'Gmail',kr:'Gmail',cmd:'Check Gmail'},
-    google_calendar:{icon:'📅',en:'Google Calendar',kr:'구글 캘린더',cmd:'Show Google Calendar'},
+    gmail:{icon:'📧',en:'Gmail',kr:'Gmail',cmd:'Check Gmail',req:'google'},
+    google_calendar:{icon:'📅',en:'Google Calendar',kr:'구글 캘린더',cmd:'Show Google Calendar',req:'google'},
     hash_text:{icon:'#️⃣',en:'Hash Text',kr:'해시 생성',cmd:'Hash text'},
     health_check:{icon:'🏥',en:'Health Check',kr:'상태 점검',cmd:'/health'},
     http_request:{icon:'🌐',en:'HTTP Request',kr:'HTTP 요청',cmd:'Make HTTP request'},
@@ -1645,7 +1645,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   var _allTools=[];
   /* Load dynamic tool list */
   fetch('/api/tools/list',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
-    _allTools=(d.tools||[]).map(function(t){var m=_toolI18n[t.name];return{name:t.name,icon:m?m.icon:'🔧',en:m?m.en:t.name,kr:m?m.kr:t.name,cmd:m?m.cmd:''}});
+    _allTools=(d.tools||[]).map(function(t){var m=_toolI18n[t.name];return{name:t.name,icon:m?m.icon:'🔧',en:m?m.en:t.name,kr:m?m.kr:t.name,cmd:m?m.cmd:'',req:m?m.req||'':''}});
     var th=document.getElementById('tools-header');
     if(th)th.textContent='🛠️ '+(_lang==='ko'?'도구':'Tools')+' ('+_allTools.length+') ▾';
     _renderToolsList('');
@@ -1656,7 +1656,9 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     var filtered=ql?_allTools.filter(function(t){return t.name.toLowerCase().indexOf(ql)>=0||t.en.toLowerCase().indexOf(ql)>=0||t.kr.indexOf(ql)>=0}):_allTools;
     c.innerHTML=filtered.map(function(t){
       var label=_lang==='ko'?t.kr:t.en;
-      return '<div class="nav-item" data-action="tool-run" data-tool-cmd="'+t.cmd.replace(/"/g,'&quot;')+'" data-tool-name="'+t.name+'" title="'+t.name+'">'+t.icon+' '+label+'</div>';
+      var reqAttr=t.req?' data-tool-req="'+t.req+'"':'';
+      var reqBadge=t.req?' <span style="font-size:9px;color:var(--text2);margin-left:auto">🔗</span>':'';
+      return '<div class="nav-item" data-action="tool-run" data-tool-cmd="'+t.cmd.replace(/"/g,'&quot;')+'" data-tool-name="'+t.name+'"'+reqAttr+' title="'+t.name+'">'+t.icon+' '+label+reqBadge+'</div>';
     }).join('');
     if(!filtered.length)c.innerHTML='<div style="padding:8px 12px;color:var(--text2);font-size:12px">'+(_lang==='ko'?'검색 결과 없음':'No results')+'</div>';
   }
@@ -1688,15 +1690,15 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- Settings --- */
   var dashView=document.getElementById('dashboard-view');
   var sessView=document.getElementById('sessions-view');
-  var chView=document.createElement('div');/* channels removed */
+  /* channels panel removed */
   var docsView=document.getElementById('docs-view');
   var cronView=document.getElementById('cron-view');
   var memView=document.getElementById('memory-view');
-  function _hideAll(){settingsEl.style.display='none';dashView.style.display='none';sessView.style.display='none';chView.style.display='none';docsView.style.display='none';cronView.style.display='none';memView.style.display='none';chat.style.display='none';inputArea.style.display='none'}
+  function _hideAll(){settingsEl.style.display='none';dashView.style.display='none';sessView.style.display='none';docsView.style.display='none';cronView.style.display='none';memView.style.display='none';chat.style.display='none';inputArea.style.display='none'}
   window.showChat=function(){_hideAll();chat.style.display='flex';inputArea.style.display='block'};
   window.showSessions=function(){_hideAll();sessView.style.display='block';window._loadSessions()};
-  window.showChannels=function(){window.showSettings()};/* redirect to settings */
-  window.showDocs=function(){_hideAll();docsView.style.display='block';window._renderDocs('')};
+  window.showChannels=function(){window.showSettings()};
+  window.showDocs=function(){_hideAll();docsView.style.display='block';try{window._renderDocs('')}catch(e){console.error('Docs render error:',e);document.getElementById('docs-content').innerHTML='<p style="color:#f87171">Render error: '+e.message+'</p>'}};
   window.showCron=function(){_hideAll();cronView.style.display='block';window._loadCron()};
   window.showMemory=function(){_hideAll();memView.style.display='block';window._loadMemory()};
   window.showSettings=function(){_hideAll();settingsEl.style.display='block';
@@ -2458,7 +2460,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='toggleMic')window.toggleMic();
     else if(a==='clearFile')window.clearFile();
     else if(a==='toggleTools'){var tl=document.getElementById('tools-list');tl.style.display=tl.style.display==='none'?'block':'none'}
-    else if(a==='tool-run'){var tcmd=el.getAttribute('data-tool-cmd');if(tcmd)window.quickCmd(tcmd)}
+    else if(a==='tool-run'){var treq=el.getAttribute('data-tool-req');if(treq){var reqMap={google:_lang==='ko'?'⚠️ Google OAuth 연동이 필요합니다. 설정에서 연결하세요.':'⚠️ Google OAuth required. Connect in Settings.',brave:_lang==='ko'?'⚠️ Brave API 키가 필요합니다. 설정에서 입력하세요.':'⚠️ Brave API key required. Enter in Settings.'};alert(reqMap[treq]||(_lang==='ko'?'⚠️ 추가 설정이 필요합니다':'⚠️ Additional setup required'))}else{var tcmd=el.getAttribute('data-tool-cmd');if(tcmd)window.quickCmd(tcmd)}}
     else if(a.startsWith('qc-'))window.quickCmd(_qcMap[a]);
     else if(a==='save-anthropic')window.saveKey('anthropic_api_key','sk-anthropic');
     else if(a==='test-anthropic')window.testKey('anthropic');
@@ -2803,35 +2805,6 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   if(document.getElementById('sess-search'))document.getElementById('sess-search').addEventListener('input',function(){window._loadSessions()});
 
   /* ── Channels Panel ── */
-  window._loadChannels=function(){
-    var c=document.getElementById('channels-content');if(!c)return;
-    var kr=_lang==='ko';
-    fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
-      var h='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">';
-      // Telegram
-      h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">';
-      h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:24px">📡</span><div><div style="font-weight:600">Telegram</div><div style="font-size:12px;color:var(--text2)">'+(kr?'메시지 채널':'Messaging Channel')+'</div></div>';
-      h+='<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;background:'+(d.unlocked?'#dcfce7;color:#16a34a':'#fee2e2;color:#dc2626')+'">'+(d.unlocked?(kr?'활성':'Active'):(kr?'비활성':'Inactive'))+'</span></div>';
-      h+='<div style="font-size:12px;color:var(--text2);line-height:1.8">';
-      h+=(kr?'상태: 웹 UI에서 설정 → Telegram Bot Token 입력':'Status: Set Telegram Bot Token in Settings')+'</div></div>';
-      // Web Chat
-      h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">';
-      h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:24px">💬</span><div><div style="font-weight:600">Web Chat</div><div style="font-size:12px;color:var(--text2)">'+(kr?'기본 채널':'Default Channel')+'</div></div>';
-      h+='<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;background:#dcfce7;color:#16a34a">'+(kr?'활성':'Active')+'</span></div>';
-      h+='<div style="font-size:12px;color:var(--text2);line-height:1.8">localhost:'+location.port+'</div></div>';
-      // WebSocket
-      h+='<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">';
-      h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:24px">🔌</span><div><div style="font-weight:600">WebSocket</div><div style="font-size:12px;color:var(--text2)">'+(kr?'실시간 연결':'Real-time Connection')+'</div></div>';
-      h+='<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:12px;background:#dcfce7;color:#16a34a">'+(kr?'활성':'Active')+'</span></div>';
-      h+='<div style="font-size:12px;color:var(--text2);line-height:1.8">ws://localhost</div></div>';
-      // Future channels placeholder
-      h+='<div style="background:var(--bg);border:1px dashed var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:13px">';
-      h+='<div style="text-align:center">➕<br>'+(kr?'Discord, Slack 등 추가 예정':'Discord, Slack coming soon')+'</div></div>';
-      h+='</div>';
-      c.innerHTML=h;
-    }).catch(function(e){c.innerHTML='Error: '+e.message});
-  };
-
   /* ── Docs Panel ── */
   var _docsData=[
     {catKr:'슬래시 커맨드',catEn:'Slash Commands',items:[
@@ -2911,6 +2884,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     c.innerHTML=h;
   };
   if(document.getElementById('docs-search'))document.getElementById('docs-search').addEventListener('input',function(){window._renderDocs(this.value)});
+  /* Pre-render docs so content is ready when panel opens */
+  try{window._renderDocs('')}catch(e){console.warn('Docs pre-render:',e)}
 
   /* ── Debug Tab ── */
   var _debugAutoTimer=null;
