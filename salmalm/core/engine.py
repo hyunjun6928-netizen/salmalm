@@ -495,10 +495,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         """Single LLM call attempt. Delegates to llm_loop."""
         return await _try_llm_call_fn(messages, model, tools, max_tokens, thinking, on_token)
 
-    async def run(self, session, user_message: str,
-                  model_override: Optional[str] = None, on_tool=None,
-                  classification: Optional[dict] = None,
-                  on_token=None, on_status=None) -> str:
+    async def run(self, session: object, user_message: str,
+                  model_override: Optional[str] = None, on_tool: Optional[object] = None,
+                  classification: Optional[Dict[str, Any]] = None,
+                  on_token: Optional[object] = None, on_status: Optional[object] = None) -> str:
         """Main execution loop — Plan → Execute → Reflect."""
 
         if not classification:
@@ -1137,7 +1137,7 @@ def _get_session_usage(session_id: str) -> dict:
     return _session_usage[session_id]
 
 
-def record_response_usage(session_id: str, model: str, usage: dict):
+def record_response_usage(session_id: str, model: str, usage: dict) -> None:
     """Record per-response usage for /usage command."""
     su = _get_session_usage(session_id)
     cost = estimate_cost(model, usage)
@@ -1857,7 +1857,7 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
             web_session._notifications = web_session._notifications[-20:]  # type: ignore[attr-defined]
 
 
-def begin_shutdown():
+def begin_shutdown() -> None:
     """Signal the engine to stop accepting new requests."""
     global _shutting_down
     _shutting_down = True

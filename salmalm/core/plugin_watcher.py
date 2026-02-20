@@ -25,7 +25,7 @@ class PluginWatcher:
         self._mtimes: Dict[str, float] = {}
         self._lock = threading.Lock()
 
-    def start(self):
+    def start(self) -> None:
         """Start watching plugins/ directory in background."""
         if self._running:
             return
@@ -35,7 +35,7 @@ class PluginWatcher:
         self._thread.start()
         log.info("[PLUGIN] Hot-reload watcher started")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the watcher."""
         self._running = False
         if self._thread:
@@ -125,7 +125,7 @@ class PluginWatcher:
         except (ValueError, IndexError):
             return None
 
-    def reload_plugins(self, names: Optional[Set[str]] = None):
+    def reload_plugins(self, names: Optional[Set[str]] = None) -> None:
         """Reload specific plugins or all if names is None."""
         with self._lock:
             if names:

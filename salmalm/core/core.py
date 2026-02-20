@@ -300,7 +300,7 @@ def check_cost_cap() -> None:
                 f"Increase SALMALM_COST_CAP env var or restart.")
 
 
-def set_current_user_id(user_id: Optional[int]):
+def set_current_user_id(user_id: Optional[int]) -> None:
     """Set the current user_id for cost tracking (thread-local)."""
     _thread_local.current_user_id = user_id
 
@@ -824,7 +824,7 @@ class LLMCronManager:
 
         return False
 
-    async def tick(self):
+    async def tick(self) -> None:
         """Check and execute due jobs. Also runs heartbeat if due."""
         # OpenClaw-style heartbeat check
         if heartbeat.should_beat():
@@ -1371,7 +1371,7 @@ class HeartbeatManager:
         return state
 
     @classmethod
-    def update_check(cls, check_name: str):
+    def update_check(cls, check_name: str) -> None:
         """Record that a specific check was performed (email, calendar, etc)."""
         state = cls._load_state()
         state['lastChecks'][check_name] = time.time()

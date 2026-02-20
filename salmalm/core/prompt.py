@@ -24,7 +24,7 @@ _BUILTIN_PERSONAS = {
 _active_personas: dict = {}
 
 
-def ensure_personas_dir():
+def ensure_personas_dir() -> None:
     """Create personas directory and install built-in presets if missing."""
     PERSONAS_DIR.mkdir(parents=True, exist_ok=True)
     for name, content in _BUILTIN_PERSONAS.items():
@@ -45,7 +45,7 @@ def list_personas() -> list:
     return personas
 
 
-def get_persona(name: str):
+def get_persona(name: str) -> Optional[str]:
     """Get persona content by name."""
     ensure_personas_dir()
     path = PERSONAS_DIR / f'{name}.md'
@@ -76,7 +76,7 @@ def delete_persona(name: str) -> bool:
     return False
 
 
-def switch_persona(session_id: str, name: str):
+def switch_persona(session_id: str, name: str) -> Optional[str]:
     """Switch active persona for a session. Returns persona content or None."""
     content = get_persona(name)
     if content is None:
@@ -101,13 +101,13 @@ def get_user_soul() -> str:
     return ''
 
 
-def set_user_soul(content: str):
+def set_user_soul(content: str) -> None:
     """Write user SOUL.md to ~/.salmalm/SOUL.md."""
     USER_SOUL_FILE.parent.mkdir(parents=True, exist_ok=True)
     USER_SOUL_FILE.write_text(content, encoding='utf-8')
 
 
-def reset_user_soul():
+def reset_user_soul() -> None:
     """Delete user SOUL.md (revert to default)."""
     try:
         if USER_SOUL_FILE.exists():

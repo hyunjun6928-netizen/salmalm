@@ -81,7 +81,7 @@ class SmartContextWindow:
         return self._budget
 
     @budget.setter
-    def budget(self, tokens: int):
+    def budget(self, tokens: int) -> None:
         self._budget = max(100, tokens)
 
     @property
@@ -92,7 +92,7 @@ class SmartContextWindow:
     def remaining_tokens(self) -> int:
         return max(0, self._budget - self.used_tokens)
 
-    def set_recent_messages(self, messages: List[Dict]):
+    def set_recent_messages(self, messages: List[Dict]) -> None:
         """Set recent conversation messages for topic analysis."""
         self._recent_messages = messages[-20:]  # keep last 20
 
@@ -160,7 +160,7 @@ class SmartContextWindow:
         lines.append(f'\n_Remaining: {self.remaining_tokens} tokens_')
         return '\n'.join(lines)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear injected context."""
         self._injected = []
 
@@ -198,12 +198,12 @@ def handle_context_command(cmd: str, session=None, **kw) -> str:
     return '❌ Usage: `/context show|budget <tokens>|clear`'
 
 
-def register_commands(router):
+def register_commands(router: object) -> None:
     """Register /context commands."""
     router.register_prefix('/context', handle_context_command)
 
 
-def register_tools(registry_module=None):
+def register_tools(registry_module: Optional[object] = None) -> None:
     """Register smart context tools."""
     try:
         from salmalm.tools.tool_registry import register_dynamic

@@ -146,7 +146,7 @@ class LLMRouter:
         return self._current_model
 
     @current_model.setter
-    def current_model(self, model: str):
+    def current_model(self, model: str) -> None:
         self._current_model = model
 
     def switch_model(self, model: str) -> str:
@@ -373,12 +373,12 @@ def handle_model_command(cmd: str, session=None, **kw) -> str:
     return f'Current model: `{current}`\nUse `/model list` or `/model switch <name>`'
 
 
-def register_commands(router):
+def register_commands(router: object) -> None:
     """Register /model commands with CommandRouter."""
     router.register_prefix('/model', handle_model_command)
 
 
-def register_tools(registry_module=None):
+def register_tools(registry_module: Optional[object] = None) -> None:
     """Register LLM router tools."""
     try:
         from salmalm.tools.tool_registry import register_dynamic

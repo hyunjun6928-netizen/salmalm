@@ -9,7 +9,7 @@ import json
 import threading as _threading
 import time as _time
 from pathlib import Path as _Path
-from typing import Optional
+from typing import Any, Dict, Optional, Tuple
 
 from salmalm.crypto import log
 from salmalm.llm import call_llm as _call_llm_sync, stream_anthropic as _stream_anthropic
@@ -104,7 +104,7 @@ def get_failover_config() -> dict:
     return _load_failover_config()
 
 
-def save_failover_config(config: dict):
+def save_failover_config(config: dict) -> None:
     """Save user's failover chain config."""
     try:
         _FAILOVER_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -160,9 +160,10 @@ async def _call_llm_streaming(messages, model=None, tools=None,
 # Failover-aware LLM calls (used by IntelligenceEngine)
 # ============================================================
 
-async def call_with_failover(messages, model, tools=None,
-                              max_tokens=4096, thinking=False,
-                              on_token=None, on_status=None):
+async def call_with_failover(messages: list, model: str, tools: Optional[list] = None,
+                              max_tokens: int = 4096, thinking: bool = False,
+                              on_token: Optional[object] = None,
+                              on_status: Optional[object] = None) -> Tuple[Dict[str, Any], Optional[str]]:
     """LLM call with automatic failover on failure.
 
     on_status: optional callback(status_type, detail_str) for typing indicators.
@@ -209,7 +210,9 @@ async def call_with_failover(messages, model, tools=None,
     return result, f"⚠️ All models failed"
 
 
-async def try_llm_call(messages, model, tools, max_tokens, thinking, on_token):
+async def try_llm_call(messages: list, model: str, tools: Optional[list],
+                       max_tokens: int, thinking: bool,
+                       on_token: Optional[object]) -> Dict[str, Any]:
     """Single LLM call attempt. Sets _failed=True on exception."""
     provider = model.split('/')[0] if '/' in model else 'anthropic'
     try:

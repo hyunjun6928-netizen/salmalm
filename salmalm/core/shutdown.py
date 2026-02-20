@@ -25,7 +25,7 @@ class ShutdownManager:
     def is_shutting_down(self) -> bool:
         return self._shutting_down
 
-    async def execute(self, timeout: float = 30.0):
+    async def execute(self, timeout: float = 30.0) -> None:
         """Run the full shutdown sequence.
 
         1. Signal engine to reject new requests
