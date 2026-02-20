@@ -84,7 +84,9 @@ async def run_server():
 
     # ── Phase 4: HTTP Server ──
     port = int(os.environ.get('SALMALM_PORT', 18800))
-    bind_addr = os.environ.get('SALMALM_BIND', '127.0.0.1')
+    # WSL: bind 0.0.0.0 so Windows browser can reach the server
+    _default_bind = '0.0.0.0' if 'microsoft' in os.uname().release.lower() else '127.0.0.1'
+    bind_addr = os.environ.get('SALMALM_BIND', _default_bind)
     server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
 
     # Auto-generate self-signed cert for HTTPS (enables microphone, camera, etc.)

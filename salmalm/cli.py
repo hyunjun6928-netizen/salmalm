@@ -105,7 +105,8 @@ def _run_node_mode():
     agent.start_heartbeat(interval=30)
 
     # Start HTTP server for tool execution
-    bind_addr = os.environ.get('SALMALM_BIND', '127.0.0.1')
+    _default_bind = '0.0.0.0' if 'microsoft' in os.uname().release.lower() else '127.0.0.1'
+    bind_addr = os.environ.get('SALMALM_BIND', _default_bind)
     server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
     logger.info(
         f"+==============================================+\n"
