@@ -140,6 +140,8 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
             fb_model_id = FALLBACK_MODELS.get(fb_provider)
             if not fb_model_id:
                 continue
+            from salmalm.core.engine import _fix_model_name
+            fb_model_id = _fix_model_name(fb_model_id)
             log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id} [after {time.time() - _t0:.2f}s]")
             try:
                 if not tools:

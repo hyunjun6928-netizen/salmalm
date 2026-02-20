@@ -250,7 +250,7 @@ def _execute_inner(name: str, args: dict) -> str:
                 resp = _http_post(
                     'https://api.openai.com/v1/chat/completions',
                     {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-                    {'model': 'gpt-4o', 'messages': [{'role': 'user', 'content': content_parts}], 'max_tokens': 1000}
+                    {'model': 'gpt-4.1-nano', 'messages': [{'role': 'user', 'content': content_parts}], 'max_tokens': 1000}
                 )
                 return resp['choices'][0]['message']['content']  # type: ignore[no-any-return]
             api_key = vault.get('anthropic_api_key')
