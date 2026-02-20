@@ -1127,6 +1127,77 @@ self.addEventListener('fetch',e=>{{
             self.end_headers()
             self.wfile.write(sw_js.encode())
 
+        elif self.path.startswith('/api/agent/export'):
+            if not self._require_auth('user'):
+                return
+            from urllib.parse import parse_qs, urlparse
+            qs = parse_qs(urlparse(self.path).query)
+            inc_sessions = qs.get('sessions', ['1'])[0] == '1'
+            inc_data = qs.get('data', ['1'])[0] == '1'
+            inc_vault = qs.get('vault', ['0'])[0] == '1'
+            import zipfile, io, json as _json, datetime
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # Soul / personality
+                soul_path = BASE_DIR / 'soul.md'
+                if soul_path.exists():
+                    zf.writestr('soul.md', soul_path.read_text(encoding='utf-8'))
+                # Memory files
+                memory_dir = BASE_DIR / 'memory'
+                if memory_dir.exists():
+                    for f in memory_dir.glob('*'):
+                        if f.is_file():
+                            zf.writestr(f'memory/{f.name}', f.read_text(encoding='utf-8'))
+                # Config
+                config_path = BASE_DIR / 'config.json'
+                if config_path.exists():
+                    zf.writestr('config.json', config_path.read_text(encoding='utf-8'))
+                routing_path = Path.home() / '.salmalm' / 'routing.json'
+                if routing_path.exists():
+                    zf.writestr('routing.json', routing_path.read_text(encoding='utf-8'))
+                # Sessions
+                if inc_sessions:
+                    from salmalm.core import _get_db
+                    conn = _get_db()
+                    rows = conn.execute('SELECT session_id, data, title FROM session_store').fetchall()
+                    sessions = []
+                    for r in rows:
+                        sessions.append({'id': r[0], 'data': r[1], 'title': r[2] if len(r) > 2 else ''})
+                    zf.writestr('sessions.json', _json.dumps(sessions, ensure_ascii=False, indent=2))
+                # Data (notes, expenses, habits, etc.)
+                if inc_data:
+                    for name in ('notes.json', 'expenses.json', 'habits.json', 'journal.json', 'dashboard.json'):
+                        p = BASE_DIR / name
+                        if p.exists():
+                            zf.writestr(f'data/{name}', p.read_text(encoding='utf-8'))
+                # Vault (API keys) — only if explicitly requested
+                if inc_vault:
+                    from salmalm.security.vault import vault
+                    if vault.is_unlocked:
+                        keys = {}
+                        for k in ('ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY'):
+                            v = vault.get(k)
+                            if v:
+                                keys[k] = v
+                        if keys:
+                            zf.writestr('vault_keys.json', _json.dumps(keys, indent=2))
+                # Manifest
+                zf.writestr('manifest.json', _json.dumps({
+                    'version': VERSION,
+                    'exported_at': datetime.datetime.now().isoformat(),
+                    'includes': {'sessions': inc_sessions, 'data': inc_data, 'vault': inc_vault}
+                }, indent=2))
+            buf.seek(0)
+            data = buf.getvalue()
+            ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            self.send_response(200)
+            self._cors()
+            self.send_header('Content-Type', 'application/zip')
+            self.send_header('Content-Disposition', f'attachment; filename="salmalm-export-{ts}.zip"')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
         elif self.path == '/dashboard':
             if not self._require_auth('user'):
                 return
@@ -1577,6 +1648,71 @@ self.addEventListener('fetch',e=>{{
                 self._json({'ok': True, 'text': text})
             except Exception as e:
                 self._json({'ok': False, 'error': str(e)}, 500)
+
+        elif self.path == '/api/agent/sync':
+            if not self._require_auth('user'):
+                return
+            action = body.get('action', 'export')
+            if action == 'export':
+                import json as _json
+                export_data = {}
+                # Quick sync: lightweight JSON export (no ZIP)
+                soul_path = BASE_DIR / 'soul.md'
+                if soul_path.exists():
+                    export_data['soul'] = soul_path.read_text(encoding='utf-8')
+                config_path = BASE_DIR / 'config.json'
+                if config_path.exists():
+                    export_data['config'] = _json.loads(config_path.read_text(encoding='utf-8'))
+                routing_path = Path.home() / '.salmalm' / 'routing.json'
+                if routing_path.exists():
+                    export_data['routing'] = _json.loads(routing_path.read_text(encoding='utf-8'))
+                memory_dir = BASE_DIR / 'memory'
+                if memory_dir.exists():
+                    export_data['memory'] = {}
+                    for f in memory_dir.glob('*'):
+                        if f.is_file():
+                            export_data['memory'][f.name] = f.read_text(encoding='utf-8')
+                self._json({'ok': True, 'data': export_data})
+            else:
+                self._json({'ok': False, 'error': 'Unknown action'}, 400)
+
+        elif self.path == '/api/agent/import/preview':
+            if not self._require_auth('user'):
+                return
+            # Read multipart file
+            import zipfile, io, json as _json
+            content_type = self.headers.get('Content-Type', '')
+            if 'multipart' not in content_type:
+                self._json({'ok': False, 'error': 'Expected multipart upload'}, 400)
+                return
+            content_length = int(self.headers.get('Content-Length', 0))
+            raw = self.rfile.read(content_length)
+            # Find ZIP in multipart
+            boundary = content_type.split('boundary=')[1].encode() if 'boundary=' in content_type else b''
+            parts = raw.split(b'--' + boundary)
+            zip_data = None
+            for part in parts:
+                if b'filename=' in part:
+                    body_start = part.find(b'\r\n\r\n')
+                    if body_start > 0:
+                        zip_data = part[body_start + 4:]
+                        if zip_data.endswith(b'\r\n'):
+                            zip_data = zip_data[:-2]
+                        break
+            if not zip_data:
+                self._json({'ok': False, 'error': 'No ZIP file found'}, 400)
+                return
+            try:
+                zf = zipfile.ZipFile(io.BytesIO(zip_data))
+                manifest = _json.loads(zf.read('manifest.json')) if 'manifest.json' in zf.namelist() else {}
+                preview = {
+                    'files': zf.namelist(),
+                    'manifest': manifest,
+                    'size': len(zip_data),
+                }
+                self._json({'ok': True, 'preview': preview})
+            except Exception as e:
+                self._json({'ok': False, 'error': str(e)}, 400)
 
         elif self.path == '/api/sessions/create':
             if not self._require_auth('user'):
