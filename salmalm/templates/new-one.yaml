@@ -1,0 +1,8 @@
+name: new-one
+display_name: new-one
+description: Custom template
+system_prompt: |
+  
+|
+tools:
+tags:

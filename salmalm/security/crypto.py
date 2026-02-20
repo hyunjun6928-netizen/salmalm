@@ -17,23 +17,29 @@ try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.primitives import hashes as crypto_hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
     HAS_CRYPTO = True
     log.info("[OK] cryptography available -- AES-256-GCM enabled")
 except ImportError:
-    log.warning("[WARN] cryptography not installed -- using HMAC-CTR fallback (stdlib). Install 'cryptography' for AES-256-GCM.")
+    log.warning(
+        "[WARN] cryptography not installed -- using HMAC-CTR fallback (stdlib). Install 'cryptography' for AES-256-GCM."
+    )
 
 
 def _derive_key(password: str, salt: bytes, length: int = 32) -> bytes:
     """Derive encryption key using PBKDF2-HMAC-SHA256."""
     if HAS_CRYPTO:
         kdf = PBKDF2HMAC(
-            algorithm=crypto_hashes.SHA256(), length=length,
-            salt=salt, iterations=PBKDF2_ITER
+            algorithm=crypto_hashes.SHA256(),
+            length=length,
+            salt=salt,
+            iterations=PBKDF2_ITER,
         )
-        return kdf.derive(password.encode('utf-8'))
+        return kdf.derive(password.encode("utf-8"))
     else:
-        return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'),
-                                   salt, PBKDF2_ITER, dklen=length)
+        return hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), salt, PBKDF2_ITER, dklen=length
+        )
 
 
 class Vault:
@@ -75,14 +81,14 @@ class Vault:
         try:
             key = _derive_key(password, self._salt)
             plaintext: bytes
-            if version == b'\x03' and HAS_CRYPTO:
+            if version == b"\x03" and HAS_CRYPTO:
                 nonce, ct = ciphertext[:12], ciphertext[12:]
                 plaintext = AESGCM(key).decrypt(nonce, ct, None)
-            elif version in (b'\x02', b'\x03'):
+            elif version in (b"\x02", b"\x03"):
                 plaintext = self._unlock_hmac_ctr(password, ciphertext)
             else:
                 return False
-            self._data = json.loads(plaintext.decode('utf-8'))
+            self._data = json.loads(plaintext.decode("utf-8"))
             return True
         except Exception:
             self._password = None
@@ -92,19 +98,19 @@ class Vault:
         """Decrypt HMAC-CTR vault (new format with IV, legacy without)."""
         assert self._salt is not None, "Salt must be set before unlock"
         tag, rest = ciphertext[:32], ciphertext[32:]
-        hmac_key = _derive_key(password, self._salt + b'hmac', 32)
+        hmac_key = _derive_key(password, self._salt + b"hmac", 32)
         if len(rest) >= 16:
             iv, ct = rest[:16], rest[16:]
             expected = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
             if hmac.compare_digest(tag, expected):
-                enc_key = _derive_key(password, self._salt + b'enc' + iv, 32)
+                enc_key = _derive_key(password, self._salt + b"enc" + iv, 32)
                 return self._ctr_decrypt(enc_key, ct)
             # Legacy format (no IV)
             ct = rest
             expected = hmac.new(hmac_key, ct, hashlib.sha256).digest()
             if not hmac.compare_digest(tag, expected):
                 raise ValueError("HMAC mismatch")
-            enc_key = _derive_key(password, self._salt + b'enc', 32)
+            enc_key = _derive_key(password, self._salt + b"enc", 32)
             return self._ctr_decrypt(enc_key, ct)
         raise ValueError("Ciphertext too short")
 
@@ -113,7 +119,7 @@ class Vault:
         if self._password is None or self._salt is None:
             return
         VAULT_FILE.parent.mkdir(parents=True, exist_ok=True)
-        plaintext: bytes = json.dumps(self._data).encode('utf-8')
+        plaintext: bytes = json.dumps(self._data).encode("utf-8")
         key = _derive_key(self._password, self._salt)
         if HAS_CRYPTO:
             nonce = secrets.token_bytes(12)
@@ -121,11 +127,11 @@ class Vault:
             VAULT_FILE.write_bytes(VAULT_VERSION + self._salt + nonce + ct)
         else:
             iv = secrets.token_bytes(16)
-            enc_key = _derive_key(self._password, self._salt + b'enc' + iv, 32)
+            enc_key = _derive_key(self._password, self._salt + b"enc" + iv, 32)
             ct = self._ctr_encrypt(enc_key, plaintext)
-            hmac_key = _derive_key(self._password, self._salt + b'hmac', 32)
+            hmac_key = _derive_key(self._password, self._salt + b"hmac", 32)
             tag = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
-            VAULT_FILE.write_bytes(b'\x02' + self._salt + tag + iv + ct)
+            VAULT_FILE.write_bytes(b"\x02" + self._salt + tag + iv + ct)
 
     @staticmethod
     def _ctr_encrypt(key: bytes, data: bytes) -> bytes:
@@ -133,9 +139,9 @@ class Vault:
         out: bytearray = bytearray()
         ctr: int = 0
         for i in range(0, len(data), 32):
-            block = hmac.new(key, ctr.to_bytes(8, 'big'), hashlib.sha256).digest()
-            chunk = data[i:i + 32]
-            out.extend(b ^ k for b, k in zip(chunk, block[:len(chunk)]))
+            block = hmac.new(key, ctr.to_bytes(8, "big"), hashlib.sha256).digest()
+            chunk = data[i : i + 32]
+            out.extend(b ^ k for b, k in zip(chunk, block[: len(chunk)]))
             ctr += 1
         return bytes(out)
 
@@ -143,17 +149,17 @@ class Vault:
 
     # Map vault keys → env var names
     _ENV_MAP = {
-        'anthropic_api_key': 'ANTHROPIC_API_KEY',
-        'openai_api_key': 'OPENAI_API_KEY',
-        'xai_api_key': 'XAI_API_KEY',
-        'google_api_key': 'GOOGLE_API_KEY',
-        'gemini_api_key': 'GEMINI_API_KEY',
-        'brave_api_key': 'BRAVE_SEARCH_API_KEY',
-        'openrouter_api_key': 'OPENROUTER_API_KEY',
-        'ollama_url': 'OLLAMA_URL',
-        'telegram_token': 'TELEGRAM_TOKEN',
-        'telegram_owner_id': 'TELEGRAM_OWNER_ID',
-        'discord_token': 'DISCORD_TOKEN',
+        "anthropic_api_key": "ANTHROPIC_API_KEY",
+        "openai_api_key": "OPENAI_API_KEY",
+        "xai_api_key": "XAI_API_KEY",
+        "google_api_key": "GOOGLE_API_KEY",
+        "gemini_api_key": "GEMINI_API_KEY",
+        "brave_api_key": "BRAVE_SEARCH_API_KEY",
+        "openrouter_api_key": "OPENROUTER_API_KEY",
+        "ollama_url": "OLLAMA_URL",
+        "telegram_token": "TELEGRAM_TOKEN",
+        "telegram_owner_id": "TELEGRAM_OWNER_ID",
+        "discord_token": "DISCORD_TOKEN",
     }
 
     def get(self, key: str, default: Optional[Any] = None) -> Any:
@@ -184,8 +190,8 @@ class Vault:
             return False
         # Verify old password matches current (timing-safe comparison)
         if not hmac.compare_digest(
-                (self._password or '').encode('utf-8'),
-                old_password.encode('utf-8')):
+            (self._password or "").encode("utf-8"), old_password.encode("utf-8")
+        ):
             return False
         # Re-encrypt with new password
         self._password = new_password
