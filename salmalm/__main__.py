@@ -10,6 +10,9 @@ def main() -> None:
     from salmalm.cli import setup_workdir, dispatch_cli
     setup_workdir()
 
+    from salmalm import init_logging
+    init_logging()
+
     if dispatch_cli():
         return
 

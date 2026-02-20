@@ -238,6 +238,19 @@ class WebSocketServer:
                 k, v = line.split(':', 1)  # type: ignore[arg-type]
                 headers[k.strip().lower()] = v.strip()
 
+        # Validate Origin (prevent cross-origin WS hijack when bound to 0.0.0.0)
+        origin = headers.get('origin', '')
+        if origin:
+            from urllib.parse import urlparse
+            o = urlparse(origin)
+            allowed_hosts = {'localhost', '127.0.0.1', '0.0.0.0', '::1'}
+            if o.hostname and o.hostname not in allowed_hosts:
+                logger.warning("WS rejected: origin %s not in allowlist", origin)
+                writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+                await writer.drain()
+                writer.close()
+                return
+
         # Validate WebSocket upgrade
         ws_key = headers.get('sec-websocket-key', '')  # type: ignore[call-overload]
         if not ws_key or 'upgrade' not in headers.get('connection', '').lower():  # type: ignore[call-overload]

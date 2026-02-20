@@ -28,23 +28,33 @@ def _register_services() -> None:
     app.register('ws_server', lambda: __import__('salmalm.ws', fromlist=['ws_server']).ws_server)
 
 
-try:
-    from .constants import LOG_FILE, DATA_DIR
+_logging_initialized = False
 
-    if not log.handlers:
-        log.setLevel(logging.INFO)
+
+def init_logging():
+    """Initialize file + console logging. Called once from entrypoint, not import."""
+    global _logging_initialized
+    if _logging_initialized or log.handlers:
+        return
+    _logging_initialized = True
+    try:
+        from .constants import LOG_FILE, DATA_DIR
         DATA_DIR.mkdir(parents=True, exist_ok=True)
+        log.setLevel(logging.INFO)
         log.addHandler(logging.FileHandler(LOG_FILE, encoding='utf-8'))
         _sh = logging.StreamHandler(sys.stdout)
         _sh.setStream(open(sys.stdout.fileno(), 'w', encoding='utf-8', errors='replace', closefd=False))
         log.addHandler(_sh)
         for h in log.handlers:
             h.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+    except Exception:
+        pass
 
+
+try:
     from .container import Container
     app = Container()
     _register_services()
 except Exception:
     # During pip build / isolated environments, constants may fail.
-    # app stays None, log stays basic — that's fine for metadata extraction.
     pass
