@@ -711,7 +711,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   };
 
   /* --- Theme --- */
-  var _theme=localStorage.getItem('salm_theme')||'dark';
+  var _theme=localStorage.getItem('salm_theme')||'light';
   if(_theme==='light')document.documentElement.setAttribute('data-theme','light');
   window.toggleTheme=function(){
     _theme=_theme==='dark'?'light':'dark';
