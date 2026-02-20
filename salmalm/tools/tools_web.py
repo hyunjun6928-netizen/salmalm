@@ -1,5 +1,6 @@
 """Web tools: web_search, web_fetch, http_request."""
 import json
+import os
 import re
 import urllib.request
 import urllib.parse
@@ -84,8 +85,12 @@ def handle_http_request(args: dict) -> str:
         return f'{reason}'
     url = final_url  # Use redirect-validated URL
     # Block dangerous request headers (Host spoofing, auth forwarding)
+    # Customizable via SALMALM_BLOCKED_HEADERS env (comma-separated additions)
     _BLOCKED_HEADERS = frozenset({'host', 'transfer-encoding', 'te', 'proxy-authorization',
                                    'proxy-connection', 'upgrade', 'connection'})
+    _extra = os.environ.get('SALMALM_BLOCKED_HEADERS', '')
+    if _extra:
+        _BLOCKED_HEADERS = _BLOCKED_HEADERS | frozenset(h.strip().lower() for h in _extra.split(',') if h.strip())
     for h in list(headers.keys()):
         if h.lower() in _BLOCKED_HEADERS:
             return f'❌ Blocked request header: {h}'

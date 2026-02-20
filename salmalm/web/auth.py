@@ -60,37 +60,79 @@ class TokenManager:
     automatically.
     """
 
-    _SECRET_FILE = DATA_DIR / ".token_secret"
+    _SECRET_DIR = DATA_DIR / ".token_keys"
+    _SECRET_FILE = DATA_DIR / ".token_secret"  # Legacy location
 
     def __init__(self, secret: Optional[bytes] = None):
+        self._keys: Dict[str, bytes] = {}  # kid -> secret
+        self._current_kid: str = ""
         if secret:
-            self._secret = secret
-        elif self._SECRET_FILE.exists():
-            self._secret = self._SECRET_FILE.read_bytes()
+            self._current_kid = "manual"
+            self._keys["manual"] = secret
         else:
-            self._secret = os.urandom(32)
-            try:
-                self._SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
-                self._SECRET_FILE.write_bytes(self._secret)
-                try:
-                    self._SECRET_FILE.chmod(0o600)
-                except (OSError, NotImplementedError):
-                    pass
-                import sys
-                if sys.platform == "win32":
-                    try:
-                        import subprocess
-                        subprocess.run(
-                            ["icacls", str(self._SECRET_FILE), "/inheritance:r",
-                             "/grant:r", f"{os.environ.get('USERNAME', 'SYSTEM')}:(R,W)"],
-                            capture_output=True, timeout=5,
-                        )
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            self._load_or_create_keys()
         self._revoked_lock = threading.Lock()
         self._ensure_revocation_table()
+
+    def _load_or_create_keys(self):
+        """Load key ring from disk, or migrate from legacy single-key file."""
+        self._SECRET_DIR.mkdir(parents=True, exist_ok=True)
+        # Load existing keys
+        for f in sorted(self._SECRET_DIR.iterdir()):
+            if f.suffix == ".key" and f.stat().st_size == 32:
+                kid = f.stem
+                self._keys[kid] = f.read_bytes()
+                self._current_kid = kid  # Latest by sort order
+        # Migrate legacy single-key file
+        if not self._keys and self._SECRET_FILE.exists():
+            legacy = self._SECRET_FILE.read_bytes()
+            if len(legacy) == 32:
+                kid = "k0"
+                self._keys[kid] = legacy
+                self._current_kid = kid
+                self._write_key_file(kid, legacy)
+        # No keys at all — generate first key
+        if not self._keys:
+            self._rotate()
+
+    def _write_key_file(self, kid: str, secret: bytes):
+        """Write a key file with restricted permissions."""
+        path = self._SECRET_DIR / f"{kid}.key"
+        path.write_bytes(secret)
+        try:
+            path.chmod(0o600)
+        except (OSError, NotImplementedError):
+            pass
+        import sys
+        if sys.platform == "win32":
+            try:
+                import subprocess
+                subprocess.run(
+                    ["icacls", str(path), "/inheritance:r",
+                     "/grant:r", f"{os.environ.get('USERNAME', 'SYSTEM')}:(R,W)"],
+                    capture_output=True, timeout=5,
+                )
+            except Exception:
+                pass
+
+    def rotate(self) -> str:
+        """Create a new signing key. Old keys kept for verification.
+
+        Returns the new kid.
+        """
+        return self._rotate()
+
+    def _rotate(self) -> str:
+        """Internal: generate new key and set as current."""
+        # kid = k{N} where N increments
+        existing = [k for k in self._keys if k.startswith("k") and k[1:].isdigit()]
+        n = max((int(k[1:]) for k in existing), default=-1) + 1
+        kid = f"k{n}"
+        secret = os.urandom(32)
+        self._keys[kid] = secret
+        self._current_kid = kid
+        self._write_key_file(kid, secret)
+        return kid
 
     def _ensure_revocation_table(self):
         """Create revoked_tokens table if it doesn't exist."""
@@ -108,12 +150,13 @@ class TokenManager:
             pass  # Will work in-memory if DB unavailable
 
     def create(self, payload: dict, expires_in: int = 86400) -> str:
-        """Create a signed token with unique jti. Default expiry: 24h."""
+        """Create a signed token with unique jti + kid. Default expiry: 24h."""
         now = int(time.time())
         jti = secrets.token_urlsafe(16)
         payload = {
             **payload,
             "jti": jti,
+            "kid": self._current_kid,
             "exp": now + expires_in,
             "iat": now,
         }
@@ -124,26 +167,41 @@ class TokenManager:
             .decode()
             .rstrip("=")
         )
-        sig = hmac.new(self._secret, data.encode(), hashlib.sha256).hexdigest()
+        secret = self._keys[self._current_kid]
+        sig = hmac.new(secret, data.encode(), hashlib.sha256).hexdigest()
         return f"{data}.{sig}"
 
     def verify(self, token: str) -> Optional[dict]:
-        """Verify token signature, expiry, and revocation status."""
+        """Verify token signature, expiry, and revocation status.
+
+        Tries the kid from the token payload first, then falls back to
+        all known keys (for legacy tokens without kid).
+        """
         try:
             parts = token.rsplit(".", 1)
             if len(parts) != 2:
                 return None
             data, sig = parts
-            expected_sig = hmac.new(
-                self._secret, data.encode(), hashlib.sha256
-            ).hexdigest()
-            if not hmac.compare_digest(sig, expected_sig):
-                return None
+            # Decode payload to get kid hint (without verifying sig yet)
             padded = data + "=" * (-len(data) % 4)
             payload = json.loads(base64.urlsafe_b64decode(padded))
+            # Try kid-specific key first, then all keys
+            kid = payload.get("kid")
+            keys_to_try = []
+            if kid and kid in self._keys:
+                keys_to_try.append(self._keys[kid])
+            else:
+                keys_to_try.extend(self._keys.values())
+            verified = False
+            for secret in keys_to_try:
+                expected = hmac.new(secret, data.encode(), hashlib.sha256).hexdigest()
+                if hmac.compare_digest(sig, expected):
+                    verified = True
+                    break
+            if not verified:
+                return None
             if payload.get("exp", 0) < time.time():
                 return None
-            # Check revocation
             jti = payload.get("jti")
             if jti and self._is_revoked(jti):
                 return None
@@ -299,7 +357,6 @@ class AuthManager:
     def __init__(self):
         self._token_mgr = TokenManager()
         self._lock = threading.Lock()
-        self._login_attempts: Dict[str, list] = {}  # username -> [timestamps]
         self._lockout_duration = 300  # 5 min lockout
         self._max_attempts = 5
         self._initialized = False
@@ -327,6 +384,14 @@ class AuthManager:
             ip_address TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS login_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            attempted_at REAL NOT NULL,
+            ip_address TEXT
+        )""")
+        conn.execute("""CREATE INDEX IF NOT EXISTS idx_login_attempts_user
+            ON login_attempts (username, attempted_at)""")
         conn.commit()
 
         # Create default admin if no users exist (random password)
@@ -408,15 +473,10 @@ class AuthManager:
         """Authenticate user. Returns user dict or None."""
         self._ensure_db()
 
-        # Check lockout
-        with self._lock:
-            attempts = self._login_attempts.get(username, [])
-            recent = [t for t in attempts if time.time() - t < self._lockout_duration]
-            if len(recent) >= self._max_attempts:
-                log.warning(
-                    f"[LOCK] Account locked: {username} ({len(recent)} failed attempts)"
-                )
-                return None
+        # Check lockout (DB-persisted)
+        if self._is_locked_out(username):
+            log.warning(f"[LOCK] Account locked: {username}")
+            return None
 
         conn = sqlite3.connect(str(AUTH_DB))
         row = conn.execute(
@@ -433,9 +493,14 @@ class AuthManager:
             self._record_attempt(username)
             return None
 
-        # Success — clear attempts
-        with self._lock:
-            self._login_attempts.pop(username, None)
+        # Success — clear attempts from DB
+        try:
+            conn2 = sqlite3.connect(str(AUTH_DB))
+            conn2.execute("DELETE FROM login_attempts WHERE username=?", (username,))
+            conn2.commit()
+            conn2.close()
+        except Exception:
+            pass
 
         # Update last login
         conn = sqlite3.connect(str(AUTH_DB))
@@ -464,11 +529,35 @@ class AuthManager:
             return None
         return {"id": row[0], "username": row[1], "role": row[2]}
 
-    def _record_attempt(self, username: str):
-        with self._lock:
-            if username not in self._login_attempts:
-                self._login_attempts[username] = []
-            self._login_attempts[username].append(time.time())
+    def _record_attempt(self, username: str, ip: str = ""):
+        """Record a failed login attempt in DB (survives restart)."""
+        try:
+            conn = sqlite3.connect(str(AUTH_DB))
+            conn.execute(
+                "INSERT INTO login_attempts (username, attempted_at, ip_address) VALUES (?, ?, ?)",
+                (username, time.time(), ip),
+            )
+            # Cleanup: remove attempts older than lockout window
+            cutoff = time.time() - self._lockout_duration
+            conn.execute("DELETE FROM login_attempts WHERE attempted_at < ?", (cutoff,))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    def _is_locked_out(self, username: str) -> bool:
+        """Check if username is locked out (DB-persisted, survives restart)."""
+        try:
+            conn = sqlite3.connect(str(AUTH_DB))
+            cutoff = time.time() - self._lockout_duration
+            row = conn.execute(
+                "SELECT COUNT(*) FROM login_attempts WHERE username=? AND attempted_at>?",
+                (username, cutoff),
+            ).fetchone()
+            conn.close()
+            return (row[0] if row else 0) >= self._max_attempts
+        except Exception:
+            return False
 
     def create_token(self, user: dict, expires_in: int = 86400) -> str:
         """Create auth token for authenticated user."""

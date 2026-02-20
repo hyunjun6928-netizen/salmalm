@@ -56,6 +56,21 @@ async def run_server():
     audit_log('startup', f'{APP_NAME} v{VERSION}')
     MEMORY_DIR.mkdir(exist_ok=True)
 
+    # ── Audit checkpoint timer (every 6 hours) ──
+    def _audit_checkpoint_loop():
+        import time as _time
+        while True:
+            _time.sleep(6 * 3600)  # 6 hours
+            try:
+                from salmalm.core.core import audit_checkpoint, audit_log_cleanup
+                audit_checkpoint()
+                audit_log_cleanup(days=30)
+            except Exception:
+                pass
+    import threading as _th
+    _ckpt = _th.Thread(target=_audit_checkpoint_loop, daemon=True, name="audit-checkpoint")
+    _ckpt.start()
+
     # ── Phase 2: SLA Monitoring ──
     try:
         from .sla import uptime_monitor, watchdog

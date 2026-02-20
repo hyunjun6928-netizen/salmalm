@@ -66,12 +66,6 @@ def _cleanup():
     threads_before = set(threading.enumerate())
     yield
     gc.collect()
-    # Close accumulated DB connections to prevent SQLite lock contention
-    try:
-        from salmalm.core.core import close_all_db_connections
-        close_all_db_connections()
-    except Exception:
-        pass
     # Kill stale daemon threads (server threads, background tasks)
     import time
     stale = [t for t in threading.enumerate()
