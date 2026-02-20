@@ -344,6 +344,12 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             'vault_unlocked': vault.is_unlocked,
         })
 
+    def _get_queue(self):
+        """Queue status API."""
+        from salmalm.features.queue import queue_status, set_queue_mode, get_queue
+        session_id = self.headers.get('X-Session-Id', 'web')
+        self._json(queue_status(session_id))
+
     def _get_status(self):
         channels = {}
         if vault.is_unlocked:
@@ -640,6 +646,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         '/api/gateway/nodes': '_get_gateway_nodes',
         '/api/status': '_get_status',
         '/api/debug': '_get_debug',
+        '/api/queue': '_get_queue',
         '/api/metrics': '_get_metrics',
         '/api/cert': '_get_cert',
         '/api/ws/status': '_get_ws_status',
@@ -1822,6 +1829,16 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 }
                 self._json({'ok': True, 'preview': preview})
             except Exception as e:
+                self._json({'ok': False, 'error': str(e)}, 400)
+
+        elif self.path == '/api/queue/mode':
+            from salmalm.features.queue import set_queue_mode, get_queue
+            mode = body.get('mode', 'collect')
+            session_id = body.get('session_id', 'web')
+            try:
+                result = set_queue_mode(session_id, mode)
+                self._json({'ok': True, 'message': result})
+            except ValueError as e:
                 self._json({'ok': False, 'error': str(e)}, 400)
 
         elif self.path == '/api/cron/add':

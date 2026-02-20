@@ -193,6 +193,7 @@ class CommandRouter:
             ('/screen', self._cmd_screen),
             ('/mcp', self._cmd_mcp),
             ('/brave', self._cmd_brave),
+            ('/queue', self._cmd_queue),
         ])
 
     # -- dispatch --
@@ -639,6 +640,49 @@ class CommandRouter:
             return brave_web_search({'query': query, 'count': 5})
         except Exception as e:
             return f'❌ Brave search error: {e}'
+
+    @staticmethod
+    def _cmd_queue(cmd, session, **_):
+        """Message queue management."""
+        from salmalm.features.queue import get_queue, set_queue_mode, queue_status, QueueMode
+        parts = cmd.split()
+        sub = parts[1] if len(parts) > 1 else 'status'
+        sid = session.session_id if session else 'default'
+
+        if sub == 'status':
+            st = queue_status(sid)
+            return (f"📨 **Queue Status**\n"
+                    f"• Mode: `{st['mode']}`\n"
+                    f"• Pending: {st['pending']}\n"
+                    f"• Backlog: {st['backlog']}\n"
+                    f"• Processing: {'🔄' if st['processing'] else '⏹️'}")
+
+        if sub in ('mode', 'set') and len(parts) >= 3:
+            mode = parts[2].lower()
+            valid = [m.value for m in QueueMode]
+            if mode not in valid:
+                return f"❌ Invalid mode: `{mode}`\nValid: {', '.join(valid)}"
+            result = set_queue_mode(sid, mode)
+            return f"✅ {result}"
+
+        if sub == 'clear':
+            q = get_queue(sid)
+            q.clear()
+            return "🗑️ Queue cleared"
+
+        if sub == 'modes':
+            return ("📨 **Queue Modes**\n"
+                    "• `collect` — Queue all, process when done (default)\n"
+                    "• `steer` — Latest message replaces pending\n"
+                    "• `followup` — Queue as follow-up context\n"
+                    "• `steer-backlog` — Steer + keep history\n"
+                    "• `interrupt` — Cancel current, process new")
+
+        return ("📨 **Queue Commands**\n"
+                "• `/queue` — Show status\n"
+                "• `/queue mode <mode>` — Set mode\n"
+                "• `/queue modes` — List available modes\n"
+                "• `/queue clear` — Clear pending messages")
 
 
 # ---------------------------------------------------------------------------
