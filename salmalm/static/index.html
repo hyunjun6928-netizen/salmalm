@@ -1459,7 +1459,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     var sel=document.getElementById('s-lang');
     if(sel)sel.value=_lang;
   }
-  window.setLang=function(v){_lang=v;localStorage.setItem('salmalm-lang',v);applyLang()};
+  window.setLang=function(v){_lang=v;localStorage.setItem('salmalm-lang',v);applyLang();if(typeof renderFeatures==='function')renderFeatures(document.getElementById('features-search')?document.getElementById('features-search').value:'');};
   /* --- Settings --- */
   var dashView=document.getElementById('dashboard-view');
   window.showChat=function(){settingsEl.style.display='none';dashView.style.display='none';chat.style.display='flex';inputArea.style.display='block'};
@@ -1682,12 +1682,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       if(!items.length)return;
       total+=items.length;
       var open=ql?'open':'';
-      html+='<div class="feat-cat '+open+'"><div class="feat-cat-header" onclick="this.parentElement.classList.toggle(\'open\')"><span class="arrow">▶</span><span>'+cat.icon+' '+(kr&&cat.title_kr?cat.title_kr:cat.title)+'</span><span style="margin-left:auto;font-size:12px;color:var(--text2)">'+items.length+'</span></div><div class="feat-cat-body">';
+      html+='<div class="feat-cat '+open+'"><div class="feat-cat-header" data-action="toggleFeatCat"><span class="arrow">▶</span><span>'+cat.icon+' '+(kr&&cat.title_kr?cat.title_kr:cat.title)+'</span><span style="margin-left:auto;font-size:12px;color:var(--text2)">'+items.length+'</span></div><div class="feat-cat-body">';
       items.forEach(function(f){
         var nm=kr&&f.name_kr?f.name_kr:f.name;
         var ds=kr&&f.desc_kr?f.desc_kr:(f.desc||'');
         html+='<div class="feat-card"><div class="feat-name">'+nm+'</div><div class="feat-desc">'+ds+'</div>';
-        if(f.command)html+='<button class="feat-cmd" onclick="document.getElementById(\'input\').value=\''+f.command.replace(/'/g,"\\'")+'\';document.getElementById(\'input\').focus()">'+f.command+'</button>';
+        if(f.command)html+='<button class="feat-cmd" data-action="fillCommand" data-cmd="'+f.command.replace(/"/g,'&quot;')+'">'+f.command+'</button>';
         html+='</div>';
       });
       html+='</div></div>';
@@ -2165,6 +2165,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='exportAgent')window.exportAgent();
     else if(a==='importAgent')window.importAgent();
     else if(a==='quickSyncExport')window.quickSyncExport();
+    else if(a==='toggleFeatCat'){el.parentElement.classList.toggle('open')}
+    else if(a==='fillCommand'){var inp=document.getElementById('input');inp.value=el.getAttribute('data-cmd');inp.focus()}
     else if(a==='toggleUser'){var uid=parseInt(el.getAttribute('data-uid'));var en=el.getAttribute('data-enabled')==='true';window.toggleUser(uid,en)}
     else if(a==='deleteUser'){window.deleteUser(el.getAttribute('data-username'))}
     else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){addMsg('assistant','✅ Saved')})}
