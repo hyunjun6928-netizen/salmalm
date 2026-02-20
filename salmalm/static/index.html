@@ -739,8 +739,22 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   /* --- Helpers --- */
   var _copyId=0;
   function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+  function _renderToolBlocks(t){
+    /* Convert <tool_call>...</tool_call> and <tool_result>...</tool_result> to collapsible UI */
+    t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g,function(_,body){
+      var name='tool';var args='';
+      try{var parsed=JSON.parse(body.trim());name=parsed.name||'tool';args=JSON.stringify(parsed.arguments||parsed,null,2)}catch(e){args=body.trim()}
+      return '<details style="margin:6px 0;border:1px solid var(--border);border-radius:8px;padding:0;overflow:hidden"><summary style="padding:8px 12px;background:var(--bg2);cursor:pointer;font-size:13px;font-weight:500">🔧 <strong>'+name+'</strong></summary><pre style="padding:8px 12px;margin:0;font-size:11px;overflow-x:auto;background:var(--bg);border-top:1px solid var(--border)">'+args.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+    });
+    t=t.replace(/<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,body){
+      var preview=body.trim();if(preview.length>300)preview=preview.substring(0,300)+'...';
+      return '<details style="margin:6px 0;border:1px solid var(--border);border-radius:8px;padding:0;overflow:hidden"><summary style="padding:8px 12px;background:var(--bg2);cursor:pointer;font-size:13px;font-weight:500">📤 Result</summary><pre style="padding:8px 12px;margin:0;font-size:11px;overflow-x:auto;background:var(--bg);border-top:1px solid var(--border)">'+preview.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+    });
+    return t;
+  }
   function renderMd(t){
     if(t.startsWith('<img ')||t.startsWith('<audio '))return t;
+    t=_renderToolBlocks(t);
     /* Extract code blocks first, escape everything else, then restore */
     var codeBlocks=[];
     t=t.replace(/```(\w+)?\n?([\s\S]*?)```/g,function(_,lang,code){
