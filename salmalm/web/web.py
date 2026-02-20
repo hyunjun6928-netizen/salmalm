@@ -68,7 +68,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _security_headers(self, nonce: str = ''):
+    def _security_headers(self):
         """Add security headers to all responses."""
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'DENY')

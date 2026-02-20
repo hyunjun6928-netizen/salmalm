@@ -636,7 +636,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     if(stored){
       localStorage.setItem('salm_chat',stored);
       var hist=JSON.parse(stored);
-      if(hist.length){window._restoring=true;hist.forEach(function(m){addMsg(m.role,m.text,m.model)});window._restoring=false}
+      if(hist.length){window._restoring=true;hist.forEach(function(m){if(m&&m.role)addMsg(m.role,m.text,m.model)});window._restoring=false}
     }
     loadSessionList();
     /* Return to chat view if on settings/usage/dashboard */
@@ -680,7 +680,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     var stored=localStorage.getItem(_storageKey(_currentSession));
     if(stored)localStorage.setItem('salm_chat',stored);
     var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
-    if(hist.length){window._restoring=true;hist.forEach(function(m){addMsg(m.role,m.text,m.model)});window._restoring=false}
+    if(hist.length){window._restoring=true;hist.forEach(function(m){if(m&&m.role)addMsg(m.role,m.text,m.model)});window._restoring=false}
     loadSessionList();
   })();
 
