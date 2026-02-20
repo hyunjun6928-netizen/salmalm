@@ -276,6 +276,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <button class="settings-tab active" data-settings-tab="general" style="padding:10px 20px;border:none;background:none;color:var(--text);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-general">⚙️ General</button>
     <button class="settings-tab" data-settings-tab="features" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-features">📖 Features</button>
     <button class="settings-tab" data-settings-tab="model-router" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px">🤖 Model</button>
+    <button class="settings-tab" data-settings-tab="debug" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-debug">🔬 Debug</button>
     <button class="settings-tab" data-settings-tab="logs" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-logs">📋 Logs</button>
   </div>
   <div id="settings-general">
@@ -484,6 +485,17 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     </div>
   </div>
   <!-- Logs Tab -->
+  <div id="settings-debug" style="display:none">
+    <div class="settings-card">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <h3 style="margin:0" data-i18n="h-debug">🔬 Debug Diagnostics</h3>
+        <button class="btn" data-action="refreshDebug" style="font-size:12px">🔄 Refresh</button>
+        <label style="font-size:12px;display:flex;align-items:center;gap:4px;margin-left:auto"><input type="checkbox" id="debug-auto-refresh"> Auto (3s)</label>
+      </div>
+      <div id="debug-panel" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      </div>
+    </div>
+  </div>
   <div id="settings-logs" style="display:none">
     <div class="settings-card">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
@@ -1357,6 +1369,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-cmdpalette':'Command palette',
       'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.',
       'mr-active':'Active Model','mr-providers-title':'📦 Models by Provider','mr-providers-desc':'Click a model to switch. Pricing per 1M tokens (input / output).','mr-keys-desc':'Enter API keys to enable providers. Keys are tested in real-time.',
+      'tab-debug':'🔬 Debug','h-debug':'🔬 Debug Diagnostics',
       'tab-logs':'📋 Logs','h-logs':'📋 Server Logs',
       'pwa-install-text':'Install SalmAlm as an app','pwa-install-btn':'Install','pwa-dismiss':'Later',
     },
@@ -1462,6 +1475,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       'shortcut-cmdpalette':'커맨드 팔레트',
       'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.',
       'mr-active':'활성 모델','mr-providers-title':'📦 프로바이더별 모델','mr-providers-desc':'모델을 클릭하면 전환됩니다. 가격: 1M 토큰당 (입력 / 출력).','mr-keys-desc':'API 키를 입력하면 프로바이더가 활성화됩니다. 키는 실시간으로 테스트됩니다.',
+      'tab-debug':'🔬 디버그','h-debug':'🔬 디버그 진단',
       'tab-logs':'📋 로그','h-logs':'📋 서버 로그',
       'pwa-install-text':'SalmAlm을 앱으로 설치','pwa-install-btn':'설치','pwa-dismiss':'나중에',
     }
@@ -1626,9 +1640,11 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
       document.getElementById('settings-general').style.display=which==='general'?'block':'none';
       document.getElementById('settings-features').style.display=which==='features'?'block':'none';
       document.getElementById('settings-model-router').style.display=which==='model-router'?'block':'none';
+      document.getElementById('settings-debug').style.display=which==='debug'?'block':'none';
       document.getElementById('settings-logs').style.display=which==='logs'?'block':'none';
       if(which==='features'&&!window._featuresLoaded){window._featuresLoaded=true;loadFeatures()}
       if(which==='model-router'){window._loadModelRouter()}
+      if(which==='debug'){window._loadDebug()}
       if(which==='logs'){window._loadLogs()}
     });
   });
@@ -2304,6 +2320,7 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     else if(a==='exportAgent')window.exportAgent();
     else if(a==='importAgent')window.importAgent();
     else if(a==='quickSyncExport')window.quickSyncExport();
+    else if(a==='refreshDebug'){window._loadDebug()}
     else if(a==='refreshLogs'){window._loadLogs()}
     else if(a==='attachFile'){document.getElementById('file-input-hidden').click()}
     else if(a==='switchModel'){
@@ -2522,6 +2539,40 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 
   /* ── Logs Tab ── */
   var _logAutoTimer=null;
+  /* ── Debug Tab ── */
+  var _debugAutoTimer=null;
+  window._loadDebug=function(){
+    var panel=document.getElementById('debug-panel');if(!panel)return;
+    panel.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">Loading...</div>';
+    fetch('/api/debug',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var kr=_lang==='ko';
+      function card(icon,title,rows){
+        var h='<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px"><div style="font-weight:600;margin-bottom:10px;font-size:13px">'+icon+' '+title+'</div>';
+        rows.forEach(function(r){h+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text2)">'+r[0]+'</span><span style="font-weight:500">'+r[1]+'</span></div>'});
+        return h+'</div>';
+      }
+      var dot=function(ok){return ok?'🟢':'🔴'};
+      // System
+      var sysRows=[[kr?'Python':'Python',d.python.split(' ')[0]],[kr?'플랫폼':'Platform',d.platform],[kr?'PID':'PID',d.pid],[kr?'메모리':'Memory',d.memory_mb+'MB'],[kr?'GC (0/1/2)':'GC (0/1/2)',d.gc.gen0+'/'+d.gc.gen1+'/'+d.gc.gen2]];
+      // Engine
+      var m=d.metrics||{};
+      var engRows=[[kr?'활성 요청':'Active Requests',d.active_requests],[kr?'종료 중':'Shutting Down',d.shutting_down?'⚠️ Yes':'No'],[kr?'총 요청':'Total Requests',m.requests||0],[kr?'도구 호출':'Tool Calls',m.tool_calls||0],[kr?'에러':'Errors',m.errors||0],[kr?'캐시 히트':'Cache Hits',m.cache_hits||0]];
+      // Session
+      var sessRows=[[kr?'메시지 수':'Messages',d.session.messages],[kr?'컨텍스트 크기':'Context Size',(d.session.context_chars/1024).toFixed(1)+'KB']];
+      // Tools
+      var toolRows=[[kr?'등록된 도구':'Registered',d.tools.registered],[kr?'동적 도구':'Dynamic',d.tools.dynamic]];
+      // Providers
+      var provRows=[];
+      for(var pn in d.providers){provRows.push([pn,dot(d.providers[pn])+' '+(d.providers[pn]?(kr?'연결됨':'Connected'):(kr?'키 없음':'No key'))])}
+      provRows.push([kr?'Vault':'Vault',dot(d.vault_unlocked)+' '+(d.vault_unlocked?(kr?'열림':'Unlocked'):(kr?'잠김':'Locked'))]);
+      panel.innerHTML=card('🖥️',kr?'시스템':'System',sysRows)+card('⚡',kr?'엔진':'Engine',engRows)+card('💬',kr?'세션 (web)':'Session (web)',sessRows)+card('🔧',kr?'도구':'Tools',toolRows)+card('🔑',kr?'프로바이더':'Providers',provRows);
+    }).catch(function(e){panel.innerHTML='<div style="grid-column:1/-1;color:#f87171">Error: '+e.message+'</div>'});
+  };
+  document.getElementById('debug-auto-refresh').addEventListener('change',function(){
+    if(this.checked){window._loadDebug();_debugAutoTimer=setInterval(window._loadDebug,3000)}
+    else{clearInterval(_debugAutoTimer);_debugAutoTimer=null}
+  });
+
   window._loadLogs=function(){
     var level=document.getElementById('log-level').value;
     var lines=document.getElementById('log-lines').value;

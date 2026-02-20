@@ -297,6 +297,48 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         from salmalm.nodes import gateway
         self._json({'nodes': gateway.list_nodes()})
 
+    def _get_debug(self):
+        """Real-time debug diagnostics panel data."""
+        if not self._require_auth('user'):
+            return
+        import sys, platform, gc
+        from salmalm.core import _metrics, get_session
+        from salmalm.core.engine import _active_requests, _shutting_down
+        from salmalm.tools.tool_registry import _HANDLERS, _ensure_modules, _DYNAMIC_TOOLS
+        try:
+            _ensure_modules()
+        except Exception:
+            pass
+        # Session info
+        sess = get_session('web')
+        sess_msgs = len(sess.messages) if sess else 0
+        sess_ctx = sum(len(str(m.get('content', ''))) for m in (sess.messages if sess else []))
+        # Provider keys
+        from salmalm.core.llm_router import PROVIDERS, is_provider_available
+        providers = {n: is_provider_available(n) for n in PROVIDERS}
+        # Memory
+        import resource
+        try:
+            mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+        except Exception:
+            mem_mb = 0
+        # GC stats
+        gc_counts = gc.get_count()
+        self._json({
+            'python': sys.version,
+            'platform': platform.platform(),
+            'pid': os.getpid(),
+            'memory_mb': round(mem_mb, 1),
+            'gc': {'gen0': gc_counts[0], 'gen1': gc_counts[1], 'gen2': gc_counts[2]},
+            'active_requests': _active_requests,
+            'shutting_down': _shutting_down,
+            'metrics': {**_metrics},
+            'session': {'messages': sess_msgs, 'context_chars': sess_ctx},
+            'tools': {'registered': len(_HANDLERS), 'dynamic': len(_DYNAMIC_TOOLS)},
+            'providers': providers,
+            'vault_unlocked': vault.is_unlocked,
+        })
+
     def _get_status(self):
         self._json({'app': APP_NAME, 'version': VERSION,  # noqa: F405
                     'unlocked': vault.is_unlocked,
@@ -568,6 +610,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         '/api/nodes': '_get_nodes',
         '/api/gateway/nodes': '_get_gateway_nodes',
         '/api/status': '_get_status',
+        '/api/debug': '_get_debug',
         '/api/metrics': '_get_metrics',
         '/api/cert': '_get_cert',
         '/api/ws/status': '_get_ws_status',
