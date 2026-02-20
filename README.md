@@ -127,7 +127,7 @@ These are SalmAlm-only — not found in ChatGPT, OpenClaw, Open WebUI, or any ot
 | 3 | **Shadow Mode** | AI silently learns your communication style, replies as you when away |
 | 4 | **Life Dashboard** | Unified view of health, finance, habits, calendar in one command |
 | 5 | **Mood-Aware Response** | Detects emotional state and adjusts tone automatically |
-| 6 | **Encrypted Vault** | PBKDF2-600K + HMAC-authenticated stream cipher for private conversations |
+| 6 | **Encrypted Vault** | PBKDF2-200K + HMAC-authenticated stream cipher for private conversations |
 | 7 | **Agent-to-Agent Protocol** | HMAC-SHA256 signed communication between SalmAlm instances |
 | 8 | **A/B Split Response** | Get two different model perspectives on the same question |
 | 9 | **Time Capsule** | Schedule messages to your future self |

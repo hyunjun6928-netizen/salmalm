@@ -27,7 +27,7 @@ import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
-from salmalm.constants import BASE_DIR, DATA_DIR, KST, PBKDF2_ITER
+from salmalm.constants import DATA_DIR, KST, PBKDF2_ITER
 from salmalm.crypto import log
 
 AUTH_DB = DATA_DIR / "auth.db"
@@ -53,7 +53,7 @@ def _verify_password(password: str, stored_hash: bytes, salt: bytes) -> bool:
 class TokenManager:
     """Stateless token creation/verification using HMAC-SHA256."""
 
-    _SECRET_FILE = BASE_DIR / '.token_secret'
+    _SECRET_FILE = DATA_DIR / '.token_secret'
 
     def __init__(self, secret: Optional[bytes] = None):
         if secret:
@@ -102,7 +102,7 @@ class TokenManager:
             if not hmac.compare_digest(sig, expected_sig):
                 return None
             # Pad base64
-            padded = data + '=' * (4 - len(data) % 4)
+            padded = data + '=' * (-len(data) % 4)
             payload = json.loads(base64.urlsafe_b64decode(padded))
             if payload.get('exp', 0) < time.time():
                 return None  # Expired

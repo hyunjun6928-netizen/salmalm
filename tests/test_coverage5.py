@@ -136,14 +136,17 @@ class TestToolHandlersCoverage5(unittest.TestCase):
 
     def test_read_file(self):
         from salmalm.tool_handlers import execute_tool
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, dir='.') as f:
+        from salmalm.constants import WORKSPACE_DIR
+        WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
+        p = str(WORKSPACE_DIR / '_test_cov5_read.txt')
+        with open(p, 'w') as f:
             f.write('hello world')
-            p = f.name
         try:
             result = execute_tool('read_file', {'path': p})
             self.assertIn('hello world', result)
         finally:
-            os.unlink(p)
+            if os.path.exists(p):
+                os.unlink(p)
 
     def test_write_file(self):
         from salmalm.tool_handlers import execute_tool

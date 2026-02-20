@@ -127,7 +127,7 @@ def get_api_key(provider: str) -> Optional[str]:
     # Fallback: check vault (web UI stores keys there)
     if not key:
         try:
-            from salmalm.security.vault import vault
+            from salmalm.security.crypto import vault
             if vault.is_unlocked:
                 vault_name = env_key.lower()  # ANTHROPIC_API_KEY -> anthropic_api_key
                 key = vault.get(vault_name)

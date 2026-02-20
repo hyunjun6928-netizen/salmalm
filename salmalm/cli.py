@@ -39,6 +39,11 @@ pause
 def _run_update():
     """Self-update via pip."""
     import subprocess as _sp
+    if sys.stdin.isatty() and '--yes' not in sys.argv:
+        confirm = input("This will run 'pip install --upgrade salmalm'. Continue? [y/N] ")
+        if confirm.strip().lower() not in ('y', 'yes'):
+            print("Cancelled.")
+            sys.exit(0)
     logger.info("[UP] Updating SalmAlm...")
     result = _sp.run(
         [sys.executable, '-m', 'pip', 'install', '--upgrade', '--no-cache-dir',
@@ -100,7 +105,8 @@ def _run_node_mode():
     agent.start_heartbeat(interval=30)
 
     # Start HTTP server for tool execution
-    server = http.server.ThreadingHTTPServer(('0.0.0.0', port), WebHandler)
+    bind_addr = os.environ.get('SALMALM_BIND', '127.0.0.1')
+    server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
     logger.info(
         f"+==============================================+\n"
         f"|  [NET] SalmAlm Node v{VERSION:<27s}|\n"

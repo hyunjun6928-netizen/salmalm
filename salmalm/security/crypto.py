@@ -20,7 +20,7 @@ try:
     HAS_CRYPTO = True
     log.info("[OK] cryptography available -- AES-256-GCM enabled")
 except ImportError:
-    log.warning("[WARN] cryptography not installed -- vault encryption disabled. Use .env for API keys instead.")
+    log.warning("[WARN] cryptography not installed -- using HMAC-CTR fallback (stdlib). Install 'cryptography' for AES-256-GCM.")
 
 
 def _derive_key(password: str, salt: bytes, length: int = 32) -> bytes:

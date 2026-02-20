@@ -3,6 +3,7 @@
 Keeps shared utilities (_resolve_path, _is_safe_command, _is_subpath) that other
 modules import, plus _legacy_execute for tools_media.py bridge.
 """
+import os
 import subprocess
 import re
 import time
@@ -72,8 +73,8 @@ def _is_safe_command(cmd: str):
 def _resolve_path(path: str, writing: bool = False) -> Path:
     """Resolve path, preventing traversal outside allowed directories.
 
-    Read: workspace + home directory
-    Write: workspace only (stricter)
+    Default: workspace only (read & write).
+    Set SALMALM_ALLOW_HOME_READ=1 to also allow reading from home directory.
     """
     p = Path(path)
     if not p.is_absolute():
@@ -87,8 +88,10 @@ def _resolve_path(path: str, writing: bool = False) -> Path:
         except ValueError:
             raise PermissionError(f'Write denied (outside workspace): {p}')
     else:
-        # Read operations: workspace + home
-        allowed = [WORKSPACE_DIR.resolve(), Path.home().resolve()]
+        # Read operations: workspace only by default; home opt-in
+        allowed = [WORKSPACE_DIR.resolve()]
+        if os.environ.get('SALMALM_ALLOW_HOME_READ', '') in ('1', 'true', 'yes'):
+            allowed.append(Path.home().resolve())
         if not any(_is_subpath(p, a) for a in allowed):
             raise PermissionError(f'Access denied: {p}')
 
