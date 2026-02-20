@@ -2719,7 +2719,6 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister()})});
     caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k)})});
   }
-})();
 
   /* ── Logs Tab ── */
   var _logAutoTimer=null;
@@ -2969,4 +2968,5 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
   });
 
   /* ── Model Router Tab (v2) ── */
+})();
 </script></body></html>
