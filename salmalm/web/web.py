@@ -356,6 +356,12 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 log.warning("Vault unlock failed (cryptography not installed?)")
                 return False
             if not pw:
+                # Localhost: try empty password as last resort before showing unlock
+                try:
+                    if vault.unlock(""):
+                        return True
+                except RuntimeError:
+                    pass
                 return False  # Has password but no env var — show unlock screen
             return False
         elif pw:
