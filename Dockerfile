@@ -50,4 +50,4 @@ ENV SALMALM_PORT=18800 \
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:18800/api/health || exit 1
 
-CMD ["python", "-m", "salmalm", "start"]
+CMD ["python", "-m", "salmalm"]
