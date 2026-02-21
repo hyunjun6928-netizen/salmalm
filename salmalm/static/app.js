@@ -1090,6 +1090,8 @@
   window.showCron=function(){_hideAll();cronView.style.display='block';window._loadCron()};
   window.showMemory=function(){_hideAll();memView.style.display='block';window._loadMemory()};
   window.showSettings=function(){_hideAll();settingsEl.style.display='block';
+    /* Auto-fill Google redirect URI with current origin */
+    var _rUri=document.querySelector('.google-redirect-uri');if(_rUri)_rUri.textContent=location.origin+'/api/google/callback';
     /* Load personas */
     if(window.loadPersonas)window.loadPersonas();
     /* Load users panel */
