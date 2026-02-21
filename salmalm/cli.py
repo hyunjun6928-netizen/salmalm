@@ -36,6 +36,49 @@ pause
         logger.warning(f"Could not create desktop shortcut: {e}")
 
 
+def _install_shortcut():
+    """Create a desktop shortcut/launcher for all platforms."""
+    if sys.platform == 'win32':
+        _ensure_windows_shortcut()
+        return
+
+    # Linux (.desktop) / macOS (.command)
+    desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
+    if not os.path.isdir(desktop):
+        # Try XDG
+        desktop = os.path.join(os.path.expanduser('~'), 'デスクトップ')  # JP locale
+        if not os.path.isdir(desktop):
+            desktop = os.path.expanduser('~/Desktop')
+            os.makedirs(desktop, exist_ok=True)
+
+    python_exe = sys.executable
+
+    if sys.platform == 'darwin':
+        # macOS: .command file
+        cmd_path = os.path.join(desktop, 'SalmAlm.command')
+        with open(cmd_path, 'w') as f:
+            f.write(f'#!/bin/bash\n"{python_exe}" -m salmalm --open\n')
+        os.chmod(cmd_path, 0o755)
+        logger.info(f"[PIN] Created {cmd_path} — double-click to start!")
+    else:
+        # Linux: .desktop file
+        desktop_path = os.path.join(desktop, 'salmalm.desktop')
+        icon_path = os.path.join(os.path.dirname(__file__), 'static', 'icon.png')
+        content = f"""[Desktop Entry]
+Type=Application
+Name=SalmAlm
+Comment=Personal AI Gateway
+Exec={python_exe} -m salmalm --open
+Icon={icon_path}
+Terminal=true
+Categories=Utility;
+"""
+        with open(desktop_path, 'w') as f:
+            f.write(content)
+        os.chmod(desktop_path, 0o755)
+        logger.info(f"[PIN] Created {desktop_path} — double-click to start!")
+
+
 def _run_update():
     """Self-update via pip."""
     import subprocess as _sp
@@ -160,10 +203,7 @@ def dispatch_cli() -> bool:
         _run_update()
         return True
     if '--shortcut' in sys.argv:
-        if sys.platform == 'win32':
-            _ensure_windows_shortcut()
-        else:
-            logger.info("Desktop shortcuts are Windows-only.")
+        _install_shortcut()
         sys.exit(0)
     if '--version' in sys.argv or '-v' in sys.argv:
         from salmalm.constants import VERSION
@@ -177,4 +217,7 @@ def dispatch_cli() -> bool:
         port = int(os.environ.get('SALMALM_PORT', 18800))
         run_tray(port)
         return True
+    if '--open' in sys.argv:
+        # Auto-open browser after server starts
+        os.environ['SALMALM_OPEN_BROWSER'] = '1'
     return False

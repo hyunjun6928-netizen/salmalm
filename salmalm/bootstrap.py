@@ -129,7 +129,13 @@ async def run_server():
 
     web_thread = threading.Thread(target=server.serve_forever, daemon=True)
     web_thread.start()
-    log.info(f"[WEB] Web UI: http://{bind_addr}:{port}")
+    url = f"http://{bind_addr}:{port}"
+    log.info(f"[WEB] Web UI: {url}")
+
+    # Auto-open browser if requested (--open flag or SALMALM_OPEN_BROWSER=1)
+    if os.environ.get('SALMALM_OPEN_BROWSER', '') == '1':
+        import webbrowser
+        webbrowser.open(url)
 
     # ── Phase 5: Vault Auto-unlock ──
     vault_pw = os.environ.get('SALMALM_VAULT_PW')
