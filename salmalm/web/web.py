@@ -2555,7 +2555,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     "anthropic-version": "2023-06-01",
                 },
                 {
-                    "model": "claude-haiku-4-5-20251001",
+                    "model": TEST_MODELS["anthropic"],
                     "max_tokens": 10,  # noqa: F405
                     "messages": [{"role": "user", "content": "ping"}],
                 },
@@ -3230,7 +3230,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             if provider == "anthropic":
                 url = f"{prov_cfg['base_url']}/messages"
                 req = urllib.request.Request(url,
-                    data=json.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 1,  # noqa: E128
+                    data=json.dumps({"model": TEST_MODELS["anthropic"], "max_tokens": 1,  # noqa: E128
                                      "messages": [{"role": "user", "content": "hi"}]}).encode(),
                     headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
                              "content-type": "application/json"}, method="POST")
@@ -3627,6 +3627,13 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             return
 
     def _post_api_onboarding(self):
+        try:
+            return self._post_api_onboarding_inner()
+        except Exception as e:
+            log.exception(f"[ONBOARDING] Unhandled error: {e}")
+            self._json({"error": f"Internal error: {str(e)[:200]}"}, 500)
+
+    def _post_api_onboarding_inner(self):
         body = self._body
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
@@ -3666,7 +3673,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                         "anthropic-version": "2023-06-01",
                     },
                     {
-                        "model": "claude-haiku-4-5-20251001",
+                        "model": TEST_MODELS["anthropic"],
                         "max_tokens": 10,  # noqa: F405
                         "messages": [{"role": "user", "content": "ping"}],
                     },
