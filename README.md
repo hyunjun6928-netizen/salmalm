@@ -57,7 +57,7 @@ First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 ## ⚡ Quick Start
 
 ```bash
-# One-liner install (creates venv, installs, adds to PATH)
+# One-liner install (creates venv, installs, symlinks to ~/.local/bin)
 curl -fsSL https://raw.githubusercontent.com/hyunjun6928-netizen/salmalm/main/scripts/install.sh | bash
 
 # Or manual install
@@ -68,6 +68,9 @@ salmalm
 
 # Auto-open browser on start
 salmalm --open
+
+# ⚠️ If you installed with install.sh before v0.17.24, remove the old PATH entry:
+# Edit ~/.bashrc (or ~/.zshrc) and delete the line containing "salmalm-env/bin"
 
 # Create desktop shortcut (double-click to launch!)
 salmalm --shortcut

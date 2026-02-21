@@ -57,7 +57,7 @@ salmalm
 ## ⚡ 빠른 시작
 
 ```bash
-# 원라인 설치 (venv 자동 생성, 설치, PATH 추가)
+# 원라인 설치 (venv 자동 생성, 설치, ~/.local/bin에 심볼릭 링크)
 curl -fsSL https://raw.githubusercontent.com/hyunjun6928-netizen/salmalm/main/scripts/install.sh | bash
 
 # 또는 직접 설치
@@ -68,6 +68,9 @@ salmalm
 
 # 브라우저 자동 열기
 salmalm --open
+
+# ⚠️ v0.17.24 이전 install.sh로 설치한 경우, ~/.bashrc(또는 ~/.zshrc)에서
+# "salmalm-env/bin"이 포함된 줄을 삭제해주세요 (PATH 오염 방지)
 
 # 바탕화면 바로가기 생성 (더블클릭으로 실행!)
 salmalm --shortcut
