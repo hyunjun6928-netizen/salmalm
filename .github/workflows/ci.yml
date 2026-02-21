@@ -30,6 +30,16 @@ jobs:
       - name: Install package
         run: pip install -e ".[dev]"
 
+      - name: Version consistency check
+        run: |
+          pyproject_ver=$(python -c "import tomllib, pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          init_ver=$(python -c "from salmalm import __version__; print(__version__)")
+          if [ "$pyproject_ver" != "$init_ver" ]; then
+            echo "::error::Version mismatch: pyproject.toml=$pyproject_ver vs __init__.py=$init_ver"
+            exit 1
+          fi
+          echo "✅ Version consistent: $pyproject_ver"
+
       - name: Syntax check (py_compile)
         run: |
           find salmalm/ -name '*.py' -print0 | xargs -0 python -m py_compile

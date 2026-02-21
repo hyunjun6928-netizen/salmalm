@@ -56,20 +56,9 @@ async def run_server():
     audit_log('startup', f'{APP_NAME} v{VERSION}')
     MEMORY_DIR.mkdir(exist_ok=True)
 
-    # ── Audit checkpoint timer (every 6 hours) ──
-    def _audit_checkpoint_loop():
-        import time as _time
-        while True:
-            _time.sleep(6 * 3600)  # 6 hours
-            try:
-                from salmalm.core.core import audit_checkpoint, audit_log_cleanup
-                audit_checkpoint()
-                audit_log_cleanup(days=30)
-            except Exception:
-                pass
-    import threading as _th
-    _ckpt = _th.Thread(target=_audit_checkpoint_loop, daemon=True, name="audit-checkpoint")
-    _ckpt.start()
+    # ── Audit checkpoint cron (every 6 hours) ──
+    from salmalm.features.audit_cron import start_audit_cron
+    start_audit_cron(interval_hours=6)
 
     # ── Phase 2: SLA Monitoring ──
     try:
@@ -328,6 +317,11 @@ async def run_server():
     except Exception as e:
         log.warning(f"[SHUTDOWN] SLA cleanup error: {e}")
 
+    try:
+        from salmalm.features.audit_cron import stop_audit_cron
+        stop_audit_cron()
+    except Exception:
+        pass
     try:
         audit_log('shutdown', f'{APP_NAME} v{VERSION} graceful shutdown')
     except Exception:

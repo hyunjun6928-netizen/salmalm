@@ -74,8 +74,11 @@ class TestDataDir(unittest.TestCase):
         self.assertNotIn('site-packages', str(DATA_DIR))
 
     def test_base_dir_has_init(self):
-        from salmalm.constants import BASE_DIR
-        self.assertTrue((BASE_DIR / '__init__.py').exists())
+        # Reload to ensure BASE_DIR is not polluted by prior tests
+        import importlib
+        from salmalm import constants
+        importlib.reload(constants)
+        self.assertTrue((constants.BASE_DIR / '__init__.py').exists())
 
     def test_salmalm_home_env(self):
         import os, importlib

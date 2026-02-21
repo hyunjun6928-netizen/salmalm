@@ -52,42 +52,21 @@ _PRUNE_TAIL = 500
 MODEL_ALIASES = {'auto': None, **_CONST_ALIASES}
 
 # Multi-model routing: cost-optimized model selection
-_SIMPLE_PATTERNS = _re.compile(
-    r'^(안녕|hi|hello|hey|ㅎㅇ|ㅎㅎ|ㄱㅅ|고마워|감사|ㅋㅋ|ㅎㅎ|ok|lol|yes|no|네|아니|응|ㅇㅇ|뭐해|잘자|굿|bye|잘가|좋아|ㅠㅠ|ㅜㅜ|오|와|대박|진짜|뭐|어|음|흠|뭐야|왜|어떻게|언제|어디|누구|얼마)[\?!？！.\s]*$',
-    _re.IGNORECASE)
-_MODERATE_KEYWORDS = ['분석', '리뷰', '요약', '코드', 'code', 'analyze', 'review', 'summarize',
-                      'summary', 'compare', '비교', 'refactor', '리팩', 'debug', '디버그',
-                      'explain', '설명', '번역', 'translate']
-_COMPLEX_KEYWORDS = ['설계', '아키텍처', 'architecture', 'design', 'system design',
-                     'from scratch', '처음부터', '전체', 'migration', '마이그레이션']
-
-from salmalm.constants import MODELS as _MODELS
+# ── Model selection (extracted to core/model_selection.py) ──
+from salmalm.core.model_selection import (  # noqa: F401
+    select_model as _select_model_impl,
+    fix_model_name as _fix_model_name,
+    load_routing_config as _load_routing_config,
+    save_routing_config as _save_routing_config,
+    _SIMPLE_PATTERNS, _MODERATE_KEYWORDS, _COMPLEX_KEYWORDS,
+    _MODEL_NAME_FIXES,
+)
 import json as _json
 from pathlib import Path as _Path
+from salmalm.constants import MODELS as _MODELS
 
-# Model name corrections: constants.py has outdated names → map to real API IDs
-# Runtime model name corrections: maps deprecated/outdated model IDs to current ones.
-# Lives here (not constants.py) because these are API-layer fixes, not configuration.
-# Update when providers rename/deprecate models.
-_MODEL_NAME_FIXES = {
-    # Anthropic
-    'claude-haiku-3.5-20241022': 'claude-haiku-4-5-20251001',
-    'anthropic/claude-haiku-3.5-20241022': 'anthropic/claude-haiku-4-5-20251001',
-    'claude-haiku-4-5-20250414': 'claude-haiku-4-5-20251001',
-    'claude-sonnet-4-20250514': 'claude-sonnet-4-6',
-    'anthropic/claude-sonnet-4-20250514': 'anthropic/claude-sonnet-4-6',
-    # OpenAI (gpt-5.3-codex doesn't exist; latest codex is 5.2)
-    'gpt-5.3-codex': 'gpt-5.2-codex',
-    'openai/gpt-5.3-codex': 'openai/gpt-5.2-codex',
-    # xAI (grok-4 alias may not resolve; use dated version)
-    'grok-4': 'grok-4-0709',
-    'xai/grok-4': 'xai/grok-4-0709',
-}
-
-
-def _fix_model_name(model: str) -> str:
-    """Correct outdated model names to actual API IDs."""
-    return _MODEL_NAME_FIXES.get(model, model)
+# Backward-compat re-exports
+get_routing_config = _load_routing_config
 
 
 # Routing config: user can override which model to use for each complexity level
@@ -122,65 +101,8 @@ def get_routing_config() -> dict:
     return _load_routing_config()
 
 
-def _select_model(message: str, session) -> tuple:
-    """Select optimal model based on message complexity.
-
-    Returns (model_id, complexity_level) where complexity is 'simple'|'moderate'|'complex'.
-    Respects session-level model_override (from /model command).
-
-    NOTE: This is the single authority for model selection. core.core.ModelRouter
-    handles provider availability/failover only. Do NOT add model selection logic
-    to ModelRouter — all routing decisions flow through here.
-    TODO(v0.18): Consider merging ModelRouter.route() into this function.
-    """
-    # Check session-level override
-    override = getattr(session, 'model_override', None)
-    if override and override != 'auto':
-        if override == 'haiku':
-            return _MODELS['haiku'], 'simple'
-        elif override == 'sonnet':
-            return _MODELS['sonnet'], 'moderate'
-        elif override == 'opus':
-            return _MODELS['opus'], 'complex'
-        else:
-            # Direct model string
-            return override, 'manual'
-
-    rc = _load_routing_config()
-    # If routing not configured, use default model
-    _default_fallback = getattr(session, '_default_model', None) or _MODELS.get('sonnet', '')
-    for k in ('simple', 'moderate', 'complex'):
-        if not rc[k]:
-            rc[k] = _default_fallback
-    msg_lower = message.lower()
-    msg_len = len(message)
-
-    # Check thinking mode
-    if getattr(session, 'thinking_enabled', False):
-        return rc['complex'], 'complex'
-
-    # Complex: long messages, architecture keywords
-    if msg_len > 500:
-        return rc['complex'], 'complex'
-    for kw in _COMPLEX_KEYWORDS:
-        if kw in msg_lower:
-            return rc['complex'], 'complex'
-
-    # Moderate: code blocks, analysis keywords
-    if '```' in message or 'def ' in message or 'class ' in message:
-        return rc['moderate'], 'moderate'
-    for kw in _MODERATE_KEYWORDS:
-        if kw in msg_lower:
-            return rc['moderate'], 'moderate'
-
-    # Simple: short + greeting/simple question pattern
-    if msg_len < 50 and _SIMPLE_PATTERNS.match(message.strip()):
-        return rc['simple'], 'simple'
-    if msg_len < 50:
-        return rc['simple'], 'simple'
-
-    # Default: moderate
-    return rc['moderate'], 'moderate'
+# _select_model delegates to core/model_selection.py (backward compat)
+_select_model = _select_model_impl
 
 
 class TaskClassifier:

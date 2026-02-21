@@ -84,16 +84,35 @@ def handle_http_request(args: dict) -> str:
     if blocked:
         return f'{reason}'
     url = final_url  # Use redirect-validated URL
-    # Block dangerous request headers (Host spoofing, auth forwarding)
-    # Customizable via SALMALM_BLOCKED_HEADERS env (comma-separated additions)
-    _BLOCKED_HEADERS = frozenset({'host', 'transfer-encoding', 'te', 'proxy-authorization',
-                                   'proxy-connection', 'upgrade', 'connection'})
-    _extra = os.environ.get('SALMALM_BLOCKED_HEADERS', '')
-    if _extra:
-        _BLOCKED_HEADERS = _BLOCKED_HEADERS | frozenset(h.strip().lower() for h in _extra.split(',') if h.strip())
+    # Header security: allowlist mode (default) or blocklist mode (SALMALM_HEADER_PERMISSIVE=1)
+    _HEADER_ALLOWLIST = frozenset({
+        'accept', 'accept-language', 'accept-encoding', 'authorization',
+        'content-type', 'content-length', 'cookie', 'user-agent',
+        'cache-control', 'if-none-match', 'if-modified-since',
+        'range', 'referer', 'origin', 'x-requested-with',
+        'x-api-key', 'x-csrf-token',
+    })
+    _HEADER_BLOCKLIST = frozenset({
+        'host', 'transfer-encoding', 'te', 'proxy-authorization',
+        'proxy-connection', 'upgrade', 'connection',
+        'x-forwarded-for', 'x-real-ip', 'forwarded',
+        'x-forwarded-host', 'x-forwarded-proto',
+    })
+    _permissive = os.environ.get('SALMALM_HEADER_PERMISSIVE', '') == '1'
+    _extra_blocked = os.environ.get('SALMALM_BLOCKED_HEADERS', '')
+    if _extra_blocked:
+        _HEADER_BLOCKLIST = _HEADER_BLOCKLIST | frozenset(
+            h.strip().lower() for h in _extra_blocked.split(',') if h.strip())
     for h in list(headers.keys()):
-        if h.lower() in _BLOCKED_HEADERS:
-            return f'❌ Blocked request header: {h}'
+        hl = h.lower()
+        if _permissive:
+            # Blocklist mode: only reject explicitly dangerous headers
+            if hl in _HEADER_BLOCKLIST:
+                return f'❌ Blocked request header: {h}'
+        else:
+            # Allowlist mode (default): reject unknown headers
+            if hl not in _HEADER_ALLOWLIST:
+                return f'❌ Header not in allowlist: {h} (set SALMALM_HEADER_PERMISSIVE=1 to use blocklist mode)'
     headers.setdefault('User-Agent', f'SalmAlm/{VERSION}')
     data = body_str.encode('utf-8') if body_str else None
     try:
