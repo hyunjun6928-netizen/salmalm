@@ -93,7 +93,7 @@ SALMALM_BIND=0.0.0.0 salmalm    # LAN 노출 (보안 섹션 참조)
 |---|---|---|
 | Anthropic | Claude Opus 4, Sonnet 4, Haiku 4.5 | `ANTHROPIC_API_KEY` |
 | OpenAI | GPT-5.2, GPT-4.1, o3, o4-mini | `OPENAI_API_KEY` |
-| Google | Gemini 2.5 Pro/Flash | `GOOGLE_API_KEY` |
+| Google | Gemini 3 Pro/Flash, 2.5 Pro/Flash | `GOOGLE_API_KEY` |
 | xAI | Grok-4, Grok-3 | `XAI_API_KEY` |
 | Ollama | 로컬 모델 전부 | `OLLAMA_URL` |
 
