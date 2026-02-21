@@ -324,6 +324,53 @@ See [`SECURITY.md`](SECURITY.md) for full details.
 
 ---
 
+## 🔑 Google OAuth Setup (Gmail & Calendar)
+
+SalmAlm can read/send Gmail and manage Google Calendar via OAuth 2.0.
+
+### 1. Create OAuth Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create a project (or select an existing one)
+3. **Enable APIs**: Go to *APIs & Services → Library* and enable:
+   - **Gmail API**
+   - **Google Calendar API**
+4. **Create OAuth client**: Go to *Credentials → Create Credentials → OAuth client ID*
+   - Application type: **Web application**
+   - Authorized redirect URI: `http://localhost:18800/api/google/callback`
+   - (Replace `18800` with your `SALMALM_PORT` if changed)
+5. Copy the **Client ID** and **Client Secret**
+
+### 2. Store Credentials in SalmAlm
+
+Open the web UI → **Settings → Vault**, and save:
+
+| Key | Value |
+|-----|-------|
+| `google_client_id` | `your-client-id.apps.googleusercontent.com` |
+| `google_client_secret` | `GOCSPX-your-secret` |
+
+Or via slash command:
+```
+/vault set google_client_id your-client-id
+/vault set google_client_secret your-secret
+```
+
+### 3. Authorize
+
+Run `/oauth` in the chat or go to **Settings → OAuth Auth**. Click the Google sign-in link — you'll be redirected to Google's consent screen, then back to SalmAlm.
+
+> **Note**: If your Google Cloud app is in "Testing" mode, you must add your Google account as a **test user** under *OAuth consent screen → Test users* in the Cloud Console. Otherwise Google will block the authorization.
+
+### 4. Use It
+
+Once connected, SalmAlm tools like `gmail_read`, `gmail_send`, `calendar_list`, and `calendar_create` become fully functional. Just ask naturally:
+
+- *"Check my unread emails"*
+- *"Schedule a meeting tomorrow at 3pm"*
+
+---
+
 ## 🔧 Configuration
 
 ```bash

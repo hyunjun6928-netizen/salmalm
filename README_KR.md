@@ -322,6 +322,53 @@ HTTP 요청 도구는 기본적으로 **허용 목록 모드**를 사용합니�
 
 ---
 
+## 🔑 Google OAuth 설정 (Gmail & 캘린더)
+
+SalmAlm은 OAuth 2.0을 통해 Gmail 읽기/전송, Google 캘린더 관리가 가능합니다.
+
+### 1. OAuth 자격증명 생성
+
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials)에 접속
+2. 프로젝트 생성 (또는 기존 프로젝트 선택)
+3. **API 활성화**: *API 및 서비스 → 라이브러리*에서 아래 두 개를 활성화:
+   - **Gmail API**
+   - **Google Calendar API**
+4. **OAuth 클라이언트 생성**: *사용자 인증 정보 → 사용자 인증 정보 만들기 → OAuth 클라이언트 ID*
+   - 애플리케이션 유형: **웹 애플리케이션**
+   - 승인된 리디렉션 URI: `http://localhost:18800/api/google/callback`
+   - (`SALMALM_PORT`를 변경한 경우 포트 번호도 맞춰주세요)
+5. **클라이언트 ID**와 **클라이언트 보안 비밀번호**를 복사
+
+### 2. SalmAlm에 자격증명 저장
+
+웹 UI → **설정 → Vault**에서 저장:
+
+| 키 | 값 |
+|-----|-------|
+| `google_client_id` | `your-client-id.apps.googleusercontent.com` |
+| `google_client_secret` | `GOCSPX-your-secret` |
+
+또는 슬래시 명령어:
+```
+/vault set google_client_id your-client-id
+/vault set google_client_secret your-secret
+```
+
+### 3. 인증
+
+채팅에서 `/oauth`를 입력하거나 **설정 → OAuth 인증**을 클릭하세요. Google 로그인 화면으로 이동 후 동의하면 SalmAlm으로 자동 복귀합니다.
+
+> **참고**: Google Cloud 앱이 "테스트" 모드인 경우, Cloud Console의 *OAuth 동의 화면 → 테스트 사용자*에 본인의 Google 계정을 추가해야 합니다. 그렇지 않으면 Google이 인증을 차단합니다.
+
+### 4. 사용
+
+연결 완료 후 `gmail_read`, `gmail_send`, `calendar_list`, `calendar_create` 등의 도구가 활성화됩니다. 자연어로 요청하면 됩니다:
+
+- *"읽지 않은 이메일 확인해줘"*
+- *"내일 오후 3시에 회의 잡아줘"*
+
+---
+
 ## 🔧 설정
 
 ```bash
