@@ -31,7 +31,7 @@ from salmalm.tools.tool_handlers import execute_tool
 # ── Imports from extracted modules ──
 from salmalm.core.session_manager import (  # noqa: F401
     _should_prune_for_cache, _record_api_call_time, prune_context,
-    _has_image_block, _soft_trim,
+    _has_image_block, _soft_trim, estimate_context_window,
     _PRUNE_KEEP_LAST_ASSISTANTS, _PRUNE_SOFT_LIMIT, _PRUNE_HARD_LIMIT, _PRUNE_HEAD,
 )
 from salmalm.core.llm_loop import (  # noqa: F401
@@ -578,7 +578,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             # Session pruning — only when cache TTL expired (preserves Anthropic prompt cache)
             if _should_prune_for_cache():
-                pruned_messages, prune_stats = prune_context(session.messages)
+                _ctx_win = estimate_context_window(model)
+                pruned_messages, prune_stats = prune_context(
+                    session.messages, context_window_tokens=_ctx_win)
                 if prune_stats['soft_trimmed'] or prune_stats['hard_cleared']:
                     log.info(f"[PRUNE] soft={prune_stats['soft_trimmed']} hard={prune_stats['hard_cleared']}")
             else:
