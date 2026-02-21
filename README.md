@@ -107,6 +107,19 @@ The shortcut is **version-independent** — update SalmAlm anytime, the shortcut
 
 Set keys via environment variables or the web UI **Settings → API Keys**.
 
+#### CLI Token Reuse (Optional)
+
+If you already use [OpenAI Codex CLI](https://github.com/openai/codex) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code), SalmAlm can automatically detect and reuse their OAuth tokens:
+
+| CLI Tool | Token Path |
+|---|---|
+| OpenAI Codex CLI | `~/.codex/auth.json` |
+| Claude Code | `~/.claude/credentials.json` |
+
+No configuration needed — if the files exist, SalmAlm reads them at startup.
+
+> ⚠️ **Use at your own risk.** These tokens are issued for their respective CLI tools. Reusing them in a third-party application may violate the provider's Terms of Service. SalmAlm does not modify or share these tokens — it only reads them locally. **You are solely responsible for compliance with each provider's TOS.**
+
 ---
 
 ## 🎯 Feature Overview

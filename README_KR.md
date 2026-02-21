@@ -107,6 +107,19 @@ SALMALM_BIND=0.0.0.0 salmalm    # LAN 노출 (보안 섹션 참조)
 
 API 키는 환경변수 또는 웹 UI **설정 → API Keys**에서 입력 가능합니다.
 
+#### CLI 토큰 재사용 (선택)
+
+[OpenAI Codex CLI](https://github.com/openai/codex)나 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)를 이미 사용 중이라면, SalmAlm이 해당 OAuth 토큰을 자동으로 감지하여 재사용합니다:
+
+| CLI 도구 | 토큰 경로 |
+|---|---|
+| OpenAI Codex CLI | `~/.codex/auth.json` |
+| Claude Code | `~/.claude/credentials.json` |
+
+별도 설정 불필요 — 파일이 존재하면 시작 시 자동으로 읽습니다.
+
+> ⚠️ **본인 책임 하에 사용하세요.** 이 토큰은 각 CLI 도구 전용으로 발급된 것입니다. 제3자 애플리케이션에서의 재사용은 프로바이더의 서비스 이용약관(TOS)에 위배될 수 있습니다. SalmAlm은 해당 토큰을 수정하거나 외부로 전송하지 않으며, 로컬에서만 읽습니다. **각 프로바이더 TOS 준수 여부는 전적으로 사용자 본인의 책임입니다.**
+
 ---
 
 ## 🎯 기능 소개
