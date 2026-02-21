@@ -22,6 +22,74 @@ _LLM_TIMEOUT = int(_os.environ.get('SALMALM_LLM_TIMEOUT', '30'))
 _UA: str = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
 
+# ── CLI OAuth token reuse (Codex CLI / Claude Code) ──
+# Reads tokens from ~/.codex/auth.json and ~/.claude/credentials.json
+# These are the user's own tokens on their own machine.
+# ⚠️ Using subscription tokens outside the official CLI may violate provider TOS.
+
+def _try_cli_oauth(provider: str) -> Optional[str]:
+    """Try to read OAuth access token from CLI auth files.
+
+    Returns access_token string or None.
+    """
+    import pathlib
+    home = pathlib.Path.home()
+
+    if provider == 'openai':
+        # OpenAI Codex CLI: ~/.codex/auth.json
+        for path in (home / '.codex' / 'auth.json',
+                     home / '.openai-codex' / 'auth.json'):
+            token = _read_oauth_file(path, provider)
+            if token:
+                return token
+
+    elif provider == 'anthropic':
+        # Claude Code CLI: ~/.claude/credentials.json or ~/.claude.json
+        for path in (home / '.claude' / 'credentials.json',
+                     home / '.claude.json'):
+            token = _read_oauth_file(path, provider)
+            if token:
+                return token
+
+    return None
+
+
+def _read_oauth_file(path, provider: str) -> Optional[str]:
+    """Read and validate an OAuth token file. Returns access_token or None."""
+    try:
+        if not path.exists():
+            return None
+        data = json.loads(path.read_text('utf-8'))
+        # Handle both flat {access_token:...} and nested formats
+        if isinstance(data, dict):
+            token = data.get('access_token') or data.get('token')
+            if not token:
+                # Some formats nest under provider key
+                for key in (provider, 'default', 'oauth'):
+                    sub = data.get(key, {})
+                    if isinstance(sub, dict):
+                        token = sub.get('access_token') or sub.get('token')
+                        if token:
+                            break
+            if token and isinstance(token, str) and len(token) > 20:
+                # Check expiry if available
+                expires = data.get('expires') or data.get('expires_at', 0)
+                if expires:
+                    import time as _t
+                    try:
+                        exp_ts = float(expires)
+                        if exp_ts < _t.time():
+                            log.debug(f"[OAUTH] Token expired in {path}")
+                            return None
+                    except (ValueError, TypeError):
+                        pass
+                log.info(f"[OAUTH] Using CLI token from {path.name} for {provider}")
+                return token
+    except Exception as e:
+        log.debug(f"[OAUTH] Failed to read {path}: {e}")
+    return None
+
+
 def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120) -> dict:
     """HTTP POST with retry for transient errors (5xx, timeout, 429, 529)."""
     from salmalm.utils.retry import retry_call
@@ -90,6 +158,9 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
         api_key = vault.get('google_api_key') or vault.get('gemini_api_key')
     else:
         api_key = vault.get(f'{provider}_api_key')
+    # Fallback: try CLI OAuth tokens (Codex CLI / Claude Code)
+    if not api_key and provider in ('openai', 'anthropic'):
+        api_key = _try_cli_oauth(provider)
     if not api_key:
         return {'content': f'❌ {provider} API key not configured.\n\n'
                 f'💡 In Settings, add `{provider}_api_key` or\n'
@@ -135,6 +206,8 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
             if fb_provider == provider:
                 continue
             fb_key = vault.get(f'{fb_provider}_api_key')
+            if not fb_key and fb_provider in ('openai', 'anthropic'):
+                fb_key = _try_cli_oauth(fb_provider)
             if not fb_key:
                 continue
             fb_model_id = FALLBACK_MODELS.get(fb_provider)
@@ -548,6 +621,8 @@ def stream_anthropic(messages: List[Dict[str, Any]], model: Optional[str] = None
         return
 
     api_key = vault.get('anthropic_api_key')
+    if not api_key:
+        api_key = _try_cli_oauth('anthropic')
     if not api_key:
         yield {'type': 'error', 'error': '❌ Anthropic API key not configured.'}
         return
