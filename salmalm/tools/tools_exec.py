@@ -11,6 +11,37 @@ from salmalm.constants import WORKSPACE_DIR
 from salmalm.security.exec_approvals import (check_approval, check_env_override, BackgroundSession,  # noqa: F401
                                     BLOCKED_ENV_OVERRIDES)  # noqa: E128
 
+# ── Secret isolation ──────────────────────────────────────────────
+# Environment variables matching these patterns are stripped from
+# exec/python_eval subprocess environments so that LLM-generated
+# commands cannot exfiltrate API keys or tokens.
+_SECRET_ENV_PATTERNS = re.compile(
+    r'(?i)(API[_-]?KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AUTH|VAULT)',
+)
+
+_SECRET_ENV_ALLOWLIST = frozenset({
+    # Non-sensitive vars that happen to match patterns above
+    'DBUS_SESSION_BUS_ADDRESS',
+    'XDG_SESSION_TYPE',
+    'SESSION_MANAGER',
+})
+
+
+def _sanitized_env(extra_env: dict | None = None) -> dict:
+    """Return a copy of os.environ with secret-bearing vars removed."""
+    clean = {}
+    for k, v in os.environ.items():
+        if k in _SECRET_ENV_ALLOWLIST:
+            clean[k] = v
+        elif _SECRET_ENV_PATTERNS.search(k):
+            continue  # strip
+        else:
+            clean[k] = v
+    if extra_env:
+        # User-supplied env vars are NOT filtered — they are explicit
+        clean.update(extra_env)
+    return clean
+
 
 @register('exec')
 def handle_exec(args: dict) -> str:
@@ -77,9 +108,8 @@ def handle_exec(args: dict) -> str:
 
         # Build environment
         run_env = None
-        if env:
-            run_env = dict(os.environ)
-            run_env.update(env)
+        # Secret isolation: strip API keys/tokens from subprocess env
+        run_env = _sanitized_env(env)
 
         # shell=True is OFF by default. Pipe/redirect syntax is blocked by
         # EXEC_BLOCKLIST_PATTERNS ($(...), backticks) and _is_safe_command.
@@ -97,9 +127,7 @@ def handle_exec(args: dict) -> str:
                 run_args = {'args': shlex.split(cmd), 'shell': False}
             except ValueError:
                 return '❌ Failed to parse command. Check quoting/escaping.'
-        extra_kwargs = {}
-        if run_env:
-            extra_kwargs['env'] = run_env
+        extra_kwargs = {'env': run_env}
 
         # Resource limits for sandboxing (Linux/macOS only)
         def _set_exec_limits():
@@ -190,6 +218,12 @@ def handle_python_eval(args: dict) -> str:
         'breakpoint(', 'help(', 'input(', 'exit(', 'quit(',
         '__class__', '__subclasses__', '__bases__', '__mro__',
         'importlib', 'ctypes', 'signal',
+        # Secret exfiltration prevention
+        'salmalm.security', 'from salmalm', 'import salmalm',
+        'crypto', 'vault', 'oauth', 'api_key', 'apikey',
+        'secret', 'token', 'credential', 'password',
+        'environ[', 'environ.get', 'getenv',
+        '.codex/', '.claude/', 'auth.json', 'credentials.json',
     ]
     code_lower = code.lower().replace(' ', '').replace('\t', '')
     for blocked in _EVAL_BLOCKLIST:
@@ -225,7 +259,8 @@ else:
         except Exception:
             pass
     try:
-        _kwargs: dict = dict(capture_output=True, text=True, timeout=timeout_sec, cwd=str(WORKSPACE_DIR))
+        _kwargs: dict = dict(capture_output=True, text=True, timeout=timeout_sec,
+                             cwd=str(WORKSPACE_DIR), env=_sanitized_env())
         if sys.platform != 'win32':
             _kwargs['preexec_fn'] = _set_limits
         result = subprocess.run([sys.executable, '-c', wrapper], **_kwargs)

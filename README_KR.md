@@ -328,8 +328,12 @@ HTTP 요청 도구는 기본적으로 **허용 목록 모드**를 사용합니�
 - **Exec 리소스 제한** — 포그라운드 실행: CPU 타임아웃+5s, 1GB RAM, 100 fd, 50MB fsize (Linux/macOS)
 - **도구별 타임아웃** — exec 120초, browser 90초, 기본 60초 wall-clock 제한
 - **도구별 출력 제한** — exec 20K, browser 10K, HTTP 15K 글자 차등 제한
+- **시크릿 격리** — API 키, 토큰, 자격증명이 **서브프로세스 환경에서 자동 제거**됨 (`exec`, `python_eval`, 백그라운드 세션). `echo $OPENAI_API_KEY`나 `os.environ`으로 비밀 접근 불가
+- **출력 자동 검열** — 도구 출력에서 API 키 패턴(sk-*, ghp_*, pypi-*, AKIA* 등)을 자동 감지하여 `[REDACTED]`로 치환 후 LLM에 전달
+- **python_eval 샌드박스** — `import os/sys/subprocess`, vault/crypto 접근, `environ` 읽기, 인증파일 경로, dunder 인트로스펙션, 네트워크 임포트 차단. 리소스 제한된 격리 서브프로세스에서 실행
+- **도구별 시크릿 스코핑** — 각 도구는 하드코딩된 `vault.get('specific_key')`로 자기 키만 접근. vault 전체 접근 불가. LLM이 임의의 vault 항목 읽기 불가
 - **SQLite 강화** — WAL 저널 모드 + 5초 busy_timeout ("database is locked" 방지)
-- **46개 보안 회귀 테스트** — SSRF 우회, 헤더 인젝션, exec 우회, 도구 등급, 라우트 정책
+- **51개 보안 회귀 테스트** — SSRF 우회, 헤더 인젝션, exec 우회, 도구 등급, 라우트 정책, 시크릿 격리, 출력 검열
 
 자세한 내용은 [`SECURITY.md`](SECURITY.md)를 참조하세요.
 

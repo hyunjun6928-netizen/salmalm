@@ -112,6 +112,15 @@ Per-tool output size limits prevent token flooding:
 - `http_request`: 15,000 characters
 - `browser`: 10,000 characters
 
+### Secret Isolation
+
+API keys and tokens are **never exposed** to LLM-initiated tool executions:
+
+1. **Environment stripping** — `exec`, `python_eval`, and background sessions run in a sanitized environment. Variables matching `API_KEY`, `SECRET`, `TOKEN`, `PASSWORD`, `CREDENTIAL`, `AUTH`, `VAULT` patterns are removed before subprocess creation.
+2. **Output redaction** — tool output is scanned for patterns resembling API keys (`sk-*`, `ghp_*`, `pypi-*`, `AKIA*`, `AIza*`, `xai-*`, etc.) and replaced with `[REDACTED]` before being passed to the LLM.
+3. **python_eval blocklist** — blocks `import os/sys/subprocess`, `vault`/`crypto`/`oauth` access, `environ` reads, credential file paths (`.codex/`, `.claude/`), dunder introspection, and network-capable imports.
+4. **Per-tool vault scoping** — tools access only their own credentials via hardcoded `vault.get('specific_key')` calls. No tool exposes the full vault. The LLM cannot read arbitrary vault entries.
+
 ## Audit
 
 - All tool executions logged to `audit.db` (SQLite).

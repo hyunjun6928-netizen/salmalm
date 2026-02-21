@@ -344,8 +344,26 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     }
     _DEFAULT_TOOL_TIMEOUT = 60
 
+    # Patterns that look like leaked secrets in tool output
+    _SECRET_OUTPUT_RE = _re.compile(
+        r'(?i)(?:'
+        r'(?:sk|pk|api|key|token|secret|bearer|ghp|gho|pypi)-[A-Za-z0-9_\-]{20,}'
+        r'|AKIA[0-9A-Z]{16}'              # AWS access key
+        r'|AIza[0-9A-Za-z_\-]{35}'        # Google API key
+        r'|(?:ghp|gho|ghu|ghs|ghr)_\w{36,}'  # GitHub tokens
+        r'|pypi-[A-Za-z0-9_\-]{50,}'      # PyPI tokens
+        r'|sk-(?:ant-)?[A-Za-z0-9_\-]{20,}'  # OpenAI/Anthropic keys
+        r'|xai-[A-Za-z0-9_\-]{20,}'       # xAI keys
+        r')'
+    )
+
+    def _redact_secrets(self, text: str) -> str:
+        """Scrub anything that looks like a leaked API key/token from output."""
+        return self._SECRET_OUTPUT_RE.sub('[REDACTED]', text) if text else text
+
     def _truncate_tool_result(self, result: str, tool_name: str = '') -> str:
         """Truncate tool result based on tool type to prevent context explosion."""
+        result = self._redact_secrets(result)
         limit = self._TOOL_TRUNCATE_LIMITS.get(tool_name, self.MAX_TOOL_RESULT_CHARS)
         if len(result) > limit:
             return result[:limit] + \

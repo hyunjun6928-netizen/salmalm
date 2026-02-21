@@ -328,8 +328,12 @@ When binding to `0.0.0.0`, SalmAlm automatically:
 - **Exec resource limits** — foreground exec: CPU timeout+5s, 1GB RAM, 100 fd, 50MB fsize (Linux/macOS)
 - **Tool timeouts** — per-tool wall-clock limits (exec 120s, browser 90s, default 60s)
 - **Tool result truncation** — per-tool output limits (exec 20K, browser 10K, HTTP 15K chars)
+- **Secret isolation** — API keys, tokens, and credentials are **stripped from subprocess environments** (`exec`, `python_eval`, background sessions). Tools cannot access secrets via `echo $OPENAI_API_KEY` or `os.environ`
+- **Output redaction** — tool outputs are scanned for patterns matching API keys (sk-*, ghp_*, pypi-*, AKIA*, etc.) and automatically replaced with `[REDACTED]` before reaching the LLM
+- **python_eval sandbox** — blocks `import os/sys/subprocess`, vault/crypto access, `environ` reads, credential file paths, dunder introspection, and network imports. Runs in isolated subprocess with resource limits
+- **Per-tool secret scoping** — each tool accesses only its own required credentials via hardcoded `vault.get('specific_key')` calls. No tool has access to the full vault. The LLM cannot read arbitrary vault entries
 - **SQLite hardening** — WAL journal mode + 5s busy_timeout (prevents "database is locked")
-- **46 security regression tests** — SSRF bypass, header injection, exec bypass, tool tiers, route policies
+- **51 security regression tests** — SSRF bypass, header injection, exec bypass, tool tiers, route policies, secret isolation, output redaction
 
 **Threat model**: SalmAlm is a **local single-user tool**. The vault provides at-rest encryption for API keys and private conversations using PBKDF2-HMAC-SHA256 (200K iterations) key derivation from a user-entered master password. The password is held in memory only while the process runs and is never written to disk. For localhost convenience, `SALMALM_VAULT_KEY` env var can skip the unlock prompt — this is a deliberate UX trade-off documented in SECURITY.md, not a security recommendation for exposed deployments. If you bind to `0.0.0.0`, set a strong vault password and do not use the env var.
 

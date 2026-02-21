@@ -148,9 +148,9 @@ class BackgroundSession:
             self.status = 'error'
             self.stderr_data = 'Shell operators require SALMALM_ALLOW_SHELL=1'
             return self.session_id
-        run_env = dict(os.environ)
-        if self._env:
-            run_env.update(self._env)
+        # Secret isolation: strip API keys/tokens from background env
+        from salmalm.tools.tools_exec import _sanitized_env
+        run_env = _sanitized_env(self._env)
 
         from salmalm.constants import WORKSPACE_DIR as _ws
 

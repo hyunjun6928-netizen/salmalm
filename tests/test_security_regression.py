@@ -281,5 +281,69 @@ class TestSQLiteWAL(unittest.TestCase):
             conn.close()
 
 
+class TestSecretIsolation(unittest.TestCase):
+    """Ensure exec/python_eval cannot leak API keys or secrets."""
+
+    def test_sanitized_env_strips_api_keys(self):
+        from salmalm.tools.tools_exec import _sanitized_env
+        os.environ['TEST_API_KEY'] = 'sk-secret123'
+        os.environ['MY_SECRET_VALUE'] = 'hidden'
+        os.environ['OPENAI_API_KEY'] = 'sk-test'
+        os.environ['NORMAL_VAR'] = 'visible'
+        try:
+            env = _sanitized_env()
+            self.assertNotIn('TEST_API_KEY', env)
+            self.assertNotIn('MY_SECRET_VALUE', env)
+            self.assertNotIn('OPENAI_API_KEY', env)
+            self.assertIn('NORMAL_VAR', env)
+            self.assertEqual(env['NORMAL_VAR'], 'visible')
+        finally:
+            os.environ.pop('TEST_API_KEY', None)
+            os.environ.pop('MY_SECRET_VALUE', None)
+            os.environ.pop('OPENAI_API_KEY', None)
+            os.environ.pop('NORMAL_VAR', None)
+
+    def test_sanitized_env_preserves_session_allowlist(self):
+        from salmalm.tools.tools_exec import _sanitized_env
+        os.environ['DBUS_SESSION_BUS_ADDRESS'] = 'unix:path=/run/user/1000/bus'
+        try:
+            env = _sanitized_env()
+            self.assertIn('DBUS_SESSION_BUS_ADDRESS', env)
+        finally:
+            pass  # don't remove system var
+
+    def test_sanitized_env_allows_explicit_user_env(self):
+        from salmalm.tools.tools_exec import _sanitized_env
+        env = _sanitized_env({'MY_CUSTOM_TOKEN': 'explicit'})
+        self.assertEqual(env['MY_CUSTOM_TOKEN'], 'explicit')
+
+    def test_python_eval_blocks_vault_access(self):
+        from salmalm.tools.tools_exec import handle_python_eval
+        dangerous_codes = [
+            'from salmalm.security.crypto import vault',
+            'import salmalm',
+            'vault.get("openai_api_key")',
+            'os.environ.get("OPENAI_API_KEY")',
+            'os.environ["SECRET"]',
+            'open("/home/user/.codex/auth.json")',
+            'open("/home/user/.claude/credentials.json")',
+        ]
+        for code in dangerous_codes:
+            result = handle_python_eval({'code': code})
+            self.assertIn('Security blocked', result, f'Should block: {code}')
+
+    def test_output_redaction(self):
+        from salmalm.core.engine import IntelligenceEngine
+        engine = IntelligenceEngine.__new__(IntelligenceEngine)
+        # API keys should be redacted
+        self.assertIn('[REDACTED]', engine._redact_secrets('key is sk-ant-abc123XYZdef456789012'))
+        self.assertIn('[REDACTED]', engine._redact_secrets('ghp_abcdefghijklmnopqrstuvwxyz1234567890'))
+        self.assertIn('[REDACTED]', engine._redact_secrets('pypi-AgEIcHlwaS5vcmcCJGFhZjViOWQwLWI2NjQtNDY5OTest'))
+        self.assertIn('[REDACTED]', engine._redact_secrets('AKIAIOSFODNN7EXAMPLE'))
+        # Normal text should pass through
+        self.assertEqual(engine._redact_secrets('hello world'), 'hello world')
+        self.assertIsNone(engine._redact_secrets(None))
+
+
 if __name__ == '__main__':
     unittest.main()
