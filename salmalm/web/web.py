@@ -346,6 +346,16 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             return False
         pw = os.environ.get("SALMALM_VAULT_PW", "")
         if VAULT_FILE.exists():  # noqa: F405
+            # Check if this is a no-crypto marker file
+            try:
+                marker = VAULT_FILE.read_bytes()  # noqa: F405
+                if b'no_crypto' in marker:
+                    vault._data = {}
+                    vault._password = ""
+                    vault._salt = b"\x00" * 16
+                    return True
+            except Exception:
+                pass
             # Try env password first, then empty password (no-password vault)
             try:
                 if pw and vault.unlock(pw):
@@ -356,12 +366,6 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 log.warning("Vault unlock failed (cryptography not installed?)")
                 return False
             if not pw:
-                # Localhost: try empty password as last resort before showing unlock
-                try:
-                    if vault.unlock(""):
-                        return True
-                except RuntimeError:
-                    pass
                 return False  # Has password but no env var — show unlock screen
             return False
         elif pw:
@@ -2348,13 +2352,18 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             audit_log("setup", f"vault created {'with' if use_pw else 'without'} password")
         except RuntimeError:
             # cryptography not installed and fallback not enabled —
-            # proceed without vault (keys stored in plain SQLite)
+            # proceed without vault; create a marker file so setup doesn't loop
             log.warning("[SETUP] Vault unavailable (no cryptography). Proceeding without encryption.")
             audit_log("setup", "vault skipped — no cryptography package")
-            # Mark vault as "unlocked" with in-memory empty store so the app works
             vault._data = {}
             vault._password = ""
             vault._salt = b"\x00" * 16
+            # Write a marker so _needs_first_run() returns False next time
+            try:
+                VAULT_FILE.parent.mkdir(parents=True, exist_ok=True)  # noqa: F405
+                VAULT_FILE.write_bytes(b'{"no_crypto": true}')  # noqa: F405
+            except Exception:
+                pass
         self._json({"ok": True})
         return
 

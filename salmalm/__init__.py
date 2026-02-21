@@ -2,9 +2,9 @@ import logging
 import sys
 
 try:
-    __version__ = '0.17.1'
+    __version__ = '0.17.2'
 except Exception:
-    __version__ = '0.17.1'
+    __version__ = '0.17.2'
 
 log = logging.getLogger('salmalm')
 log.addHandler(logging.NullHandler())  # Prevent "No handlers" warning at import
