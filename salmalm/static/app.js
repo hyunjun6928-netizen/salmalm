@@ -159,7 +159,9 @@
 
   /* --- Theme --- */
   var _theme=localStorage.getItem('salm_theme')||'light';
+  var _color=localStorage.getItem('salm_color')||'';
   if(_theme==='light')document.documentElement.setAttribute('data-theme','light');
+  if(_color)document.documentElement.setAttribute('data-color',_color);
   window.toggleTheme=function(){
     _theme=_theme==='dark'?'light':'dark';
     document.documentElement.setAttribute('data-theme',_theme==='light'?'light':'');
@@ -167,7 +169,14 @@
     var btn=document.getElementById('theme-toggle');
     btn.textContent=_theme==='dark'?'🌙':'☀️';
   };
+  window.setColor=function(c){
+    _color=c;document.documentElement.setAttribute('data-color',c||'');
+    localStorage.setItem('salm_color',c||'');
+    var dots=document.querySelectorAll('.color-dot');
+    dots.forEach(function(d){d.style.outline=d.getAttribute('data-color')===c?'2px solid var(--text)':'none'});
+  };
   document.getElementById('theme-toggle').textContent=_theme==='dark'?'🌙':'☀️';
+  setTimeout(function(){var dots=document.querySelectorAll('.color-dot');dots.forEach(function(d){if(d.getAttribute('data-color')===_color)d.style.outline='2px solid var(--text)'})},100);
 
   /* --- Sidebar toggle (mobile) --- */
   window.toggleSidebar=function(){
@@ -728,7 +737,7 @@
       'nav-chat':'💬 Chat','nav-settings':'⚙️ Settings','nav-dashboard':'📈 Dashboard',
       'tab-general':'⚙️ General','tab-features':'📖 Features',
       'features-search-ph':'Search features...','features-empty':'No features found.',
-      'h-model':'🤖 Model Settings','h-keys':'🔑 API Key Management','h-update':'🔄 Update','h-lang':'🌐 Language',
+      'h-model':'🤖 Model Settings','h-keys':'🔑 API Key Management','h-update':'🔄 Update','h-lang':'🌐 Language','h-color':'Accent Color',
       'lbl-model':'Default Model','lbl-ollama':'Ollama URL',
       'btn-save':'Save','btn-test':'Test','btn-check':'Check for Updates','btn-update':'⬆️ Update',
       'btn-export':'📥 Export','btn-send':'Send',
@@ -839,7 +848,7 @@
       'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정','nav-dashboard':'📈 대시보드',
       'tab-general':'⚙️ 일반','tab-features':'📖 기능 가이드',
       'features-search-ph':'기능 검색...','features-empty':'검색 결과가 없습니다.',
-      'h-model':'🤖 모델 설정','h-keys':'🔑 API 키 관리','h-update':'🔄 업데이트','h-lang':'🌐 언어',
+      'h-model':'🤖 모델 설정','h-keys':'🔑 API 키 관리','h-update':'🔄 업데이트','h-lang':'🌐 언어','h-color':'테마 색상',
       'lbl-model':'기본 모델','lbl-ollama':'Ollama URL',
       'btn-save':'저장','btn-test':'테스트','btn-check':'업데이트 확인','btn-update':'⬆️ 업데이트',
       'btn-export':'📥 내보내기','btn-send':'전송',
@@ -1828,6 +1837,7 @@
     else if(a==='sess-open'){var sid2=el.getAttribute('data-sid');if(sid2){window._currentSession=sid2;showChat();loadSessions();loadChatHistory(sid2)}}
     else if(a==='toggleSidebar')window.toggleSidebar();
     else if(a==='toggleTheme')window.toggleTheme();
+    else if(a==='setColorDot'){window.setColor(el.getAttribute('data-color'))}
     else if(a==='openDashboard')window.showDashboard();
     else if(a==='exportChat')window.exportChat('md');
     else if(a==='toggleExportMenu')window.toggleExportMenu();
