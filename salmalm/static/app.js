@@ -1820,6 +1820,9 @@
 
   applyLang();
 
+  /* --- Toast notification --- */
+  window._toast=function(msg,ms){ms=ms||2000;var d=document.createElement('div');d.textContent=msg;d.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg3);color:var(--text);padding:8px 20px;border-radius:10px;font-size:13px;z-index:9999;box-shadow:0 2px 12px rgba(0,0,0,0.2);opacity:0;transition:opacity 0.2s';document.body.appendChild(d);requestAnimationFrame(function(){d.style.opacity='1'});setTimeout(function(){d.style.opacity='0';setTimeout(function(){d.remove()},300)},ms)};
+
   /* --- CSP-safe event delegation --- */
   var _qcMap={'qc-help':'/help','qc-sysmon':'Check system status','qc-memory':'Show memory files',
     'qc-cost':'Show cost report','qc-cron':'Show cron jobs','qc-python':'Calculate 1+1 in Python',
@@ -1866,7 +1869,7 @@
     else if(a==='toggleThinking')window.toggleThinking();
     else if(a==='toggleMic')window.toggleMic();
     else if(a==='stopGen'){window._cancelGeneration();var _sb4=document.getElementById('stop-btn');var _sb5=document.getElementById('send-btn');if(_sb4)_sb4.style.display='none';if(_sb5)_sb5.style.display='flex'}
-    else if(a==='queueMsg'){var _qi=document.getElementById('input');var _qm=_qi?_qi.value.trim():'';if(!_qm){if(window._msgQueue&&window._msgQueue.length>0){if(confirm((t('queue-clear')||'Queue has ')+window._msgQueue.length+(t('queue-clear2')||' messages. Clear?'))){window._msgQueue=[];var _qb0=document.getElementById('queue-btn');if(_qb0)_qb0.textContent='📥'}}return}if(!window._msgQueue)window._msgQueue=[];window._msgQueue.push(_qm);_qi.value='';_qi.style.height='auto';var _qb=document.getElementById('queue-btn');if(_qb)_qb.textContent='📥'+window._msgQueue.length}
+    else if(a==='queueMsg'){var _qi=document.getElementById('input');var _qm=_qi?_qi.value.trim():'';if(!_qm){if(window._msgQueue&&window._msgQueue.length>0){if(confirm((t('queue-clear')||'Queue has ')+window._msgQueue.length+(t('queue-clear2')||' messages. Clear?'))){window._msgQueue=[];var _qb0=document.getElementById('queue-btn');if(_qb0)_qb0.textContent='📥'}}else{window._toast&&window._toast(t('queue-empty')||'Type a message first')}return}if(!window._msgQueue)window._msgQueue=[];window._msgQueue.push(_qm);_qi.value='';_qi.style.height='auto';var _qb=document.getElementById('queue-btn');if(_qb)_qb.textContent='📥'+window._msgQueue.length;window._toast&&window._toast((_lang==='ko'?'큐에 추가됨':'Queued')+' ('+window._msgQueue.length+')')}
     else if(a==='clearFile')window.clearFile();
     else if(a==='toggleTools'){var tl=document.getElementById('tools-list');tl.style.display=tl.style.display==='none'?'block':'none'}
     else if(a==='tool-run'){var treq=el.getAttribute('data-tool-req');if(treq){var kr2=_lang==='ko';var reqMap={
