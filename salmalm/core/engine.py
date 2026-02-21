@@ -297,21 +297,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 all_tools.append(t)
                 seen.add(t['name'])
 
-        # ── Selective tool injection based on intent ──
-        if intent:
-            allowed = set(INTENT_TOOLS.get(intent, []))
-            # Add keyword-triggered tools
-            msg_lower = user_message.lower()
-            for kw, tools in _KEYWORD_TOOLS.items():
-                if kw in msg_lower:
-                    allowed.update(tools)
-            # Always include memory tools for memory intent
-            if intent == 'memory':
-                allowed.update(['memory_read', 'memory_write', 'memory_search'])
-            if allowed:
-                all_tools = [t for t in all_tools if t['name'] in allowed]
-            else:
-                return []
+        # ── Tool injection: always provide all tools ──
+        # Previously filtered by intent, but this prevented LLM from using
+        # tools when intent classification was wrong (e.g. "파일 목록" → chat).
+        # Keyword-triggered tools are still boosted but never restrict.
+        # All 62 tools are always available — LLM decides what to use.
 
         if provider == 'google':
             return [{'name': t['name'], 'description': t['description'],
@@ -573,17 +563,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             provider = model.split('/')[0] if '/' in model else 'anthropic'
 
-            # OpenClaw-style: intent별 도구 선별 주입
-            cur_intent = classification['intent']
-            intent_tool_names = INTENT_TOOLS.get(cur_intent, [])
-            # Also check keyword-triggered tools
-            _msg_lower = user_message.lower() if user_message else ''
-            _has_kw_tools = any(kw in _msg_lower for kw in _KEYWORD_TOOLS)
-            if intent_tool_names or _has_kw_tools:
-                tools = self._get_tools_for_provider(provider, intent=cur_intent,
-                                                     user_message=user_message or '')
-            else:
-                tools = None
+            # Always provide tools — let the LLM decide what to use
+            # Intent/keyword filtering was too restrictive (chat/memory/creative got no tools)
+            tools = self._get_tools_for_provider(provider, intent=classification['intent'],
+                                                 user_message=user_message or '')
 
             # Use thinking for first call on complex tasks
             think_this_call = (use_thinking and iteration == 0
