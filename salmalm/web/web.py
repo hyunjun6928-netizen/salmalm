@@ -3190,11 +3190,13 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             return
         msg = llm_router.switch_model(model)
         # Also update session-level override so auto-routing respects UI selection
-        sid = self._get_session_id()
-        if sid:
+        sid = self.headers.get("X-Session-Id") or body.get("session") or "web"
+        try:
             from salmalm.core import get_session as _gs_switch
             _s = _gs_switch(sid)
             _s.model_override = model if model != 'auto' else 'auto'
+        except Exception:
+            pass
         self._json({"ok": "✅" in msg, "message": msg, "current_model": llm_router.current_model})
 
     def _post_api_test_provider(self):
