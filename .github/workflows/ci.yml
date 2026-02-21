@@ -110,7 +110,7 @@ jobs:
       - name: Install package + Playwright
         run: |
           pip install -e ".[dev]"
-          pip install playwright
+          pip install playwright websockets
           playwright install chromium --with-deps
 
       - name: E2E Browser Tests
