@@ -168,7 +168,7 @@ async def run_server():
             return
         if msg_type == 'message':
             text = data.get('text', '').strip()
-            session_id = client.session_id or 'web'
+            session_id = data.get('session') or client.session_id or 'web'
             image_b64 = data.get('image')
             image_mime = data.get('image_mime', 'image/png')
             if not text and not image_b64:
@@ -187,7 +187,14 @@ async def run_server():
             try:
                 from salmalm.core.engine import process_message
                 image_data = (image_b64, image_mime) if image_b64 else None
+                # Pass session-level model override
+                from salmalm.core import get_session as _gs_ws
+                _sess_ws = _gs_ws(session_id)
+                _model_ov_ws = getattr(_sess_ws, 'model_override', None)
+                if _model_ov_ws == 'auto':
+                    _model_ov_ws = None
                 response = await process_message(session_id, text or '', image_data=image_data,
+                                                 model_override=_model_ov_ws,
                                                  on_tool=on_tool, on_status=on_status)
                 await stream.send_done(response)
             except Exception as e:
