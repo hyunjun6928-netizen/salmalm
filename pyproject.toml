@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "salmalm"
-version = "0.17.11"
+version = "0.17.12"
 description = "Personal AI Gateway — Pure Python, zero-dependency AI assistant with multi-model routing, web UI, and 56+ built-in tools"
 readme = "README.md"
 license = "MIT"
@@ -28,7 +28,7 @@ classifiers = [
     "Topic :: Communications :: Chat",
     "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
 ]
-dependencies = []
+dependencies = ["cryptography>=41.0"]
 
 [project.optional-dependencies]
 crypto = ["cryptography>=42.0"]
