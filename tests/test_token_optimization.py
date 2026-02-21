@@ -81,18 +81,19 @@ class TestSelectiveToolInjection(unittest.TestCase):
         self.assertIn('날씨', _KEYWORD_TOOLS)
         self.assertIn('weather', _KEYWORD_TOOLS['날씨'])
 
-    def test_get_tools_chat_empty(self):
+    def test_get_tools_chat_returns_all(self):
+        """v0.17.20+: intent filter removed — all tools always passed."""
         from salmalm.core.engine import IntelligenceEngine
         engine = IntelligenceEngine()
         tools = engine._get_tools_for_provider('anthropic', intent='chat')
-        self.assertEqual(tools, [])
+        self.assertGreaterEqual(len(tools), 50)
 
-    def test_get_tools_code_bounded(self):
+    def test_get_tools_code_returns_all(self):
+        """v0.17.20+: intent filter removed — all tools always passed."""
         from salmalm.core.engine import IntelligenceEngine
         engine = IntelligenceEngine()
         tools = engine._get_tools_for_provider('anthropic', intent='code')
-        self.assertGreater(len(tools), 0)
-        self.assertLessEqual(len(tools), 15)
+        self.assertGreaterEqual(len(tools), 50)
 
     def test_keyword_injection_weather(self):
         from salmalm.core.engine import IntelligenceEngine
