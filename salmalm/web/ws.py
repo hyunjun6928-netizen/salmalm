@@ -291,6 +291,22 @@ class WebSocketServer:
         self.clients[client._id] = client
         log.info(f"[FAST] WS client connected (session={session_id}, total={len(self.clients)})")
 
+        # SSE resume: flush buffered messages from previous connection
+        # Find any disconnected client with same session that has buffered messages
+        for old_id, old_client in list(self.clients.items()):
+            if (old_id != client._id
+                    and old_client.session_id == session_id
+                    and not old_client.connected
+                    and old_client._buffer):
+                log.info(f"[WS] Resuming {len(old_client._buffer)} buffered messages for session={session_id}")
+                for buffered_msg in old_client._buffer:
+                    try:
+                        await client.send_json(buffered_msg)
+                    except Exception:
+                        break
+                old_client._buffer.clear()
+                self.clients.pop(old_id, None)
+
         # Auto-register presence
         try:
             from salmalm.features.presence import presence_manager

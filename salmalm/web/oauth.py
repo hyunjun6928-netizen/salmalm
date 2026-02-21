@@ -41,7 +41,7 @@ def _xor_bytes(data: bytes, key: bytes) -> bytes:
 
 
 def _encrypt_tokens(data: dict) -> str:
-    # Prefer vault (AES-GCM) over XOR obfuscation
+    # Prefer vault (AES-GCM) — ONLY secure storage path
     try:
         from salmalm.security.crypto import vault
         if vault.is_unlocked:
@@ -49,6 +49,12 @@ def _encrypt_tokens(data: dict) -> str:
             return '__VAULT__'
     except Exception:
         pass
+    # XOR fallback — warn loudly, this is NOT secure storage
+    log.warning(
+        "[OAUTH] ⚠️ Storing tokens with XOR obfuscation (NOT encryption). "
+        "Install cryptography package and unlock vault for secure storage: "
+        "pip install salmalm[crypto]"
+    )
     raw = json.dumps(data).encode()
     return base64.b64encode(_xor_bytes(raw, _OBFUSCATION_KEY)).decode()
 

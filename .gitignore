@@ -29,6 +29,9 @@ __pycache__/
 *.pyc
 *.pyo
 .env
+.venv/
+venv/
+env/
 
 # OS
 .DS_Store
@@ -59,3 +62,4 @@ workflows.json
 tts_output/
 rss_feeds.json
 qr_output/
+salmalm/exports/

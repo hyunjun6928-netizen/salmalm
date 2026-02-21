@@ -100,6 +100,25 @@ def handle_exec(args: dict) -> str:
         extra_kwargs = {}
         if run_env:
             extra_kwargs['env'] = run_env
+
+        # Resource limits for sandboxing (Linux/macOS only)
+        def _set_exec_limits():
+            try:
+                import resource
+                # CPU: match timeout
+                resource.setrlimit(resource.RLIMIT_CPU, (timeout + 5, timeout + 10))
+                # Memory: 1GB max
+                resource.setrlimit(resource.RLIMIT_AS, (1024 * 1024 * 1024, 1024 * 1024 * 1024))
+                # File descriptors: 100
+                resource.setrlimit(resource.RLIMIT_NOFILE, (100, 100))
+                # Max file size: 50MB
+                resource.setrlimit(resource.RLIMIT_FSIZE, (50 * 1024 * 1024, 50 * 1024 * 1024))
+            except Exception:
+                pass
+
+        if sys.platform != 'win32' and not needs_shell:
+            extra_kwargs['preexec_fn'] = _set_exec_limits
+
         result = subprocess.run(
             **run_args, capture_output=True, text=True,
             timeout=timeout, cwd=str(WORKSPACE_DIR), **extra_kwargs

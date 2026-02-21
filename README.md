@@ -86,12 +86,14 @@ Set keys via environment variables or the web UI **Settings → API Keys**.
 ### Core AI
 - **Multi-model auto-routing** — routes simple→Haiku, moderate→Sonnet, complex→Opus
 - **Extended Thinking** — deep reasoning mode with budget control
-- **Context compaction** — auto-summarizes at 80K tokens
+- **5-stage context compaction** — strip binary → trim tools → drop old → truncate → LLM summarize, with cross-session continuity
 - **Prompt caching** — Anthropic cache_control for 90% cost reduction on system prompts
-- **Model failover** — exponential backoff across providers
+- **Model failover** — exponential backoff + transient error retry across providers
+- **Message queue** — offline message queuing with auto-drain on recovery
+- **Sub-agent system** — spawn/steer/collect background AI workers with isolated sessions
 
 ### 62 Built-in Tools
-Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Python eval, image generation (DALL-E), TTS/STT, browser automation, RAG search, QR codes, system monitor, and more.
+Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Python eval, image generation (DALL-E), TTS/STT, browser automation (Playwright), RAG search, QR codes, system monitor, OS-native sandbox, mesh networking, canvas preview, and more.
 
 ### Web UI
 - Real-time streaming (WebSocket + SSE fallback)
@@ -102,6 +104,12 @@ Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Pyth
 - Code syntax highlighting
 - Dark/Light themes, EN/KR i18n
 - PWA installable
+
+### Infrastructure
+- **OS-native sandbox** — bubblewrap (Linux) / sandbox-exec (macOS) / rlimit fallback
+- **Mesh networking** — P2P between SalmAlm instances (task delegation, clipboard sharing, LAN discovery)
+- **Canvas** — local HTML/code/chart preview server at `:18803`
+- **Browser automation** — Playwright snapshot/act pattern (`pip install salmalm[browser]`)
 
 ### Channels
 - **Web** — full-featured SPA at `localhost:18800`

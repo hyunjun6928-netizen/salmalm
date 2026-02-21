@@ -40,7 +40,33 @@ def handle_sub_agent(args: dict) -> str:
             return '❌ agent_id and message are required'
         result = SubAgent.send_message(agent_id, message)
         return result
-    return f'❌ Unknown action: {action}'
+    elif action == 'stop' or action == 'kill':
+        agent_id = args.get('agent_id', 'all')
+        return SubAgent.stop_agent(agent_id)
+    elif action == 'log':
+        agent_id = args.get('agent_id', '')
+        if not agent_id:
+            return '❌ agent_id is required'
+        limit = args.get('limit', 20)
+        return SubAgent.get_log(agent_id, limit=limit)
+    elif action == 'info':
+        agent_id = args.get('agent_id', '')
+        if not agent_id:
+            return '❌ agent_id is required'
+        return SubAgent.get_info(agent_id)
+    elif action == 'steer':
+        # OpenClaw-style steering: send guidance to a running/completed sub-agent
+        agent_id = args.get('agent_id', '')
+        message = args.get('message', '')
+        if not agent_id or not message:
+            return '❌ agent_id and message are required for steering'
+        # Use the subagent_manager's steer if available, else fall back to send
+        try:
+            from salmalm.features.subagents import subagent_manager
+            return subagent_manager.steer(agent_id, message)
+        except Exception:
+            return SubAgent.send_message(agent_id, message)
+    return f'❌ Unknown action: {action}. Available: spawn, list, result, send, stop, log, info, steer'
 
 
 @register('skill_manage')

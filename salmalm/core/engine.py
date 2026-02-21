@@ -14,6 +14,10 @@ import re as _re
 import threading as _threading
 import time as _time
 from salmalm.security.crypto import log
+from salmalm.core.cost import (  # noqa: F401
+    estimate_tokens, estimate_cost, MODEL_PRICING,
+    get_pricing as _get_pricing,
+)
 
 # Graceful shutdown state
 _shutting_down = False
@@ -123,6 +127,11 @@ def _select_model(message: str, session) -> tuple:
 
     Returns (model_id, complexity_level) where complexity is 'simple'|'moderate'|'complex'.
     Respects session-level model_override (from /model command).
+
+    NOTE: This is the single authority for model selection. core.core.ModelRouter
+    handles provider availability/failover only. Do NOT add model selection logic
+    to ModelRouter — all routing decisions flow through here.
+    TODO(v0.18): Consider merging ModelRouter.route() into this function.
     """
     # Check session-level override
     override = getattr(session, 'model_override', None)
@@ -403,15 +412,47 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                      'input_schema': t['input_schema']} for t in all_tools]
         return all_tools
 
-    # Max chars per tool result sent to LLM context
+    # Max chars per tool result sent to LLM context (default + per-type overrides)
     MAX_TOOL_RESULT_CHARS = 50_000
+    # Aggressive truncation for tools that produce verbose/binary output
+    _TOOL_TRUNCATE_LIMITS = {
+        'exec': 20_000,          # Shell output can be huge
+        'exec_session': 10_000,  # Background session output
+        'sandbox_exec': 20_000,
+        'python_eval': 15_000,
+        'browser': 10_000,       # HTML/accessibility trees
+        'http_request': 15_000,  # API responses
+        'web_fetch': 15_000,
+        'read': 30_000,          # File content
+        'rag_search': 10_000,    # Search results
+        'system_info': 5_000,
+        'canvas': 5_000,
+    }
+    # Per-tool hard timeout (seconds) — total wall-clock including subprocess/IO
+    _TOOL_TIMEOUTS = {
+        'exec': 120,
+        'exec_session': 10,      # Just submits, doesn't wait
+        'sandbox_exec': 60,
+        'python_eval': 30,
+        'browser': 90,
+        'http_request': 30,
+        'web_fetch': 30,
+        'mesh': 60,
+        'image_generate': 120,
+    }
+    _DEFAULT_TOOL_TIMEOUT = 60
 
-    def _truncate_tool_result(self, result: str) -> str:
-        """Truncate tool result to prevent context explosion."""
-        if len(result) > self.MAX_TOOL_RESULT_CHARS:
-            return result[:self.MAX_TOOL_RESULT_CHARS] + \
-                f'\n\n... [truncated: {len(result)} chars total, showing first {self.MAX_TOOL_RESULT_CHARS}]'
+    def _truncate_tool_result(self, result: str, tool_name: str = '') -> str:
+        """Truncate tool result based on tool type to prevent context explosion."""
+        limit = self._TOOL_TRUNCATE_LIMITS.get(tool_name, self.MAX_TOOL_RESULT_CHARS)
+        if len(result) > limit:
+            return result[:limit] + \
+                f'\n\n... [truncated: {len(result)} chars total, limit {limit} for {tool_name or "default"}]'
         return result
+
+    def _get_tool_timeout(self, tool_name: str) -> int:
+        """Get hard timeout for a tool (total wall-clock)."""
+        return self._TOOL_TIMEOUTS.get(tool_name, self._DEFAULT_TOOL_TIMEOUT)
 
     def _execute_tools_parallel(self, tool_calls: list, on_tool=None) -> dict:
         """Execute multiple tools in parallel, return {id: result}."""
@@ -444,7 +485,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             _metrics['tool_calls'] += 1
             t0 = _time.time()
             try:
-                result = self._truncate_tool_result(execute_tool(tc['name'], tc['arguments']))
+                result = self._truncate_tool_result(
+                    execute_tool(tc['name'], tc['arguments']), tool_name=tc['name'])
                 elapsed = _time.time() - t0
                 audit_log('tool_call', f"{tc['name']}: ok ({elapsed:.2f}s)",
                           detail_dict={'tool': tc['name'],
@@ -472,7 +514,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         outputs = {}
         for tc_id, (f, tc) in futures.items():
             try:
-                outputs[tc_id] = self._truncate_tool_result(f.result(timeout=60))
+                _tool_timeout = self._get_tool_timeout(tc['name'])
+                outputs[tc_id] = self._truncate_tool_result(
+                    f.result(timeout=_tool_timeout), tool_name=tc['name'])
                 elapsed = _time.time() - start_times[tc_id]
                 audit_log('tool_call', f"{tc['name']}: ok ({elapsed:.2f}s)",
                           detail_dict={'tool': tc['name'],
@@ -672,33 +716,37 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             # Record API call time for cache TTL tracking
             _record_api_call_time()
 
-            # ── Token overflow: aggressive truncation + retry once ──
+            # ── Token overflow: use compaction first, then aggressive truncation ──
             if result.get('error') == 'token_overflow':
                 msg_count = len(session.messages)
-                # Keep system prompt + last 10 messages
-                if msg_count > 12:
+                log.warning(f"[CUT] Token overflow with {msg_count} messages — running compaction")
+
+                # Stage A: Try proper compaction first
+                session.messages = compact_messages(
+                    session.messages, session=session, on_status=on_status)
+                result, _ = await self._call_with_failover(
+                    session.messages, model=model, tools=tools,
+                    max_tokens=_dynamic_max_tokens, thinking=think_this_call)
+
+                if result.get('error') == 'token_overflow' and len(session.messages) > 12:
+                    # Stage B: Force truncation — keep system + last 10
                     system_msgs = [m for m in session.messages if m['role'] == 'system'][:1]
-                    recent_msgs = session.messages[-10:]
-                    session.messages = system_msgs + recent_msgs
-                    log.warning(f"[CUT] Force-truncated: {msg_count} -> {len(session.messages)} msgs")
-                    # Retry with truncated context
-                    result = await _call_llm_async(session.messages, model=model, tools=tools,
-                                                   thinking=think_this_call)
-                    if result.get('error') == 'token_overflow':
-                        # Still too long — nuclear option: keep only last 4
-                        session.messages = (system_msgs or []) + session.messages[-4:]
-                        log.warning(f"[CUT][CUT] Nuclear truncation: -> {len(session.messages)} msgs")
-                        result = await _call_llm_async(session.messages, model=model, tools=tools)
-                        if result.get('error'):
-                            session.add_assistant("⚠️ Context too large. Use /clear to reset.")
-                            return "⚠️ Context too large. Use /clear to reset."
-                elif msg_count > 4:
-                    session.messages = session.messages[:1] + session.messages[-4:]
-                    result = await _call_llm_async(session.messages, model=model, tools=tools)
-                    if result.get('error'):
-                        session.add_assistant("⚠️ Context too large. Use /clear to reset.")
-                        return "⚠️ Context too large. Use /clear to reset."
-                else:
+                    session.messages = system_msgs + session.messages[-10:]
+                    log.warning(f"[CUT] Post-compaction truncation: -> {len(session.messages)} msgs")
+                    result, _ = await self._call_with_failover(
+                        session.messages, model=model, tools=tools,
+                        max_tokens=_dynamic_max_tokens, thinking=False)
+
+                if result.get('error') == 'token_overflow' and len(session.messages) > 4:
+                    # Stage C: Nuclear — keep only last 4
+                    system_msgs = [m for m in session.messages if m['role'] == 'system'][:1]
+                    session.messages = (system_msgs or []) + session.messages[-4:]
+                    log.warning(f"[CUT][CUT] Nuclear truncation: -> {len(session.messages)} msgs")
+                    result, _ = await self._call_with_failover(
+                        session.messages, model=model, tools=tools,
+                        max_tokens=_dynamic_max_tokens)
+
+                if result.get('error'):
                     session.add_assistant("⚠️ Context too large. Use /clear to reset.")
                     return "⚠️ Context too large. Use /clear to reset."
 
@@ -719,17 +767,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 # Detailed usage tracking (LibreChat style)
                 try:
                     from salmalm.features.edge_cases import usage_tracker
-                    # Estimate cost (rough: Opus=$15/M, Sonnet=$3/M, Haiku=$0.25/M input)
                     _inp, _out = usage.get('input', 0), usage.get('output', 0)
-                    _model_lower = model.lower()
-                    if 'opus' in _model_lower:
-                        _cost = (_inp * 15 + _out * 75) / 1_000_000
-                    elif 'sonnet' in _model_lower:
-                        _cost = (_inp * 3 + _out * 15) / 1_000_000
-                    elif 'haiku' in _model_lower:
-                        _cost = (_inp * 0.25 + _out * 1.25) / 1_000_000
-                    else:
-                        _cost = (_inp * 3 + _out * 15) / 1_000_000
+                    _cost = estimate_cost(model, usage)
                     usage_tracker.record(_session_id, model, _inp, _out, _cost,
                                          classification.get('intent', ''))
                 except Exception:
@@ -795,13 +834,17 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             # ── LLM edge cases ──
 
-            # Empty response: retry once
+            # Empty response: retry up to 2 times with backoff
             if not response or not response.strip():
-                log.warning("[LLM] Empty response, retrying once")
-                retry_result, _ = await self._call_with_failover(
-                    pruned_messages, model=model, tools=tools,
-                    max_tokens=4096, thinking=False)
-                response = retry_result.get('content', '')
+                for _retry in range(2):
+                    log.warning(f"[LLM] Empty response, retry #{_retry + 1}")
+                    await asyncio.sleep(0.5 * (_retry + 1))  # 0.5s, 1.0s backoff
+                    retry_result, _ = await self._call_with_failover(
+                        pruned_messages, model=model, tools=tools,
+                        max_tokens=4096, thinking=False)
+                    response = retry_result.get('content', '')
+                    if response and response.strip():
+                        break
                 if not response or not response.strip():
                     response = '⚠️ 응답을 생성할 수 없습니다. / Could not generate a response.'
 
@@ -913,808 +956,14 @@ async def process_message(session_id: str, user_message: str,
                 _active_requests_event.set()
 
 
-# ============================================================
-# Slash Command Handlers — extracted from _process_message_inner
-# ============================================================
 
-def _cmd_clear(cmd, session, **_):
-    session.messages = [m for m in session.messages if m['role'] == 'system'][:1]
-    return 'Conversation cleared.'
-
-
-def _cmd_help(cmd, session, **_):
-    from salmalm.tools import TOOL_DEFINITIONS
-    tool_count = len(TOOL_DEFINITIONS)
-    return f"""😈 **SalmAlm v{VERSION}** — Personal AI Gateway
-
-📌 **Commands**
-/clear — Clear conversation
-/help — This help
-/model <name> — Change model
-/think <question> — 🧠 Deep reasoning (Opus)
-/plan <question> — 📋 Plan → Execute
-/status — Usage + Cost
-/context — Context window token usage
-/tools — Tool list
-/uptime — Uptime stats (업타임)
-/latency — Latency stats (레이턴시)
-/health detail — Detailed health report (상세 헬스)
-/security — 🛡️ Security audit report
-/evolve — 🧬 Self-evolving prompt (status|apply|reset|history)
-/mood — 🎭 Mood-aware response (status|on|off|sensitive)
-/think <내용> — 💭 Record a thought (or list|search|tag|stats|export)
-
-🤖 **Model Aliases** (27)
-claude, sonnet, opus, haiku, gpt, gpt5, o3, o4mini,
-grok, grok4, gemini, flash, deepseek, llama, auto ...
-
-🔧 **Tools** ({tool_count})
-File R/W, code exec, web search, RAG search,
-system monitor, cron jobs, image analysis, TTS ...
-
-🧠 **Intelligence Engine**
-Auto intent classification (7 levels) → Model routing → Parallel tools → Self-evaluation
-
-💡 **Tip**: Just speak naturally. Read a file, search the web, write code, etc."""
-
-
-def _cmd_status(cmd, session, **_):
-    return execute_tool('usage_report', {})
-
-
-def _cmd_tools(cmd, session, **_):
-    from salmalm.tools import TOOL_DEFINITIONS
-    lines = [f'🔧 **Tool List** ({len(TOOL_DEFINITIONS)})\n']
-    for t in TOOL_DEFINITIONS:
-        lines.append(f"• **{t['name']}** — {t['description'][:60]}")
-    return '\n'.join(lines)
-
-
-async def _cmd_think(cmd, session, *, on_tool=None, **_):
-    think_msg = cmd[7:].strip()
-    if not think_msg:
-        return 'Usage: /think <question>'
-    # Route thought-stream subcommands
-    _thought_subs = ('list', 'search', 'tag', 'timeline', 'stats', 'export')
-    first_word = think_msg.split(None, 1)[0].lower() if think_msg else ''
-    if first_word in _thought_subs:
-        return _cmd_thought(cmd, session)
-    session.add_user(think_msg)
-    session.messages = compact_messages(session.messages, session=session)
-    classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
-                      'thinking_budget': 16000, 'score': 5}
-    return await _engine.run(session, think_msg,
-                             model_override=COMMAND_MODEL,
-                             on_tool=on_tool, classification=classification)
-
-
-async def _cmd_plan(cmd, session, *, model_override=None, on_tool=None, **_):
-    plan_msg = cmd[6:].strip()
-    if not plan_msg:
-        return 'Usage: /plan <task description>'
-    session.add_user(plan_msg)
-    session.messages = compact_messages(session.messages, session=session)
-    classification = {'intent': 'code', 'tier': 3, 'thinking': True,
-                      'thinking_budget': 10000, 'score': 5}
-    return await _engine.run(session, plan_msg, model_override=model_override,
-                             on_tool=on_tool, classification=classification)
-
-
-def _cmd_uptime(cmd, session, **_):
-    from salmalm.features.sla import uptime_monitor, sla_config  # noqa: F401
-    stats = uptime_monitor.get_stats()
-    target = stats['target_pct']
-    pct = stats['monthly_uptime_pct']
-    status_icon = '🟢' if pct >= target else ('🟡' if pct >= 99.0 else '🔴')
-    lines = [
-        '📊 **SalmAlm Uptime** / 업타임 현황\n',
-        f'{status_icon} Current uptime: **{stats["uptime_human"]}**',
-        f'📅 Month ({stats["month"]}): **{pct}%** (target: {target}%)',
-        f'📅 Today: **{stats["daily_uptime_pct"]}%**',
-        f'🕐 Started: {stats["start_time"][:19]}',
-    ]
-    incidents = stats.get('recent_incidents', [])
-    if incidents:
-        lines.append(f'\n⚠️ Recent incidents ({len(incidents)}):')
-        for inc in incidents[:5]:
-            dur = f'{inc["duration_sec"]:.0f}s' if inc['duration_sec'] else '?'
-            lines.append(f'  • {inc["start"][:19]} — {inc["reason"]} ({dur})')
-    return '\n'.join(lines)
-
-
-def _cmd_latency(cmd, session, **_):
-    from salmalm.features.sla import latency_tracker
-    stats = latency_tracker.get_stats()
-    if stats['count'] == 0:
-        return '📊 No latency data yet. / 레이턴시 데이터가 없습니다.'
-    tgt = stats['targets']
-    ttft = stats['ttft']
-    total = stats['total']
-    ttft_ok = '✅' if ttft['p95'] <= tgt['ttft_ms'] else '⚠️'
-    total_ok = '✅' if total['p95'] <= tgt['response_ms'] else '⚠️'
-    lines = [
-        f'📊 **Latency Stats** / 레이턴시 통계 ({stats["count"]} requests)\n',
-        f'{ttft_ok} **TTFT** (Time To First Token):',
-        f'  P50={ttft["p50"]:.0f}ms  P95={ttft["p95"]:.0f}ms  P99={ttft["p99"]:.0f}ms  (target: <{tgt["ttft_ms"]}ms)',
-        f'{total_ok} **Total Response Time**:',
-        f'  P50={total["p50"]:.0f}ms  P95={total["p95"]:.0f}ms  P99={total["p99"]:.0f}ms  (target: <{tgt["response_ms"]}ms)',
-    ]
-    if stats['consecutive_timeouts'] > 0:
-        lines.append(f'⚠️ Consecutive timeouts: {stats["consecutive_timeouts"]}')
-    return '\n'.join(lines)
-
-
-def _cmd_health_detail(cmd, session, **_):
-    from salmalm.features.sla import watchdog
-    report = watchdog.get_detailed_health()
-    status = report.get('status', 'unknown')
-    icon = {'healthy': '🟢', 'degraded': '🟡', 'unhealthy': '🔴'}.get(status, '⚪')
-    lines = [f'{icon} **Health Report** / 상세 헬스 리포트\n', f'Status: **{status}**\n']
-    for name, check in report.get('checks', {}).items():
-        s = check.get('status', '?')
-        ci = {'ok': '✅', 'warning': '⚠️', 'error': '❌'}.get(s, '❔')
-        extra = ''
-        if 'usage_mb' in check:
-            extra = f' ({check["usage_mb"]}MB/{check["limit_mb"]}MB)'
-        elif 'usage_pct' in check:
-            extra = f' ({check["usage_pct"]}%/{check["limit_pct"]}%)'
-        elif 'error' in check:
-            extra = f' ({check["error"][:50]})'
-        lines.append(f'{ci} {name}: {s}{extra}')
-    return '\n'.join(lines)
-
-
-def _cmd_prune(cmd, session, **_):
-    _, stats = prune_context(session.messages)
-    total = stats['soft_trimmed'] + stats['hard_cleared'] + stats['unchanged']
-    return (f"🧹 **Session Pruning Results**\n"
-            f"• Soft-trimmed: {stats['soft_trimmed']}\n"
-            f"• Hard-cleared: {stats['hard_cleared']}\n"
-            f"• Unchanged: {stats['unchanged']}\n"
-            f"• Total tool results scanned: {total}")
-
-
-def _cmd_usage_daily(cmd, session, **_):
-    from salmalm.features.edge_cases import usage_tracker
-    report = usage_tracker.daily_report()
-    if not report:
-        return '📊 No usage data yet. / 아직 사용량 데이터가 없습니다.'
-    lines = ['📊 **Daily Usage Report / 일별 사용량**\n']
-    for r in report[:14]:
-        lines.append(f"• {r['date']} | {r['model'].split('/')[-1]} | "
-                     f"in:{r['input_tokens']} out:{r['output_tokens']} | "
-                     f"${r['cost']:.4f} ({r['calls']} calls)")
-    return '\n'.join(lines)
-
-
-def _cmd_usage_monthly(cmd, session, **_):
-    from salmalm.features.edge_cases import usage_tracker
-    report = usage_tracker.monthly_report()
-    if not report:
-        return '📊 No usage data yet. / 아직 사용량 데이터가 없습니다.'
-    lines = ['📊 **Monthly Usage Report / 월별 사용량**\n']
-    for r in report:
-        lines.append(f"• {r['month']} | {r['model'].split('/')[-1]} | "
-                     f"in:{r['input_tokens']} out:{r['output_tokens']} | "
-                     f"${r['cost']:.4f} ({r['calls']} calls)")
-    return '\n'.join(lines)
-
-
-def _cmd_bookmarks(cmd, session, **_):
-    from salmalm.features.edge_cases import bookmark_manager
-    bms = bookmark_manager.list_all(limit=20)
-    if not bms:
-        return '⭐ No bookmarks yet. / 아직 북마크가 없습니다.'
-    lines = ['⭐ **Bookmarks / 북마크**\n']
-    for b in bms:
-        lines.append(f"• [{b['session_id']}#{b['message_index']}] "
-                     f"{b['preview'][:60]}{'...' if len(b.get('preview', '')) > 60 else ''}")
-    return '\n'.join(lines)
-
-
-def _cmd_compare(cmd, session, *, session_id='', **_):
-    compare_msg = cmd[9:].strip()
-    if not compare_msg:
-        return 'Usage: /compare <message> — Compare responses from multiple models'
-    from salmalm.features.edge_cases import compare_models
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                results = pool.submit(lambda: asyncio.run(compare_models(session_id, compare_msg))).result()
-        else:
-            results = loop.run_until_complete(compare_models(session_id, compare_msg))
-    except Exception:
-        results = asyncio.run(compare_models(session_id, compare_msg))
-    lines = ['🔀 **Model Comparison / 모델 비교**\n']
-    for r in results:
-        model_name = r['model'].split('/')[-1]
-        if r.get('error'):
-            lines.append(f"### ❌ {model_name}\n{r['error']}\n")
-        else:
-            lines.append(f"### 🤖 {model_name} ({r['time_ms']}ms)\n{r['response'][:500]}\n")
-    return '\n'.join(lines)
-
-
-def _cmd_security(cmd, session, **_):
-    from salmalm.security import security_auditor
-    return security_auditor.format_report()
-
-
-def estimate_tokens(text: str) -> int:
-    """Estimate tokens: Korean /2, English /4, mixed weighted."""
-    if not text:
-        return 0
-    kr_chars = sum(1 for c in text if '\uac00' <= c <= '\ud7a3' or '\u3131' <= c <= '\u318e')
-    kr_ratio = kr_chars / max(len(text), 1)
-    if kr_ratio > 0.3:
-        return int(len(text) / 2)
-    elif kr_ratio < 0.05:
-        return int(len(text) / 4)
-    return int(len(text) / 3)
-
-
-# ── Model pricing (USD per 1M tokens) ──
-MODEL_PRICING = {
-    'claude-opus-4': {'input': 15.0, 'output': 75.0, 'cache_read': 1.5, 'cache_write': 18.75},
-    'claude-sonnet-4': {'input': 3.0, 'output': 15.0, 'cache_read': 0.3, 'cache_write': 3.75},
-    'claude-haiku-4-5': {'input': 1.0, 'output': 5.0, 'cache_read': 0.1, 'cache_write': 1.25},
-    'gemini-2.5-pro': {'input': 1.25, 'output': 10.0, 'cache_read': 0.315, 'cache_write': 1.25},
-    'gemini-2.5-flash': {'input': 0.15, 'output': 0.60, 'cache_read': 0.0375, 'cache_write': 0.15},
-    'gemini-2.0-flash': {'input': 0.10, 'output': 0.40, 'cache_read': 0.025, 'cache_write': 0.10},
-    'gemini-3-pro': {'input': 1.25, 'output': 10.0, 'cache_read': 0.315, 'cache_write': 1.25},
-    'gemini-3-flash': {'input': 0.15, 'output': 0.60, 'cache_read': 0.0375, 'cache_write': 0.15},
-    'grok-4': {'input': 3.0, 'output': 15.0, 'cache_read': 0.3, 'cache_write': 3.75},
-    'grok-3': {'input': 3.0, 'output': 15.0, 'cache_read': 0.3, 'cache_write': 3.75},
-    'grok-3-mini': {'input': 0.30, 'output': 0.50, 'cache_read': 0.03, 'cache_write': 0.375},
-}
-
-
-def _get_pricing(model: str) -> dict:
-    """Get pricing for a model string (fuzzy match)."""
-    m = model.lower().replace('-', '').replace('/', '')
-    for key, pricing in MODEL_PRICING.items():
-        if key.replace('-', '') in m:
-            return pricing
-    # Gemini fallback
-    if 'gemini' in m:
-        if 'pro' in m:
-            return MODEL_PRICING['gemini-2.5-pro']
-        return MODEL_PRICING['gemini-2.5-flash']
-    # Default to sonnet pricing
-    return MODEL_PRICING['claude-sonnet-4']
-
-
-def estimate_cost(model: str, usage: dict) -> float:
-    """Estimate cost in USD from usage dict."""
-    pricing = _get_pricing(model)
-    inp = usage.get('input', 0)
-    out = usage.get('output', 0)
-    cache_write = usage.get('cache_creation_input_tokens', 0)
-    cache_read = usage.get('cache_read_input_tokens', 0)
-    # Subtract cached tokens from regular input
-    regular_input = max(0, inp - cache_write - cache_read)
-    cost = (
-        regular_input * pricing['input'] / 1_000_000
-        + out * pricing['output'] / 1_000_000
-        + cache_write * pricing['cache_write'] / 1_000_000
-        + cache_read * pricing['cache_read'] / 1_000_000
-    )
-    return cost
-
-
-# ── Session usage tracking ──
-_session_usage: Dict[str, dict] = {}  # session_id -> {responses: [...], mode: 'off'}
-
-
-def _get_session_usage(session_id: str) -> dict:
-    if session_id not in _session_usage:
-        _session_usage[session_id] = {'responses': [], 'mode': 'off', 'total_cost': 0.0}
-    return _session_usage[session_id]
-
-
-def record_response_usage(session_id: str, model: str, usage: dict) -> None:
-    """Record per-response usage for /usage command."""
-    su = _get_session_usage(session_id)
-    cost = estimate_cost(model, usage)
-    su['responses'].append({
-        'model': model, 'input': usage.get('input', 0),
-        'output': usage.get('output', 0),
-        'cache_read': usage.get('cache_read_input_tokens', 0),
-        'cache_write': usage.get('cache_creation_input_tokens', 0),
-        'cost': cost,
-    })
-    su['total_cost'] += cost
-
-
-def _cmd_context(cmd, session, **_):
-    """Show context window token usage breakdown."""
-    sub = cmd.strip().split()
-    detail_mode = len(sub) > 1 and sub[1] == 'detail'
-
-    from salmalm.core.prompt import build_system_prompt
-    sys_prompt = build_system_prompt(full=False)
-    sys_tokens = estimate_tokens(sys_prompt)
-
-    # Tool schemas
-    tool_tokens = 0
-    tool_text = ''
-    tool_details = []
-    try:
-        from salmalm.tools import TOOL_DEFINITIONS
-        for t in TOOL_DEFINITIONS:
-            schema_text = json.dumps({'name': t['name'], 'description': t['description'],
-                                      'input_schema': t['input_schema']})
-            tool_details.append((t['name'], len(schema_text), estimate_tokens(schema_text)))
-        tool_text = json.dumps([{'name': t['name'], 'description': t['description'],
-                                 'input_schema': t['input_schema']} for t in TOOL_DEFINITIONS])
-        tool_tokens = estimate_tokens(tool_text)
-    except Exception:
-        TOOL_DEFINITIONS = []
-
-    # Injected files breakdown
-    from salmalm.constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, BASE_DIR
-    from salmalm.core.prompt import USER_SOUL_FILE
-    file_details = []
-    for label, path in [('SOUL.md', SOUL_FILE), ('USER_SOUL.md', USER_SOUL_FILE),
-                        ('AGENTS.md', AGENTS_FILE), ('MEMORY.md', MEMORY_FILE),
-                        ('USER.md', USER_FILE), ('TOOLS.md', BASE_DIR / 'TOOLS.md')]:
-        if path.exists():
-            raw = path.read_text(encoding='utf-8')
-            file_details.append((label, len(raw), estimate_tokens(raw)))
-
-    # Conversation history
-    history_text = ''
-    for m in session.messages:
-        c = m.get('content', '')
-        if isinstance(c, str):
-            history_text += c
-        elif isinstance(c, list):
-            for block in c:
-                if isinstance(block, dict):
-                    history_text += block.get('content', '') or block.get('text', '') or ''
-    history_tokens = estimate_tokens(history_text)
-
-    total = sys_tokens + tool_tokens + history_tokens
-
-    lines = [f"""📊 **Context Window Usage**
-
-| Component | Chars | ~Tokens |
-|-----------|------:|--------:|
-| System Prompt | {len(sys_prompt):,} | {sys_tokens:,} |
-| Tool Schemas ({len(TOOL_DEFINITIONS)}) | {len(tool_text):,} | {tool_tokens:,} |
-| Conversation ({len(session.messages)} msgs) | {len(history_text):,} | {history_tokens:,} |
-| **Total** | | **{total:,}** |"""]
-
-    if detail_mode:
-        lines.append('\n📁 **Injected Files**')
-        for label, chars, tokens in sorted(file_details, key=lambda x: -x[2]):
-            lines.append(f'  • {label}: {chars:,} chars / ~{tokens:,} tokens')
-
-        lines.append('\n🔧 **Tool Schemas (top 10 by size)**')
-        for name, chars, tokens in sorted(tool_details, key=lambda x: -x[2])[:10]:
-            lines.append(f'  • {name}: {chars:,} chars / ~{tokens:,} tokens')
-
-    lines.append('\n💡 Intent-based injection reduces tools to ≤15 per call.')
-    lines.append('🔒 Prompt caching: system prompt + tool schemas marked ephemeral.')
-    return '\n'.join(lines)
-
-
-def _cmd_usage(cmd, session, *, session_id='', **_):
-    """Handle /usage tokens|full|cost|off commands."""
-    parts = cmd.strip().split()
-    sub = parts[1] if len(parts) > 1 else 'tokens'
-    su = _get_session_usage(session_id)
-
-    if sub == 'off':
-        su['mode'] = 'off'
-        return '📊 Usage footer: **OFF**'
-    elif sub == 'tokens':
-        su['mode'] = 'tokens'
-        if not su['responses']:
-            return '📊 Usage tracking: **ON** (tokens mode). No responses yet.'
-        last = su['responses'][-1]
-        return (f'📊 Usage mode: **tokens**\n'
-                f'Last: in={last["input"]:,} out={last["output"]:,} '
-                f'(cache_read={last["cache_read"]:,} cache_write={last["cache_write"]:,})')
-    elif sub == 'full':
-        su['mode'] = 'full'
-        if not su['responses']:
-            return '📊 Usage tracking: **ON** (full mode). No responses yet.'
-        lines = ['📊 **Usage (full)**\n']
-        for i, r in enumerate(su['responses'][-10:], 1):
-            model_short = r['model'].split('/')[-1][:20]
-            lines.append(f'{i}. {model_short} | in:{r["input"]:,} out:{r["output"]:,} | ${r["cost"]:.4f}')
-        lines.append(f'\n💰 Session total: **${su["total_cost"]:.4f}**')
-        return '\n'.join(lines)
-    elif sub == 'cost':
-        lines = ['💰 **Session Cost Summary**\n']
-        if not su['responses']:
-            lines.append('No API calls yet.')
-        else:
-            lines.append(f'Requests: {len(su["responses"])}')
-            total_in = sum(r['input'] for r in su['responses'])
-            total_out = sum(r['output'] for r in su['responses'])
-            total_cache_read = sum(r['cache_read'] for r in su['responses'])
-            total_cache_write = sum(r['cache_write'] for r in su['responses'])
-            lines.append(f'Input tokens: {total_in:,} (cache read: {total_cache_read:,}, cache write: {total_cache_write:,})')
-            lines.append(f'Output tokens: {total_out:,}')
-            lines.append(f'**Total cost: ${su["total_cost"]:.4f}**')
-            if total_cache_read > 0:
-                # Estimate savings from cache
-                pricing = _get_pricing(su['responses'][-1]['model'])
-                saved = total_cache_read * (pricing['input'] - pricing['cache_read']) / 1_000_000
-                lines.append(f'💡 Cache savings: ~${saved:.4f}')
-        return '\n'.join(lines)
-    else:
-        return '📊 `/usage tokens|full|cost|off`'
-
-
-def _cmd_soul(cmd, session, **_):
-    from salmalm.core.prompt import get_user_soul, USER_SOUL_FILE
-    content = get_user_soul()
-    if content:
-        return f'📜 **SOUL.md** (`{USER_SOUL_FILE}`)\n\n{content}'
-    return f'📜 SOUL.md is not set. Create `{USER_SOUL_FILE}` or edit via Settings.'
-
-
-def _cmd_soul_reset(cmd, session, **_):
-    from salmalm.core.prompt import reset_user_soul
-    reset_user_soul()
-    session.add_system(build_system_prompt(full=True))
-    return '📜 SOUL.md reset to default.'
-
-
-def _cmd_model(cmd, session, **_):
-    model_name = cmd[7:].strip()
-    if model_name in ('auto', 'opus', 'sonnet', 'haiku'):
-        session.model_override = model_name if model_name != 'auto' else 'auto'
-        if model_name == 'auto':
-            router.set_force_model(None)
-            return 'Model: **auto** (cost-optimized routing) — saved ✅\n• simple → haiku ⚡ • moderate → sonnet • complex → opus 💎'
-        labels = {'opus': 'claude-opus-4-6 💎', 'sonnet': 'claude-sonnet-4-6', 'haiku': 'claude-haiku-4-5 ⚡'}
-        return f'Model: **{model_name}** ({labels[model_name]}) — saved ✅'
-    if '/' in model_name:
-        router.set_force_model(model_name)
-        session.model_override = model_name
-        return f'Model changed: {model_name} — saved ✅'
-    if model_name in MODEL_ALIASES:
-        resolved = MODEL_ALIASES[model_name]
-        router.set_force_model(resolved)
-        session.model_override = resolved
-        return f'Model changed: {model_name} → {resolved} — saved ✅'
-    return f'Unknown model: {model_name}\\nAvailable: auto, opus, sonnet, haiku, {", ".join(sorted(MODEL_ALIASES.keys()))}'
-
-
-def _cmd_tts(cmd, session, **_):
-    arg = cmd[4:].strip()
-    if arg == 'on':
-        session.tts_enabled = True
-        return '🔊 TTS: **ON** — 응답을 음성으로 전송합니다.'
-    elif arg == 'off':
-        session.tts_enabled = False
-        return '🔇 TTS: **OFF**'
-    else:
-        status = 'ON' if getattr(session, 'tts_enabled', False) else 'OFF'
-        voice = getattr(session, 'tts_voice', 'alloy')
-        return f'🔊 TTS: **{status}** (voice: {voice})\n`/tts on` · `/tts off` · `/voice alloy|nova|echo|fable|onyx|shimmer`'
-
-
-def _cmd_voice(cmd, session, **_):
-    arg = cmd[6:].strip()
-    valid_voices = ('alloy', 'nova', 'echo', 'fable', 'onyx', 'shimmer')
-    if arg in valid_voices:
-        session.tts_voice = arg
-        return f'🎙️ Voice: **{arg}** — saved ✅'
-    return f'Available voices: {", ".join(valid_voices)}'
-
-
-def _cmd_subagents(cmd, session, **_):
-    """Handle /subagents commands: list, stop, log, info."""
-    from salmalm.features.agents import SubAgent
-    parts = cmd.split(maxsplit=2)
-    sub = parts[1] if len(parts) > 1 else 'list'
-    arg = parts[2] if len(parts) > 2 else ''
-
-    if sub == 'list':
-        agents = SubAgent.list_agents()
-        if not agents:
-            return '🤖 No active sub-agents.'
-        lines = ['🤖 **Sub-agents**\n']
-        for i, a in enumerate(agents, 1):
-            icon = {'running': '🔄', 'completed': '✅', 'error': '❌', 'stopped': '⏹'}.get(a['status'], '❓')
-            lines.append(f"{icon} #{i} `{a['id']}` — {a['label']} [{a['status']}] "
-                         f"({a['runtime_s']}s, ${a.get('estimated_cost', 0):.4f})")
-        return '\n'.join(lines)
-
-    elif sub == 'stop':
-        if not arg:
-            return '❌ Usage: /subagents stop <id|#N|all>'
-        return SubAgent.stop_agent(arg)
-
-    elif sub == 'log':
-        log_parts = arg.split(maxsplit=1)
-        agent_id = log_parts[0] if log_parts else ''
-        limit = int(log_parts[1]) if len(log_parts) > 1 and log_parts[1].isdigit() else 20
-        if not agent_id:
-            return '❌ Usage: /subagents log <id|#N> [limit]'
-        return SubAgent.get_log(agent_id, limit)
-
-    elif sub == 'info':
-        if not arg:
-            return '❌ Usage: /subagents info <id|#N>'
-        return SubAgent.get_info(arg)
-
-    return '❌ Usage: /subagents list|stop|log|info <args>'
-
-
-def _cmd_agent(cmd, session, *, session_id='', **_):
-    from salmalm.features.agents import agent_manager
-    parts = cmd.split(maxsplit=2)
-    sub = parts[1] if len(parts) > 1 else 'list'
-    if sub == 'list':
-        agents = agent_manager.list_agents()
-        lines = ['🤖 **Agents** (에이전트 목록)\n']
-        for a in agents:
-            lines.append(f"• **{a['id']}** — {a['display_name']}")
-        bindings = agent_manager.list_bindings()
-        if bindings:
-            lines.append('\n📌 **Bindings** (바인딩)')
-            for k, v in bindings.items():
-                lines.append(f'• {k} → {v}')
-        return '\n'.join(lines)
-    elif sub == 'create' and len(parts) > 2:
-        return agent_manager.create(parts[2])
-    elif sub == 'switch' and len(parts) > 2:
-        chat_key = f'session:{session_id}'
-        return agent_manager.switch(chat_key, parts[2])
-    elif sub == 'delete' and len(parts) > 2:
-        return agent_manager.delete(parts[2])
-    elif sub == 'bind' and len(parts) > 2:
-        bind_parts = parts[2].split()
-        if len(bind_parts) == 2:
-            return agent_manager.bind(bind_parts[0], bind_parts[1])
-        return '❌ Usage: /agent bind <chat_key> <agent_id>'
-    return '❌ Usage: /agent list|create|switch|delete|bind <args>'
-
-
-def _cmd_hooks(cmd, session, **_):
-    from salmalm.features.hooks import hook_manager
-    parts = cmd.split(maxsplit=2)
-    sub = parts[1] if len(parts) > 1 else 'list'
-    if sub == 'list':
-        hooks = hook_manager.list_hooks()
-        if not hooks:
-            return '📋 No hooks configured. Edit ~/.salmalm/hooks.json'
-        lines = ['🪝 **Hooks** (이벤트 훅)\n']
-        for event, info in hooks.items():
-            cmds_list = info['commands']
-            pc = info['plugin_callbacks']
-            lines.append(f"• **{event}**: {len(cmds_list)} commands, {pc} plugin callbacks")
-            for i, c in enumerate(cmds_list):
-                lines.append(f"  [{i}] `{c[:60]}`")
-        return '\n'.join(lines)
-    elif sub == 'test' and len(parts) > 2:
-        return hook_manager.test_hook(parts[2].strip())
-    elif sub == 'add' and len(parts) > 2:
-        add_parts = parts[2].split(maxsplit=1)
-        if len(add_parts) == 2:
-            return hook_manager.add_hook(add_parts[0], add_parts[1])
-        return '❌ Usage: /hooks add <event> <command>'
-    elif sub == 'reload':
-        hook_manager.reload()
-        return '🔄 Hooks reloaded'
-    return '❌ Usage: /hooks list|test|add|reload'
-
-
-def _cmd_plugins(cmd, session, **_):
-    from salmalm.features.plugin_manager import plugin_manager
-    parts = cmd.split(maxsplit=2)
-    sub = parts[1] if len(parts) > 1 else 'list'
-    if sub == 'list':
-        plugins = plugin_manager.list_plugins()
-        if not plugins:
-            return '🔌 No plugins found. Add to ~/.salmalm/plugins/'
-        lines = ['🔌 **Plugins** (플러그인)\n']
-        for p in plugins:
-            status = '✅' if p['enabled'] else '❌'
-            err = f" ⚠️ {p['error']}" if p.get('error') else ''
-            lines.append(f"• {status} **{p['name']}** v{p['version']} — {p['description'][:40]}{err}")
-            if p['tools']:
-                lines.append(f"  Tools: {', '.join(p['tools'])}")
-        return '\n'.join(lines)
-    elif sub == 'reload':
-        return plugin_manager.reload_all()
-    elif sub == 'enable' and len(parts) > 2:
-        return plugin_manager.enable(parts[2].strip())
-    elif sub == 'disable' and len(parts) > 2:
-        return plugin_manager.disable(parts[2].strip())
-    return '❌ Usage: /plugins list|reload|enable|disable <name>'
-
-
-# ── Self-Evolving Prompt commands ──
-def _cmd_evolve(cmd, session, **_):
-    parts = cmd.strip().split(None, 2)
-    sub = parts[1] if len(parts) > 1 else 'status'
-    from salmalm.features.self_evolve import prompt_evolver
-    if sub == 'status':
-        return prompt_evolver.get_status()
-    elif sub == 'apply':
-        from salmalm.core.prompt import USER_SOUL_FILE
-        return prompt_evolver.apply_to_soul(USER_SOUL_FILE)
-    elif sub == 'reset':
-        return prompt_evolver.reset()
-    elif sub == 'history':
-        return prompt_evolver.get_history()
-    return '❌ Usage: /evolve status|apply|reset|history'
-
-# ── Mood-Aware commands ──
-
-
-def _cmd_mood(cmd, session, **_):
-    parts = cmd.strip().split(None, 2)
-    sub = parts[1] if len(parts) > 1 else 'status'
-    from salmalm.features.mood import mood_detector
-    if sub == 'status':
-        # Use last user message for context
-        last_msg = ''
-        for m in reversed(session.messages):
-            if m.get('role') == 'user':
-                last_msg = str(m.get('content', ''))
-                break
-        return mood_detector.get_status(last_msg)
-    elif sub in ('off', 'on', 'sensitive'):
-        return mood_detector.set_mode(sub)
-    elif sub == 'report':
-        period = parts[2] if len(parts) > 2 else 'week'
-        return mood_detector.generate_report(period)
-    return '❌ Usage: /mood status|off|on|sensitive|report [week|month]'
-
-# ── Thought Stream commands ──
-
-
-def _cmd_thought(cmd, session, **_):
-    from salmalm.features.thoughts import thought_stream, _format_thoughts, _format_stats
-    text = cmd.strip()
-    # Remove /think prefix
-    if text.startswith('/thought'):
-        text = text[8:].strip()
-    elif text.startswith('/think'):
-        # Only handle /think subcommands here, not /think <question> for deep reasoning
-        text = text[6:].strip()
-
-    if not text:
-        return '❌ Usage: /think <내용> | /think list | /think search <쿼리> | /think tag <태그> | /think stats'
-
-    parts = text.split(None, 1)
-    sub = parts[0]
-    arg = parts[1].strip() if len(parts) > 1 else ''
-
-    if sub == 'list':
-        n = int(arg) if arg.isdigit() else 10
-        thoughts = thought_stream.list_recent(n)
-        return _format_thoughts(thoughts, f'💭 **최근 {n}개 생각**\n')
-    elif sub == 'search':
-        if not arg:
-            return '❌ Usage: /think search <쿼리>'
-        results = thought_stream.search(arg)
-        return _format_thoughts(results, f'🔍 **검색: {arg}**\n')
-    elif sub == 'tag':
-        if not arg:
-            return '❌ Usage: /think tag <태그>'
-        results = thought_stream.by_tag(arg)
-        return _format_thoughts(results, f'🏷️ **태그: #{arg}**\n')
-    elif sub == 'timeline':
-        results = thought_stream.timeline(arg if arg else None)
-        date_label = arg if arg else '오늘'
-        return _format_thoughts(results, f'📅 **타임라인: {date_label}**\n')
-    elif sub == 'stats':
-        return _format_stats(thought_stream.stats())
-    elif sub == 'export':
-        md = thought_stream.export_markdown()
-        return md
-    else:
-        # It's a thought to record — detect mood first
-        thought_text = text
-        mood = 'neutral'
-        try:
-            from salmalm.features.mood import mood_detector
-            mood, _ = mood_detector.detect(thought_text)
-        except Exception:
-            pass
-        tid = thought_stream.add(thought_text, mood=mood)
-        tags = ''
-        import re as _re2
-        found_tags = _re2.findall(r'#(\w+)', thought_text)
-        if found_tags:
-            tags = f' 🏷️ {", ".join("#" + t for t in found_tags)}'
-        return f'💭 생각 #{tid} 기록됨{tags}'
-
-
-def _cmd_export_fn(cmd, session, **_):
-    """Handle /export [md|json|html] command."""
-    from salmalm.core.export import export_session
-    parts = cmd.strip().split()
-    fmt = parts[1] if len(parts) > 1 else 'md'
-    result = export_session(session, fmt=fmt)
-    if result.get('ok'):
-        return (f'📤 **Conversation exported**\n'
-                f'Format: {fmt.upper()}\n'
-                f'File: `{result["filename"]}`\n'
-                f'Size: {result["size"]:,} bytes\n'
-                f'Path: `{result["path"]}`')
-    return f'❌ Export failed: {result.get("error", "unknown error")}'
-
-
-# Public alias
-_cmd_export = _cmd_export_fn
-
-# Exact-match slash commands
-_SLASH_COMMANDS = {
-    '/clear': _cmd_clear,
-    '/help': _cmd_help,
-    '/status': _cmd_status,
-    '/tools': _cmd_tools,
-    '/uptime': _cmd_uptime,
-    '/latency': _cmd_latency,
-    '/health detail': _cmd_health_detail,
-    '/health_detail': _cmd_health_detail,
-    '/prune': _cmd_prune,
-    '/usage daily': _cmd_usage_daily,
-    '/usage monthly': _cmd_usage_monthly,
-    '/bookmarks': _cmd_bookmarks,
-    '/security': _cmd_security,
-    '/soul': _cmd_soul,
-    '/soul reset': _cmd_soul_reset,
-    '/context': _cmd_context,
-    '/context detail': _cmd_context,
-}
-
-# Also add /usage to prefix commands
-
-# Prefix-match slash commands (checked with startswith)
-_SLASH_PREFIX_COMMANDS = [
-    ('/usage', _cmd_usage),
-    ('/think ', _cmd_think),
-    ('/plan ', _cmd_plan),
-    ('/compare ', _cmd_compare),
-    ('/model ', _cmd_model),
-    ('/tts', _cmd_tts),
-    ('/voice', _cmd_voice),
-    ('/subagents', _cmd_subagents),
-    ('/agent', _cmd_agent),
-    ('/hooks', _cmd_hooks),
-    ('/plugins', _cmd_plugins),
-    ('/evolve', _cmd_evolve),
-    ('/mood', _cmd_mood),
-    ('/thought', _cmd_thought),
-    ('/export', _cmd_export_fn),
-]
-
-
-async def _dispatch_slash_command(cmd, session, session_id, model_override, on_tool):
-    """Dispatch slash commands. Returns response string or None if not a command."""
-    # Exact match first
-    handler = _SLASH_COMMANDS.get(cmd)
-    if handler is not None:
-        result = handler(cmd, session, session_id=session_id,
-                         model_override=model_override, on_tool=on_tool)
-        if asyncio.iscoroutine(result):
-            return await result
-        return result
-
-    # Prefix match
-    for prefix, handler in _SLASH_PREFIX_COMMANDS:
-        if cmd.startswith(prefix) or (not prefix.endswith(' ') and cmd == prefix.rstrip()):
-            result = handler(cmd, session, session_id=session_id,
-                             model_override=model_override, on_tool=on_tool)
-            if asyncio.iscoroutine(result):
-                return await result
-            return result
-
-    return None
-
+# ── Slash commands + usage tracking — extracted to slash_commands.py ──
+from salmalm.core.slash_commands import (  # noqa: F401, E402
+    _session_usage, _get_session_usage, record_response_usage,
+    _SLASH_COMMANDS, _SLASH_PREFIX_COMMANDS, _dispatch_slash_command,
+    # Re-export for backward compatibility (tests import from engine)
+    _cmd_context, _cmd_usage, _cmd_plugins, _cmd_export_fn as _cmd_export,
+)
 
 async def _process_message_inner(session_id: str, user_message: str,
                                  model_override: Optional[str] = None,
@@ -1844,14 +1093,25 @@ async def _process_message_inner(session_id: str, user_message: str,
     # Fix outdated model names to actual API IDs
     selected_model = _fix_model_name(selected_model)
 
-    # ── SLA: Measure latency (레이턴시 측정) ──
+    # ── SLA: Measure latency (레이턴시 측정) + abort token accumulation ──
     _sla_start = _time.time()
     _sla_first_token_time = [0.0]  # mutable for closure
     _orig_on_token = on_token
 
+    # Start streaming accumulator for abort recovery
+    from salmalm.features.abort import abort_controller as _abort_ctl
+    _abort_ctl.start_streaming(session_id)
+
     def _sla_on_token(event):
         if _sla_first_token_time[0] == 0.0:
             _sla_first_token_time[0] = _time.time()
+        # Accumulate tokens for abort recovery
+        if isinstance(event, dict):
+            delta = event.get('delta', {})
+            if isinstance(delta, dict) and delta.get('type') == 'text_delta':
+                _abort_ctl.accumulate_token(session_id, delta.get('text', ''))
+            elif event.get('type') == 'text' and event.get('text'):
+                _abort_ctl.accumulate_token(session_id, event['text'])
         if _orig_on_token:
             _orig_on_token(event)
 

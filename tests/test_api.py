@@ -32,16 +32,20 @@ class TestAPIEndpoints(unittest.TestCase):
         from salmalm.web import WebHandler as SalmAlmHandler
         from http.server import HTTPServer
 
-        cls._port = 18899
-        cls._server = HTTPServer(('127.0.0.1', cls._port), SalmAlmHandler)
+        cls._server = HTTPServer(('127.0.0.1', 0), SalmAlmHandler)
+        cls._port = cls._server.server_address[1]
         cls._thread = threading.Thread(target=cls._server.serve_forever, daemon=True)
         cls._thread.start()
         time.sleep(0.1)  # Wait for server to start
 
     @classmethod
     def tearDownClass(cls):
-        cls._server.shutdown()
-        cls._server.server_close()
+        try:
+            cls._server.shutdown()
+            cls._server.server_close()
+        except Exception:
+            pass
+        cls._thread.join(timeout=3)
         import shutil
         shutil.rmtree(cls._tmpdir, ignore_errors=True)
 

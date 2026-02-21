@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import unittest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -111,9 +112,12 @@ class TestLLMRouterAPI(unittest.TestCase):
         self.assertIn('mr-providers', html)
         self.assertIn('mr-keys', html)
         self.assertIn('mr-current-name', html)
-        self.assertIn('_loadModelRouter', html)
-        self.assertIn('/api/model/switch', html)
-        self.assertIn('switchModel', html)
+        # JS extracted to external file; check script reference or inline presence
+        self.assertTrue('app.js' in html or '_loadModelRouter' in html)
+        # JS functions moved to external app.js; verify via app.js or inline
+        app_js = (Path(__file__).parent.parent / 'salmalm' / 'static' / 'app.js').read_text()
+        self.assertIn('/api/model/switch', app_js)
+        self.assertIn('switchModel', app_js)
 
 
 if __name__ == '__main__':

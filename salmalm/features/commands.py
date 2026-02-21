@@ -63,7 +63,7 @@ COMMAND_DEFS: Dict[str, str] = {
     '/usage': 'Usage stats',
     '/model': 'Show/set model',
     '/queue': 'Queue status',
-    '/subagents': 'List subagents',
+    '/subagents': 'Sub-agents (spawn|list|stop|steer|log|info|collect) / 서브에이전트',
     '/persona': 'Persona management',
     '/branch': 'Branch conversation',
     '/rollback': 'Rollback to previous state',
@@ -304,11 +304,14 @@ class CommandRouter:
     @staticmethod
     def _cmd_restart(cmd, session, **_):
         log.info('Restart requested via /restart')
-        # Schedule restart after response
+        # Schedule restart after response (skip in test environments)
         import threading
 
         def _do_restart():
             time.sleep(1)
+            if os.environ.get('PYTEST_CURRENT_TEST') or os.environ.get('SALMALM_NO_RESTART'):
+                log.info('Restart suppressed (test/no-restart mode)')
+                return
             os.execv(sys.executable, [sys.executable] + sys.argv)
         threading.Thread(target=_do_restart, daemon=True).start()
         return '🔄 Restarting server...'

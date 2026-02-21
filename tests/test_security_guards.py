@@ -21,7 +21,9 @@ class TestExecSafety(unittest.TestCase):
         from salmalm.constants import EXEC_ELEVATED
         self.assertIn('pip', EXEC_ELEVATED)
         self.assertIn('npm', EXEC_ELEVATED)
-        self.assertIn('python3', EXEC_ELEVATED)
+        # python3 moved to EXEC_BLOCKED_INTERPRETERS (P0-1 hardening)
+        from salmalm.constants import EXEC_BLOCKED_INTERPRETERS
+        self.assertIn('python3', EXEC_BLOCKED_INTERPRETERS)
 
     def test_pattern_blocked_eval(self):
         from salmalm.tools.tools_common import _is_safe_command

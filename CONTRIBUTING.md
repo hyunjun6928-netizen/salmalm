@@ -1,99 +1,99 @@
 # Contributing to SalmAlm
 
-First off, thanks for considering contributing! 🎉
-
-## Getting Started
+## Quick Start
 
 ```bash
 git clone https://github.com/hyunjun6928-netizen/salmalm.git
 cd salmalm
-python -m pip install -e ".[dev]"
-python -m unittest discover tests/ -v
+pip install -e ".[dev]"
 ```
 
-## Development Setup
+## Running Tests
 
-SalmAlm has **zero external dependencies** (stdlib only). The only optional dependency is `cryptography` for AES-256-GCM vault encryption.
+### ⚠️ Important: Do NOT run `pytest tests/` directly
+
+The full test suite hangs when run in a single process due to test-file-level state pollution (HTTP servers, asyncio loops, `os.execv` in `/restart` command). This is a known issue.
+
+### Recommended: Per-file execution (CI-style)
 
 ```bash
-# Run the dev server
-python server.py
-# → http://localhost:18800
-
-# Run tests
-python -m unittest discover tests/ -v
-
-# Quick import check
-python -c "import salmalm; print('OK')"
+# Run all tests safely (same as CI)
+for f in tests/test_*.py; do
+    echo "--- $f ---"
+    python -m pytest "$f" -q --timeout=30
+done
 ```
 
-## How to Contribute
+### Alternative: pytest-forked
 
-### 🐛 Bug Reports
+```bash
+pip install pytest-forked
+python -m pytest tests/ --forked --timeout=30
+```
 
-Open an issue with:
-- Python version (`python --version`)
-- OS (Windows/Mac/Linux)
-- Steps to reproduce
-- Error message or log (`salmalm.log`)
+This forks each test into a separate process. Slower (~2min) but avoids all state pollution.
 
-### 💡 Feature Requests
+### Run a specific test file
 
-Open an issue describing:
-- What you want to do
-- Why it would be useful
-- Any implementation ideas
+```bash
+python -m pytest tests/test_tools.py -v --timeout=30
+```
 
-### 🔧 Pull Requests
+### Run a specific test
 
-1. Fork the repo
-2. Create a branch (`git checkout -b fix/my-fix`)
-3. Make your changes
-4. Run tests (`python -m unittest discover tests/ -v`)
-5. Commit with a clear message
-6. Push and open a PR
-
-### 🧩 Plugins
-
-The easiest way to contribute is writing a plugin! Drop a `.py` file in `plugins/`:
-
-```python
-# plugins/my_tool.py
-TOOLS = [{
-    "name": "my_tool",
-    "description": "Does something cool",
-    "parameters": {"type": "object", "properties": {}}
-}]
-
-def execute(name, params, context=None):
-    return "Hello from my plugin!"
+```bash
+python -m pytest tests/test_e2e.py::TestE2ECommandRouting::test_command_routing -v
 ```
 
 ## Code Style
 
-- Pure Python stdlib (no external dependencies in core)
-- Functions over classes where possible
-- Korean comments are fine (this is a bilingual project)
-- Test your changes: `python -m unittest discover tests/`
+- **Max line length**: 120 characters
+- **Linting**: `flake8 salmalm/ --max-line-length=120 --ignore=E501,W503,E402,E203,F405`
+- **No new dependencies**: SalmAlm is stdlib-only. New features must use only Python standard library.
+  - Exception: Optional extras (`pip install salmalm[browser]` for Playwright)
+- **Imports**: Use direct imports (`from salmalm.core.engine import ...`), not shim imports (`from salmalm import engine`). Shims are deprecated (see `DEPRECATIONS.md`).
 
-## Good First Issues
-
-Look for issues labeled `good first issue` — these are designed for newcomers.
-
-## Architecture Overview
+## Architecture
 
 ```
 salmalm/
-├── core.py          — session management, cron, caching
-├── engine.py        — Intelligence Engine (classify → plan → execute → reflect)
-├── llm.py           — LLM API calls (6 providers)
-├── tools.py         — 30 tool definitions
-├── tool_handlers.py — tool execution
-├── web.py           — HTTP server + API
-├── templates.py     — HTML templates
-└── ...              — 25 modules total
+├── core/           # Engine, session, LLM routing, compaction, cost
+├── features/       # Commands, agents, mood, hooks, plugins, mesh, canvas
+├── security/       # Crypto, sandbox, exec approvals, audit
+├── tools/          # 62 built-in tools (exec, browser, web, file, etc.)
+├── web/            # HTTP server, WebSocket, OAuth, templates
+├── channels/       # Telegram, Slack integrations
+├── utils/          # Chunker, migration, markdown
+└── static/         # Web UI (HTML/CSS/JS)
 ```
 
-## Questions?
+### Key Design Decisions
 
-Open a Discussion on GitHub or file an issue. We're friendly. 😈
+- **DATA_DIR** (`~/SalmAlm` or `$SALMALM_HOME`): All runtime data (DB, vault, memory, logs). BASE_DIR is code only.
+- **Security defaults**: Dangerous features OFF. See `SECURITY.md`.
+- **OS-native sandbox**: No Docker dependency. bubblewrap → unshare → rlimit fallback.
+- **Cost estimation**: Single source in `core/cost.py`.
+
+## Adding a New Tool
+
+1. Create handler in `tools/tools_yourmodule.py`
+2. Register in `tools/tool_registry.py`
+3. Add tool definition in `tools/tools.py`
+4. Add i18n strings (EN + KR) in your module
+5. Write tests in `tests/test_yourmodule.py`
+6. Update tool count in `README.md` and `README_KR.md`
+
+## Adding a Slash Command
+
+1. Add handler function in `core/engine.py` (in the slash commands section)
+2. Register in `_SLASH_COMMANDS` dict (exact match) or `_SLASH_PREFIX_COMMANDS` list (prefix match)
+3. Add help text in `features/commands.py`
+4. Write tests
+
+## Pull Request Checklist
+
+- [ ] Tests pass: `python -m pytest tests/test_yourfile.py -v --timeout=30`
+- [ ] No new dependencies (stdlib only)
+- [ ] i18n: Both EN and KR strings provided
+- [ ] Security: Dangerous features default OFF with env var opt-in
+- [ ] Lint: `flake8 salmalm/ --max-line-length=120 --ignore=E501,W503,E402,E203,F405`

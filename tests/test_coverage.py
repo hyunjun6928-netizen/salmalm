@@ -577,8 +577,8 @@ class TestWebAPI(unittest.TestCase):
         os.environ['SALMALM_LOG_FILE'] = os.path.join(cls._tmpdir, 'test.log')
         from salmalm.web import WebHandler
         from http.server import HTTPServer
-        cls._port = 18898
-        cls._server = HTTPServer(('127.0.0.1', cls._port), WebHandler)
+        cls._server = HTTPServer(('127.0.0.1', 0), WebHandler)
+        cls._port = cls._server.server_address[1]
         import threading
         cls._thread = threading.Thread(target=cls._server.serve_forever, daemon=True)
         cls._thread.start()
@@ -586,7 +586,12 @@ class TestWebAPI(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls._server.shutdown()
+        try:
+            cls._server.shutdown()
+            cls._server.server_close()
+        except Exception:
+            pass
+        cls._thread.join(timeout=3)
         cls._server.server_close()
         import shutil; shutil.rmtree(cls._tmpdir, ignore_errors=True)
 

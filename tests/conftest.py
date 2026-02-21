@@ -1,9 +1,22 @@
-"""Test configuration — network safety + resource cleanup."""
+"""Test configuration — network safety, resource cleanup, isolation.
+
+Sections:
+  1. Network guard — block all non-localhost I/O
+  2. Per-test cleanup — GC + thread reaper
+  3. Per-test timeout — SIGALRM watchdog (Unix only)
+  4. Temp directory isolation — DATA_DIR → tempdir
+"""
+from __future__ import annotations
+
 import faulthandler
 import gc
+import os
 import socket
+import tempfile
 import threading
 import urllib.request
+
+import pytest
 
 faulthandler.enable()
 
@@ -11,20 +24,19 @@ faulthandler.enable()
 import salmalm.constants as _c
 _c.PBKDF2_ITER = 1_000
 
-import pytest
 
 # ---------------------------------------------------------------------------
-# 1. Block all non-localhost network I/O at the socket level
+# 1. Network guard — block all non-localhost socket connections
 # ---------------------------------------------------------------------------
 _original_socket_connect = socket.socket.connect
 _original_socket_connect_ex = socket.socket.connect_ex
 _original_urlopen = urllib.request.urlopen
 
-_ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
+_ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
 
 
-def _get_host(address):
-    """Extract host from address tuple or return None."""
+def _get_host(address) -> str | None:
+    """Extract host from address tuple."""
     if isinstance(address, tuple) and len(address) >= 2:
         return str(address[0])
     return None
@@ -46,42 +58,38 @@ def _guarded_connect_ex(self, address):
 
 def _guarded_urlopen(url, *args, **kwargs):
     url_str = url if isinstance(url, str) else getattr(url, 'full_url', str(url))
-    # Allow localhost URLs
     if any(h in url_str for h in ("://127.0.0.1", "://localhost", "://[::1]", "://0.0.0.0")):
         return _original_urlopen(url, *args, **kwargs)
     raise urllib.error.URLError(f"[conftest] Network blocked: urlopen {url_str}")
 
 
-# Patch at module level so it's active for the entire test session
 socket.socket.connect = _guarded_connect
 socket.socket.connect_ex = _guarded_connect_ex
 urllib.request.urlopen = _guarded_urlopen
 
+
 # ---------------------------------------------------------------------------
-# 2. Per-test cleanup: GC + kill stale threads
+# 2. Per-test cleanup — GC + stale thread reaper
 # ---------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def _cleanup():
-    """GC + thread cleanup + DB connection cleanup between tests."""
+    """GC + thread join between tests to prevent state leakage."""
     threads_before = set(threading.enumerate())
     yield
     gc.collect()
-    # Kill stale daemon threads (server threads, background tasks)
-    import time
     stale = [t for t in threading.enumerate()
              if t not in threads_before and t is not threading.current_thread()]
     for t in stale:
         t.join(timeout=1.0)
-    # Force-close any lingering sockets from test HTTP servers
     gc.collect()
 
 
 # ---------------------------------------------------------------------------
-# 3. Global test timeout (per-test) to prevent infinite hangs
+# 3. Per-test timeout — SIGALRM watchdog (Unix only)
 # ---------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
 def _test_timeout():
-    """Kill any individual test that runs longer than 30s."""
+    """Kill any individual test that runs longer than 30s (Unix only)."""
     import signal
     import sys
 
@@ -97,3 +105,12 @@ def _test_timeout():
     yield
     signal.alarm(0)
     signal.signal(signal.SIGALRM, old)
+
+
+# ---------------------------------------------------------------------------
+# 4. DATA_DIR isolation note
+# ---------------------------------------------------------------------------
+# Individual test files that create HTTP servers (test_api, test_coverage, etc.)
+# manage their own DATA_DIR via setUpClass. A global autouse fixture here
+# conflicts with those setups. DATA_DIR isolation is per-test-file responsibility.
+# See CONTRIBUTING.md for the per-file test execution pattern.

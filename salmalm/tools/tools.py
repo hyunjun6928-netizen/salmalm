@@ -261,7 +261,7 @@ TOOL_DEFINITIONS = [
         'input_schema': {
             'type': 'object',
             'properties': {
-                'action': {'type': 'string', 'description': 'spawn, list, result, or send', 'enum': ['spawn', 'list', 'result', 'send']},
+                'action': {'type': 'string', 'description': 'spawn, list, result, send, stop, log, info, or steer', 'enum': ['spawn', 'list', 'result', 'send', 'stop', 'log', 'info', 'steer']},
                 'task': {'type': 'string', 'description': 'Task description (for spawn)'},
                 'model': {'type': 'string', 'description': 'Model to use (optional)'},
                 'agent_id': {'type': 'string', 'description': 'Agent ID (for result/send)'},
@@ -381,15 +381,16 @@ TOOL_DEFINITIONS = [
     },
     {
         'name': 'browser',
-        'description': 'Browser automation via Chrome CDP. Navigate, screenshot, execute JS.',
+        'description': 'Browser automation (Playwright). Snapshot/act pattern: snapshot → reason → act → verify. Requires pip install salmalm[browser]. / 브라우저 자동화. 스냅샷→추론→행동→검증 패턴.',
         'input_schema': {
             'type': 'object',
             'properties': {
-                'action': {'type': 'string', 'description': 'navigate/screenshot/text/html/evaluate/click/type/tabs/pdf/status', 'enum': ['navigate', 'screenshot', 'text', 'html', 'evaluate', 'click', 'type', 'tabs', 'pdf', 'status', 'connect', 'console']},
-                'url': {'type': 'string', 'description': 'URL (for navigate)'},
+                'action': {'type': 'string', 'description': 'status/snapshot/act/screenshot', 'enum': ['status', 'snapshot', 'act', 'screenshot']},
+                'url': {'type': 'string', 'description': 'URL to navigate to'},
+                'kind': {'type': 'string', 'description': 'Action kind for act: click/type/press/navigate/evaluate/screenshot', 'enum': ['click', 'type', 'press', 'navigate', 'evaluate', 'screenshot']},
                 'selector': {'type': 'string', 'description': 'CSS selector (for click/type)'},
-                'expression': {'type': 'string', 'description': 'JavaScript code (for evaluate)'},
-                'text': {'type': 'string', 'description': 'Input text (for type)'},
+                'text': {'type': 'string', 'description': 'Input text (for type/press/evaluate/navigate)'},
+                'timeout': {'type': 'integer', 'description': 'Timeout in ms (default 30000)'},
             },
             'required': ['action']
         }
@@ -794,6 +795,55 @@ TOOL_DEFINITIONS = [
                 'prompt': {'type': 'string', 'description': 'For add_cron: AI prompt to execute'},
             },
             'required': ['action'],
+        }
+    },
+    {
+        'name': 'mesh',
+        'description': 'SalmAlm Mesh — P2P networking between instances. Delegate tasks, share clipboard, discover LAN peers. / 인스턴스 간 P2P 네트워킹. 작업 위임, 클립보드 공유, LAN 피어 탐색.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'status/add/remove/ping/task/broadcast/clipboard/discover', 'enum': ['status', 'add', 'remove', 'ping', 'task', 'broadcast', 'clipboard', 'discover']},
+                'url': {'type': 'string', 'description': 'Peer URL (for add)'},
+                'name': {'type': 'string', 'description': 'Peer display name'},
+                'peer_id': {'type': 'string', 'description': 'Peer ID (for remove/task)'},
+                'task': {'type': 'string', 'description': 'Task to delegate (for task/broadcast)'},
+                'text': {'type': 'string', 'description': 'Clipboard text (for clipboard)'},
+                'secret': {'type': 'string', 'description': 'Shared secret for auth'},
+                'model': {'type': 'string', 'description': 'Model override for delegated task'},
+            },
+            'required': ['action'],
+        }
+    },
+    {
+        'name': 'canvas',
+        'description': 'Canvas — render HTML, markdown, code, or charts on a local preview server (:18803). / 로컬 프리뷰 서버에서 HTML, 마크다운, 코드, 차트 렌더링.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'action': {'type': 'string', 'description': 'status/present/markdown/code/list', 'enum': ['status', 'present', 'markdown', 'code', 'list']},
+                'html': {'type': 'string', 'description': 'HTML content (for present)'},
+                'text': {'type': 'string', 'description': 'Markdown text (for markdown)'},
+                'code': {'type': 'string', 'description': 'Source code (for code)'},
+                'language': {'type': 'string', 'description': 'Programming language (for code)'},
+                'title': {'type': 'string', 'description': 'Page title'},
+                'open': {'type': 'boolean', 'description': 'Open in browser (default false)'},
+            },
+            'required': ['action'],
+        }
+    },
+    {
+        'name': 'sandbox_exec',
+        'description': 'Execute in OS-native sandbox (bubblewrap/sandbox-exec/rlimit). Safer than exec. / OS 기본 샌드박스에서 실행. exec보다 안전.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'command': {'type': 'string', 'description': 'Shell command to execute in sandbox'},
+                'timeout': {'type': 'integer', 'description': 'Timeout in seconds (default 30)'},
+                'allow_network': {'type': 'boolean', 'description': 'Allow network access (default false)'},
+                'memory_mb': {'type': 'integer', 'description': 'Memory limit in MB (default 512)'},
+            },
+            'required': ['command'],
         }
     },
 ]

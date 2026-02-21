@@ -566,6 +566,46 @@ router = ModelRouter()
 
 
 # ============================================================
+# Compaction Summary Persistence — cross-session continuity
+# ============================================================
+def _persist_compaction_summary(session_id: str, summary: str) -> None:
+    """Save compaction summary to DB for cross-session restoration.
+
+    OpenClaw-style: when a session is restored after restart, the last
+    compaction summary is injected so the AI retains prior context.
+    """
+    if not summary or not session_id:
+        return
+    try:
+        conn = _get_db()
+        conn.execute("""CREATE TABLE IF NOT EXISTS compaction_summaries (
+            session_id TEXT PRIMARY KEY,
+            summary TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            message_count INTEGER DEFAULT 0
+        )""")
+        conn.execute(
+            "INSERT OR REPLACE INTO compaction_summaries (session_id, summary, created_at) VALUES (?,?,?)",
+            (session_id, summary[:10000], datetime.now(KST).isoformat()),
+        )
+        conn.commit()
+    except Exception as e:
+        log.warning(f"[PKG] Summary persist error: {e}")
+
+
+def _restore_compaction_summary(session_id: str) -> Optional[str]:
+    """Restore last compaction summary for a session (cross-session continuity)."""
+    try:
+        conn = _get_db()
+        row = conn.execute(
+            "SELECT summary FROM compaction_summaries WHERE session_id=?",
+            (session_id,),
+        ).fetchone()
+        return row[0] if row else None
+    except Exception:
+        return None
+
+
 def _msg_content_str(msg: dict) -> str:
     """Extract text content from a message (handles list content blocks)."""
     c = msg.get("content", "")
@@ -587,8 +627,18 @@ def compact_messages(
     on_status: Optional[Callable] = None,
 ) -> list:
     """Multi-stage compaction: trim tool results → drop old tools → summarize.
-    Hard limit: max 100 messages, max 500K chars (≈125K tokens).
-    OpenClaw-style: flush memory before compaction."""
+
+    OpenClaw-quality compaction with 5 stages:
+      1. Strip binary/image data from old messages
+      2. Trim long tool results (keep first 500 chars)
+      3. Drop old tool messages, keep user/assistant
+      4. Truncate verbose old assistant messages
+      5. LLM summarization of remaining old context
+
+    Hard limits: max 100 messages, max 500K chars (≈125K tokens).
+    Pre-compaction: flush memory to persistent store.
+    Post-compaction: inject summary as system message, not user message.
+    """
     # Empty conversation guard
     if not messages:
         return messages
@@ -635,18 +685,15 @@ def compact_messages(
 
     log.info(f"[PKG] Compacting {len(messages)} messages ({total_chars} chars)")
 
-    # Stage 1: Trim long tool results (keep first 500 chars)
+    # Stage 1: Strip binary/image data from old messages
     trimmed = []
     for m in messages:
-        if m["role"] == "tool" and len(_msg_content_str(m)) > 500:
-            trimmed.append(
-                {**m, "content": _msg_content_str(m)[:500] + "\n... [truncated]"}
-            )
-        elif m["role"] == "user" and isinstance(m.get("content"), list):
-            # Strip base64 image data from old messages
+        if m["role"] == "user" and isinstance(m.get("content"), list):
             new_content = []
             for block in m["content"]:
                 if isinstance(block, dict) and block.get("type") == "image":
+                    new_content.append({"type": "text", "text": "[Image attached]"})
+                elif isinstance(block, dict) and block.get("type") == "image_url":
                     new_content.append({"type": "text", "text": "[Image attached]"})
                 else:
                     new_content.append(block)
@@ -654,12 +701,30 @@ def compact_messages(
         else:
             trimmed.append(m)
 
+    # Stage 2: Trim long tool results (keep first 500 chars)
+    for i, m in enumerate(trimmed):
+        if m["role"] == "tool" and len(_msg_content_str(m)) > 500:
+            trimmed[i] = {**m, "content": _msg_content_str(m)[:500] + "\n... [truncated]"}
+        # Also trim tool_result blocks inside user messages (Anthropic format)
+        elif m["role"] == "user" and isinstance(m.get("content"), list):
+            new_blocks = []
+            for block in m["content"]:
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    content = block.get("content", "")
+                    if isinstance(content, str) and len(content) > 500:
+                        new_blocks.append({**block, "content": content[:500] + "\n... [truncated]"})
+                    else:
+                        new_blocks.append(block)
+                else:
+                    new_blocks.append(block)
+            trimmed[i] = {**m, "content": new_blocks}
+
     total_after_trim = sum(len(_msg_content_str(m)) for m in trimmed)
     if total_after_trim < COMPACTION_THRESHOLD:  # noqa: F405
-        log.info(f"[PKG] Stage 1 sufficient: {total_chars} -> {total_after_trim} chars")
+        log.info(f"[PKG] Stage 2 sufficient: {total_chars} -> {total_after_trim} chars")
         return trimmed
 
-    # Stage 2: Drop old tool messages entirely, keep last 10 messages
+    # Stage 3: Drop old tool messages entirely, keep last 10 messages
     system_msgs = [m for m in trimmed if m["role"] == "system"]
     non_system = [m for m in trimmed if m["role"] != "system"]
     recent = non_system[-10:]
@@ -668,20 +733,43 @@ def compact_messages(
     # Drop tool/tool_result messages from old, keep user/assistant
     old_important = [m for m in old if m["role"] in ("user", "assistant")]
 
-    stage2 = system_msgs + old_important + recent
-    total_after_drop = sum(len(_msg_content_str(m)) for m in stage2)
+    stage3 = system_msgs + old_important + recent
+    total_after_drop = sum(len(_msg_content_str(m)) for m in stage3)
     if total_after_drop < COMPACTION_THRESHOLD:  # noqa: F405
-        log.info(f"[PKG] Stage 2 sufficient: {total_chars} -> {total_after_drop} chars")
-        return stage2
+        log.info(f"[PKG] Stage 3 sufficient: {total_chars} -> {total_after_drop} chars")
+        return stage3
 
-    # Stage 3: Summarize old messages
-    to_summarize = old_important
+    # Stage 4: Truncate verbose old assistant messages (keep first 800 chars each)
+    stage4_old = []
+    for m in old_important:
+        txt = _msg_content_str(m)
+        if m["role"] == "assistant" and len(txt) > 800:
+            stage4_old.append({**m, "content": txt[:800] + "\n... [compacted]"})
+        elif m["role"] == "user" and len(txt) > 500:
+            stage4_old.append({**m, "content": txt[:500] + "\n... [compacted]"})
+        else:
+            stage4_old.append(m)
+
+    stage4 = system_msgs + stage4_old + recent
+    total_after_trunc = sum(len(_msg_content_str(m)) for m in stage4)
+    if total_after_trunc < COMPACTION_THRESHOLD:  # noqa: F405
+        log.info(f"[PKG] Stage 4 sufficient: {total_chars} -> {total_after_trunc} chars")
+        return stage4
+
+    # Stage 5: LLM summarization of old context
+    to_summarize = stage4_old
     if not to_summarize:
         return system_msgs + recent
 
-    summary_text = "\n".join(
-        f"[{m['role']}]: {_msg_content_str(m)[:300]}" for m in to_summarize[-20:]
-    )
+    # Build structured summary input (preserve more context than before)
+    summary_parts = []
+    for m in to_summarize[-30:]:  # Up to 30 old messages
+        role = m["role"]
+        txt = _msg_content_str(m)[:400]
+        if txt.strip():
+            summary_parts.append(f"[{role}]: {txt}")
+
+    summary_text = "\n".join(summary_parts)
 
     from salmalm.core.llm import call_llm
 
@@ -690,27 +778,61 @@ def compact_messages(
     _summ_msgs = [
         {
             "role": "system",
-            "content": "Summarize the following conversation concisely. Focus on decisions, tasks, and key context in 5-8 sentences.",
+            "content": (
+                "Summarize the following conversation concisely but thoroughly. "
+                "You MUST preserve:\n"
+                "1. Key decisions and conclusions\n"
+                "2. Task progress and what was accomplished\n"
+                "3. Important facts, numbers, file paths, code context\n"
+                "4. User preferences and constraints mentioned\n"
+                "5. Any pending/blocked items\n"
+                "Write in the same language as the conversation. "
+                "Use 5-15 sentences. Do NOT start with 'The conversation...' — "
+                "write as a factual summary that can serve as context for continued work."
+            ),
         },
         {"role": "user", "content": summary_text},
     ]
     # Note: call_llm is sync (urllib). Always call directly since compact_messages
     # is invoked from sync context. If ever called from async, wrap in run_in_executor.
-    summary_result = call_llm(_summ_msgs, model=summary_model, max_tokens=800)
+    try:
+        summary_result = call_llm(_summ_msgs, model=summary_model, max_tokens=1200)
+    except Exception as e:
+        # Compaction LLM failed — fall back to stage 4 result (no summary)
+        log.error(f"[PKG] Stage 5 LLM failed: {e} — using stage 4 result")
+        return stage4
+
+    summary_content = summary_result.get("content", "")
+    if not summary_content or len(summary_content) < 20:
+        log.warning("[PKG] Stage 5 produced empty/short summary — using stage 4 result")
+        return stage4
+
+    # Guard: if summary is longer than what it replaces, skip it
+    original_chars = sum(len(_msg_content_str(m)) for m in to_summarize)
+    if len(summary_content) > original_chars:
+        log.warning(f"[PKG] Summary ({len(summary_content)}) > original ({original_chars}) — using stage 4")
+        return stage4
 
     compacted = (
         system_msgs
         + [
             {
                 "role": "system",
-                "content": f"[Previous conversation summary]\n{summary_result['content']}",
+                "content": f"[Previous conversation summary — {len(to_summarize)} messages compacted]\n{summary_content}",
             }
         ]
         + recent
     )
 
+    # Persist compaction summary for cross-session continuity
+    if session:
+        try:
+            _persist_compaction_summary(getattr(session, 'id', ''), summary_content)
+        except Exception as e:
+            log.warning(f"[PKG] Summary persistence error: {e}")
+
     log.info(
-        f"[PKG] Stage 3 compacted: {len(messages)} -> {len(compacted)} messages, "
+        f"[PKG] Stage 5 compacted: {len(messages)} -> {len(compacted)} messages, "
         f"{total_chars} → {sum(len(_msg_content_str(m)) for m in compacted)} chars"
     )
     return compacted
@@ -1354,6 +1476,16 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
             from salmalm.core.prompt import build_system_prompt
 
             _sessions[session_id].add_system(build_system_prompt(full=True))
+
+            # Cross-session continuity: inject last compaction summary
+            prev_summary = _restore_compaction_summary(session_id)
+            if prev_summary:
+                _sessions[session_id].messages.append({
+                    "role": "system",
+                    "content": f"[Previous session context]\n{prev_summary}",
+                })
+                log.info(f"[NOTE] Restored compaction summary for {session_id} ({len(prev_summary)} chars)")
+
             log.info(
                 f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)"
             )
@@ -1842,12 +1974,23 @@ def compact_session(session_id: str, force: bool = False) -> str:
     summ_msgs = [
         {
             "role": "system",
-            "content": "You are a conversation summarizer. Summarize the following conversation concisely but thoroughly. Preserve key decisions, facts, code context, task progress, and user preferences. Write in the same language as the conversation. Output 5-15 sentences.",
+            "content": (
+                "Summarize the following conversation concisely but thoroughly. "
+                "You MUST preserve:\n"
+                "1. Key decisions and conclusions\n"
+                "2. Task progress and what was accomplished\n"
+                "3. Important facts, numbers, file paths, code context\n"
+                "4. User preferences and constraints mentioned\n"
+                "5. Any pending/blocked items\n"
+                "Write in the same language as the conversation. "
+                "Use 5-15 sentences. Do NOT start with 'The conversation...' — "
+                "write as a factual summary that can serve as context for continued work."
+            ),
         },
         {"role": "user", "content": summary_text},
     ]
     try:
-        result = call_llm(summ_msgs, model=summary_model, max_tokens=1000)
+        result = call_llm(summ_msgs, model=summary_model, max_tokens=1200)
     except Exception as e:
         # Compaction error: preserve original messages, skip compaction
         log.error(f"[COMPACT] LLM call failed during compaction: {e}")

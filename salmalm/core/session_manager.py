@@ -1,6 +1,12 @@
 """Session management — pruning, compaction, cache TTL tracking.
 
 Extracted from engine.py for maintainability.
+
+OpenClaw-style cache-aware pruning:
+- Anthropic prompt caching has a 5-minute TTL
+- Pruning within TTL invalidates the cache (wasted tokens)
+- We track API call times and only prune when TTL has expired
+- System prompt + tool schemas are marked cache_control=ephemeral
 """
 from __future__ import annotations
 
@@ -13,21 +19,39 @@ import time as _time
 # ============================================================
 # ── Cache TTL tracking for pruning ──
 _last_api_call_time: float = 0.0
-_CACHE_TTL_SECONDS = 300  # 5 minutes default
+_CACHE_TTL_SECONDS = 300  # 5 minutes (Anthropic prompt cache TTL)
+_last_prune_time: float = 0.0
+_PRUNE_COOLDOWN = 60  # Don't prune more than once per 60s
 
 
 def _should_prune_for_cache() -> bool:
-    """Only prune if cache TTL has expired since last API call."""
-    global _last_api_call_time  # noqa: F824
+    """Only prune if cache TTL has expired since last API call.
+
+    OpenClaw pattern: Anthropic charges for cache_creation_input_tokens
+    on first use, then cache_read_input_tokens on subsequent calls within
+    TTL. Pruning (changing message structure) invalidates the cache,
+    forcing re-creation. So we only prune when TTL has already expired.
+    Additionally, enforce a cooldown to prevent excessive pruning.
+    """
+    global _last_api_call_time, _last_prune_time  # noqa: F824
+    now = _time.time()
     if _last_api_call_time == 0:
         return True
-    return (_time.time() - _last_api_call_time) >= _CACHE_TTL_SECONDS
+    if now - _last_prune_time < _PRUNE_COOLDOWN:
+        return False
+    return (now - _last_api_call_time) >= _CACHE_TTL_SECONDS
 
 
 def _record_api_call_time():
     """Record timestamp of API call for TTL tracking."""
     global _last_api_call_time
     _last_api_call_time = _time.time()
+
+
+def _record_prune_time():
+    """Record timestamp of pruning for cooldown tracking."""
+    global _last_prune_time
+    _last_prune_time = _time.time()
 
 
 _PRUNE_KEEP_LAST_ASSISTANTS = 3
@@ -61,6 +85,7 @@ def prune_context(messages: list) -> tuple:
     Returns (pruned_messages, stats_dict).
     Does NOT modify the original list — returns a deep copy.
     """
+    _record_prune_time()
     pruned = copy.deepcopy(messages)
     stats = {'soft_trimmed': 0, 'hard_cleared': 0, 'unchanged': 0}
 

@@ -50,11 +50,13 @@ if hasattr(C, 'SESSIONS_DIR'):
 def _run(coro):
     """Run a coroutine in a fresh event loop (isolated per call)."""
     loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         return loop.run_until_complete(coro)
     finally:
         loop.close()
-        asyncio.set_event_loop(None)
+        # Restore a fresh loop so subsequent tests/files don't break
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
 
 # ===========================================================================

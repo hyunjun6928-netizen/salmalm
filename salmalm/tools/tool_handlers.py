@@ -48,11 +48,42 @@ def execute_tool(name: str, args: dict) -> str:
     - Environment variable injection ($VAR in args): sanitized
     - All exceptions caught and returned as error strings
     """
-    # Path traversal prevention
+    # Path traversal prevention — primary: resolve + subpath check; secondary: string filter
+    from salmalm.constants import WORKSPACE_DIR, DATA_DIR
+    _allowed_roots = (str(WORKSPACE_DIR), str(DATA_DIR), '/tmp')
     for key in ('path', 'file_path', 'image_path', 'audio_path', 'file1', 'file2'):
         val = args.get(key, '')
-        if isinstance(val, str) and '..' in val:
+        if not isinstance(val, str) or not val:
+            continue
+        # Quick string filter (secondary defense)
+        if '..' in val:
             return f'❌ Path traversal blocked: ".." not allowed in {key} / 경로 탈출 차단'
+        # Primary defense: resolve symlinks and check against allowed roots
+        try:
+            from pathlib import Path as _P
+            resolved = str(_P(val).resolve())
+            # Also resolve relative to WORKSPACE_DIR
+            if not _P(val).is_absolute():
+                resolved = str((WORKSPACE_DIR / val).resolve())
+            in_allowed = any(resolved.startswith(root) for root in _allowed_roots)
+            # Home read requires opt-in
+            home_read_ok = (os.environ.get('SALMALM_ALLOW_HOME_READ')
+                            and resolved.startswith(str(_P.home())))
+            if not in_allowed and not home_read_ok:
+                # Only block if the path actually exists (real traversal attempt)
+                # Non-existent paths are harmless — let the handler give "not found"
+                if _P(resolved).exists() or _P(val).exists():
+                    return (f'❌ Path outside allowed directories: {key}={val} / '
+                            f'허용 디렉토리 외부 경로 차단: denied')
+                # For non-existent paths outside allowed dirs, still block
+                # absolute paths that clearly target sensitive dirs
+                _sensitive = ('/etc/', '/var/', '/root/', '/proc/', '/sys/',
+                              '/boot/', '/dev/', 'C:\\Windows', 'C:\\System')
+                if any(resolved.startswith(s) or val.startswith(s) for s in _sensitive):
+                    return (f'❌ Access denied: {key}={val} / '
+                            f'접근 거부: 보호된 시스템 경로')
+        except Exception:
+            pass  # Let downstream handlers deal with invalid paths
 
     # Environment variable injection prevention
     for key, val in args.items():

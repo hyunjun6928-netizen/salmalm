@@ -138,20 +138,38 @@ async def _call_llm_async(*args, **kwargs):
 
 async def _call_google_streaming(messages, model=None, tools=None,
                                  max_tokens=4096, on_token=None):
-    """Streaming Google Gemini call — yields tokens via on_token callback, returns final result."""
+    """Streaming Google Gemini call — yields tokens via on_token callback, returns final result.
+
+    Handles streaming interruptions gracefully — preserves partial content.
+    """
     def _run():
         final_result = None
-        for event in _stream_google(messages, model=model, tools=tools,
-                                    max_tokens=max_tokens):
-            if on_token:
-                on_token(event)
-            if event.get('type') == 'message_end':
-                final_result = event
-            elif event.get('type') == 'error':
-                return {'content': event.get('error', '❌ Google streaming error'),
+        accumulated_text = []
+        try:
+            for event in _stream_google(messages, model=model, tools=tools,
+                                        max_tokens=max_tokens):
+                if on_token:
+                    on_token(event)
+                if event.get('type') == 'content_block_delta':
+                    delta = event.get('delta', {})
+                    if delta.get('type') == 'text_delta':
+                        accumulated_text.append(delta.get('text', ''))
+                if event.get('type') == 'message_end':
+                    final_result = event
+                elif event.get('type') == 'error':
+                    return {'content': event.get('error', '❌ Google streaming error'),
+                            'tool_calls': [], 'usage': {'input': 0, 'output': 0},
+                            'model': model or '?'}
+        except Exception as e:
+            partial = ''.join(accumulated_text)
+            if partial:
+                log.warning(f"[STREAM] Google streaming interrupted with {len(partial)} chars: {e}")
+                return {'content': partial + '\n\n⚠️ [Streaming interrupted]',
                         'tool_calls': [], 'usage': {'input': 0, 'output': 0},
                         'model': model or '?'}
-        return final_result or {'content': '', 'tool_calls': [],
+            raise
+        return final_result or {'content': ''.join(accumulated_text) if accumulated_text else '',
+                                'tool_calls': [],
                                 'usage': {'input': 0, 'output': 0},
                                 'model': model or '?'}
     return await asyncio.to_thread(_run)
@@ -164,20 +182,38 @@ async def _call_llm_streaming(messages, model=None, tools=None,
 
     on_token: callback(event_dict) called for each streaming event.
     Returns the same dict format as call_llm.
+    Handles streaming interruptions gracefully — preserves partial content.
     """
     def _run():
         final_result = None
-        for event in _stream_anthropic(messages, model=model, tools=tools,
-                                       max_tokens=max_tokens, thinking=thinking):
-            if on_token:
-                on_token(event)
-            if event.get('type') == 'message_end':
-                final_result = event
-            elif event.get('type') == 'error':
-                return {'content': event.get('error', '❌ Streaming error'),
+        accumulated_text = []
+        try:
+            for event in _stream_anthropic(messages, model=model, tools=tools,
+                                           max_tokens=max_tokens, thinking=thinking):
+                if on_token:
+                    on_token(event)
+                # Track text deltas for recovery
+                if event.get('type') == 'content_block_delta':
+                    delta = event.get('delta', {})
+                    if delta.get('type') == 'text_delta':
+                        accumulated_text.append(delta.get('text', ''))
+                if event.get('type') == 'message_end':
+                    final_result = event
+                elif event.get('type') == 'error':
+                    return {'content': event.get('error', '❌ Streaming error'),
+                            'tool_calls': [], 'usage': {'input': 0, 'output': 0},
+                            'model': model or '?'}
+        except Exception as e:
+            # Streaming interrupted — return partial content if available
+            partial = ''.join(accumulated_text)
+            if partial:
+                log.warning(f"[STREAM] Interrupted with {len(partial)} chars partial: {e}")
+                return {'content': partial + '\n\n⚠️ [Streaming interrupted]',
                         'tool_calls': [], 'usage': {'input': 0, 'output': 0},
                         'model': model or '?'}
-        return final_result or {'content': '', 'tool_calls': [],
+            raise
+        return final_result or {'content': ''.join(accumulated_text) if accumulated_text else '',
+                                'tool_calls': [],
                                 'usage': {'input': 0, 'output': 0},
                                 'model': model or '?'}
     return await asyncio.to_thread(_run)
@@ -215,6 +251,14 @@ async def call_with_failover(messages: list, model: str, tools: Optional[list] =
     result = await try_llm_call(messages, model, tools, max_tokens, thinking, on_token)
     if not result.get('_failed'):
         _clear_model_cooldown(model)
+        # Service recovered — drain any queued messages
+        try:
+            from salmalm.features.message_queue import message_queue
+            if message_queue.get_status()['queued'] > 0:
+                import asyncio
+                asyncio.create_task(message_queue.drain())
+        except Exception:
+            pass
         return result, None
 
     # Primary failed — record and try fallbacks
@@ -233,33 +277,84 @@ async def call_with_failover(messages: list, model: str, tools: Optional[list] =
             return result, warn
         _record_model_failure(fb)
 
-    # All failed — return the last error
+    # All failed — try to queue the message for later processing
+    try:
+        from salmalm.features.message_queue import message_queue
+        # Extract the last user message for queuing
+        user_msgs = [m for m in messages if m.get('role') == 'user']
+        if user_msgs:
+            last_user = user_msgs[-1]
+            content = last_user.get('content', '')
+            if isinstance(content, str) and content:
+                message_queue.enqueue('unknown', content, model_override=model)
+                log.info("[QUEUE] Message queued after all-models-failed")
+    except Exception:
+        pass
+
     return result, "⚠️ All models failed"
 
 
 async def try_llm_call(messages: list, model: str, tools: Optional[list],
                        max_tokens: int, thinking: bool,
                        on_token: Optional[object]) -> Dict[str, Any]:
-    """Single LLM call attempt. Sets _failed=True on exception."""
+    """Single LLM call attempt with transient error retry.
+
+    Retries once on transient errors (timeout, 5xx, connection reset).
+    Sets _failed=True on persistent failure.
+    """
     provider = model.split('/')[0] if '/' in model else 'anthropic'
-    try:
-        if on_token and provider == 'anthropic':
-            result = await _call_llm_streaming(
-                messages, model=model, tools=tools,
-                thinking=thinking, on_token=on_token)
-        elif on_token and provider == 'google':
-            result = await _call_google_streaming(
-                messages, model=model, tools=tools,
-                max_tokens=max_tokens, on_token=on_token)
-        else:
-            result = await _call_llm_async(messages, model=model, tools=tools,
-                                           thinking=thinking)
-        # Check for error responses that indicate API failure
-        content = result.get('content', '')
-        if isinstance(content, str) and content.startswith('❌') and 'API key' not in content:
-            result['_failed'] = True
-        return result
-    except Exception as e:
-        log.error(f"[FAILOVER] {model} call error: {e}")
-        return {'content': f'❌ {e}', 'tool_calls': [], '_failed': True,
-                'usage': {'input': 0, 'output': 0}, 'model': model}
+    _TRANSIENT_PATTERNS = ('timeout', 'timed out', '529', '503', '502',
+                           'connection reset', 'connection refused',
+                           'overloaded', 'rate limit', '429')
+
+    last_error = None
+    for attempt in range(2):  # 1 initial + 1 retry
+        try:
+            if on_token and provider == 'anthropic':
+                result = await _call_llm_streaming(
+                    messages, model=model, tools=tools,
+                    thinking=thinking, on_token=on_token)
+            elif on_token and provider == 'google':
+                result = await _call_google_streaming(
+                    messages, model=model, tools=tools,
+                    max_tokens=max_tokens, on_token=on_token)
+            else:
+                result = await _call_llm_async(messages, model=model, tools=tools,
+                                               thinking=thinking)
+            # Check for error responses — prefer explicit 'error' field over content sniffing
+            if result.get('error'):
+                error_str = str(result['error']).lower()
+                if attempt == 0 and any(p in error_str for p in _TRANSIENT_PATTERNS):
+                    log.warning(f"[RETRY] Transient error from {model}: {result['error']}")
+                    await asyncio.sleep(1.5)
+                    continue
+                result['_failed'] = True
+                return result
+
+            # Fallback: detect error from content (for providers that return errors as text)
+            # Only flag as failed if content is ONLY an error message (short + starts with ❌)
+            content = result.get('content', '')
+            if (isinstance(content, str) and content.startswith('❌')
+                    and len(content) < 500 and 'API key' not in content):
+                content_lower = content.lower()
+                if attempt == 0 and any(p in content_lower for p in _TRANSIENT_PATTERNS):
+                    log.warning(f"[RETRY] Transient error from {model}, retrying: {content[:100]}")
+                    await asyncio.sleep(1.5)
+                    continue
+                result['_failed'] = True
+            return result
+        except Exception as e:
+            last_error = e
+            err_str = str(e).lower()
+            if attempt == 0 and any(p in err_str for p in _TRANSIENT_PATTERNS):
+                log.warning(f"[RETRY] Transient exception from {model}, retrying: {e}")
+                await asyncio.sleep(1.5)
+                continue
+            log.error(f"[FAILOVER] {model} call error: {e}")
+            return {'content': f'❌ {e}', 'tool_calls': [], '_failed': True,
+                    'usage': {'input': 0, 'output': 0}, 'model': model}
+
+    # Both attempts failed
+    log.error(f"[FAILOVER] {model} failed after retry: {last_error}")
+    return {'content': f'❌ {last_error}', 'tool_calls': [], '_failed': True,
+            'usage': {'input': 0, 'output': 0}, 'model': model}

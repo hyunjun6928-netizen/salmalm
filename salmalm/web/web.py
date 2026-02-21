@@ -87,15 +87,30 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    # Per-request CSP nonce (generated fresh each time)
+    _csp_nonce: str = ''
+
     def _security_headers(self):
-        """Add security headers to all responses."""
+        """Add security headers to all responses.
+
+        CSP uses nonce-based script-src when SALMALM_CSP_NONCE=1 (strict mode).
+        Default: 'unsafe-inline' for compatibility with single-page inline scripts.
+        TODO(v0.18): Migrate all inline scripts to external files, remove unsafe-inline.
+        """
+        import secrets as _secrets
+        self._csp_nonce = _secrets.token_urlsafe(16)
+
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header(
             "Permissions-Policy", "camera=(), microphone=(self), geolocation=()"
         )
-        script_src = "'self' 'unsafe-inline'"
+        # CSP: nonce mode (strict) vs inline mode (compat)
+        if os.environ.get("SALMALM_CSP_NONCE"):
+            script_src = f"'self' 'nonce-{self._csp_nonce}'"
+        else:
+            script_src = "'self' 'unsafe-inline'"
         self.send_header(
             "Content-Security-Policy",
             f"default-src 'self'; "
@@ -169,19 +184,36 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self._json({"error": "Authentication required"}, 401)
         return None
 
+    # Trusted proxy subnets — only accept X-Forwarded-For from these
+    _TRUSTED_PROXY_NETS = ('127.', '::1', '10.', '172.16.', '172.17.',
+                           '172.18.', '172.19.', '172.2', '172.30.',
+                           '172.31.', '192.168.')
+
     def _get_client_ip(self) -> str:
-        """Get client IP. Only trusts X-Forwarded-For if SALMALM_TRUST_PROXY is set."""
+        """Get client IP. Only trusts X-Forwarded-For if:
+        1. SALMALM_TRUST_PROXY is set, AND
+        2. The actual socket peer is from a trusted proxy subnet (private/loopback).
+        This prevents XFF spoofing from untrusted sources.
+        """
+        remote_addr = self.client_address[0] if self.client_address else "?"
         if os.environ.get("SALMALM_TRUST_PROXY"):
-            xff = self.headers.get("X-Forwarded-For")
-            if xff:
-                return xff.split(",")[0].strip()
-        return self.client_address[0] if self.client_address else "?"
+            # Only trust XFF if the direct connection is from a trusted proxy
+            is_trusted = any(remote_addr.startswith(net)
+                             for net in self._TRUSTED_PROXY_NETS)
+            if is_trusted:
+                xff = self.headers.get("X-Forwarded-For")
+                if xff:
+                    return xff.split(",")[0].strip()
+        return remote_addr
 
     def _check_rate_limit(self) -> bool:
         """Check rate limit. Returns True if OK, sends 429 if exceeded."""
         ip = self._get_client_ip()
         user = extract_auth(dict(self.headers))
-        if not user and ip in ("127.0.0.1", "::1", "localhost") and vault.is_unlocked:
+        # Loopback admin bypass: only when server is bound to 127.0.0.1 (not 0.0.0.0)
+        _bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+        if (not user and ip in ("127.0.0.1", "::1", "localhost")
+                and vault.is_unlocked and _bind in ("127.0.0.1", "::1", "localhost")):
             user = {"username": "local", "role": "admin"}
         role = user.get("role", "anonymous") if user else "anonymous"
         key = user.get("username", ip) if user else ip
@@ -1159,6 +1191,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         "/api/google/auth": "_get_api_google_auth",
         "/manifest.json": "_get_manifest_json",
         "/sw.js": "_get_sw_js",
+        "/static/app.js": "_get_static_app_js",
         "/dashboard": "_get_dashboard",
         "/docs": "_get_docs",
     }
@@ -1590,6 +1623,30 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         self.send_header("Cache-Control", "no-cache, no-store")
         self.end_headers()
         self.wfile.write(sw_js.encode())
+
+    def _get_static_app_js(self):
+        """Serve extracted main application JavaScript."""
+        js_path = Path(__file__).parent.parent / "static" / "app.js"
+        if not js_path.exists():
+            self.send_error(404)
+            return
+        content = js_path.read_bytes()
+        # ETag for caching
+        import hashlib
+        etag = f'"{hashlib.md5(content).hexdigest()}"'
+        if self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self._cors()
+        self._security_headers()
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Content-Length", str(len(content)))
+        self.send_header("ETag", etag)
+        self.send_header("Cache-Control", "public, max-age=3600")
+        self.end_headers()
+        self.wfile.write(content)
 
     def _get_dashboard(self):
         if not self._require_auth("user"):
@@ -2976,6 +3033,185 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         else:
             self._json({"error": "Unknown action"}, 400)
 
+    def _post_api_chat(self):
+        """Handle /api/chat and /api/chat/stream — main conversation endpoint."""
+        from salmalm.core.engine import process_message
+        body = self._body
+        self._auto_unlock_localhost()
+        if not vault.is_unlocked:
+            self._json({"error": "Vault locked"}, 403)
+            return
+        message = body.get("message", "")
+        session_id = body.get("session", "web")
+        image_b64 = body.get("image_base64")
+        image_mime = body.get("image_mime", "image/png")
+        ui_lang = body.get("lang", "")
+        use_stream = self.path.endswith("/stream")
+
+        if use_stream:
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
+
+            def send_sse(event, data):
+                try:
+                    payload = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    self.wfile.write(payload.encode())
+                    self.wfile.flush()
+                except Exception:
+                    pass
+
+            send_sse("status", {"text": "🤔 Thinking..."})
+            tool_count = [0]
+
+            def on_tool_sse(name, args):
+                tool_count[0] += 1
+                send_sse("tool", {"name": name, "args": str(args)[:200], "count": tool_count[0]})
+                send_sse("status", {"text": f"🔧 Running {name}..."})
+
+            streamed_text = [""]
+
+            def on_token_sse(event):
+                try:
+                    etype = event.get("type", "")
+                    if etype == "text_delta":
+                        text = event.get("text", "")
+                        if text:
+                            streamed_text[0] += text
+                            send_sse("chunk", {"text": text, "streaming": True})
+                    elif etype == "thinking_delta":
+                        send_sse("thinking", {"text": event.get("text", "")})
+                    elif etype == "tool_use_start":
+                        tool_count[0] += 1
+                        send_sse("status", {"text": f"🔧 Running {event.get('name', 'tool')}..."})
+                        send_sse("tool", {"name": event.get("name", ""), "count": tool_count[0]})
+                    elif etype == "error":
+                        send_sse("error", {"text": event.get("error", "")})
+                except Exception:
+                    pass
+
+            try:
+                loop = asyncio.new_event_loop()
+                response = loop.run_until_complete(
+                    process_message(session_id, message,
+                                    image_data=(image_b64, image_mime) if image_b64 else None,
+                                    on_tool=on_tool_sse, on_token=on_token_sse, lang=ui_lang))
+                loop.close()
+            except Exception as e:
+                log.error(f"SSE process_message error: {e}")
+                response = f"❌ Internal error: {type(e).__name__}"
+            from salmalm.core import get_session as _gs2
+            _sess2 = _gs2(session_id)
+            try:
+                from salmalm.tools.tools_ui import pop_pending_commands
+                for cmd in pop_pending_commands():
+                    send_sse("ui_cmd", cmd)
+            except Exception:
+                pass
+            send_sse("done", {
+                "response": response,
+                "model": getattr(_sess2, "last_model", router.force_model or "auto"),
+                "complexity": getattr(_sess2, "last_complexity", "auto"),
+            })
+            try:
+                self.wfile.write(b"event: close\ndata: {}\n\n")
+                self.wfile.flush()
+            except Exception:
+                pass
+        else:
+            try:
+                loop = asyncio.new_event_loop()
+                response = loop.run_until_complete(
+                    process_message(session_id, message,
+                                    image_data=(image_b64, image_mime) if image_b64 else None,
+                                    lang=ui_lang))
+                loop.close()
+            except Exception as e:
+                log.error(f"Chat process_message error: {e}")
+                response = f"❌ Internal error: {type(e).__name__}"
+            from salmalm.core import get_session as _gs
+            _sess = _gs(session_id)
+            self._json({
+                "response": response,
+                "model": getattr(_sess, "last_model", router.force_model or "auto"),
+                "complexity": getattr(_sess, "last_complexity", "auto"),
+            })
+
+    def _post_api_model_switch(self):
+        """Handle /api/llm-router/switch and /api/model/switch."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        from salmalm.core.llm_router import llm_router
+        model = body.get("model", "")
+        if not model:
+            self._json({"error": "model required"}, 400)
+            return
+        msg = llm_router.switch_model(model)
+        self._json({"ok": "✅" in msg, "message": msg, "current_model": llm_router.current_model})
+
+    def _post_api_test_provider(self):
+        """Handle /api/llm-router/test-key and /api/test-provider."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        provider = body.get("provider", "")
+        api_key = body.get("api_key", "")
+        if not provider or not api_key:
+            self._json({"error": "provider and api_key required"}, 400)
+            return
+        from salmalm.core.llm_router import PROVIDERS
+        prov_cfg = PROVIDERS.get(provider)
+        if not prov_cfg:
+            self._json({"ok": False, "message": f"Unknown provider: {provider}"})
+            return
+        env_key = prov_cfg.get("env_key", "")
+        if env_key:
+            old_val = os.environ.get(env_key)
+            os.environ[env_key] = api_key
+        try:
+            import urllib.request
+            import urllib.error
+            if provider == "anthropic":
+                url = f"{prov_cfg['base_url']}/messages"
+                req = urllib.request.Request(url,
+                    data=json.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 1,
+                                     "messages": [{"role": "user", "content": "hi"}]}).encode(),
+                    headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                             "content-type": "application/json"}, method="POST")
+            elif provider == "ollama":
+                url = f"{prov_cfg['base_url']}/api/tags"
+                req = urllib.request.Request(url)
+            else:
+                url = f"{prov_cfg['base_url']}/models"
+                req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}"})
+            urllib.request.urlopen(req, timeout=10)
+            self._json({"ok": True, "message": f"✅ {provider} key is valid"})
+        except urllib.error.HTTPError as e:
+            self._json({"ok": False, "message": f"❌ HTTP {e.code}: Invalid key"})
+        except Exception as e:
+            self._json({"ok": False, "message": f"❌ Connection failed: {e}"})
+        finally:
+            if env_key:
+                if old_val is not None:
+                    os.environ[env_key] = old_val
+                elif env_key in os.environ:
+                    del os.environ[env_key]
+
+    def _post_api_thoughts_search(self):
+        """Handle /api/thoughts/search."""
+        body = self._body
+        from salmalm.features.thoughts import thought_stream
+        q = body.get("q", body.get("query", ""))
+        if not q:
+            self._json({"error": "query required"}, 400)
+            return
+        results = thought_stream.search(q)
+        self._json({"thoughts": results})
+
     def _post_api_chat_abort(self):
         body = self._body
         # Abort generation — LibreChat style (생성 중지)
@@ -3730,235 +3966,14 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         if _post_handler:
             return getattr(self, _post_handler)()
 
-        # ── Multi-tenant user management endpoints ──────────
+        # ── Remaining POST routes (dispatch table above handles most) ──────
         if self.path in ("/api/chat", "/api/chat/stream"):
-            self._auto_unlock_localhost()
-            if not vault.is_unlocked:
-                self._json({"error": "Vault locked"}, 403)
-                return
-            message = body.get("message", "")
-            session_id = body.get("session", "web")
-            image_b64 = body.get("image_base64")
-            image_mime = body.get("image_mime", "image/png")
-            ui_lang = body.get("lang", "")
-            use_stream = self.path.endswith("/stream")
-
-            if use_stream:
-                # SSE streaming response
-                self.send_response(200)
-                self._cors()
-                self.send_header("Content-Type", "text/event-stream")
-                self.send_header("Cache-Control", "no-cache")
-                self.send_header("Connection", "keep-alive")
-                self.end_headers()
-
-                def send_sse(event, data):
-                    try:
-                        payload = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-                        self.wfile.write(payload.encode())
-                        self.wfile.flush()
-                    except Exception:
-                        pass
-
-                send_sse("status", {"text": "🤔 Thinking..."})
-                tool_count = [0]
-
-                def on_tool_sse(name, args):
-                    tool_count[0] += 1
-                    send_sse(
-                        "tool",
-                        {"name": name, "args": str(args)[:200], "count": tool_count[0]},
-                    )
-                    send_sse("status", {"text": f"🔧 Running {name}..."})
-
-                # Token-by-token streaming callback (OpenClaw-style)
-                streamed_text = [""]
-
-                def on_token_sse(event):
-                    try:
-                        etype = event.get("type", "")
-                        if etype == "text_delta":
-                            text = event.get("text", "")
-                            if text:
-                                streamed_text[0] += text
-                                send_sse("chunk", {"text": text, "streaming": True})
-                        elif etype == "thinking_delta":
-                            send_sse("thinking", {"text": event.get("text", "")})
-                        elif etype == "tool_use_start":
-                            tool_count[0] += 1
-                            send_sse(
-                                "status",
-                                {"text": f"🔧 Running {event.get('name', 'tool')}..."},
-                            )
-                            send_sse(
-                                "tool",
-                                {"name": event.get("name", ""), "count": tool_count[0]},
-                            )
-                        elif etype == "error":
-                            send_sse("error", {"text": event.get("error", "")})
-                    except Exception:
-                        pass  # SSE write errors are non-fatal
-
-                try:
-                    loop = asyncio.new_event_loop()
-                    response = loop.run_until_complete(
-                        process_message(
-                            session_id,
-                            message,
-                            image_data=(image_b64, image_mime) if image_b64 else None,
-                            on_tool=on_tool_sse,
-                            on_token=on_token_sse,
-                            lang=ui_lang,
-                        )
-                    )
-                    loop.close()
-                except Exception as e:
-                    log.error(f"SSE process_message error: {e}")
-                    response = f"❌ Internal error: {type(e).__name__}"
-                from salmalm.core import get_session as _gs2
-
-                _sess2 = _gs2(session_id)
-                # Send pending UI commands before done
-                try:
-                    from salmalm.tools.tools_ui import pop_pending_commands
-
-                    for cmd in pop_pending_commands():
-                        send_sse("ui_cmd", cmd)
-                except Exception:
-                    pass
-                send_sse(
-                    "done",
-                    {
-                        "response": response,
-                        "model": getattr(
-                            _sess2, "last_model", router.force_model or "auto"
-                        ),
-                        "complexity": getattr(_sess2, "last_complexity", "auto"),
-                    },
-                )
-                try:
-                    self.wfile.write(b"event: close\ndata: {}\n\n")
-                    self.wfile.flush()
-                except Exception:
-                    pass
-            else:
-                try:
-                    loop = asyncio.new_event_loop()
-                    response = loop.run_until_complete(
-                        process_message(
-                            session_id,
-                            message,
-                            image_data=(image_b64, image_mime) if image_b64 else None,
-                            lang=ui_lang,
-                        )
-                    )
-                    loop.close()
-                except Exception as e:
-                    log.error(f"Chat process_message error: {e}")
-                    response = f"❌ Internal error: {type(e).__name__}"
-                from salmalm.core import get_session as _gs
-
-                _sess = _gs(session_id)
-                self._json(
-                    {
-                        "response": response,
-                        "model": getattr(
-                            _sess, "last_model", router.force_model or "auto"
-                        ),
-                        "complexity": getattr(_sess, "last_complexity", "auto"),
-                    }
-                )
-
-        # === Gateway-Node Protocol ===
-        if self.path in ("/api/llm-router/switch", "/api/model/switch"):
-            if not self._require_auth("user"):
-                return
-            from salmalm.core.llm_router import llm_router
-
-            model = body.get("model", "")
-            if not model:
-                self._json({"error": "model required"}, 400)
-                return
-            msg = llm_router.switch_model(model)
-            self._json(
-                {
-                    "ok": "✅" in msg,
-                    "message": msg,
-                    "current_model": llm_router.current_model,
-                }
-            )
-
+            return self._post_api_chat()
+        elif self.path in ("/api/llm-router/switch", "/api/model/switch"):
+            return self._post_api_model_switch()
         elif self.path in ("/api/llm-router/test-key", "/api/test-provider"):
-            if not self._require_auth("user"):
-                return
-            provider = body.get("provider", "")
-            api_key = body.get("api_key", "")
-            if not provider or not api_key:
-                self._json({"error": "provider and api_key required"}, 400)
-                return
-            # Test by setting env temporarily and making a minimal call
-            from salmalm.core.llm_router import PROVIDERS
-
-            prov_cfg = PROVIDERS.get(provider)
-            if not prov_cfg:
-                self._json({"ok": False, "message": f"Unknown provider: {provider}"})
-                return
-            env_key = prov_cfg.get("env_key", "")
-            if env_key:
-                old_val = os.environ.get(env_key)
-                os.environ[env_key] = api_key
-            try:
-                import urllib.request
-                import urllib.error
-
-                if provider == "anthropic":
-                    url = f"{prov_cfg['base_url']}/messages"
-                    req = urllib.request.Request(
-                        url,
-                        data=json.dumps(
-                            {
-                                "model": "claude-haiku-4-5-20251001",
-                                "max_tokens": 1,
-                                "messages": [{"role": "user", "content": "hi"}],
-                            }
-                        ).encode(),
-                        headers={
-                            "x-api-key": api_key,
-                            "anthropic-version": "2023-06-01",
-                            "content-type": "application/json",
-                        },
-                        method="POST",
-                    )
-                elif provider == "ollama":
-                    url = f"{prov_cfg['base_url']}/api/tags"
-                    req = urllib.request.Request(url)
-                else:
-                    url = f"{prov_cfg['base_url']}/models"
-                    req = urllib.request.Request(
-                        url, headers={"Authorization": f"Bearer {api_key}"}
-                    )
-                urllib.request.urlopen(req, timeout=10)
-                self._json({"ok": True, "message": f"✅ {provider} key is valid"})
-            except urllib.error.HTTPError as e:
-                self._json({"ok": False, "message": f"❌ HTTP {e.code}: Invalid key"})
-            except Exception as e:
-                self._json({"ok": False, "message": f"❌ Connection failed: {e}"})
-            finally:
-                if env_key:
-                    if old_val is not None:
-                        os.environ[env_key] = old_val
-                    elif env_key in os.environ:
-                        del os.environ[env_key]
-
+            return self._post_api_test_provider()
         elif self.path.startswith("/api/thoughts/search"):
-            from salmalm.features.thoughts import thought_stream
-
-            q = body.get("q", body.get("query", ""))
-            if not q:
-                self._json({"error": "query required"}, 400)
-                return
-            results = thought_stream.search(q)
-            self._json({"thoughts": results})
-
+            return self._post_api_thoughts_search()
         else:
             self._json({"error": "Not found"}, 404)

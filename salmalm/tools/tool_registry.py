@@ -18,7 +18,7 @@ def _ensure_modules():
                          tools_misc, tools_system, tools_util, tools_agent,
                          tools_browser, tools_google, tools_media,
                          tools_calendar, tools_email, tools_personal)
-    from salmalm.tools import tools_brave  # noqa: F401
+    from salmalm.tools import tools_brave, tools_mesh, tools_sandbox  # noqa: F401
     # Register apply_patch tool
     from salmalm.tools.tools_patch import apply_patch as _apply_patch_fn
     _HANDLERS['apply_patch'] = lambda args: _apply_patch_fn(

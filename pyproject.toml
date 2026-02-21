@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "salmalm"
-version = "0.16.4"
+version = "0.16.5"
 description = "Personal AI Gateway — Pure Python, zero-dependency AI assistant with multi-model routing, web UI, and 56+ built-in tools"
 readme = "README.md"
 license = "MIT"
@@ -32,7 +32,8 @@ dependencies = []
 
 [project.optional-dependencies]
 crypto = ["cryptography>=42.0"]
-dev = ["pytest", "pytest-asyncio", "pytest-timeout", "pytest-cov", "flake8"]
+browser = ["playwright>=1.40"]
+dev = ["pytest", "pytest-asyncio", "pytest-timeout", "pytest-cov", "pytest-forked", "flake8"]
 
 [project.scripts]
 salmalm = "salmalm.__main__:main"
@@ -63,6 +64,10 @@ exclude = ["plugins/", "scripts/", "memory/"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 timeout = 30
+# Full-suite hang: test file HTTP servers + asyncio loops pollute shared process state.
+# CI mitigates via per-file execution (for f in tests/test_*.py; do pytest "$f"; done).
+# For local `pytest tests/`, use: pytest --forked tests/ (requires pytest-forked).
+# See CONTRIBUTING.md for details.
 
 [tool.flake8]
 max-line-length = 120
