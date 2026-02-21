@@ -71,20 +71,28 @@ get_routing_config = _load_routing_config
 _select_model = _select_model_impl
 
 
+_main_loop = None  # Captured by process_message for cross-thread scheduling
+
+
 def _safe_callback(cb, *args):
-    """Call a callback that may be sync or async. Fire-and-forget for async."""
+    """Call a callback that may be sync or async. Fire-and-forget for async.
+
+    Works from both async context and sync threads (e.g. ThreadPoolExecutor).
+    Uses run_coroutine_threadsafe when no running loop in current thread.
+    """
     if cb is None:
         return
     result = cb(*args)
     if asyncio.iscoroutine(result):
         try:
             loop = asyncio.get_running_loop()
-            task = loop.create_task(result)
-            task.add_done_callback(
-                lambda t: t.exception() if not t.cancelled() and t.exception() else None
-            )
+            loop.create_task(result)
         except RuntimeError:
-            pass
+            # We're in a sync thread — schedule on the main loop
+            if _main_loop and _main_loop.is_running():
+                asyncio.run_coroutine_threadsafe(result, _main_loop)
+            else:
+                result.close()
 
 
 class TaskClassifier:
@@ -826,6 +834,11 @@ async def process_message(session_id: str, user_message: str,
     - Shutdown rejection
     - Unhandled exceptions → graceful error message
     """
+    global _main_loop
+    try:
+        _main_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        pass
     # Reject new requests during shutdown
     if _shutting_down:
         return '⚠️ Server is shutting down. Please try again later. / 서버가 종료 중입니다.'
