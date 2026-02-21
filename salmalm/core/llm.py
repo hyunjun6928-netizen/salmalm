@@ -693,13 +693,24 @@ def stream_anthropic(messages: List[Dict[str, Any]], model: Optional[str] = None
         yield {'type': 'error', 'error': str(e)[:200]}
 
 
-def _iter_chunks(resp, chunk_size: int = 1024) -> Generator[str, None, None]:
-    """Read HTTP response in chunks, decode to str."""
+def _iter_chunks(resp, chunk_size: int = 4096) -> Generator[str, None, None]:
+    """Read HTTP response in chunks, decode to str.
+
+    Uses an incremental UTF-8 decoder to avoid splitting multibyte characters
+    (e.g. Korean 3-byte sequences) at chunk boundaries.
+    """
+    import codecs
+    decoder = codecs.getincrementaldecoder('utf-8')('replace')
     while True:
         chunk = resp.read(chunk_size)
         if not chunk:
+            text = decoder.decode(b'', final=True)
+            if text:
+                yield text
             break
-        yield chunk.decode('utf-8', errors='replace')
+        text = decoder.decode(chunk, final=False)
+        if text:
+            yield text
 
 
 def _process_stream_event(event: dict, content_text: str, thinking_text: str,
