@@ -279,6 +279,20 @@ ChatGPT, OpenClaw, Open WebUI 어디에도 없는 삶앎만의 기능:
 | `/skill` | 스킬 관리 |
 | `/oauth` | OAuth 설정 (Gmail, 캘린더) |
 | `/queue` | 메시지 큐 관리 |
+| `/tts <텍스트>` | 텍스트 음성 변환 |
+| `/voice` | 음성 설정 |
+| `/thought` | 의식의 흐름 |
+| `/models` | 현재 모델 정보 |
+| `/uptime` | 서버 가동 시간 |
+| `/latency` | 응답 지연 통계 |
+| `/health detail` | 상세 건강 보고서 |
+| `/restart` | 서버 재시작 |
+| `/stop` | 서버 중지 |
+| `/reset` | 세션 상태 초기화 |
+| `/verbose` | 상세 모드 토글 |
+| `/reasoning` | 추론 표시 토글 |
+| `/dock` | 도크 관리 |
+| `/send` | 채널에 메시지 전송 |
 
 </details>
 

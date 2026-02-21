@@ -279,6 +279,20 @@ These are SalmAlm-only — not found in ChatGPT, OpenClaw, Open WebUI, or any ot
 | `/skill` | Skill management |
 | `/oauth` | OAuth setup (Gmail, Calendar) |
 | `/queue` | Message queue management |
+| `/tts <text>` | Text-to-speech |
+| `/voice` | Voice settings |
+| `/thought` | Stream of consciousness |
+| `/models` | Show current model info |
+| `/uptime` | Server uptime |
+| `/latency` | Response latency stats |
+| `/health detail` | Detailed health report |
+| `/restart` | Restart server |
+| `/stop` | Stop server |
+| `/reset` | Reset session state |
+| `/verbose` | Toggle verbose mode |
+| `/reasoning` | Toggle reasoning display |
+| `/dock` | Dock management |
+| `/send` | Send message to channel |
 
 </details>
 
