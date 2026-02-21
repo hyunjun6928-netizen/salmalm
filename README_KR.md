@@ -83,6 +83,23 @@ SALMALM_PORT=8080 salmalm
 SALMALM_BIND=0.0.0.0 salmalm    # LAN 노출 (보안 섹션 참조)
 ```
 
+### 업데이트
+
+SalmAlm 업데이트 방법 3가지:
+
+```bash
+# 방법 1: 내장 명령어 (추천)
+salmalm --update
+
+# 방법 2: pip 직접
+pip install --upgrade salmalm
+
+# 방법 3: 웹 UI
+# 설정 → 🔄 업데이트 → "업데이트 확인" → "⬆️ 업데이트"
+```
+
+업데이트 후 서버를 재시작하세요 (`Ctrl+C` 후 `salmalm`).
+
 ### 바탕화면 바로가기
 
 `salmalm --shortcut`을 한 번 실행하면 바탕화면에 아이콘이 생깁니다:

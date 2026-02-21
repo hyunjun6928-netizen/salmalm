@@ -83,6 +83,23 @@ SALMALM_PORT=8080 salmalm
 SALMALM_BIND=0.0.0.0 salmalm    # expose to LAN (see Security section)
 ```
 
+### Updating
+
+Three ways to update SalmAlm:
+
+```bash
+# Option 1: Built-in command (recommended)
+salmalm --update
+
+# Option 2: pip directly
+pip install --upgrade salmalm
+
+# Option 3: Web UI
+# Settings → 🔄 Update → "Check for Updates" → "⬆️ Update"
+```
+
+After updating, restart the server (`Ctrl+C` then `salmalm`).
+
 ### Desktop Shortcut
 
 Run `salmalm --shortcut` once to create a desktop icon:
