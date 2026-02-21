@@ -336,14 +336,18 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
     </div>
     <div id="google-result" style="margin-top:8px;font-size:12px"></div>
     <details style="margin-top:12px">
-      <summary style="font-size:12px;color:var(--text2);cursor:pointer" data-i18n="google-guide-title">📋 Setup Guide</summary>
-      <ol style="font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2">
-        <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--accent2)">Google Cloud Console</a> — <span data-i18n="google-guide-1">Google Cloud Console → Create/Select Project</span></li>
-        <li data-i18n="google-guide-2">APIs & Services → Credentials → Create OAuth 2.0 Client ID</li>
-        <li data-i18n="google-guide-3">Application type: Web application</li>
-        <li><span data-i18n="google-guide-4">Authorized redirect URI:</span> <code style="background:var(--bg);padding:2px 6px;border-radius:4px">http://localhost:PORT/api/google/callback</code></li>
-        <li data-i18n="google-guide-5">Enter Client ID and Client Secret above</li>
-        <li data-i18n="google-guide-6">Click Connect Google Account</li>
+      <summary style="font-size:12px;color:var(--text2);cursor:pointer">📋 Setup Guide (click to expand)</summary>
+      <ol style="font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2.2">
+        <li><a href="https://console.cloud.google.com" target="_blank" rel="noopener" style="color:var(--accent2)">console.cloud.google.com</a> 접속 → 프로젝트 생성 (또는 기존 프로젝트 선택)</li>
+        <li>좌측 ≡ 메뉴 → <b>APIs & Services</b> → <b>Enabled APIs</b> → <b>+ ENABLE APIS AND SERVICES</b></li>
+        <li><b>Google Calendar API</b>와 <b>Gmail API</b> 검색하여 각각 <b>Enable</b></li>
+        <li>좌측 ≡ 메뉴 → <b>APIs & Services</b> → <b>OAuth consent screen</b> → <b>Audience</b> 탭 → <b>Add users</b> → 본인 Gmail 입력</li>
+        <li>좌측 메뉴 → <b>Credentials</b> → <b>+ CREATE CREDENTIALS</b> → <b>OAuth client ID</b></li>
+        <li>Application type: <b>Web application</b></li>
+        <li>Authorized redirect URIs → <b>+ ADD URI</b> → <code style="background:var(--bg);padding:2px 6px;border-radius:4px">http://127.0.0.1:18800/api/google/callback</code></li>
+        <li><b>CREATE</b> 클릭 → Client ID와 Client Secret 복사</li>
+        <li>위 입력란에 붙여넣기 후 <b>Save</b></li>
+        <li>🔗 <b>Google 계정 연결</b> 클릭</li>
       </ol>
     </details>
   </div>
