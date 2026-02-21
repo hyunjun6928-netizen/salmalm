@@ -8,6 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
+[![테스트](https://img.shields.io/badge/%ED%85%8C%EC%8A%A4%ED%8A%B8-1%2C663%20%ED%86%B5%EA%B3%BC-brightgreen)]()
 [![도구](https://img.shields.io/badge/%EB%8F%84%EA%B5%AC-62%EA%B0%9C-blueviolet)]()
 [![명령어](https://img.shields.io/badge/%EB%AA%85%EB%A0%B9%EC%96%B4-32%EA%B0%9C-orange)]()
 
@@ -25,7 +26,7 @@ Docker 필요 없음. Node.js 필요 없음. 설정 파일 필요 없음.
 
 ```bash
 pip install salmalm
-salmalm start
+salmalm
 # → http://localhost:18800
 ```
 
@@ -57,15 +58,30 @@ salmalm start
 # 설치
 pip install salmalm
 
-# 시작 (웹 UI 자동 열림)
-salmalm start
+# 시작 (http://localhost:18800 에서 웹 UI 실행)
+salmalm
 
-# 옵션 지정
-salmalm start --port 8080 --no-browser
+# 브라우저 자동 열기
+salmalm --open
+
+# 바탕화면 바로가기 생성 (더블클릭으로 실행!)
+salmalm --shortcut
 
 # 업데이트
-pip install salmalm --upgrade
+salmalm --update
 ```
+
+### 바탕화면 바로가기
+
+`salmalm --shortcut`을 한 번 실행하면 바탕화면에 아이콘이 생깁니다:
+
+| 플랫폼 | 생성 파일 | 사용법 |
+|---|---|---|
+| **Windows** | 바탕화면에 `SalmAlm.bat` | 더블클릭 → 서버 시작 + 브라우저 열림 |
+| **Linux** | 바탕화면에 `salmalm.desktop` | 더블클릭 → 서버 시작 + 브라우저 열림 |
+| **macOS** | 바탕화면에 `SalmAlm.command` | 더블클릭 → 서버 시작 + 브라우저 열림 |
+
+바로가기는 **버전과 무관**합니다 — 삶앎을 업데이트해도 아이콘은 그대로 동작합니다.
 
 ### 지원 프로바이더
 
@@ -84,30 +100,35 @@ API 키는 환경변수 또는 웹 UI **설정 → API Keys**에서 입력 가�
 ## 🎯 기능 소개
 
 ### 핵심 AI
-- **멀티모델 자동 라우팅** — 간단한 질문→Haiku, 보통→Sonnet, 복잡→Opus 자동 선택
+- **지능형 모델 라우팅** — 복잡도에 따라 모델 자동 선택 (간단→Haiku, 보통→Sonnet, 복잡→Opus), 전용 `model_selection` 모듈로 분리, 사용자 커스텀 라우팅 지원
 - **확장 사고 모드** — 예산 제어가 가능한 심층 추론
-- **5단계 컨텍스트 압축** — 바이너리 제거 → 도구 축소 → 이전 도구 삭제 → 장문 축약 → LLM 요약, 세션 간 연속성 지원
+- **5단계 컨텍스트 압축** — 바이너리 제거 → 도구 축소 → 이전 도구 삭제 → 장문 축약 → LLM 요약, `compaction_summaries` DB 테이블을 통한 세션 간 연속성 지원
 - **프롬프트 캐싱** — Anthropic cache_control로 시스템 프롬프트 비용 90% 절감
-- **모델 장애 전환** — 지수 백오프 + 일시적 오류 자동 재시도
-- **메시지 큐** — 오프라인 메시지 큐잉, 복구 시 자동 처리
-- **서브에이전트 시스템** — 백그라운드 AI 워커 생성/조종/수집 (격리 세션)
+- **모델 장애 전환** — 지수 백오프 + 일시적 오류(timeout/5xx/429) 1.5초 딜레이 자동 재시도
+- **메시지 큐** — FIFO 오프라인 메시지 큐잉, 3단계 재시도 백오프, 데드 레터 처리; 모델 복구 시 자동 처리
+- **서브에이전트 시스템** — 백그라운드 AI 워커 생성/조종/수집 (격리 세션); 8개 액션 (spawn, stop, list, log, info, steer, collect, status)
+- **스트리밍 안정성** — 중단 시 부분 콘텐츠 보존; `AbortController`가 토큰 축적 후 취소 시 동결
+- **캐시 인식 세션 정리** — Anthropic 프롬프트 캐시 TTL(5분) 인지, 60초 쿨다운
 
 ### 62개 내장 도구
 웹 검색(Brave), 이메일(Gmail), 캘린더(Google), 파일 I/O, 셸 실행, Python 실행, 이미지 생성(DALL-E), TTS/STT, 브라우저 자동화(Playwright), RAG 검색, QR 코드, 시스템 모니터, OS 기본 샌드박스, 메시 네트워킹, 캔버스 프리뷰 등.
 
 ### 웹 UI
 - 실시간 스트리밍 (WebSocket + SSE 폴백)
+- WebSocket 재연결 + 세션 이어받기 (버퍼링된 메시지 자동 전송)
 - 세션 분기, 롤백, 검색 (`Ctrl+K`)
 - 커맨드 팔레트 (`Ctrl+Shift+P`)
 - 메시지 편집/삭제/재생성
 - 이미지 붙여넣기/드래그앤드롭 + 비전
 - 코드 구문 강조
-- 다크/라이트 테마, 한국어/영어 자동 감지
+- 다크/라이트 테마 (라이트 기본), 한국어/영어 자동 감지
 - PWA 설치 가능
+- CSP 호환 — 모든 JS가 외부 `app.js`에, 인라인 이벤트 핸들러 없음
+- 컨텍스트 압축 진행 표시 (✨ Compacting context...)
 
 ### 인프라
-- **OS 기본 샌드박스** — bubblewrap (Linux) / sandbox-exec (macOS) / rlimit 폴백
-- **메시 네트워킹** — SalmAlm 인스턴스 간 P2P (작업 위임, 클립보드 공유, LAN 자동 탐색)
+- **OS 기본 샌드박스** — bubblewrap (Linux) / sandbox-exec (macOS) / rlimit 폴백; 최강 티어 자동 감지
+- **메시 네트워킹** — SalmAlm 인스턴스 간 P2P (작업 위임, 클립보드 공유, LAN UDP 자동 탐색, HMAC 인증)
 - **캔버스** — 로컬 HTML/코드/차트 프리뷰 서버 (`:18803`)
 - **브라우저 자동화** — Playwright 스냅샷/액트 패턴 (`pip install salmalm[browser]`)
 
@@ -176,7 +197,7 @@ ChatGPT, OpenClaw, Open WebUI 어디에도 없는 삶앎만의 기능:
 | `/a2a` | AI간 통신 |
 | `/workflow` | 워크플로우 엔진 |
 | `/mcp` | MCP 관리 |
-| `/subagents` | 서브에이전트 |
+| `/subagents` | 서브에이전트 (spawn, steer, collect, list, stop, log, info, status) |
 | `/evolve` | 자가 진화 프롬프트 |
 | `/mood` | 감정 감지 |
 | `/split` | A/B 분할 응답 |
@@ -201,15 +222,27 @@ ChatGPT, OpenClaw, Open WebUI 어디에도 없는 삶앎만의 기능:
 | 홈 디렉토리 파일 읽기 | 워크스페이스만 | `SALMALM_ALLOW_HOME_READ=1` |
 | 금고 (`cryptography` 없을 때) | 비활성 | `SALMALM_VAULT_FALLBACK=1` (HMAC-CTR) |
 | exec에서 인터프리터 실행 | 차단 | `/bash` 또는 `python_eval` 도구 사용 |
+| HTTP 요청 헤더 | 허용 목록만 | `SALMALM_HEADER_PERMISSIVE=1`로 차단 목록 모드 전환 |
 
-추가 보안:
+### 헤더 보안
+
+HTTP 요청 도구는 기본적으로 **허용 목록 모드**를 사용합니다 — 안전한 헤더(Accept, Content-Type, Authorization, User-Agent 등)만 허용됩니다. 알 수 없는 헤더는 거부됩니다.
+
+`SALMALM_HEADER_PERMISSIVE=1`을 설정하면 차단 목록 모드로 전환됩니다 (위험한 헤더 Proxy-Authorization, X-Forwarded-For 등만 차단).
+
+### 추가 보안
 
 - **SSRF 방어** — 모든 리다이렉트 홉에서 사설 IP 차단, 스킴 허용 목록, userinfo 차단
 - **토큰 보안** — JWT `kid` 키 순환, `jti` 폐기, PBKDF2-200K 비밀번호 해싱
 - **로그인 잠금** — DB 기반 영구 브루트포스 방어 + 자동 정리
-- **감사 추적** — 변조 방지용 추가 전용 체크포인트 로그
+- **감사 추적** — 변조 방지용 추가 전용 체크포인트 로그, 자동 크론 (6시간마다) + 정리 (30일)
 - **WebSocket Origin 검증** — 크로스 사이트 WebSocket 하이재킹 방지
-- **CSP 호환 UI** — 인라인 이벤트 핸들러 없음, `data-action` 위임 전면 적용
+- **CSP 호환 UI** — 인라인 스크립트/이벤트 핸들러 없음; 외부 `app.js` + ETag 캐싱; `SALMALM_CSP_NONCE=1`로 엄격 CSP 옵트인
+- **Exec 리소스 제한** — 포그라운드 실행: CPU 타임아웃+5s, 1GB RAM, 100 fd, 50MB fsize (Linux/macOS)
+- **도구별 타임아웃** — exec 120초, browser 90초, 기본 60초 wall-clock 제한
+- **도구별 출력 제한** — exec 20K, browser 10K, HTTP 15K 글자 차등 제한
+
+자세한 내용은 [`SECURITY.md`](SECURITY.md)를 참조하세요.
 
 ---
 
@@ -227,10 +260,16 @@ SALMALM_LLM_TIMEOUT=30    # LLM 요청 타임아웃 (초)
 SALMALM_COST_CAP=0        # 월간 비용 상한 (0=무제한)
 
 # 보안
-SALMALM_VAULT_PW=...      # 시작 시 금고 자동 잠금해제
-SALMALM_ALLOW_SHELL=1     # exec에서 셸 연산자 허용
-SALMALM_ALLOW_HOME_READ=1 # 워크스페이스 외부 파일 읽기 허용
-SALMALM_VAULT_FALLBACK=1  # cryptography 없이 HMAC-CTR 금고 허용
+SALMALM_VAULT_PW=...         # 시작 시 금고 자동 잠금해제
+SALMALM_ALLOW_SHELL=1        # exec에서 셸 연산자 허용
+SALMALM_ALLOW_HOME_READ=1    # 워크스페이스 외부 파일 읽기 허용
+SALMALM_VAULT_FALLBACK=1     # cryptography 없이 HMAC-CTR 금고 허용
+SALMALM_HEADER_PERMISSIVE=1  # HTTP 헤더: 허용 목록 대신 차단 목록 모드
+SALMALM_CSP_NONCE=1          # nonce 기반 엄격 CSP
+SALMALM_OPEN_BROWSER=1       # 서버 시작 시 브라우저 자동 열기
+
+# 메시
+SALMALM_MESH_SECRET=...   # 메시 피어 인증용 HMAC 시크릿
 ```
 
 모든 설정은 웹 UI에서도 가능합니다.
@@ -242,19 +281,37 @@ SALMALM_VAULT_FALLBACK=1  # cryptography 없이 HMAC-CTR 금고 허용
 ```
 브라우저 ──WebSocket──► 삶앎 서버 ──► Anthropic / OpenAI / Google / xAI / Ollama
    │                      │
-   └──HTTP/SSE──►        ├── SQLite (세션, 사용량, 메모리)
-                          ├── 도구 레지스트리 (62개)
-텔레그램 ──►              ├── 크론 스케줄러
-디스코드 ──►              ├── RAG 엔진 (TF-IDF + 코사인 유사도)
+   └──HTTP/SSE──►        ├── SQLite (세션, 사용량, 메모리, 감사)
+                          ├── 모델 선택 (복잡도 기반 라우팅)
+텔레그램 ──►              ├── 도구 레지스트리 (62개)
+디스코드 ──►              ├── 크론 스케줄러 + 감사 크론
+                          ├── 서브에이전트 매니저 (spawn/steer/collect)
+메시 피어 ──►             ├── 메시지 큐 (오프라인 + 재시도 + 데드 레터)
+                          ├── RAG 엔진 (TF-IDF + 코사인 유사도)
+                          ├── OS 기본 샌드박스 (bwrap/unshare/rlimit)
+                          ├── 캔버스 서버 (:18803)
                           ├── 플러그인 시스템
                           └── 금고 (PBKDF2 암호화)
 ```
 
-- **216개 모듈**, **4만3천+ 줄**, **78개 테스트 파일**, **1,785개 테스트**
+- **216개 모듈**, **4만3천+ 줄**, **81개 테스트 파일**, **1,663개 테스트**
 - 순수 Python 3.10+ 표준 라이브러리 — 프레임워크 없음, 무거운 의존성 없음
 - 라우트 테이블 아키텍처 (GET 85개 + POST 59개 핸들러)
 - 기본 바인딩 `127.0.0.1` — 네트워크 노출은 명시적 opt-in
 - 런타임 데이터는 `~/SalmAlm`에 저장 (`SALMALM_HOME`으로 변경 가능)
+- 비용 추정 `core/cost.py`에 통합, 모델별 가격 정보
+- 슬래시 명령어 `core/slash_commands.py`로 분리 (engine.py: 2007→1221줄)
+- 모델 선택 `core/model_selection.py`로 분리
+- 웹 UI JS `static/app.js`로 외부화 (index.html: 3016→661줄)
+
+### 버전 관리
+
+```bash
+# 모든 소스 파일의 버전을 한 번에 변경 (pyproject.toml + __init__.py)
+python scripts/bump_version.py 0.17.0
+
+# CI가 자동으로 버전 일관성 검사
+```
 
 ---
 
@@ -282,11 +339,15 @@ def register(app):
 
 ## 🤝 기여하기
 
+자세한 가이드는 [`CONTRIBUTING.md`](CONTRIBUTING.md)를 참조하세요 (테스트 실행법, 코드 스타일, 아키텍처 개요 포함).
+
 ```bash
 git clone https://github.com/hyunjun6928-netizen/salmalm.git
 cd salmalm
 pip install -e ".[dev]"
-python -m pytest tests/ --timeout=30
+
+# 테스트 실행 (파일별, CI 스타일)
+for f in tests/test_*.py; do python -m pytest "$f" -q --timeout=30; done
 ```
 
 ---

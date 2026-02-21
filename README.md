@@ -8,6 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
+[![Tests](https://img.shields.io/badge/tests-1%2C663%20passed-brightgreen)]()
 [![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
 [![Commands](https://img.shields.io/badge/commands-32-orange)]()
 
@@ -25,7 +26,7 @@ No Docker. No Node.js. No config files. Just:
 
 ```bash
 pip install salmalm
-salmalm start
+salmalm
 # → http://localhost:18800
 ```
 
@@ -57,15 +58,30 @@ First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 # Install
 pip install salmalm
 
-# Start (opens web UI automatically)
-salmalm start
+# Start (opens web UI at http://localhost:18800)
+salmalm
 
-# Or with options
-salmalm start --port 8080 --no-browser
+# With auto-open browser
+salmalm --open
+
+# Create desktop shortcut (double-click to launch!)
+salmalm --shortcut
 
 # Update
-pip install salmalm --upgrade
+salmalm --update
 ```
+
+### Desktop Shortcut
+
+Run `salmalm --shortcut` once to create a desktop icon:
+
+| Platform | What's created | How to use |
+|---|---|---|
+| **Windows** | `SalmAlm.bat` on Desktop | Double-click → server starts + browser opens |
+| **Linux** | `salmalm.desktop` on Desktop | Double-click → server starts + browser opens |
+| **macOS** | `SalmAlm.command` on Desktop | Double-click → server starts + browser opens |
+
+The shortcut is **version-independent** — update SalmAlm anytime, the shortcut keeps working.
 
 ### Supported Providers
 
@@ -84,30 +100,35 @@ Set keys via environment variables or the web UI **Settings → API Keys**.
 ## 🎯 Feature Overview
 
 ### Core AI
-- **Multi-model auto-routing** — routes simple→Haiku, moderate→Sonnet, complex→Opus
+- **Intelligent model routing** — auto-selects model by complexity (simple→Haiku, moderate→Sonnet, complex→Opus), extracted to dedicated `model_selection` module with user-configurable routing
 - **Extended Thinking** — deep reasoning mode with budget control
-- **5-stage context compaction** — strip binary → trim tools → drop old → truncate → LLM summarize, with cross-session continuity
+- **5-stage context compaction** — strip binary → trim tools → drop old → truncate → LLM summarize, with cross-session continuity via `compaction_summaries` DB table
 - **Prompt caching** — Anthropic cache_control for 90% cost reduction on system prompts
-- **Model failover** — exponential backoff + transient error retry across providers
-- **Message queue** — offline message queuing with auto-drain on recovery
-- **Sub-agent system** — spawn/steer/collect background AI workers with isolated sessions
+- **Model failover** — exponential backoff + transient error retry (timeout/5xx/429) with 1.5s delay across providers
+- **Message queue** — offline message queuing with FIFO ordering, 3-stage retry backoff, and dead letter handling; auto-drain on model recovery
+- **Sub-agent system** — spawn/steer/collect background AI workers with isolated sessions; 8 actions (spawn, stop, list, log, info, steer, collect, status)
+- **Streaming stability** — partial content preservation on abort; `AbortController` accumulates tokens and freezes on cancel
+- **Cache-aware session pruning** — respects Anthropic prompt cache TTL (5min) with 60s cooldown
 
 ### 62 Built-in Tools
 Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Python eval, image generation (DALL-E), TTS/STT, browser automation (Playwright), RAG search, QR codes, system monitor, OS-native sandbox, mesh networking, canvas preview, and more.
 
 ### Web UI
 - Real-time streaming (WebSocket + SSE fallback)
+- WebSocket reconnect with session resume (buffered message flush)
 - Session branching, rollback, search (`Ctrl+K`)
 - Command palette (`Ctrl+Shift+P`)
 - Message edit/delete/regenerate
 - Image paste/drag-drop with vision
 - Code syntax highlighting
-- Dark/Light themes, EN/KR i18n
+- Dark/Light themes (light default), EN/KR i18n
 - PWA installable
+- CSP-compatible — all JS in external `app.js`, no inline event handlers
+- Compaction progress indicator (✨ Compacting context...)
 
 ### Infrastructure
-- **OS-native sandbox** — bubblewrap (Linux) / sandbox-exec (macOS) / rlimit fallback
-- **Mesh networking** — P2P between SalmAlm instances (task delegation, clipboard sharing, LAN discovery)
+- **OS-native sandbox** — bubblewrap (Linux) / sandbox-exec (macOS) / rlimit fallback; auto-detects strongest tier
+- **Mesh networking** — P2P between SalmAlm instances (task delegation, clipboard sharing, LAN UDP discovery, HMAC auth)
 - **Canvas** — local HTML/code/chart preview server at `:18803`
 - **Browser automation** — Playwright snapshot/act pattern (`pip install salmalm[browser]`)
 
@@ -176,7 +197,7 @@ These are SalmAlm-only — not found in ChatGPT, OpenClaw, Open WebUI, or any ot
 | `/a2a` | Agent-to-agent |
 | `/workflow` | Workflow engine |
 | `/mcp` | MCP management |
-| `/subagents` | Sub-agents |
+| `/subagents` | Sub-agents (spawn, steer, collect, list, stop, log, info, status) |
 | `/evolve` | Self-evolving prompt |
 | `/mood` | Mood detection |
 | `/split` | A/B split response |
@@ -201,15 +222,27 @@ SalmAlm follows a **dangerous features default OFF** policy:
 | Home directory file read | Workspace only | `SALMALM_ALLOW_HOME_READ=1` |
 | Vault (without `cryptography`) | Disabled | `SALMALM_VAULT_FALLBACK=1` for HMAC-CTR |
 | Interpreters in exec | Blocked | Use `/bash` or `python_eval` tool instead |
+| HTTP request headers | Allowlist only | `SALMALM_HEADER_PERMISSIVE=1` for blocklist mode |
 
-Additional hardening:
+### Header Security
+
+HTTP request tool uses **allowlist mode** by default — only safe headers (Accept, Content-Type, Authorization, User-Agent, etc.) are permitted. Unknown headers are rejected.
+
+Set `SALMALM_HEADER_PERMISSIVE=1` to switch to blocklist mode (blocks only dangerous headers like Proxy-Authorization, X-Forwarded-For).
+
+### Additional Hardening
 
 - **SSRF defense** — private IP blocklist on every redirect hop, scheme allowlist, userinfo block
 - **Token security** — JWT with `kid` key rotation, `jti` revocation, PBKDF2-200K password hashing
 - **Login lockout** — persistent DB-backed brute-force protection with auto-cleanup
-- **Audit trail** — append-only checkpoint log for tamper evidence
+- **Audit trail** — append-only checkpoint log with automated cron (every 6 hours) + cleanup (30 days)
 - **WebSocket origin validation** — prevents cross-site WebSocket hijacking
-- **CSP-compatible UI** — no inline event handlers, `data-action` delegation throughout
+- **CSP-compatible UI** — no inline scripts or event handlers; external `app.js` with ETag caching; optional strict CSP via `SALMALM_CSP_NONCE=1`
+- **Exec resource limits** — foreground exec: CPU timeout+5s, 1GB RAM, 100 fd, 50MB fsize (Linux/macOS)
+- **Tool timeouts** — per-tool wall-clock limits (exec 120s, browser 90s, default 60s)
+- **Tool result truncation** — per-tool output limits (exec 20K, browser 10K, HTTP 15K chars)
+
+See [`SECURITY.md`](SECURITY.md) for full details.
 
 ---
 
@@ -227,10 +260,16 @@ SALMALM_LLM_TIMEOUT=30    # LLM request timeout (seconds)
 SALMALM_COST_CAP=0        # Monthly cost cap (0=unlimited)
 
 # Security
-SALMALM_VAULT_PW=...      # Auto-unlock vault on start
-SALMALM_ALLOW_SHELL=1     # Enable shell operators in exec
-SALMALM_ALLOW_HOME_READ=1 # Allow file read outside workspace
-SALMALM_VAULT_FALLBACK=1  # Allow HMAC-CTR vault without cryptography
+SALMALM_VAULT_PW=...         # Auto-unlock vault on start
+SALMALM_ALLOW_SHELL=1        # Enable shell operators in exec
+SALMALM_ALLOW_HOME_READ=1    # Allow file read outside workspace
+SALMALM_VAULT_FALLBACK=1     # Allow HMAC-CTR vault without cryptography
+SALMALM_HEADER_PERMISSIVE=1  # HTTP headers: blocklist mode instead of allowlist
+SALMALM_CSP_NONCE=1          # Strict CSP with nonce-based script-src
+SALMALM_OPEN_BROWSER=1       # Auto-open browser on server start
+
+# Mesh
+SALMALM_MESH_SECRET=...   # HMAC secret for mesh peer authentication
 ```
 
 All configuration is also available through the web UI.
@@ -242,19 +281,37 @@ All configuration is also available through the web UI.
 ```
 Browser ──WebSocket──► SalmAlm ──► Anthropic / OpenAI / Google / xAI / Ollama
    │                     │
-   └──HTTP/SSE──►       ├── SQLite (sessions, usage, memory)
-                         ├── Tool Registry (62 tools)
-Telegram ──►             ├── Cron Scheduler
-Discord  ──►             ├── RAG Engine (TF-IDF + cosine similarity)
+   └──HTTP/SSE──►       ├── SQLite (sessions, usage, memory, audit)
+                         ├── Model Selection (complexity-based routing)
+Telegram ──►             ├── Tool Registry (62 tools)
+Discord  ──►             ├── Cron Scheduler + Audit Cron
+                         ├── Sub-Agent Manager (spawn/steer/collect)
+Mesh Peers ──►           ├── Message Queue (offline + retry + dead letter)
+                         ├── RAG Engine (TF-IDF + cosine similarity)
+                         ├── OS-native Sandbox (bwrap/unshare/rlimit)
+                         ├── Canvas Server (:18803)
                          ├── Plugin System
                          └── Vault (PBKDF2 encrypted)
 ```
 
-- **216 modules**, **43K+ lines**, **78 test files**, **1,785 tests**
+- **216 modules**, **43K+ lines**, **81 test files**, **1,663 tests**
 - Pure Python 3.10+ stdlib — no frameworks, no heavy dependencies
 - Route-table architecture (85 GET + 59 POST handlers)
 - Default bind `127.0.0.1` — explicit opt-in for network exposure
 - Runtime data under `~/SalmAlm` (configurable via `SALMALM_HOME`)
+- Cost estimation unified in `core/cost.py` with per-model pricing
+- Slash commands extracted to `core/slash_commands.py` (engine.py: 2007→1221 lines)
+- Model selection extracted to `core/model_selection.py`
+- Web UI JS extracted to external `static/app.js` (index.html: 3016→661 lines)
+
+### Version Management
+
+```bash
+# Bump version across all source files (pyproject.toml + __init__.py)
+python scripts/bump_version.py 0.17.0
+
+# CI automatically checks version consistency
+```
 
 ---
 
@@ -282,11 +339,15 @@ def register(app):
 
 ## 🤝 Contributing
 
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for full guide including test execution, code style, and architecture overview.
+
 ```bash
 git clone https://github.com/hyunjun6928-netizen/salmalm.git
 cd salmalm
 pip install -e ".[dev]"
-python -m pytest tests/ --timeout=30
+
+# Run tests (per-file, CI-style)
+for f in tests/test_*.py; do python -m pytest "$f" -q --timeout=30; done
 ```
 
 ---
