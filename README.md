@@ -58,17 +58,21 @@ First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 # Install
 pip install salmalm
 
-# Start (opens web UI at http://localhost:18800)
+# Start (web UI at http://localhost:18800)
 salmalm
 
-# With auto-open browser
+# Auto-open browser on start
 salmalm --open
 
 # Create desktop shortcut (double-click to launch!)
 salmalm --shortcut
 
-# Update
+# Self-update to latest version
 salmalm --update
+
+# Custom port / external access
+SALMALM_PORT=8080 salmalm
+SALMALM_BIND=0.0.0.0 salmalm    # expose to LAN (see Security section)
 ```
 
 ### Desktop Shortcut
@@ -217,7 +221,7 @@ SalmAlm follows a **dangerous features default OFF** policy:
 
 | Feature | Default | Opt-in |
 |---|---|---|
-| Network bind | `127.0.0.1` (loopback only) | `SALMALM_BIND=0.0.0.0` or `--host 0.0.0.0` |
+| Network bind | `127.0.0.1` (loopback only) | `SALMALM_BIND=0.0.0.0` |
 | Shell operators (pipe, redirect, chain) | Blocked | `SALMALM_ALLOW_SHELL=1` |
 | Home directory file read | Workspace only | `SALMALM_ALLOW_HOME_READ=1` |
 | Vault (without `cryptography`) | Disabled | `SALMALM_VAULT_FALLBACK=1` for HMAC-CTR |
@@ -326,9 +330,9 @@ Mesh Peers ──►           ├── Message Queue (offline + retry + dead l
                          └── Vault (PBKDF2 encrypted)
 ```
 
-- **217 modules**, **44K+ lines**, **82 test files**, **1,709 tests**
+- **231 modules**, **45K+ lines**, **82 test files**, **1,709 tests**
 - Pure Python 3.10+ stdlib — no frameworks, no heavy dependencies
-- Route-table architecture (85 GET + 59 POST handlers)
+- Route-table architecture (59 GET + 63 POST registered handlers)
 - Default bind `127.0.0.1` — explicit opt-in for network exposure
 - Runtime data under `~/SalmAlm` (configurable via `SALMALM_HOME`)
 - Cost estimation unified in `core/cost.py` with per-model pricing
@@ -359,12 +363,18 @@ docker compose up -d
 
 ## 🔌 Plugins
 
+Drop a `.py` file in the `plugins/` directory — auto-discovered on startup:
+
 ```python
-# plugins/my_plugin/__init__.py
-def register(app):
-    @app.tool("my_tool")
-    def my_tool(args):
-        return "Hello from my plugin!"
+# plugins/my_plugin.py
+TOOLS = [{
+    'name': 'my_tool',
+    'description': 'Says hello',
+    'input_schema': {'type': 'object', 'properties': {'name': {'type': 'string'}}}
+}]
+
+def handle_my_tool(args):
+    return f"Hello, {args.get('name', 'world')}!"
 ```
 
 ---

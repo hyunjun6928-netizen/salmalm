@@ -67,8 +67,12 @@ salmalm --open
 # 바탕화면 바로가기 생성 (더블클릭으로 실행!)
 salmalm --shortcut
 
-# 업데이트
+# 최신 버전으로 업데이트
 salmalm --update
+
+# 포트 변경 / 외부 접근 허용
+SALMALM_PORT=8080 salmalm
+SALMALM_BIND=0.0.0.0 salmalm    # LAN 노출 (보안 섹션 참조)
 ```
 
 ### 바탕화면 바로가기
@@ -217,7 +221,7 @@ ChatGPT, OpenClaw, Open WebUI 어디에도 없는 삶앎만의 기능:
 
 | 기능 | 기본값 | 활성화 방법 |
 |---|---|---|
-| 네트워크 바인딩 | `127.0.0.1` (루프백만) | `SALMALM_BIND=0.0.0.0` 또는 `--host 0.0.0.0` |
+| 네트워크 바인딩 | `127.0.0.1` (루프백만) | `SALMALM_BIND=0.0.0.0` |
 | 셸 연산자 (파이프, 리다이렉트, 체인) | 차단 | `SALMALM_ALLOW_SHELL=1` |
 | 홈 디렉토리 파일 읽기 | 워크스페이스만 | `SALMALM_ALLOW_HOME_READ=1` |
 | 금고 (`cryptography` 없을 때) | 비활성 | `SALMALM_VAULT_FALLBACK=1` (HMAC-CTR) |
@@ -326,9 +330,9 @@ SALMALM_MESH_SECRET=...   # 메시 피어 인증용 HMAC 시크릿
                           └── 금고 (PBKDF2 암호화)
 ```
 
-- **217개 모듈**, **4만4천+ 줄**, **82개 테스트 파일**, **1,709개 테스트**
+- **231개 모듈**, **4만5천+ 줄**, **82개 테스트 파일**, **1,709개 테스트**
 - 순수 Python 3.10+ 표준 라이브러리 — 프레임워크 없음, 무거운 의존성 없음
-- 라우트 테이블 아키텍처 (GET 85개 + POST 59개 핸들러)
+- 라우트 테이블 아키텍처 (GET 59개 + POST 63개 등록 핸들러)
 - 기본 바인딩 `127.0.0.1` — 네트워크 노출은 명시적 opt-in
 - 런타임 데이터는 `~/SalmAlm`에 저장 (`SALMALM_HOME`으로 변경 가능)
 - 비용 추정 `core/cost.py`에 통합, 모델별 가격 정보
@@ -359,12 +363,18 @@ docker compose up -d
 
 ## 🔌 플러그인
 
+`plugins/` 디렉토리에 `.py` 파일을 넣으면 시작 시 자동 인식됩니다:
+
 ```python
-# plugins/my_plugin/__init__.py
-def register(app):
-    @app.tool("my_tool")
-    def my_tool(args):
-        return "Hello from my plugin!"
+# plugins/my_plugin.py
+TOOLS = [{
+    'name': 'my_tool',
+    'description': '인사하기',
+    'input_schema': {'type': 'object', 'properties': {'name': {'type': 'string'}}}
+}]
+
+def handle_my_tool(args):
+    return f"안녕하세요, {args.get('name', '세계')}!"
 ```
 
 ---

@@ -91,7 +91,7 @@ salmalm/
 │   ├── tools_sandbox.py # Sandbox exec tool
 │   └── ...
 ├── web/                # HTTP server, WebSocket, OAuth, templates
-│   ├── web.py          # Route-table HTTP server (85 GET + 59 POST)
+│   ├── web.py          # Route-table HTTP server (59 GET + 63 POST)
 │   ├── ws.py           # WebSocket server with reconnect/resume
 │   ├── middleware.py   # Route security policies, rate limiter, tool tiers
 │   └── ...
