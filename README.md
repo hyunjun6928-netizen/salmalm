@@ -32,6 +32,8 @@ salmalm
 
 First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 
+> ⚠️ **Don't run `salmalm` from inside a cloned repo directory** — Python will import the local source instead of the installed package. Run from `~` or any other directory.
+
 ---
 
 ## Why SalmAlm?
