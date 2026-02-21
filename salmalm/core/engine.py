@@ -448,6 +448,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
     def _should_reflect(self, classification: dict, response: str, iteration: int) -> bool:
         """Determine if response needs self-reflection pass."""
+        import os as _os
+        if _os.environ.get('SALMALM_REFLECT', '1') == '0':
+            return False
         # Only reflect on complex tasks with significant responses
         if classification['intent'] not in ('code', 'analysis'):
             return False

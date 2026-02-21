@@ -117,17 +117,22 @@ def handle_http_request(args: dict) -> str:
     data = body_str.encode('utf-8') if body_str else None
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        _MAX_RESP_BYTES = 2 * 1024 * 1024  # 2 MB guard
         with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
             status = resp.status
             resp_headers = dict(resp.headers)
-            raw = resp.read()
+            raw = resp.read(_MAX_RESP_BYTES + 1)
+            truncated = len(raw) > _MAX_RESP_BYTES
+            if truncated:
+                raw = raw[:_MAX_RESP_BYTES]
         try:
             body_json = json.loads(raw)
             body_out = json.dumps(body_json, ensure_ascii=False, indent=2)[:8000]
         except (json.JSONDecodeError, UnicodeDecodeError):
             body_out = raw.decode('utf-8', errors='replace')[:8000]
         header_str = '\n'.join(f'  {k}: {v}' for k, v in list(resp_headers.items())[:10])
-        return f'HTTP {status}\nHeaders:\n{header_str}\n\nBody:\n{body_out}'
+        trunc_note = ' [truncated at 2MB]' if truncated else ''
+        return f'HTTP {status}{trunc_note}\nHeaders:\n{header_str}\n\nBody:\n{body_out}'
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')[:3000]
         return f'HTTP {e.code} {e.reason}\n{body}'
