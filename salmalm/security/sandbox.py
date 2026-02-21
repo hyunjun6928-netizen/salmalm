@@ -93,6 +93,8 @@ _MACOS_SANDBOX_PROFILE = """
 """
 
 # bubblewrap (bwrap) arguments for Linux sandbox
+
+
 def _bwrap_args(workspace: str, allow_network: bool = False) -> list:
     """Build bwrap command arguments for Linux sandboxing."""
     args = [
@@ -118,7 +120,7 @@ def _bwrap_args(workspace: str, allow_network: bool = False) -> list:
     # /lib64 may not exist on all distros
     if not Path('/lib64').exists():
         args = [a for i, a in enumerate(args)
-                if not (a == '/lib64' and i > 0 and args[i-1] == '--ro-bind')]
+                if not (a == '/lib64' and i > 0 and args[i-1] == '--ro-bind')]  # noqa: E226
         # Remove the --ro-bind before /lib64
         cleaned = []
         skip_next = False
@@ -126,7 +128,7 @@ def _bwrap_args(workspace: str, allow_network: bool = False) -> list:
             if skip_next:
                 skip_next = False
                 continue
-            if a == '--ro-bind' and i + 2 < len(args) and args[i+1] == '/lib64':
+            if a == '--ro-bind' and i + 2 < len(args) and args[i+1] == '/lib64':  # noqa: E226
                 skip_next = True  # skip /lib64 and its target
                 continue
             cleaned.append(a)

@@ -5,7 +5,7 @@ from salmalm.tools.tool_registry import register
 @register('sandbox_exec')
 def handle_sandbox_exec(args: dict) -> str:
     """Execute a command in OS-native sandbox. / OS 기본 샌드박스에서 명령 실행."""
-    from salmalm.security.sandbox import sandbox_exec, get_sandbox_status
+    from salmalm.security.sandbox import sandbox_exec
     command = args.get('command', '')
     if not command:
         return '❌ command is required / command를 입력하세요'

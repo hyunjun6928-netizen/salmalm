@@ -31,6 +31,8 @@ __pycache__/
 .env
 .venv/
 venv/
+nohup.out
+exports/
 env/
 
 # OS

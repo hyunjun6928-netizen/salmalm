@@ -102,10 +102,13 @@ class TestSafeCommand(unittest.TestCase):
         ok, reason = _is_safe_command('')
         self.assertFalse(ok)
     
-    def test_chained(self):
+    def test_chained_blocked_by_default(self):
+        import os
+        os.environ.pop('SALMALM_ALLOW_SHELL', None)
         from salmalm.tools.tool_handlers import _is_safe_command
         ok, reason = _is_safe_command('echo a && echo b')
-        self.assertTrue(ok)
+        self.assertFalse(ok)
+        self.assertIn('Shell operators', reason)
     
     def test_unknown(self):
         from salmalm.tools.tool_handlers import _is_safe_command

@@ -26,6 +26,7 @@ def connect(
     check_same_thread : passed to ``sqlite3.connect``.
     """
     conn = sqlite3.connect(str(path), check_same_thread=check_same_thread)
+    conn.execute("PRAGMA busy_timeout=5000")  # 5s wait on lock instead of immediate failure
     if row_factory:
         conn.row_factory = sqlite3.Row
     if wal:

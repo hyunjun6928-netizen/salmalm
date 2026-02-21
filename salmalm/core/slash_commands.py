@@ -3,15 +3,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
-import time as _time
 from typing import Dict
 
-from salmalm.constants import VERSION, MODEL_ALIASES as _CONST_ALIASES
+from salmalm.constants import VERSION, COMMAND_MODEL, MODEL_ALIASES as _CONST_ALIASES  # noqa: F401
 
 MODEL_ALIASES = {'auto': None, **_CONST_ALIASES}
-from salmalm.core.cost import estimate_tokens, estimate_cost, MODEL_PRICING, get_pricing as _get_pricing
-from salmalm.security.crypto import log
+from salmalm.core.cost import estimate_tokens, estimate_cost, MODEL_PRICING, get_pricing as _get_pricing  # noqa: F401
+from salmalm.security.crypto import log  # noqa: F401
 
 
 def _get_engine():
@@ -24,6 +22,22 @@ def _get_router():
     """Lazy import router to avoid circular dependency."""
     from salmalm.core import router
     return router
+
+
+def _lazy_compact_messages():
+    from salmalm.core import compact_messages
+    return compact_messages
+
+
+def _lazy_prune_context():
+    from salmalm.core.session_manager import prune_context
+    return prune_context
+
+
+def _lazy_build_system_prompt(**kwargs):
+    from salmalm.core.prompt import build_system_prompt
+    return build_system_prompt(**kwargs)
+
 
 # Session usage tracking (shared state)
 _session_usage: Dict[str, dict] = {}
@@ -92,6 +106,7 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
 
 
 def _cmd_status(cmd, session, **_):
+    from salmalm.tools.tool_handlers import execute_tool
     return execute_tool('usage_report', {})
 
 
@@ -113,12 +128,12 @@ async def _cmd_think(cmd, session, *, on_tool=None, **_):
     if first_word in _thought_subs:
         return _cmd_thought(cmd, session)
     session.add_user(think_msg)
-    session.messages = compact_messages(session.messages, session=session)
+    session.messages = _lazy_compact_messages()(session.messages, session=session)
     classification = {'intent': 'analysis', 'tier': 3, 'thinking': True,
                       'thinking_budget': 16000, 'score': 5}
     return await _get_engine().run(session, think_msg,
-                             model_override=COMMAND_MODEL,
-                             on_tool=on_tool, classification=classification)
+                             model_override=COMMAND_MODEL,  # noqa: E128
+                             on_tool=on_tool, classification=classification)  # noqa: E128
 
 
 async def _cmd_plan(cmd, session, *, model_override=None, on_tool=None, **_):
@@ -126,11 +141,11 @@ async def _cmd_plan(cmd, session, *, model_override=None, on_tool=None, **_):
     if not plan_msg:
         return 'Usage: /plan <task description>'
     session.add_user(plan_msg)
-    session.messages = compact_messages(session.messages, session=session)
+    session.messages = _lazy_compact_messages()(session.messages, session=session)
     classification = {'intent': 'code', 'tier': 3, 'thinking': True,
                       'thinking_budget': 10000, 'score': 5}
     return await _get_engine().run(session, plan_msg, model_override=model_override,
-                             on_tool=on_tool, classification=classification)
+                             on_tool=on_tool, classification=classification)  # noqa: E128
 
 
 def _cmd_uptime(cmd, session, **_):
@@ -198,7 +213,7 @@ def _cmd_health_detail(cmd, session, **_):
 
 
 def _cmd_prune(cmd, session, **_):
-    _, stats = prune_context(session.messages)
+    _, stats = _lazy_prune_context()(session.messages)
     total = stats['soft_trimmed'] + stats['hard_cleared'] + stats['unchanged']
     return (f"🧹 **Session Pruning Results**\n"
             f"• Soft-trimmed: {stats['soft_trimmed']}\n"
@@ -273,37 +288,6 @@ def _cmd_compare(cmd, session, *, session_id='', **_):
 def _cmd_security(cmd, session, **_):
     from salmalm.security import security_auditor
     return security_auditor.format_report()
-
-
-# ── Cost/token estimation — single source in cost.py ──
-from salmalm.core.cost import (  # noqa: F401
-    estimate_tokens, estimate_cost, MODEL_PRICING,
-    get_pricing as _get_pricing,
-)
-
-
-# ── Session usage tracking ──
-_session_usage: Dict[str, dict] = {}  # session_id -> {responses: [...], mode: 'off'}
-
-
-def _get_session_usage(session_id: str) -> dict:
-    if session_id not in _session_usage:
-        _session_usage[session_id] = {'responses': [], 'mode': 'off', 'total_cost': 0.0}
-    return _session_usage[session_id]
-
-
-def record_response_usage(session_id: str, model: str, usage: dict) -> None:
-    """Record per-response usage for /usage command."""
-    su = _get_session_usage(session_id)
-    cost = estimate_cost(model, usage)
-    su['responses'].append({
-        'model': model, 'input': usage.get('input', 0),
-        'output': usage.get('output', 0),
-        'cache_read': usage.get('cache_read_input_tokens', 0),
-        'cache_write': usage.get('cache_creation_input_tokens', 0),
-        'cost': cost,
-    })
-    su['total_cost'] += cost
 
 
 def _cmd_context(cmd, session, **_):
@@ -438,7 +422,7 @@ def _cmd_soul(cmd, session, **_):
 
 
 def _cmd_soul_reset(cmd, session, **_):
-    from salmalm.core.prompt import reset_user_soul
+    from salmalm.core.prompt import reset_user_soul, build_system_prompt
     reset_user_soul()
     session.add_system(build_system_prompt(full=True))
     return '📜 SOUL.md reset to default.'
@@ -830,4 +814,3 @@ async def _dispatch_slash_command(cmd, session, session_id, model_override, on_t
             return result
 
     return None
-

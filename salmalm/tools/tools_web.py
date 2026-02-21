@@ -6,7 +6,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 from salmalm.tools.tool_registry import register
-from salmalm.tools.tools_common import _is_private_url, _is_private_url_follow_redirects
+from salmalm.tools.tools_common import _is_private_url_follow_redirects
 from salmalm.constants import VERSION
 from salmalm.security.crypto import vault
 from salmalm.core.llm import _http_get

@@ -16,7 +16,6 @@ All content served from a temporary directory, auto-cleaned.
 import hashlib
 import html
 import http.server
-import os
 import re
 import socketserver
 import threading

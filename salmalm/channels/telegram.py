@@ -10,7 +10,8 @@ import time
 import urllib.request
 from typing import Any, Dict, Optional
 
-from salmalm.constants import APP_NAME, WORKSPACE_DIR
+from pathlib import Path
+from salmalm.constants import APP_NAME, VERSION, WORKSPACE_DIR
 from salmalm.security.crypto import vault, log
 from salmalm.core import router, get_session, audit_log, compact_messages, set_telegram_bot
 from salmalm.core.llm import _http_post, _http_get

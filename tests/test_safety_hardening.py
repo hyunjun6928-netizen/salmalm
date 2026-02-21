@@ -224,7 +224,7 @@ class TestWebFetch2MBLimit(unittest.TestCase):
         mock_resp.__exit__ = MagicMock(return_value=False)
 
         with patch('salmalm.tools_web.urllib.request.urlopen', return_value=mock_resp):
-            with patch('salmalm.tools_web._is_private_url', return_value=(False, '')):
+            with patch('salmalm.tools.tools_web._is_private_url_follow_redirects', return_value=(False, '', 'https://example.com/large')):
                 result = handle_web_fetch({'url': 'http://example.com', 'max_chars': 1000})
                 # Should have called read(2MB)
                 mock_resp.read.assert_called_once_with(2 * 1024 * 1024)

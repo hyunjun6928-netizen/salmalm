@@ -7,9 +7,9 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple  # noqa: F401
 
-from salmalm.constants import (VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG,
+from salmalm.constants import (VERSION, INTENT_SHORT_MSG, INTENT_COMPLEX_MSG,  # noqa: F401
                                INTENT_CONTEXT_DEPTH, REFLECT_SNIPPET_LEN,
-                               MODEL_ALIASES as _CONST_ALIASES, COMMAND_MODEL)
+                               MODEL_ALIASES as _CONST_ALIASES, COMMAND_MODEL)  # noqa: F401
 import re as _re
 import threading as _threading
 import time as _time
@@ -61,44 +61,10 @@ from salmalm.core.model_selection import (  # noqa: F401
     _SIMPLE_PATTERNS, _MODERATE_KEYWORDS, _COMPLEX_KEYWORDS,
     _MODEL_NAME_FIXES,
 )
-import json as _json
-from pathlib import Path as _Path
-from salmalm.constants import MODELS as _MODELS
+from salmalm.constants import MODELS as _MODELS  # noqa: F401
 
 # Backward-compat re-exports
 get_routing_config = _load_routing_config
-
-
-# Routing config: user can override which model to use for each complexity level
-_ROUTING_CONFIG_FILE = _Path.home() / '.salmalm' / 'routing.json'
-
-
-def _load_routing_config() -> dict:
-    """Load user's model routing config. Returns {simple, moderate, complex} model IDs."""
-    defaults = {'simple': '', 'moderate': '', 'complex': ''}
-    try:
-        if _ROUTING_CONFIG_FILE.exists():
-            cfg = _json.loads(_ROUTING_CONFIG_FILE.read_text(encoding='utf-8'))
-            for k in ('simple', 'moderate', 'complex'):
-                if k in cfg and cfg[k]:
-                    defaults[k] = cfg[k]
-    except Exception:
-        pass
-    return defaults
-
-
-def _save_routing_config(config: dict):
-    """Save user's model routing config."""
-    try:
-        _ROUTING_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _ROUTING_CONFIG_FILE.write_text(_json.dumps(config, indent=2), encoding='utf-8')
-    except Exception:
-        pass
-
-
-def get_routing_config() -> dict:
-    """Public getter for routing config (used by web API)."""
-    return _load_routing_config()
 
 
 # _select_model delegates to core/model_selection.py (backward compat)
@@ -878,7 +844,6 @@ async def process_message(session_id: str, user_message: str,
                 _active_requests_event.set()
 
 
-
 # ── Slash commands + usage tracking — extracted to slash_commands.py ──
 from salmalm.core.slash_commands import (  # noqa: F401, E402
     _session_usage, _get_session_usage, record_response_usage,
@@ -886,6 +851,7 @@ from salmalm.core.slash_commands import (  # noqa: F401, E402
     # Re-export for backward compatibility (tests import from engine)
     _cmd_context, _cmd_usage, _cmd_plugins, _cmd_export_fn as _cmd_export,
 )
+
 
 async def _process_message_inner(session_id: str, user_message: str,
                                  model_override: Optional[str] = None,

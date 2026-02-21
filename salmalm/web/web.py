@@ -3178,7 +3178,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             if provider == "anthropic":
                 url = f"{prov_cfg['base_url']}/messages"
                 req = urllib.request.Request(url,
-                    data=json.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 1,
+                    data=json.dumps({"model": "claude-haiku-4-5-20251001", "max_tokens": 1,  # noqa: E128
                                      "messages": [{"role": "user", "content": "hi"}]}).encode(),
                     headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
                              "content-type": "application/json"}, method="POST")
@@ -3922,7 +3922,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
     }
 
     def _do_post_inner(self):
-        from salmalm.core.engine import process_message
+        from salmalm.core.engine import process_message  # noqa: F401
 
         length = int(self.headers.get("Content-Length", 0))
 

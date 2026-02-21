@@ -10,7 +10,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 from salmalm.security.crypto import log
 
 
@@ -109,7 +109,7 @@ class SubAgentManager:
     def _run_agent(self, task: SubAgentTask, on_complete: Optional[Callable] = None):
         """Execute sub-agent in isolated session."""
         try:
-            from salmalm.core.core import get_session, Session
+            from salmalm.core.core import get_session, Session  # noqa: F401
             from salmalm.core.llm import call_llm
             from salmalm.core.prompt import build_system_prompt
             from salmalm.tools.tool_handlers import execute_tool
@@ -239,7 +239,6 @@ class SubAgentManager:
         to_remove = len(self._tasks) - self._MAX_HISTORY
         for tid, _ in completed[:to_remove]:
             del self._tasks[tid]
-
 
     def steer(self, task_id: str, message: str) -> str:
         """Send a steering message to a running or completed sub-agent.

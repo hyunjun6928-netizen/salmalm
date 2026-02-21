@@ -9,7 +9,7 @@ import sys
 import threading
 
 from salmalm.constants import (  # noqa: F401
-    VERSION, APP_NAME, VAULT_FILE, MEMORY_DIR, BASE_DIR
+    VERSION, APP_NAME, VAULT_FILE, MEMORY_DIR, BASE_DIR, DATA_DIR
 )
 from salmalm.security.crypto import vault, log, HAS_CRYPTO
 from salmalm.core import (  # noqa: F401
@@ -94,6 +94,11 @@ async def run_server():
     if bind_addr == '0.0.0.0':
         log.warning("[WARN] Binding to 0.0.0.0 — server is accessible from LAN. "
                     "Set SALMALM_BIND=127.0.0.1 to restrict to localhost.")
+        # External exposure safety checks
+        from salmalm.web.middleware import check_external_exposure_safety
+        exposure_warnings = check_external_exposure_safety(bind_addr, WebHandler)
+        for w in exposure_warnings:
+            log.warning(w)
     server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
 
     # Auto-generate self-signed cert for HTTPS (enables microphone, camera, etc.)

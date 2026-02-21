@@ -70,8 +70,8 @@ def _importance_score(msg: dict) -> float:
             return 3.0
         return 0.5
     # User preference/decision messages
-    if any(kw in text for kw in ('always', 'never', 'remember', 'decide', 'conclusion',
-                                  'important', 'approved', '항상', '결정', '결론', '기억')):
+    if any(kw in text for kw in ('always', 'never', 'remember', 'decide', 'conclusion',  # noqa: E127
+                                  'important', 'approved', '항상', '결정', '결론', '기억')):  # noqa: E127
         return 5.0 if role == 'user' else 4.0
     if role == 'user':
         return 3.0

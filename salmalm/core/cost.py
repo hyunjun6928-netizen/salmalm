@@ -23,6 +23,8 @@ def estimate_tokens(text: str) -> int:
 
 
 # Model pricing (USD per 1M tokens)
+# Last updated: 2026-02-21 — verify at provider pricing pages
+PRICING_VERSION = '2026-02-21'
 MODEL_PRICING: Dict[str, dict] = {
     'claude-opus-4': {'input': 15.0, 'output': 75.0, 'cache_read': 1.5, 'cache_write': 18.75},
     'claude-sonnet-4': {'input': 3.0, 'output': 15.0, 'cache_read': 0.3, 'cache_write': 3.75},

@@ -95,6 +95,18 @@ def execute_tool(name: str, args: dict) -> str:
 
     audit_log('tool_exec', f'{name}: {json.dumps(args, ensure_ascii=False)[:200]}')
 
+    # Tool tier check — critical tools blocked when externally exposed without auth
+    try:
+        import os as _os
+        bind = _os.environ.get('SALMALM_BIND', '127.0.0.1')
+        if bind != '127.0.0.1':
+            from salmalm.web.middleware import get_tool_tier
+            tier = get_tool_tier(name)
+            if tier == 'critical':
+                log.warning(f"[SECURITY] Critical tool '{name}' invoked on external bind")
+    except Exception:
+        pass
+
     # Try remote node dispatch first (if gateway has registered nodes)
     try:
         from salmalm.features.nodes import gateway

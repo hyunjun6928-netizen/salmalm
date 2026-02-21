@@ -11,7 +11,7 @@ Provides:
 import random
 import time
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Tuple
 
 from salmalm.security.crypto import log
@@ -53,7 +53,7 @@ def classify_error(error: Exception, status_code: int = 0, body: str = "") -> st
 
     # Network errors
     if any(w in error_str for w in ["timeout", "connection", "dns", "socket", "network",
-                                     "etimedout", "econnrefused", "enotfound"]):
+                                     "etimedout", "econnrefused", "enotfound"]):  # noqa: E127
         return ErrorKind.NETWORK
 
     # Default: treat as transient (safer to retry)
@@ -212,7 +212,7 @@ async def retry_with_recovery(
 
             if attempt < max_retries:
                 log.warning(f"[RETRY] {provider} attempt {attempt + 1}/{max_retries}: {e} "
-                           f"(kind={kind}, delay={delay:.1f}s)")
+                           f"(kind={kind}, delay={delay:.1f}s)")  # noqa: E128
                 if on_retry:
                     try:
                         on_retry(attempt, delay, e)

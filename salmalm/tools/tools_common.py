@@ -1,4 +1,5 @@
 """Shared helper functions for tool modules."""
+import os
 import re
 import threading
 from pathlib import Path
@@ -15,6 +16,10 @@ def _is_safe_command(cmd: str):
     """Check if command is safe to execute (allowlist + blocklist double defense)."""
     if not cmd.strip():
         return False, 'Empty command'
+    # Shell operator blocking (pipe, redirect, chain) — requires SALMALM_ALLOW_SHELL=1
+    if not os.environ.get('SALMALM_ALLOW_SHELL'):
+        if re.search(r'[|;&]|>>?|<<', cmd):
+            return False, 'Shell operators (|, >, >>, ;, &&, ||) blocked. Set SALMALM_ALLOW_SHELL=1 to enable.'
     for pattern in EXEC_BLOCKLIST_PATTERNS:
         if re.search(pattern, cmd):
             return False, f'Blocked pattern: {pattern}'
@@ -138,7 +143,7 @@ def _is_private_url_follow_redirects(url: str, max_redirects: int = 5):
     """
     import urllib.request
     import urllib.error
-    from urllib.parse import urlparse, urljoin
+    from urllib.parse import urljoin
 
     current_url = url
     for i in range(max_redirects + 1):
@@ -155,6 +160,7 @@ def _is_private_url_follow_redirects(url: str, max_redirects: int = 5):
             req = urllib.request.Request(current_url, method='HEAD',
                                          headers={'User-Agent': 'SalmAlm-SSRF-Check/1.0'})
             # Use a custom opener that doesn't follow redirects
+
             class _NoRedirect(urllib.request.HTTPRedirectHandler):
                 def redirect_request(self, req, fp, code, msg, headers, newurl):
                     raise urllib.error.HTTPError(newurl, code, msg, headers, fp)

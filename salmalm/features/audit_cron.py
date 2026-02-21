@@ -38,7 +38,6 @@ def _schedule(interval_seconds: float) -> None:
 
 def start_audit_cron(interval_hours: float = _DEFAULT_INTERVAL_HOURS) -> None:
     """Start periodic audit checkpoint. Safe to call multiple times (idempotent)."""
-    global _timer
     with _lock:
         if _timer is not None:
             return  # Already running

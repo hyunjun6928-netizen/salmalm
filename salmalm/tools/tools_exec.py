@@ -9,7 +9,7 @@ from salmalm.tools.tool_registry import register
 from salmalm.tools.tools_common import _is_safe_command
 from salmalm.constants import WORKSPACE_DIR
 from salmalm.security.exec_approvals import (check_approval, check_env_override, BackgroundSession,  # noqa: F401
-                                    BLOCKED_ENV_OVERRIDES)
+                                    BLOCKED_ENV_OVERRIDES)  # noqa: E128
 
 
 @register('exec')
