@@ -10,7 +10,7 @@
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
 [![테스트](https://img.shields.io/badge/%ED%85%8C%EC%8A%A4%ED%8A%B8-1%2C710%20%ED%86%B5%EA%B3%BC-brightgreen)]()
 [![도구](https://img.shields.io/badge/%EB%8F%84%EA%B5%AC-62%EA%B0%9C-blueviolet)]()
-[![명령어](https://img.shields.io/badge/%EB%AA%85%EB%A0%B9%EC%96%B4-32%EA%B0%9C-orange)]()
+[![명령어](https://img.shields.io/badge/%EB%AA%85%EB%A0%B9%EC%96%B4-62%EA%B0%9C+-orange)]()
 
 **[English README](README.md)**
 
@@ -173,7 +173,7 @@ ChatGPT, OpenClaw, Open WebUI 어디에도 없는 삶앎만의 기능:
 
 ---
 
-## 📋 명령어 (32개)
+## 📋 명령어 (62개+)
 
 <details>
 <summary>전체 명령어 목록 보기</summary>
@@ -212,6 +212,28 @@ ChatGPT, OpenClaw, Open WebUI 어디에도 없는 삶앎만의 기능:
 | `/screen` | 브라우저 제어 |
 | `/life` | 인생 대시보드 |
 | `/briefing` | 데일리 브리핑 |
+| `/debug` | 실시간 시스템 진단 |
+| `/security` | 보안 상태 요약 |
+| `/plugins` | 플러그인 관리 |
+| `/export` | 세션 데이터 내보내기 |
+| `/soul` | AI 성격 파일 보기/편집 |
+| `/config` | 설정 관리 |
+| `/brave` | Brave 검색 설정 |
+| `/approve` | 대기 중인 exec 명령 승인 |
+| `/agent` | 에이전트 관리 |
+| `/plan` | 다단계 계획 생성 |
+| `/compare` | 모델 응답 비교 |
+| `/hooks` | 웹훅 관리 |
+| `/health` | 시스템 건강 점검 |
+| `/bookmarks` | 저장된 링크 보기 |
+| `/new` | 새 세션 |
+| `/clear` | 현재 세션 초기화 |
+| `/whoami` | 현재 사용자 정보 |
+| `/tools` | 사용 가능한 도구 목록 |
+| `/prune` | 컨텍스트 수동 정리 |
+| `/skill` | 스킬 관리 |
+| `/oauth` | OAuth 설정 (Gmail, 캘린더) |
+| `/queue` | 메시지 큐 관리 |
 
 </details>
 

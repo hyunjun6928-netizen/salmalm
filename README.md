@@ -10,7 +10,7 @@
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
 [![Tests](https://img.shields.io/badge/tests-1%2C710%20passed-brightgreen)]()
 [![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
-[![Commands](https://img.shields.io/badge/commands-32-orange)]()
+[![Commands](https://img.shields.io/badge/commands-62+-orange)]()
 
 **[한국어 README](README_KR.md)**
 
@@ -173,7 +173,7 @@ These are SalmAlm-only — not found in ChatGPT, OpenClaw, Open WebUI, or any ot
 
 ---
 
-## 📋 Commands (32)
+## 📋 Commands (62+)
 
 <details>
 <summary>Click to expand full command list</summary>
@@ -212,6 +212,28 @@ These are SalmAlm-only — not found in ChatGPT, OpenClaw, Open WebUI, or any ot
 | `/screen` | Browser control |
 | `/life` | Life dashboard |
 | `/briefing` | Daily briefing |
+| `/debug` | Real-time system diagnostics |
+| `/security` | Security status overview |
+| `/plugins` | Plugin management |
+| `/export` | Export session data |
+| `/soul` | View/edit AI personality file |
+| `/config` | Configuration management |
+| `/brave` | Brave search settings |
+| `/approve` | Approve pending exec commands |
+| `/agent` | Agent management |
+| `/plan` | Create multi-step plans |
+| `/compare` | Compare model responses |
+| `/hooks` | Webhook management |
+| `/health` | System health check |
+| `/bookmarks` | View saved links |
+| `/new` | New session |
+| `/clear` | Clear current session |
+| `/whoami` | Current user info |
+| `/tools` | List available tools |
+| `/prune` | Prune context manually |
+| `/skill` | Skill management |
+| `/oauth` | OAuth setup (Gmail, Calendar) |
+| `/queue` | Message queue management |
 
 </details>
 
