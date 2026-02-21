@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
-[![테스트](https://img.shields.io/badge/%ED%85%8C%EC%8A%A4%ED%8A%B8-1%2C709%20%ED%86%B5%EA%B3%BC-brightgreen)]()
+[![테스트](https://img.shields.io/badge/%ED%85%8C%EC%8A%A4%ED%8A%B8-1%2C710%20%ED%86%B5%EA%B3%BC-brightgreen)]()
 [![도구](https://img.shields.io/badge/%EB%8F%84%EA%B5%AC-62%EA%B0%9C-blueviolet)]()
 [![명령어](https://img.shields.io/badge/%EB%AA%85%EB%A0%B9%EC%96%B4-32%EA%B0%9C-orange)]()
 
@@ -226,6 +226,7 @@ ChatGPT, OpenClaw, Open WebUI 어디에도 없는 삶앎만의 기능:
 | 홈 디렉토리 파일 읽기 | 워크스페이스만 | `SALMALM_ALLOW_HOME_READ=1` |
 | 금고 (`cryptography` 없을 때) | 비활성 | `SALMALM_VAULT_FALLBACK=1` (HMAC-CTR) |
 | exec에서 인터프리터 실행 | 차단 | `/bash` 또는 `python_eval` 도구 사용 |
+| 위험 exec 플래그 (find -exec, awk -f 등) | 차단 | 해당없음 (보안 강화, 우회 불가) |
 | HTTP 요청 헤더 | 허용 목록만 | `SALMALM_HEADER_PERMISSIVE=1`로 차단 목록 모드 전환 |
 
 ### 헤더 보안
@@ -265,6 +266,7 @@ HTTP 요청 도구는 기본적으로 **허용 목록 모드**를 사용합니�
 
 - **SSRF 방어** — 모든 리다이렉트 홉에서 사설 IP 차단, 스킴 허용 목록, userinfo 차단, 10진 IP 정규화
 - **셸 연산자 차단** — 파이프(`|`), 리다이렉트(`>`), 체인(`&&`, `||`, `;`)이 exec에서 기본 차단
+- **Exec 인수 차단 목록** — 명령별 위험 플래그 차단: `find -exec`, `awk system()`, `tar --to-command`, `git clone/push`, `sed -i`, `xargs -I`
 - **토큰 보안** — JWT `kid` 키 순환, `jti` 폐기, PBKDF2-200K 비밀번호 해싱
 - **로그인 잠금** — DB 기반 영구 브루트포스 방어 + 자동 정리
 - **감사 추적** — 변조 방지용 추가 전용 체크포인트 로그, 자동 크론 (6시간마다) + 정리 (30일)
@@ -293,6 +295,7 @@ SALMALM_HOME=~/SalmAlm    # 데이터 디렉토리 (DB, 금고, 로그, 메모�
 # AI
 SALMALM_LLM_TIMEOUT=30    # LLM 요청 타임아웃 (초)
 SALMALM_COST_CAP=0        # 월간 비용 상한 (0=무제한)
+SALMALM_REFLECT=0          # 자기 성찰 패스 비활성화 (비용/지연 절감)
 
 # 보안
 SALMALM_VAULT_PW=...         # 시작 시 금고 자동 잠금해제
@@ -330,7 +333,7 @@ SALMALM_MESH_SECRET=...   # 메시 피어 인증용 HMAC 시크릿
                           └── 금고 (PBKDF2 암호화)
 ```
 
-- **231개 모듈**, **4만5천+ 줄**, **82개 테스트 파일**, **1,709개 테스트**
+- **231개 모듈**, **4만5천+ 줄**, **82개 테스트 파일**, **1,710개 테스트**
 - 순수 Python 3.10+ 표준 라이브러리 — 프레임워크 없음, 무거운 의존성 없음
 - 라우트 테이블 아키텍처 (GET 59개 + POST 63개 등록 핸들러)
 - 기본 바인딩 `127.0.0.1` — 네트워크 노출은 명시적 opt-in

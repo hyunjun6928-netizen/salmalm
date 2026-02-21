@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
-[![Tests](https://img.shields.io/badge/tests-1%2C709%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1%2C710%20passed-brightgreen)]()
 [![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
 [![Commands](https://img.shields.io/badge/commands-32-orange)]()
 
@@ -226,6 +226,7 @@ SalmAlm follows a **dangerous features default OFF** policy:
 | Home directory file read | Workspace only | `SALMALM_ALLOW_HOME_READ=1` |
 | Vault (without `cryptography`) | Disabled | `SALMALM_VAULT_FALLBACK=1` for HMAC-CTR |
 | Interpreters in exec | Blocked | Use `/bash` or `python_eval` tool instead |
+| Dangerous exec flags (find -exec, awk -f, etc.) | Blocked | N/A (security hardening, no override) |
 | HTTP request headers | Allowlist only | `SALMALM_HEADER_PERMISSIVE=1` for blocklist mode |
 
 ### Header Security
@@ -265,6 +266,7 @@ When binding to `0.0.0.0`, SalmAlm automatically:
 
 - **SSRF defense** — private IP blocklist on every redirect hop, scheme allowlist, userinfo block, decimal IP normalization
 - **Shell operator blocking** — pipe (`|`), redirect (`>`), chain (`&&`, `||`, `;`) blocked by default in exec
+- **Exec argument blocklist** — dangerous flags blocked per command: `find -exec`, `awk system()`, `tar --to-command`, `git clone/push`, `sed -i`, `xargs -I`
 - **Token security** — JWT with `kid` key rotation, `jti` revocation, PBKDF2-200K password hashing
 - **Login lockout** — persistent DB-backed brute-force protection with auto-cleanup
 - **Audit trail** — append-only checkpoint log with automated cron (every 6 hours) + cleanup (30 days)
@@ -293,6 +295,7 @@ SALMALM_HOME=~/SalmAlm    # Data directory (DB, vault, logs, memory)
 # AI
 SALMALM_LLM_TIMEOUT=30    # LLM request timeout (seconds)
 SALMALM_COST_CAP=0        # Monthly cost cap (0=unlimited)
+SALMALM_REFLECT=0          # Disable self-reflection pass (saves cost/latency)
 
 # Security
 SALMALM_VAULT_PW=...         # Auto-unlock vault on start
@@ -330,7 +333,7 @@ Mesh Peers ──►           ├── Message Queue (offline + retry + dead l
                          └── Vault (PBKDF2 encrypted)
 ```
 
-- **231 modules**, **45K+ lines**, **82 test files**, **1,709 tests**
+- **231 modules**, **45K+ lines**, **82 test files**, **1,710 tests**
 - Pure Python 3.10+ stdlib — no frameworks, no heavy dependencies
 - Route-table architecture (59 GET + 63 POST registered handlers)
 - Default bind `127.0.0.1` — explicit opt-in for network exposure

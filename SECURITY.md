@@ -7,6 +7,7 @@ SalmAlm ships with powerful tools that are **disabled by default**. Each require
 | Feature | Env Variable | Default | Risk |
 |---------|-------------|---------|------|
 | Shell operators (pipe, redirect, chain) | `SALMALM_ALLOW_SHELL=1` | OFF | Command injection |
+| Dangerous exec flags (find -exec, awk -f, git clone, sed -i, tar --to-command, xargs -I) | N/A (always blocked) | OFF | Code execution via allowed commands |
 | Home directory file read | `SALMALM_ALLOW_HOME_READ=1` | OFF | Data exfiltration |
 | Bind to all interfaces | `SALMALM_BIND=0.0.0.0` | `127.0.0.1` | Network exposure |
 | Vault fallback (HMAC-CTR) | `SALMALM_VAULT_FALLBACK=1` | OFF | Weaker encryption |
