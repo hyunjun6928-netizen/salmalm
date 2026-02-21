@@ -142,6 +142,57 @@ def _ensure_audit_v2_table():
     conn.commit()
 
 
+# ── Audit log batching ──
+_audit_buffer: list = []  # buffered audit entries
+_AUDIT_BATCH_SIZE = 20    # flush after this many entries
+_AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush
+_audit_flush_timer: Optional[threading.Timer] = None  # noqa: F405
+
+
+def _flush_audit_buffer() -> None:
+    """Write buffered audit entries to SQLite in a single transaction."""
+    global _audit_flush_timer
+    with _audit_lock:
+        if not _audit_buffer:
+            _audit_flush_timer = None
+            return
+        entries = _audit_buffer[:]
+        _audit_buffer.clear()
+        _audit_flush_timer = None
+
+    conn = _get_db()
+    # Get current chain head
+    row = conn.execute(
+        "SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    prev = row[0] if row else "0" * 64
+
+    for ts, event, detail, session_id, json_detail in entries:
+        # v1: hash-chain
+        payload = f"{ts}|{event}|{detail}|{prev}"
+        h = hashlib.sha256(payload.encode()).hexdigest()
+        conn.execute(
+            "INSERT INTO audit_log (ts, event, detail, prev_hash, hash) VALUES (?,?,?,?,?)",
+            (ts, event, detail[:500], prev, h),
+        )
+        prev = h
+        # v2: structured
+        conn.execute(
+            "INSERT INTO audit_log_v2 (timestamp, event_type, session_id, detail) VALUES (?,?,?,?)",
+            (ts, event, session_id, json_detail),
+        )
+    conn.commit()
+
+
+def _schedule_audit_flush() -> None:
+    """Schedule a delayed flush if not already pending."""
+    global _audit_flush_timer
+    if _audit_flush_timer is None:
+        _audit_flush_timer = threading.Timer(_AUDIT_FLUSH_INTERVAL, _flush_audit_buffer)  # noqa: F405
+        _audit_flush_timer.daemon = True
+        _audit_flush_timer.start()
+
+
 def audit_log(
     event: str,
     detail: str = "",
@@ -150,40 +201,33 @@ def audit_log(
 ) -> None:
     """Write an audit event to the security log (v1 chain + v2 structured).
 
+    Events are buffered and flushed in batches for performance.
+    Flush triggers: batch size (20) or time interval (5s), whichever comes first.
+
     Args:
         event: event type string (tool_call, api_call, auth_success, etc.)
         detail: plain text detail (for v1 compatibility)
         session_id: associated session ID
         detail_dict: structured detail as dict (serialized to JSON for v2)
     """
+    _ensure_audit_v2_table()
+    ts = datetime.now(KST).isoformat()  # noqa: F405
+    json_detail = (
+        json.dumps(detail_dict, ensure_ascii=False)
+        if detail_dict
+        else json.dumps({"text": detail[:500]})
+    )
+
     with _audit_lock:
-        conn = _get_db()
-        ts = datetime.now(KST).isoformat()  # noqa: F405
+        _audit_buffer.append((ts, event, detail, session_id, json_detail))
+        if len(_audit_buffer) >= _AUDIT_BATCH_SIZE:
+            pass  # will flush below
+        else:
+            _schedule_audit_flush()
+            return
 
-        # v1: hash-chain audit log (backwards compat)
-        row = conn.execute(
-            "SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-        prev = row[0] if row else "0" * 64
-        payload = f"{ts}|{event}|{detail}|{prev}"
-        h = hashlib.sha256(payload.encode()).hexdigest()
-        conn.execute(
-            "INSERT INTO audit_log (ts, event, detail, prev_hash, hash) VALUES (?,?,?,?,?)",
-            (ts, event, detail[:500], prev, h),
-        )
-
-        # v2: structured audit log
-        _ensure_audit_v2_table()
-        json_detail = (
-            json.dumps(detail_dict, ensure_ascii=False)
-            if detail_dict
-            else json.dumps({"text": detail[:500]})
-        )
-        conn.execute(
-            "INSERT INTO audit_log_v2 (timestamp, event_type, session_id, detail) VALUES (?,?,?,?)",
-            (ts, event, session_id, json_detail),
-        )
-        conn.commit()
+    # Flush immediately when batch is full
+    _flush_audit_buffer()
 
 
 def audit_checkpoint() -> Optional[str]:

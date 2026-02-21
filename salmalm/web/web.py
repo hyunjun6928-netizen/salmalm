@@ -70,7 +70,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             return body
         import gzip as _gzip
 
-        compressed = _gzip.compress(body, compresslevel=6)
+        compressed = _gzip.compress(body, compresslevel=1)  # fast compression, minimal CPU
         if len(compressed) < len(body):
             self.send_header("Content-Encoding", "gzip")
             return compressed
@@ -1610,6 +1610,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self._cors()
         self.send_header("Content-Type", "application/manifest+json")
+        self.send_header("Cache-Control", "public, max-age=86400")
         self.end_headers()
         self.wfile.write(json.dumps(manifest).encode())
 
