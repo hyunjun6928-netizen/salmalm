@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
-[![Tests](https://img.shields.io/badge/tests-1%2C663%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1%2C709%20passed-brightgreen)]()
 [![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
 [![Commands](https://img.shields.io/badge/commands-32-orange)]()
 
@@ -230,17 +230,48 @@ HTTP request tool uses **allowlist mode** by default — only safe headers (Acce
 
 Set `SALMALM_HEADER_PERMISSIVE=1` to switch to blocklist mode (blocks only dangerous headers like Proxy-Authorization, X-Forwarded-For).
 
+### Route Security Middleware
+
+Every HTTP route has a **security policy** (auth, audit, CSRF, rate limit) enforced automatically via `web/middleware.py`:
+
+- **Public routes** (`/`, `/setup`, `/static/*`) — no auth required
+- **API routes** (`/api/*`) — auth required, writes audited, CSRF enforced on POST
+- **Sensitive routes** (`/api/vault/*`, `/api/admin/*`) — always require auth + CSRF
+
+Developers can't accidentally skip auth — the middleware chain enforces it structurally.
+
+### Tool Risk Tiers
+
+Tools are classified by risk level, and **critical tools are blocked on external network exposure without authentication**:
+
+| Tier | Tools | External (0.0.0.0) |
+|---|---|---|
+| 🔴 Critical | exec, bash, file_write, file_delete, python_eval, browser_action, sandbox_exec | Auth required |
+| 🟡 High | http_request, send_email, file_read, mesh_task | Allowed with warning |
+| 🟢 Normal | web_search, calendar, QR, etc. | Allowed |
+
+### External Exposure Safety
+
+When binding to `0.0.0.0`, SalmAlm automatically:
+- ⚠️ Warns if no admin password is set
+- ⚠️ Warns about dangerous tools being accessible
+- Blocks critical tools for unauthenticated sessions
+
 ### Additional Hardening
 
-- **SSRF defense** — private IP blocklist on every redirect hop, scheme allowlist, userinfo block
+- **SSRF defense** — private IP blocklist on every redirect hop, scheme allowlist, userinfo block, decimal IP normalization
+- **Shell operator blocking** — pipe (`|`), redirect (`>`), chain (`&&`, `||`, `;`) blocked by default in exec
 - **Token security** — JWT with `kid` key rotation, `jti` revocation, PBKDF2-200K password hashing
 - **Login lockout** — persistent DB-backed brute-force protection with auto-cleanup
 - **Audit trail** — append-only checkpoint log with automated cron (every 6 hours) + cleanup (30 days)
+- **Rate limiting** — in-memory per-IP rate limiter (60 req/min) for API routes
 - **WebSocket origin validation** — prevents cross-site WebSocket hijacking
 - **CSP-compatible UI** — no inline scripts or event handlers; external `app.js` with ETag caching; optional strict CSP via `SALMALM_CSP_NONCE=1`
 - **Exec resource limits** — foreground exec: CPU timeout+5s, 1GB RAM, 100 fd, 50MB fsize (Linux/macOS)
 - **Tool timeouts** — per-tool wall-clock limits (exec 120s, browser 90s, default 60s)
 - **Tool result truncation** — per-tool output limits (exec 20K, browser 10K, HTTP 15K chars)
+- **SQLite hardening** — WAL journal mode + 5s busy_timeout (prevents "database is locked")
+- **46 security regression tests** — SSRF bypass, header injection, exec bypass, tool tiers, route policies
 
 See [`SECURITY.md`](SECURITY.md) for full details.
 
@@ -290,11 +321,12 @@ Mesh Peers ──►           ├── Message Queue (offline + retry + dead l
                          ├── RAG Engine (TF-IDF + cosine similarity)
                          ├── OS-native Sandbox (bwrap/unshare/rlimit)
                          ├── Canvas Server (:18803)
+                         ├── Security Middleware (auth/audit/rate/CSRF per route)
                          ├── Plugin System
                          └── Vault (PBKDF2 encrypted)
 ```
 
-- **216 modules**, **43K+ lines**, **81 test files**, **1,663 tests**
+- **217 modules**, **44K+ lines**, **82 test files**, **1,709 tests**
 - Pure Python 3.10+ stdlib — no frameworks, no heavy dependencies
 - Route-table architecture (85 GET + 59 POST handlers)
 - Default bind `127.0.0.1` — explicit opt-in for network exposure

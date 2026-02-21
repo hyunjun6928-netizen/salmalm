@@ -14,6 +14,26 @@ SalmAlm ships with powerful tools that are **disabled by default**. Each require
 | CSP nonce strict mode | `SALMALM_CSP_NONCE=1` | OFF (unsafe-inline) | XSS surface |
 | HTTP header permissive mode | `SALMALM_HEADER_PERMISSIVE=1` | OFF (allowlist) | Header injection |
 
+## Route Security Middleware
+
+Every HTTP route has an enforced security policy via `web/middleware.py`:
+
+- **RoutePolicy** per route: `auth`, `audit`, `csrf`, `rate` attributes
+- Public routes (`/`, `/setup`, `/static/*`): no auth
+- API routes (`/api/*`): auth required, writes audited, CSRF on POST
+- Sensitive routes (`/api/vault/*`, `/api/admin/*`): always auth + CSRF
+- **Rate limiting**: in-memory per-IP, 60 requests per 60-second window
+
+## Tool Risk Tiers
+
+| Tier | Tools | External (0.0.0.0) without auth |
+|------|-------|---------------------------------|
+| Critical | exec, bash, file_write, file_delete, python_eval, browser_action, sandbox_exec | **Blocked** |
+| High | http_request, send_email, file_read, mesh_task | Warning logged |
+| Normal | All others | Allowed |
+
+When `SALMALM_BIND=0.0.0.0`, SalmAlm automatically warns if no admin password is configured and blocks critical tools for unauthenticated sessions.
+
 ## Blocked by Default
 
 - **Interpreters** (`python`, `python3`, `node`, `bash`, `sh`, `ruby`, `perl`) are blocked from `exec` tool entirely via `EXEC_BLOCKED_INTERPRETERS`.
@@ -113,6 +133,6 @@ Please report security vulnerabilities via GitHub Issues with the `security` lab
 
 | Version | Supported |
 |---------|-----------|
-| 0.17.x | ✅ Current |
+| 0.17.x | ✅ Current (1,709 tests, 46 security regression tests) |
 | 0.16.x | ✅ Security fixes |
 | < 0.16 | ❌ Upgrade recommended |

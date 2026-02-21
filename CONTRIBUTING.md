@@ -93,6 +93,7 @@ salmalm/
 ├── web/                # HTTP server, WebSocket, OAuth, templates
 │   ├── web.py          # Route-table HTTP server (85 GET + 59 POST)
 │   ├── ws.py           # WebSocket server with reconnect/resume
+│   ├── middleware.py   # Route security policies, rate limiter, tool tiers
 │   └── ...
 ├── channels/           # Telegram, Slack integrations
 ├── utils/              # Chunker, migration, markdown
@@ -144,7 +145,7 @@ CI automatically checks version consistency between these files.
 ## Pull Request Checklist
 
 - [ ] Tests pass: `python -m pytest tests/test_yourfile.py -v --timeout=30`
-- [ ] Full suite: `python -m pytest tests/ -q --timeout=30` (1,663 tests expected)
+- [ ] Full suite: `python -m pytest tests/ -q --timeout=30` (1,709 tests expected)
 - [ ] No new dependencies (stdlib only)
 - [ ] i18n: Both EN and KR strings provided
 - [ ] Security: Dangerous features default OFF with env var opt-in

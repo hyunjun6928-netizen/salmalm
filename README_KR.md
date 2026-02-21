@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
-[![테스트](https://img.shields.io/badge/%ED%85%8C%EC%8A%A4%ED%8A%B8-1%2C663%20%ED%86%B5%EA%B3%BC-brightgreen)]()
+[![테스트](https://img.shields.io/badge/%ED%85%8C%EC%8A%A4%ED%8A%B8-1%2C709%20%ED%86%B5%EA%B3%BC-brightgreen)]()
 [![도구](https://img.shields.io/badge/%EB%8F%84%EA%B5%AC-62%EA%B0%9C-blueviolet)]()
 [![명령어](https://img.shields.io/badge/%EB%AA%85%EB%A0%B9%EC%96%B4-32%EA%B0%9C-orange)]()
 
@@ -230,17 +230,48 @@ HTTP 요청 도구는 기본적으로 **허용 목록 모드**를 사용합니�
 
 `SALMALM_HEADER_PERMISSIVE=1`을 설정하면 차단 목록 모드로 전환됩니다 (위험한 헤더 Proxy-Authorization, X-Forwarded-For 등만 차단).
 
+### 라우트 보안 미들웨어
+
+모든 HTTP 라우트에 **보안 정책** (인증, 감사, CSRF, 요청 제한)이 `web/middleware.py`를 통해 자동 적용됩니다:
+
+- **공개 라우트** (`/`, `/setup`, `/static/*`) — 인증 불필요
+- **API 라우트** (`/api/*`) — 인증 필수, 쓰기 작업 감사, POST에 CSRF 적용
+- **민감한 라우트** (`/api/vault/*`, `/api/admin/*`) — 항상 인증 + CSRF 필수
+
+개발자가 실수로 인증을 빠뜨릴 수 없습니다 — 미들웨어 체인이 구조적으로 강제합니다.
+
+### 도구 위험 등급
+
+도구는 위험 수준별로 분류되며, **외부 네트워크 노출 시 인증 없는 위험 도구 실행이 차단**됩니다:
+
+| 등급 | 도구 | 외부 노출 (0.0.0.0) |
+|---|---|---|
+| 🔴 위험 | exec, bash, file_write, file_delete, python_eval, browser_action, sandbox_exec | 인증 필수 |
+| 🟡 주의 | http_request, send_email, file_read, mesh_task | 경고와 함께 허용 |
+| 🟢 일반 | web_search, calendar, QR 등 | 허용 |
+
+### 외부 노출 안전장치
+
+`0.0.0.0`에 바인딩하면 삶앎이 자동으로:
+- ⚠️ 관리자 비밀번호 미설정 시 경고
+- ⚠️ 위험 도구 접근 가능 경고
+- 미인증 세션에서 위험 도구 차단
+
 ### 추가 보안
 
-- **SSRF 방어** — 모든 리다이렉트 홉에서 사설 IP 차단, 스킴 허용 목록, userinfo 차단
+- **SSRF 방어** — 모든 리다이렉트 홉에서 사설 IP 차단, 스킴 허용 목록, userinfo 차단, 10진 IP 정규화
+- **셸 연산자 차단** — 파이프(`|`), 리다이렉트(`>`), 체인(`&&`, `||`, `;`)이 exec에서 기본 차단
 - **토큰 보안** — JWT `kid` 키 순환, `jti` 폐기, PBKDF2-200K 비밀번호 해싱
 - **로그인 잠금** — DB 기반 영구 브루트포스 방어 + 자동 정리
 - **감사 추적** — 변조 방지용 추가 전용 체크포인트 로그, 자동 크론 (6시간마다) + 정리 (30일)
+- **요청 제한** — 인메모리 IP별 레이트 리미터 (60요청/분) API 라우트 적용
 - **WebSocket Origin 검증** — 크로스 사이트 WebSocket 하이재킹 방지
 - **CSP 호환 UI** — 인라인 스크립트/이벤트 핸들러 없음; 외부 `app.js` + ETag 캐싱; `SALMALM_CSP_NONCE=1`로 엄격 CSP 옵트인
 - **Exec 리소스 제한** — 포그라운드 실행: CPU 타임아웃+5s, 1GB RAM, 100 fd, 50MB fsize (Linux/macOS)
 - **도구별 타임아웃** — exec 120초, browser 90초, 기본 60초 wall-clock 제한
 - **도구별 출력 제한** — exec 20K, browser 10K, HTTP 15K 글자 차등 제한
+- **SQLite 강화** — WAL 저널 모드 + 5초 busy_timeout ("database is locked" 방지)
+- **46개 보안 회귀 테스트** — SSRF 우회, 헤더 인젝션, exec 우회, 도구 등급, 라우트 정책
 
 자세한 내용은 [`SECURITY.md`](SECURITY.md)를 참조하세요.
 
@@ -290,11 +321,12 @@ SALMALM_MESH_SECRET=...   # 메시 피어 인증용 HMAC 시크릿
                           ├── RAG 엔진 (TF-IDF + 코사인 유사도)
                           ├── OS 기본 샌드박스 (bwrap/unshare/rlimit)
                           ├── 캔버스 서버 (:18803)
+                          ├── 보안 미들웨어 (라우트별 인증/감사/제한/CSRF)
                           ├── 플러그인 시스템
                           └── 금고 (PBKDF2 암호화)
 ```
 
-- **216개 모듈**, **4만3천+ 줄**, **81개 테스트 파일**, **1,663개 테스트**
+- **217개 모듈**, **4만4천+ 줄**, **82개 테스트 파일**, **1,709개 테스트**
 - 순수 Python 3.10+ 표준 라이브러리 — 프레임워크 없음, 무거운 의존성 없음
 - 라우트 테이블 아키텍처 (GET 85개 + POST 59개 핸들러)
 - 기본 바인딩 `127.0.0.1` — 네트워크 노출은 명시적 opt-in
