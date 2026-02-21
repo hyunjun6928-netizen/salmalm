@@ -32,7 +32,12 @@ jobs:
 
       - name: Version consistency check
         run: |
-          pyproject_ver=$(python -c "import tomllib, pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          pyproject_ver=$(python -c "
+          import pathlib, re
+          text = pathlib.Path('pyproject.toml').read_text()
+          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.M)
+          print(m.group(1))
+          ")
           init_ver=$(python -c "from salmalm import __version__; print(__version__)")
           if [ "$pyproject_ver" != "$init_ver" ]; then
             echo "::error::Version mismatch: pyproject.toml=$pyproject_ver vs __init__.py=$init_ver"
