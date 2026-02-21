@@ -57,7 +57,10 @@ salmalm
 ## ⚡ 빠른 시작
 
 ```bash
-# 설치
+# 원라인 설치 (venv 자동 생성, 설치, PATH 추가)
+curl -fsSL https://raw.githubusercontent.com/hyunjun6928-netizen/salmalm/main/scripts/install.sh | bash
+
+# 또는 직접 설치
 pip install salmalm
 
 # 시작 (http://localhost:18800 에서 웹 UI 실행)

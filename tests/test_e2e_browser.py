@@ -273,3 +273,136 @@ class E2EBrowserTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class E2EBrowserExtendedTest(unittest.TestCase):
+    """Extended E2E tests — reuses server from E2EBrowserTest."""
+
+    @classmethod
+    def setUpClass(cls):
+        if not HAS_PLAYWRIGHT:
+            raise unittest.SkipTest("playwright not installed")
+        # Reuse port from main test or start new server
+        cls.port = E2EBrowserTest.port
+        cls.base_url = E2EBrowserTest.base_url
+        if not cls.port:
+            raise unittest.SkipTest("Server not started")
+
+    def _new_page(self, pw):
+        browser = pw.chromium.launch(headless=True)
+        page = browser.new_page()
+        return browser, page
+
+    def test_10_setup_or_unlock_page(self):
+        """First visit shows setup or unlock page (not a crash)."""
+        with sync_playwright() as pw:
+            browser, page = self._new_page(pw)
+            try:
+                resp = page.goto(self.base_url)
+                self.assertIn(resp.status, (200, 304))
+                content = page.content().lower()
+                # Should show one of: setup, unlock, onboarding, or main chat
+                has_valid_page = any(kw in content for kw in [
+                    'setup', 'unlock', 'password', 'onboarding',
+                    'send-btn', 'input', 'salmalm'
+                ])
+                self.assertTrue(has_valid_page, "Page doesn't show any expected content")
+            finally:
+                browser.close()
+
+    def test_11_chat_post_no_500(self):
+        """POST /api/chat doesn't return 500 (even without API key)."""
+        import urllib.request
+        import urllib.error
+        data = json.dumps({"message": "hello", "session": "test-e2e"}).encode()
+        req = urllib.request.Request(
+            f"{self.base_url}/api/chat",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            resp = urllib.request.urlopen(req, timeout=10)
+            self.assertNotEqual(resp.getcode(), 500)
+        except urllib.error.HTTPError as e:
+            # 401/403 is OK (auth required), 500 is not
+            self.assertNotEqual(e.code, 500, f"Chat returned 500: {e.read()[:200]}")
+
+    def test_12_language_switch(self):
+        """Language setting persists in localStorage."""
+        with sync_playwright() as pw:
+            browser, page = self._new_page(pw)
+            try:
+                page.goto(self.base_url)
+                page.wait_for_timeout(2000)
+
+                # Check if setLang function exists
+                has_set_lang = page.evaluate("typeof window.setLang === 'function'")
+                if has_set_lang:
+                    page.evaluate("window.setLang('ko')")
+                    lang = page.evaluate("localStorage.getItem('salmalm-lang')")
+                    self.assertEqual(lang, "ko")
+
+                    page.evaluate("window.setLang('en')")
+                    lang = page.evaluate("localStorage.getItem('salmalm-lang')")
+                    self.assertEqual(lang, "en")
+                else:
+                    self.skipTest("setLang not available (setup/unlock page)")
+            finally:
+                browser.close()
+
+    def test_13_theme_toggle(self):
+        """Theme toggle switches between light and dark."""
+        with sync_playwright() as pw:
+            browser, page = self._new_page(pw)
+            try:
+                page.goto(self.base_url)
+                page.wait_for_timeout(2000)
+
+                has_toggle = page.evaluate("typeof window.toggleTheme === 'function'")
+                if has_toggle:
+                    page.evaluate("window.toggleTheme()")
+                    theme = page.evaluate("localStorage.getItem('salm_theme')")
+                    self.assertIn(theme, ("light", "dark"))
+                else:
+                    self.skipTest("toggleTheme not available")
+            finally:
+                browser.close()
+
+    def test_14_color_theme(self):
+        """Color theme changes data-color attribute."""
+        with sync_playwright() as pw:
+            browser, page = self._new_page(pw)
+            try:
+                page.goto(self.base_url)
+                page.wait_for_timeout(2000)
+
+                has_set_color = page.evaluate("typeof window.setColor === 'function'")
+                if has_set_color:
+                    page.evaluate("window.setColor('ocean')")
+                    color = page.evaluate("document.documentElement.getAttribute('data-color')")
+                    self.assertEqual(color, "ocean")
+
+                    stored = page.evaluate("localStorage.getItem('salm_color')")
+                    self.assertEqual(stored, "ocean")
+                else:
+                    self.skipTest("setColor not available")
+            finally:
+                browser.close()
+
+    def test_15_no_console_errors(self):
+        """No JavaScript errors on page load."""
+        with sync_playwright() as pw:
+            browser, page = self._new_page(pw)
+            try:
+                js_errors = []
+                page.on("pageerror", lambda err: js_errors.append(str(err)))
+
+                page.goto(self.base_url)
+                page.wait_for_timeout(3000)
+
+                # Filter out known non-critical errors
+                critical = [e for e in js_errors if 'ResizeObserver' not in e]
+                self.assertEqual(critical, [], f"JS errors on load: {critical}")
+            finally:
+                browser.close()

@@ -57,7 +57,10 @@ First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 ## ⚡ Quick Start
 
 ```bash
-# Install
+# One-liner install (creates venv, installs, adds to PATH)
+curl -fsSL https://raw.githubusercontent.com/hyunjun6928-netizen/salmalm/main/scripts/install.sh | bash
+
+# Or manual install
 pip install salmalm
 
 # Start (web UI at http://localhost:18800)
