@@ -532,6 +532,8 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
     <button id="attach-btn" title="Attach file" data-action="attachFile" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">📎</button>
     <input type="file" id="file-input-hidden" accept="image/png,image/jpeg,image/gif,image/webp,.txt,.md,.py,.js,.json,.csv,.html,.css,.pdf" style="display:none">
     <button id="mic-btn" data-action="toggleMic" title="Voice input" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">🎤</button>
+    <button id="queue-btn" data-action="queueMsg" title="Add to queue" style="width:36px;height:36px;border-radius:10px;border:none;background:var(--bg3);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 0.15s">📥</button>
+    <button id="stop-btn" data-action="stopGen" title="Stop generating" style="display:none;width:36px;height:36px;border-radius:10px;border:none;background:var(--red,#f87171);color:#fff;cursor:pointer;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:all 0.15s">⏹</button>
     <button id="send-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
     </button>

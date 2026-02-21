@@ -546,6 +546,8 @@
       var _secs=((Date.now()-_wsSendStart)/1000).toFixed(1);
       addMsg('assistant',data.text||'','⏱️'+_secs+'s');
       fetch('/api/status').then(function(r){return r.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+      /* Queue drain: send next queued message */
+      if(window._msgQueue&&window._msgQueue.length>0){var _nextMsg=window._msgQueue.shift();setTimeout(function(){var _inp=document.getElementById('input');if(_inp){_inp.value=_nextMsg;window.doSend()}},500)}
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
     }else if(data.type==='error'){
       if(typingEl)typingEl.remove();
@@ -694,6 +696,10 @@
     if(!msg){btn.disabled=false;return}
 
     addTyping();
+    var _stopBtn=document.getElementById('stop-btn');
+    var _sendBtnEl=document.getElementById('send-btn');
+    if(_stopBtn){_stopBtn.style.display='flex'}
+    if(_sendBtnEl){_sendBtnEl.style.display='none'}
     var _sendStart=Date.now();
     _wsSendStart=_sendStart;
     var chatBody={message:msg,session:_currentSession,lang:_lang};
@@ -705,7 +711,7 @@
         await _sendViaSse(chatBody,_sendStart);
       }
     }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ Error: '+se.message)}
-    finally{btn.disabled=false;input.focus()}
+    finally{btn.disabled=false;input.focus();var _sb2=document.getElementById('stop-btn');var _sb3=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb3)_sb3.style.display='flex'}
   }
   window.doSend=doSend;
 
@@ -818,7 +824,7 @@
       'cmd-search':'Search','cmd-theme':'Toggle Theme','cmd-sidebar':'Toggle Sidebar',
       'cmd-dashboard':'Dashboard',
       'shortcut-cmdpalette':'Command palette',
-      'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.',
+      'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.','queue-empty':'Type a message first','queue-btn-title':'Add to queue','stop-btn-title':'Stop generating',
       'mr-active':'Active Model','mr-providers-title':'📦 Models by Provider','mr-providers-desc':'Click a model to switch. Pricing per 1M tokens (input / output).','mr-keys-desc':'Enter API keys to enable providers. Keys are tested in real-time.',
       'nav-sessions':'📋 Sessions','nav-docs':'📖 Docs','nav-cron':'⏰ Cron Jobs','nav-memory':'🧠 Memory',
       'cron-title':'⏰ Cron Jobs','cron-add':'➕ Add Job','cron-name':'Name','cron-interval':'Interval (seconds)','cron-schedule':'Schedule','cron-at':'Run at (optional)','cron-prompt':'Prompt','btn-cancel':'Cancel',
@@ -929,7 +935,7 @@
       'cmd-search':'검색','cmd-theme':'테마 전환','cmd-sidebar':'사이드바 전환',
       'cmd-dashboard':'대시보드',
       'shortcut-cmdpalette':'커맨드 팔레트',
-      'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.',
+      'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.','queue-empty':'먼저 메시지를 입력하세요','queue-btn-title':'큐에 추가','stop-btn-title':'생성 중단',
       'mr-active':'활성 모델','mr-providers-title':'📦 프로바이더별 모델','mr-providers-desc':'모델을 클릭하면 전환됩니다. 가격: 1M 토큰당 (입력 / 출력).','mr-keys-desc':'API 키를 입력하면 프로바이더가 활성화됩니다. 키는 실시간으로 테스트됩니다.',
       'nav-sessions':'📋 세션','nav-docs':'📖 문서','nav-cron':'⏰ 크론 작업','nav-memory':'🧠 기억',
       'cron-title':'⏰ 크론 작업','cron-add':'➕ 작업 추가','cron-name':'이름','cron-interval':'간격 (초)','cron-schedule':'스케줄','cron-at':'실행 시각 (선택)','cron-prompt':'프롬프트','btn-cancel':'취소',
@@ -1833,6 +1839,8 @@
     else if(a==='pwaDismiss')window.pwaDismiss();
     else if(a==='toggleThinking')window.toggleThinking();
     else if(a==='toggleMic')window.toggleMic();
+    else if(a==='stopGen'){window._cancelGeneration();var _sb4=document.getElementById('stop-btn');var _sb5=document.getElementById('send-btn');if(_sb4)_sb4.style.display='none';if(_sb5)_sb5.style.display='flex'}
+    else if(a==='queueMsg'){var _qi=document.getElementById('input');var _qm=_qi?_qi.value.trim():'';if(!_qm){if(window._msgQueue&&window._msgQueue.length>0){if(confirm((t('queue-clear')||'Queue has ')+window._msgQueue.length+(t('queue-clear2')||' messages. Clear?'))){window._msgQueue=[];var _qb0=document.getElementById('queue-btn');if(_qb0)_qb0.textContent='📥'}}return}if(!window._msgQueue)window._msgQueue=[];window._msgQueue.push(_qm);_qi.value='';_qi.style.height='auto';var _qb=document.getElementById('queue-btn');if(_qb)_qb.textContent='📥'+window._msgQueue.length}
     else if(a==='clearFile')window.clearFile();
     else if(a==='toggleTools'){var tl=document.getElementById('tools-list');tl.style.display=tl.style.display==='none'?'block':'none'}
     else if(a==='tool-run'){var treq=el.getAttribute('data-tool-req');if(treq){var kr2=_lang==='ko';var reqMap={
