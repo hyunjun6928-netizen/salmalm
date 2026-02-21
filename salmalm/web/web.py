@@ -2165,9 +2165,12 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         except (BrokenPipeError, ConnectionResetError):
             pass  # Client disconnected — nothing to send
         except Exception as e:
-            log.error(f"POST {self.path} error: {e}")
+            import traceback
+            err_detail = traceback.format_exc()
+            log.error(f"POST {self.path} error: {e}\n{err_detail}")
+            print(f"[ERROR] POST {self.path}: {e}", flush=True)
             try:
-                self._json({"error": "Internal server error"}, 500)
+                self._json({"error": f"Internal error: {str(e)[:200]}"}, 500)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass  # Client already gone
         finally:

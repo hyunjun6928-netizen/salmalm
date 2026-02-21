@@ -53,23 +53,27 @@ echo -e "${GREEN}done${NC}"
 VER=$(python -c "import salmalm; print(salmalm.__version__)" 2>/dev/null || echo "?")
 echo -e "  ${GREEN}✓${NC} SalmAlm v${VER} installed"
 
-# Add to PATH
-SALMALM_BIN="$VENV_DIR/bin"
-PATH_LINE="export PATH=\"$SALMALM_BIN:\$PATH\""
+# Create symlink in ~/.local/bin (no PATH pollution)
+LOCAL_BIN="${XDG_BIN_HOME:-$HOME/.local/bin}"
+mkdir -p "$LOCAL_BIN"
+ln -sf "$VENV_DIR/bin/salmalm" "$LOCAL_BIN/salmalm"
+
+# Ensure ~/.local/bin is in PATH (standard location, won't override python)
 ADDED_PATH=false
-
-for rcfile in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
-    if [ -f "$rcfile" ]; then
-        if ! grep -qF "salmalm-env/bin" "$rcfile" 2>/dev/null; then
-            echo "" >> "$rcfile"
-            echo "# SalmAlm" >> "$rcfile"
-            echo "$PATH_LINE" >> "$rcfile"
-            ADDED_PATH=true
+if ! echo "$PATH" | grep -q "$LOCAL_BIN"; then
+    PATH_LINE="export PATH=\"$LOCAL_BIN:\$PATH\""
+    for rcfile in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+        if [ -f "$rcfile" ]; then
+            if ! grep -qF ".local/bin" "$rcfile" 2>/dev/null; then
+                echo "" >> "$rcfile"
+                echo "# Local binaries" >> "$rcfile"
+                echo "$PATH_LINE" >> "$rcfile"
+                ADDED_PATH=true
+            fi
         fi
-    fi
-done
-
-export PATH="$SALMALM_BIN:$PATH"
+    done
+    export PATH="$LOCAL_BIN:$PATH"
+fi
 
 echo ""
 echo -e "${BOLD}${GREEN}✅ Installation complete!${NC}"
@@ -78,7 +82,7 @@ echo "  Run now:    salmalm"
 echo "  Open:       http://127.0.0.1:18800"
 if [ "$ADDED_PATH" = true ]; then
     echo ""
-    echo "  PATH updated. Restart your terminal or run:"
+    echo "  ~/.local/bin added to PATH. Restart your terminal or run:"
     echo "    source ~/.bashrc  # or ~/.zshrc"
 fi
 echo ""
