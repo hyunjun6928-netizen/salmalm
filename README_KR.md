@@ -142,7 +142,16 @@ API 키는 환경변수 또는 웹 UI **설정 → API Keys**에서 입력 가�
 - **OS 기본 샌드박스** — bubblewrap (Linux) / sandbox-exec (macOS) / rlimit 폴백; 최강 티어 자동 감지
 - **메시 네트워킹** — SalmAlm 인스턴스 간 P2P (작업 위임, 클립보드 공유, LAN UDP 자동 탐색, HMAC 인증)
 - **캔버스** — 로컬 HTML/코드/차트 프리뷰 서버 (`:18803`)
-- **브라우저 자동화** — Playwright 스냅샷/액트 패턴 (`pip install salmalm[browser]`)
+- **브라우저 자동화** — Playwright 스냅샷/액트 패턴 (아래 설정 참고)
+
+### 🌐 브라우저 자동화 (선택)
+
+```bash
+pip install salmalm[browser]
+playwright install chromium
+```
+
+설치하면 AI가 웹 브라우징, 스크린샷, 폼 입력, 페이지 조작을 자동으로 수행할 수 있습니다.
 
 ### 채널
 - **웹** — `localhost:18800`에서 풀기능 SPA

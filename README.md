@@ -142,7 +142,16 @@ Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Pyth
 - **OS-native sandbox** — bubblewrap (Linux) / sandbox-exec (macOS) / rlimit fallback; auto-detects strongest tier
 - **Mesh networking** — P2P between SalmAlm instances (task delegation, clipboard sharing, LAN UDP discovery, HMAC auth)
 - **Canvas** — local HTML/code/chart preview server at `:18803`
-- **Browser automation** — Playwright snapshot/act pattern (`pip install salmalm[browser]`)
+- **Browser automation** — Playwright snapshot/act pattern (see setup below)
+
+### 🌐 Browser Automation (Optional)
+
+```bash
+pip install salmalm[browser]
+playwright install chromium
+```
+
+Once installed, the AI can browse the web, take screenshots, fill forms, and interact with pages autonomously.
 
 ### Channels
 - **Web** — full-featured SPA at `localhost:18800`
