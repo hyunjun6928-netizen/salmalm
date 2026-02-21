@@ -429,7 +429,10 @@ def _cmd_soul_reset(cmd, session, **_):
 
 
 def _cmd_model(cmd, session, **_):
-    model_name = cmd[7:].strip()
+    model_name = cmd[7:].strip() if len(cmd) > 7 else ''
+    if not model_name:
+        current = getattr(session, 'model_override', None) or 'auto'
+        return f'Current model: **{current}**\nUsage: `/model <name>` — e.g. `/model opus`, `/model auto`, `/model anthropic/claude-sonnet-4-6`'
     if model_name in ('auto', 'opus', 'sonnet', 'haiku'):
         session.model_override = model_name if model_name != 'auto' else 'auto'
         if model_name == 'auto':
@@ -769,6 +772,8 @@ _SLASH_COMMANDS = {
     '/soul reset': _cmd_soul_reset,
     '/context': _cmd_context,
     '/context detail': _cmd_context,
+    '/model': _cmd_model,
+    '/models': _cmd_model,
 }
 
 # Also add /usage to prefix commands
