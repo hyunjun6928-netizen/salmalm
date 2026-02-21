@@ -71,6 +71,22 @@ get_routing_config = _load_routing_config
 _select_model = _select_model_impl
 
 
+def _safe_callback(cb, *args):
+    """Call a callback that may be sync or async. Fire-and-forget for async."""
+    if cb is None:
+        return
+    result = cb(*args)
+    if asyncio.iscoroutine(result):
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(result)
+            task.add_done_callback(
+                lambda t: t.exception() if not t.cancelled() and t.exception() else None
+            )
+        except RuntimeError:
+            pass
+
+
 class TaskClassifier:
     """Classify user intent to determine execution strategy."""
 
@@ -346,17 +362,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         """Execute multiple tools in parallel, return {id: result}."""
         for tc in tool_calls:
             if on_tool:
-                result = on_tool(tc['name'], tc['arguments'])
-                # Handle async callbacks
-                if asyncio.iscoroutine(result):
-                    try:
-                        loop = asyncio.get_running_loop()
-                        task = loop.create_task(result)
-                        task.add_done_callback(
-                            lambda t: t.exception() if not t.cancelled() and t.exception() else None
-                        )
-                    except RuntimeError:
-                        pass  # No running event loop
+                _safe_callback(on_tool, tc['name'], tc['arguments'])
 
         # Fire on_tool_call hook for each tool (도구 호출 훅)
         try:
@@ -590,9 +596,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             # Status callback: typing/thinking
             if on_status:
                 if think_this_call:
-                    on_status(STATUS_THINKING, '🧠 Thinking...')
+                    _safe_callback(on_status, STATUS_THINKING, '🧠 Thinking...')
                 else:
-                    on_status(STATUS_TYPING, 'typing')
+                    _safe_callback(on_status, STATUS_TYPING, 'typing')
 
             # Dynamic max_tokens based on intent
             _dynamic_max_tokens = _get_dynamic_max_tokens(
@@ -674,7 +680,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 # Status: tool running
                 if on_status:
                     tool_names = ', '.join(tc['name'] for tc in result['tool_calls'][:3])
-                    on_status(STATUS_TOOL_RUNNING, f'🔧 Running {tool_names}...')
+                    _safe_callback(on_status, STATUS_TOOL_RUNNING, f'🔧 Running {tool_names}...')
 
                 # Validate tool calls
                 valid_tools = []

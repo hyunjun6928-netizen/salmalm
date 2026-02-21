@@ -269,7 +269,9 @@ async def call_with_failover(messages: list, model: str, tools: Optional[list] =
             continue
         log.info(f"[FAILOVER] {model} failed, trying {fb}")
         if on_status:
-            on_status(STATUS_TYPING, f"⚠️ {model.split('/')[-1]} failed, falling back to {fb.split('/')[-1]}")
+            _cb_result = on_status(STATUS_TYPING, f"⚠️ {model.split('/')[-1]} failed, falling back to {fb.split('/')[-1]}")
+            if asyncio.iscoroutine(_cb_result):
+                await _cb_result
         result = await try_llm_call(messages, fb, tools, max_tokens, thinking, on_token)
         if not result.get('_failed'):
             _clear_model_cooldown(fb)
