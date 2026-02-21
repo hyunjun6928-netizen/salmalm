@@ -136,6 +136,8 @@ async def run_server():
     web_thread.start()
     url = f"http://{bind_addr}:{port}"
     log.info(f"[WEB] Web UI: {url}")
+    # Always print to stdout so users see the URL even without logging config
+    print(f"\n  😈 SalmAlm v{VERSION} running at {url}\n  Press Ctrl+C to stop.\n", flush=True)
 
     # Auto-open browser if requested (--open flag or SALMALM_OPEN_BROWSER=1)
     if os.environ.get('SALMALM_OPEN_BROWSER', '') == '1':
