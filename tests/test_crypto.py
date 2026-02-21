@@ -106,3 +106,67 @@ class TestDeriveKey(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestKeychainIntegration(unittest.TestCase):
+    """Test OS keychain helper functions."""
+
+    def test_keychain_get_no_keyring(self):
+        """Returns None when keyring is not available."""
+        import importlib
+        from unittest.mock import patch
+        from salmalm.security.crypto import _keychain_get
+        with patch.dict('sys.modules', {'keyring': None}):
+            result = _keychain_get()
+            self.assertIsNone(result)
+
+    def test_keychain_set_no_keyring(self):
+        """Returns False when keyring is not available."""
+        from unittest.mock import patch
+        from salmalm.security.crypto import _keychain_set
+        with patch.dict('sys.modules', {'keyring': None}):
+            result = _keychain_set("test")
+            self.assertFalse(result)
+
+    def test_keychain_get_with_mock(self):
+        """Returns password from keyring when available."""
+        from unittest.mock import MagicMock, patch
+        from salmalm.security.crypto import _keychain_get
+        mock_kr = MagicMock()
+        mock_kr.get_password.return_value = "secret123"
+        with patch.dict('sys.modules', {'keyring': mock_kr}):
+            result = _keychain_get()
+            self.assertEqual(result, "secret123")
+
+    def test_keychain_set_with_mock(self):
+        """Stores password via keyring."""
+        from unittest.mock import MagicMock, patch
+        from salmalm.security.crypto import _keychain_set
+        mock_kr = MagicMock()
+        with patch.dict('sys.modules', {'keyring': mock_kr}):
+            result = _keychain_set("secret123")
+            self.assertTrue(result)
+
+    def test_vault_create_saves_to_keychain(self):
+        """Vault.create() saves password to keychain."""
+        from unittest.mock import patch, MagicMock
+        from salmalm.security.crypto import Vault, _KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT
+        mock_kr = MagicMock()
+        with patch.dict('sys.modules', {'keyring': mock_kr}):
+            v = Vault()
+            with patch.object(v, '_save'):
+                v.create("mypass", save_to_keychain=True)
+                mock_kr.set_password.assert_called_once_with(
+                    _KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT, "mypass"
+                )
+
+    def test_vault_create_skip_keychain(self):
+        """Vault.create() with save_to_keychain=False skips keychain."""
+        from unittest.mock import patch, MagicMock
+        from salmalm.security.crypto import Vault
+        mock_kr = MagicMock()
+        with patch.dict('sys.modules', {'keyring': mock_kr}):
+            v = Vault()
+            with patch.object(v, '_save'):
+                v.create("mypass", save_to_keychain=False)
+                mock_kr.set_password.assert_not_called()

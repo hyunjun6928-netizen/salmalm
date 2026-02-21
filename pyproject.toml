@@ -33,6 +33,7 @@ dependencies = ["cryptography>=41.0"]
 [project.optional-dependencies]
 crypto = ["cryptography>=42.0"]
 browser = ["playwright>=1.40"]
+keychain = ["keyring>=24.0"]
 dev = ["pytest", "pytest-asyncio", "pytest-timeout", "pytest-cov", "pytest-forked", "flake8"]
 
 [project.scripts]

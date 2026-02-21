@@ -338,13 +338,27 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         return not (has_api_key or has_ollama)
 
     def _auto_unlock_localhost(self):
-        """Auto-unlock vault for localhost connections."""
+        """Auto-unlock vault for localhost connections.
+
+        Priority: OS keychain → env var (deprecated) → empty password → prompt.
+        """
         if vault.is_unlocked:
             return True
         ip = self._get_client_ip()
         if ip not in ("127.0.0.1", "::1", "localhost"):
             return False
+        # 1. Try OS keychain first (most secure)
+        if vault.try_keychain_unlock():
+            return True
         pw = os.environ.get("SALMALM_VAULT_PW", "")
+        if pw:
+            import warnings
+            warnings.warn(
+                "SALMALM_VAULT_PW env var is deprecated and will be removed in v0.20. "
+                "Use OS keychain instead: vault password is auto-saved on first unlock.",
+                FutureWarning,
+                stacklevel=2,
+            )
         if VAULT_FILE.exists():  # noqa: F405
             # Check if this is a no-crypto marker file
             try:
@@ -356,9 +370,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     return True
             except Exception:
                 pass
-            # Try env password first, then empty password (no-password vault)
+            # 2. Try env password (deprecated), then empty password
             try:
-                if pw and vault.unlock(pw):
+                if pw and vault.unlock(pw, save_to_keychain=True):
                     return True
                 if vault.unlock(""):
                     return True  # No-password vault
@@ -2634,9 +2648,9 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         body = self._body
         password = body.get("password", "")
         if VAULT_FILE.exists():  # noqa: F405
-            ok = vault.unlock(password)
+            ok = vault.unlock(password, save_to_keychain=True)
         else:
-            vault.create(password)
+            vault.create(password, save_to_keychain=True)
             ok = True
         if ok:
             audit_log("unlock", "vault unlocked")

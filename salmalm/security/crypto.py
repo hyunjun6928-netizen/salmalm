@@ -1,4 +1,10 @@
-"""SalmAlm crypto — AES-256-GCM vault with HMAC-CTR fallback."""
+"""SalmAlm crypto — AES-256-GCM vault with HMAC-CTR fallback.
+
+Password storage hierarchy (most secure → least secure):
+  1. OS keychain (macOS Keychain / Windows Credential Manager / Linux Secret Service)
+  2. User-entered master password (prompted each session)
+  3. SALMALM_VAULT_KEY env var (deprecated — convenience only)
+"""
 
 from __future__ import annotations
 
@@ -11,6 +17,43 @@ from typing import Any, Dict, List, Optional
 
 from salmalm.constants import VAULT_FILE, PBKDF2_ITER, VAULT_VERSION
 from salmalm import log
+
+# ── OS Keychain Integration ──
+_KEYCHAIN_SERVICE = "salmalm"
+_KEYCHAIN_ACCOUNT = "vault_master"
+
+
+def _keychain_get() -> Optional[str]:
+    """Retrieve vault password from OS keychain. Returns None if unavailable."""
+    try:
+        import keyring
+        pw = keyring.get_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
+        return pw
+    except Exception:
+        return None
+
+
+def _keychain_set(password: str) -> bool:
+    """Store vault password in OS keychain. Returns True on success."""
+    try:
+        import keyring
+        keyring.set_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT, password)
+        log.info("[OK] Vault password saved to OS keychain")
+        return True
+    except Exception as exc:
+        log.debug(f"[WARN] Could not save to OS keychain: {exc}")
+        return False
+
+
+def _keychain_delete() -> bool:
+    """Remove vault password from OS keychain."""
+    try:
+        import keyring
+        keyring.delete_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
+        return True
+    except Exception:
+        return False
+
 
 HAS_CRYPTO: bool = False
 _ALLOW_FALLBACK: bool = bool(os.environ.get("SALMALM_VAULT_FALLBACK"))
@@ -69,7 +112,7 @@ class Vault:
         """Whether the vault has been unlocked with a valid password."""
         return self._password is not None
 
-    def create(self, password: str) -> None:
+    def create(self, password: str, save_to_keychain: bool = True) -> None:
         """Create a new vault with the given master password."""
         if not HAS_CRYPTO and not _ALLOW_FALLBACK:
             raise RuntimeError(
@@ -79,8 +122,19 @@ class Vault:
         self._salt = secrets.token_bytes(16)
         self._data = {}
         self._save()
+        if save_to_keychain and password:
+            _keychain_set(password)
 
-    def unlock(self, password: str) -> bool:
+    def try_keychain_unlock(self) -> bool:
+        """Attempt to unlock vault using OS keychain. Returns True on success."""
+        pw = _keychain_get()
+        if pw is not None:
+            if self.unlock(pw):
+                log.info("[OK] Vault unlocked via OS keychain")
+                return True
+        return False
+
+    def unlock(self, password: str, save_to_keychain: bool = False) -> bool:
         """Unlock an existing vault. Returns True on success."""
         if not VAULT_FILE.exists():
             return False
@@ -102,6 +156,8 @@ class Vault:
             else:
                 return False
             self._data = json.loads(plaintext.decode("utf-8"))
+            if save_to_keychain and password:
+                _keychain_set(password)
             return True
         except Exception:
             self._password = None
@@ -214,6 +270,7 @@ class Vault:
         self._password = new_password
         self._salt = secrets.token_bytes(16)
         self._save()
+        _keychain_set(new_password)
         return True
 
     def keys(self) -> List[str]:
