@@ -94,3 +94,27 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install package + Playwright
+        run: |
+          pip install -e ".[dev]"
+          pip install playwright
+          playwright install chromium --with-deps
+
+      - name: E2E Browser Tests
+        env:
+          ANTHROPIC_API_KEY: sk-test-fake-key-for-e2e
+        run: |
+          python -m pytest tests/test_e2e_browser.py -v --timeout=60
