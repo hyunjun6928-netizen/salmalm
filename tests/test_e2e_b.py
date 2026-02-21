@@ -116,6 +116,12 @@ class TestE2EVaultOpenClose(unittest.TestCase):
     """10. 볼트 열기 → 저장 → 닫기 → 접근 거부."""
 
     def test_vault_open_close_flow(self):
+        import os
+        try:
+            import cryptography  # noqa: F401
+        except ImportError:
+            if not os.environ.get('SALMALM_VAULT_FALLBACK'):
+                self.skipTest('cryptography not installed')
         from salmalm.security.crypto import Vault
         v = Vault()
         v.create('test_password_123')

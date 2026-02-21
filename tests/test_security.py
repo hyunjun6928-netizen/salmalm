@@ -377,7 +377,13 @@ class TestCryptography(unittest.TestCase):
 
     def test_vault_encryption_roundtrip(self):
         """Vault should encrypt and decrypt data correctly."""
+        import os
         from salmalm.security.crypto import Vault
+        try:
+            import cryptography  # noqa: F401
+        except ImportError:
+            if not os.environ.get('SALMALM_VAULT_FALLBACK'):
+                self.skipTest('cryptography not installed and SALMALM_VAULT_FALLBACK not set')
         import tempfile
         v = Vault()
         with tempfile.NamedTemporaryFile(suffix='.vault', delete=False) as f:

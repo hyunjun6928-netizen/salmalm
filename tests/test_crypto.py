@@ -7,13 +7,21 @@ import tempfile
 import unittest
 from pathlib import Path
 
+try:
+    import cryptography  # noqa: F401
+    _HAS_CRYPTO = True
+except ImportError:
+    _HAS_CRYPTO = os.environ.get('SALMALM_VAULT_FALLBACK') == '1'
+
 import salmalm.constants as constants
 from salmalm.security.crypto import Vault, _derive_key
+
 
 _test_dir = tempfile.mkdtemp()
 _test_vault = Path(_test_dir) / '.vault_crypto_test.enc'
 
 
+@unittest.skipUnless(_HAS_CRYPTO, 'cryptography not installed and SALMALM_VAULT_FALLBACK not set')
 class TestVault(unittest.TestCase):
 
     def setUp(self):

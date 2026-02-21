@@ -347,16 +347,24 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         pw = os.environ.get("SALMALM_VAULT_PW", "")
         if VAULT_FILE.exists():  # noqa: F405
             # Try env password first, then empty password (no-password vault)
-            if pw and vault.unlock(pw):
-                return True
-            if vault.unlock(""):
-                return True  # No-password vault
+            try:
+                if pw and vault.unlock(pw):
+                    return True
+                if vault.unlock(""):
+                    return True  # No-password vault
+            except RuntimeError:
+                log.warning("Vault unlock failed (cryptography not installed?)")
+                return False
             if not pw:
                 return False  # Has password but no env var — show unlock screen
             return False
         elif pw:
-            vault.create(pw)
-            return True
+            try:
+                vault.create(pw)
+                return True
+            except RuntimeError:
+                log.warning("Vault create failed (cryptography not installed?)")
+                return False
         # No vault file, no env var → first run, handled by _needs_first_run
         return True
 
