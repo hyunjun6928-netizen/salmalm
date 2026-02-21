@@ -606,7 +606,7 @@
             var act=edata.action,val=edata.value||'';
             if(act==='set_lang'){window.setLang(val)}
             else if(act==='set_theme'){document.body.setAttribute('data-theme',val);localStorage.setItem('salmalm-theme',val)}
-            else if(act==='set_model'){fetch('/api/model/set',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({model:val})}).then(function(){modelBadge.textContent=val.split('/').pop()})}
+            else if(act==='set_model'){fetch('/api/model/switch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({model:val})}).then(function(){modelBadge.textContent=val.split('/').pop()})}
             else if(act==='new_session'){window.newSession&&window.newSession()}
             else if(act==='show_panel'){var panelMap={chat:'showChat',settings:'showSettings',dashboard:'showDashboard',sessions:'showSessions',cron:'showCron',memory:'showMemory',docs:'showDocs'};var fn=panelMap[val];if(fn&&window[fn])window[fn]()}
             else if(act==='add_cron'){fetch('/api/cron/add',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({name:edata.name||'ai-job',interval:edata.interval||3600,prompt:edata.prompt||''})}).then(function(){if(window._loadCron)window._loadCron()})}

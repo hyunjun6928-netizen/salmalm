@@ -3119,8 +3119,15 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
             try:
                 loop = asyncio.new_event_loop()
+                # Pass session-level model override to engine
+                from salmalm.core import get_session as _gs_pre
+                _sess_pre = _gs_pre(session_id)
+                _model_ov = getattr(_sess_pre, 'model_override', None)
+                if _model_ov == 'auto':
+                    _model_ov = None
                 response = loop.run_until_complete(
                     process_message(session_id, message,
+                                    model_override=_model_ov,
                                     image_data=(image_b64, image_mime) if image_b64 else None,
                                     on_tool=on_tool_sse, on_token=on_token_sse, lang=ui_lang))
                 loop.close()
@@ -3148,8 +3155,15 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         else:
             try:
                 loop = asyncio.new_event_loop()
+                # Pass session-level model override to engine
+                from salmalm.core import get_session as _gs_pre2
+                _sess_pre2 = _gs_pre2(session_id)
+                _model_ov2 = getattr(_sess_pre2, 'model_override', None)
+                if _model_ov2 == 'auto':
+                    _model_ov2 = None
                 response = loop.run_until_complete(
                     process_message(session_id, message,
+                                    model_override=_model_ov2,
                                     image_data=(image_b64, image_mime) if image_b64 else None,
                                     lang=ui_lang))
                 loop.close()
@@ -3175,6 +3189,12 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"error": "model required"}, 400)
             return
         msg = llm_router.switch_model(model)
+        # Also update session-level override so auto-routing respects UI selection
+        sid = self._get_session_id()
+        if sid:
+            from salmalm.core import get_session as _gs_switch
+            _s = _gs_switch(sid)
+            _s.model_override = model if model != 'auto' else 'auto'
         self._json({"ok": "✅" in msg, "message": msg, "current_model": llm_router.current_model})
 
     def _post_api_test_provider(self):
