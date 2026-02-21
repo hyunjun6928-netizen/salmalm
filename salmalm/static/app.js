@@ -191,11 +191,11 @@
     t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g,function(_,body){
       var name='tool';var args='';
       try{var parsed=JSON.parse(body.trim());name=parsed.name||'tool';args=JSON.stringify(parsed.arguments||parsed,null,2)}catch(e){args=body.trim()}
-      return '<details style="margin:6px 0;border:1px solid var(--border);border-radius:8px;padding:0;overflow:hidden"><summary style="padding:8px 12px;background:var(--bg2);cursor:pointer;font-size:13px;font-weight:500">🔧 <strong>'+name+'</strong></summary><pre style="padding:8px 12px;margin:0;font-size:11px;overflow-x:auto;background:var(--bg);border-top:1px solid var(--border)">'+args.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+      return '<details class="tool-block"><summary class="tool-header">🔧 <strong>'+name+'</strong></summary><pre class="tool-body">'+args.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
     });
     t=t.replace(/<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,body){
       var preview=body.trim();if(preview.length>300)preview=preview.substring(0,300)+'...';
-      return '<details style="margin:6px 0;border:1px solid var(--border);border-radius:8px;padding:0;overflow:hidden"><summary style="padding:8px 12px;background:var(--bg2);cursor:pointer;font-size:13px;font-weight:500">📤 Result</summary><pre style="padding:8px 12px;margin:0;font-size:11px;overflow-x:auto;background:var(--bg);border-top:1px solid var(--border)">'+preview.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+      return '<details class="tool-block"><summary class="tool-header">📤 Result</summary><pre class="tool-body">'+preview.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
     });
     return t;
   }
@@ -533,7 +533,7 @@
           if(data.input){
             var inputStr=typeof data.input==='string'?data.input:JSON.stringify(data.input,null,2);
             if(inputStr.length>200)inputStr=inputStr.substring(0,200)+'...';
-            toolHtml+='<details style="margin-top:4px;font-size:11px"><summary style="cursor:pointer;color:var(--text2)">📥 Input</summary><pre style="background:var(--bg);padding:6px;border-radius:4px;margin:4px 0;overflow-x:auto;font-size:11px;max-height:150px">'+inputStr.replace(/</g,'&lt;')+'</pre></details>';
+            toolHtml+='<details class="tool-block" style="margin-top:4px"><summary class="tool-header">📥 Input</summary><pre class="tool-body">'+inputStr.replace(/</g,'&lt;')+'</pre></details>';
           }
           /* Append to tool log instead of replacing */
           if(!tb2._toolLog){tb2._toolLog='';tb2.innerHTML=''}
@@ -597,7 +597,7 @@
           }else if(etype==='tool'){
             if(typingEl){var tb2=typingEl.querySelector('.bubble');if(tb2){
               var toolH='<div style="display:flex;align-items:center;gap:8px"><div class="typing-indicator"><span></span><span></span><span></span></div> <span style="font-weight:600">🔧 '+edata.name+'</span>'+(edata.count?' <span style="font-size:11px;color:var(--text2)">('+edata.count+')</span>':'')+'</div>';
-              if(edata.input){var inp=typeof edata.input==='string'?edata.input:JSON.stringify(edata.input,null,2);if(inp.length>200)inp=inp.substring(0,200)+'...';toolH+='<details style="margin-top:4px;font-size:11px"><summary style="cursor:pointer;color:var(--text2)">📥 Input</summary><pre style="background:var(--bg);padding:6px;border-radius:4px;margin:4px 0;overflow-x:auto;font-size:11px;max-height:150px">'+inp.replace(/</g,'&lt;')+'</pre></details>'}
+              if(edata.input){var inp=typeof edata.input==='string'?edata.input:JSON.stringify(edata.input,null,2);if(inp.length>200)inp=inp.substring(0,200)+'...';toolH+='<details class="tool-block" style="margin-top:4px"><summary class="tool-header">📥 Input</summary><pre class="tool-body">'+inp.replace(/</g,'&lt;')+'</pre></details>'}
               if(!tb2._toolLog){tb2._toolLog='';tb2.innerHTML=''}
               tb2._toolLog+=toolH;tb2.innerHTML=tb2._toolLog;
             }}

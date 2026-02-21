@@ -61,6 +61,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 .msg-row.assistant .bubble{background:var(--bot-bg);border:1px solid var(--border);border-bottom-left-radius:4px}
 .bubble code{background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:13px;font-family:'SF Mono',monospace}
 .bubble pre{background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;overflow-x:auto;margin:8px 0;font-size:13px;border:1px solid var(--border)}
+.tool-block{margin:4px 0;border-radius:6px;overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));font-size:12px}
+.tool-header{padding:6px 10px;background:color-mix(in srgb,var(--accent) 8%,var(--bg2));cursor:pointer;font-size:12px;font-weight:500;list-style:none;display:flex;align-items:center;gap:6px;color:var(--text2)}
+.tool-header::-webkit-details-marker{display:none}
+.tool-header::before{content:'▶';font-size:9px;transition:transform 0.15s;color:var(--accent)}
+details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
+.tool-body{padding:8px 10px;margin:0;font-size:11px;overflow-x:auto;background:var(--bg);border-top:1px solid color-mix(in srgb,var(--accent) 15%,var(--border));max-height:200px;overflow-y:auto;color:var(--text2);line-height:1.4}
 .bubble pre code{background:none;padding:0;font-size:13px}
 /* Syntax highlight keywords */
 .bubble pre .kw{color:#c792ea}.bubble pre .str{color:#c3e88d}.bubble pre .num{color:#f78c6c}.bubble pre .cmt{color:#546e7a;font-style:italic}
