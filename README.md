@@ -318,6 +318,8 @@ When binding to `0.0.0.0`, SalmAlm automatically:
 - **SQLite hardening** — WAL journal mode + 5s busy_timeout (prevents "database is locked")
 - **46 security regression tests** — SSRF bypass, header injection, exec bypass, tool tiers, route policies
 
+**Threat model**: SalmAlm is a **local single-user tool**. The vault provides at-rest encryption for API keys and private conversations using PBKDF2-HMAC-SHA256 (200K iterations) key derivation from a user-entered master password. The password is held in memory only while the process runs and is never written to disk. For localhost convenience, `SALMALM_VAULT_KEY` env var can skip the unlock prompt — this is a deliberate UX trade-off documented in SECURITY.md, not a security recommendation for exposed deployments. If you bind to `0.0.0.0`, set a strong vault password and do not use the env var.
+
 See [`SECURITY.md`](SECURITY.md) for full details.
 
 ---
