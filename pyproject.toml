@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "salmalm"
-version = "0.17.3"
+version = "0.17.4"
 description = "Personal AI Gateway — Pure Python, zero-dependency AI assistant with multi-model routing, web UI, and 56+ built-in tools"
 readme = "README.md"
 license = "MIT"
@@ -48,7 +48,7 @@ Documentation = "https://github.com/hyunjun6928-netizen/salmalm#readme"
 include = ["salmalm*"]
 
 [tool.setuptools.package-data]
-salmalm = ["py.typed", "default_skills/**/*.md", "static/*.html"]
+salmalm = ["py.typed", "default_skills/**/*.md", "static/*.html", "static/*.js", "static/*.svg", "static/*.css", "static/*.json", "static/*.png", "static/*.ico"]
 
 [tool.mypy]
 python_version = "3.12"
