@@ -59,7 +59,20 @@ def get_dynamic_tools() -> list:
 
 def execute_tool(name: str, args: dict) -> str:
     """Execute a tool and return result string. Auto-dispatches to remote node if available."""
+    import os as _os
     audit_log('tool_exec', f'{name}: {json.dumps(args, ensure_ascii=False)[:200]}')
+
+    # Defense-in-depth: tool tier re-verification at registry level
+    # (supplements web middleware check — catches internal call paths)
+    bind = _os.environ.get('SALMALM_BIND', '127.0.0.1')
+    if bind != '127.0.0.1':
+        try:
+            from salmalm.web.middleware import is_tool_allowed_external
+            if not is_tool_allowed_external(name):
+                log.warning(f"[SECURITY] Tool '{name}' blocked: external bind + restricted tier")
+                return f'❌ Tool "{name}" is restricted on externally-exposed instances'
+        except ImportError:
+            pass
 
     # Try remote node dispatch first (if gateway has registered nodes)
     try:

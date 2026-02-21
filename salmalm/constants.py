@@ -33,24 +33,40 @@ SESSION_TIMEOUT = 3600 * 8
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION = 60
 EXEC_ALLOWLIST = {
-    # Core utils
-    'ls', 'cat', 'head', 'tail', 'wc', 'sort', 'uniq', 'grep', 'awk', 'sed',
-    'find', 'which', 'file', 'stat', 'du', 'df', 'echo', 'printf', 'date',
-    'tr', 'cut', 'tee', 'xargs', 'diff', 'patch', 'env', 'pwd', 'whoami',
+    # Core utils (read-only / safe)
+    'ls', 'cat', 'head', 'tail', 'wc', 'sort', 'uniq', 'grep', 'sed',
+    'which', 'file', 'stat', 'du', 'df', 'echo', 'printf', 'date',
+    'tr', 'cut', 'tee', 'diff', 'patch', 'env', 'pwd', 'whoami',
     'uname', 'hostname', 'id', 'dirname', 'basename', 'realpath', 'readlink',
     'md5sum', 'sha256sum', 'base64', 'xxd', 'hexdump', 'yes', 'true', 'false',
     # Dev tools (read-only / query only)
     'git', 'gh',
+    # Guarded commands — allowed but with subcommand/flag restrictions (see EXEC_ARG_BLOCKLIST)
+    'awk', 'find', 'xargs', 'tar',
     # Network (read-only)
     'ping', 'dig', 'nslookup', 'host', 'traceroute', 'ss', 'ip',
-    # curl/wget removed: SSRF bypass risk (use web_fetch/http_request tools instead)
     # File ops (safe)
-    'cp', 'mv', 'mkdir', 'touch', 'ln', 'tar', 'gzip', 'gunzip', 'zip', 'unzip',
+    'cp', 'mv', 'mkdir', 'touch', 'ln', 'gzip', 'gunzip', 'zip', 'unzip',
     # Text
     'jq', 'yq', 'csvtool', 'sqlite3', 'psql', 'mysql',
     # System info
     'ps', 'top', 'htop', 'free', 'uptime', 'lsof', 'nproc', 'lscpu', 'lsblk',
 }
+# Per-command dangerous argument/flag blocklist — blocks code execution vectors
+EXEC_ARG_BLOCKLIST: dict = {
+    'awk': {'-f', '--file'},
+    'find': {'-exec', '-execdir', '-delete', '-ok', '-okdir'},
+    'xargs': {'-I', '--replace', '-i'},
+    'tar': {'--to-command', '--checkpoint-action', '--use-compress-program'},
+    'git': {'clone', 'pull', 'push', 'fetch', 'remote', 'submodule', 'hook'},
+    'sed': {'-i', '--in-place'},
+}
+# Pattern blocklist for inline code execution in awk/sed
+EXEC_INLINE_CODE_PATTERNS = [
+    r'\bawk\b[^|;]*\bsystem\s*\(',    # awk '{ system("...") }'
+    r'\bawk\b[^|;]*\bgetline\b',      # awk getline can read arbitrary files/commands
+    r'\bawk\b[^|;]*"\s*\|',           # awk print | "cmd"
+]
 # Elevated commands: allowed but logged with warning (can run arbitrary code)
 # Interpreters (python/node/deno/bun) removed — use python_eval tool instead.
 # They bypass allowlist by executing arbitrary code via -c, -m, file args, stdin.
@@ -217,4 +233,18 @@ COMPLEX_INDICATORS = ['code', 'analyze', 'security', 'optimize', 'design', 'impl
 TOOL_HINT_KEYWORDS = ['file', 'exec', 'run', 'search',
                        'web', 'image', 'memory',
                        'system', 'cron', 'screenshot']
+
+# ── Model name corrections (deprecated → current API IDs) ──
+# Single source of truth for model ID fixes. Used by model_selection.fix_model_name().
+MODEL_NAME_FIXES: dict = {
+    'claude-haiku-3.5-20241022': 'claude-haiku-4-5-20251001',
+    'anthropic/claude-haiku-3.5-20241022': 'anthropic/claude-haiku-4-5-20251001',
+    'claude-haiku-4-5-20250414': 'claude-haiku-4-5-20251001',
+    'claude-sonnet-4-20250514': 'claude-sonnet-4-6',
+    'anthropic/claude-sonnet-4-20250514': 'anthropic/claude-sonnet-4-6',
+    'gpt-5.3-codex': 'gpt-5.2-codex',
+    'openai/gpt-5.3-codex': 'openai/gpt-5.2-codex',
+    'grok-4': 'grok-4-0709',
+    'xai/grok-4': 'xai/grok-4-0709',
+}
 

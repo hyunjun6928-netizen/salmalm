@@ -6,6 +6,7 @@ from pathlib import Path
 
 from salmalm.constants import (EXEC_ALLOWLIST, EXEC_BLOCKLIST, EXEC_BLOCKLIST_PATTERNS,
                                EXEC_ELEVATED, EXEC_BLOCKED_INTERPRETERS,
+                               EXEC_ARG_BLOCKLIST, EXEC_INLINE_CODE_PATTERNS,
                                PROTECTED_FILES, WORKSPACE_DIR)
 from salmalm.security.crypto import log
 
@@ -23,6 +24,10 @@ def _is_safe_command(cmd: str):
     for pattern in EXEC_BLOCKLIST_PATTERNS:
         if re.search(pattern, cmd):
             return False, f'Blocked pattern: {pattern}'
+    # Inline code execution patterns (awk system(), getline, etc.)
+    for pattern in EXEC_INLINE_CODE_PATTERNS:
+        if re.search(pattern, cmd):
+            return False, 'Blocked inline code execution pattern'
     stages = re.split(r'\s*(?:\|\||&&|;|\|)\s*', cmd)
     for stage in stages:
         words = stage.strip().split()
@@ -37,6 +42,17 @@ def _is_safe_command(cmd: str):
             log.warning(f"[WARN] Elevated exec: {first_word} (can run arbitrary code)")
         elif first_word not in EXEC_ALLOWLIST:
             return False, f'Command not in allowlist: {first_word}'
+        # Per-command arg/flag blocklist
+        blocked_args = EXEC_ARG_BLOCKLIST.get(first_word)
+        if blocked_args:
+            for w in words[1:]:
+                w_base = w.split('=')[0]
+                if w in blocked_args or w_base in blocked_args:
+                    return False, f'Blocked argument for {first_word}: {w}'
+                # Match flags with attached values (e.g., -I{} matches -I)
+                for ba in blocked_args:
+                    if ba.startswith('-') and w.startswith(ba) and len(w) > len(ba):
+                        return False, f'Blocked argument for {first_word}: {w}'
     if re.search(r'`.*`|\$\(.*\)|<\(|>\(', cmd):
         inner = re.findall(r'`([^`]+)`|\$\(([^)]+)\)', cmd)
         for groups in inner:

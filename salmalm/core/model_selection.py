@@ -23,18 +23,8 @@ _MODERATE_KEYWORDS = ['분석', '리뷰', '요약', '코드', 'code', 'analyze',
 _COMPLEX_KEYWORDS = ['설계', '아키텍처', 'architecture', 'design', 'system design',
                      'from scratch', '처음부터', '전체', 'migration', '마이그레이션']
 
-# ── Model name corrections ──
-_MODEL_NAME_FIXES = {
-    'claude-haiku-3.5-20241022': 'claude-haiku-4-5-20251001',
-    'anthropic/claude-haiku-3.5-20241022': 'anthropic/claude-haiku-4-5-20251001',
-    'claude-haiku-4-5-20250414': 'claude-haiku-4-5-20251001',
-    'claude-sonnet-4-20250514': 'claude-sonnet-4-6',
-    'anthropic/claude-sonnet-4-20250514': 'anthropic/claude-sonnet-4-6',
-    'gpt-5.3-codex': 'gpt-5.2-codex',
-    'openai/gpt-5.3-codex': 'openai/gpt-5.2-codex',
-    'grok-4': 'grok-4-0709',
-    'xai/grok-4': 'xai/grok-4-0709',
-}
+# ── Model name corrections (from constants — single source of truth) ──
+from salmalm.constants import MODEL_NAME_FIXES as _MODEL_NAME_FIXES
 
 # ── Routing config ──
 _ROUTING_CONFIG_FILE = Path.home() / '.salmalm' / 'routing.json'
