@@ -176,7 +176,11 @@
     dots.forEach(function(d){d.style.outline=d.getAttribute('data-color')===c?'2px solid var(--text)':'none'});
   };
   document.getElementById('theme-toggle').textContent=_theme==='dark'?'🌙':'☀️';
-  setTimeout(function(){var dots=document.querySelectorAll('.color-dot');dots.forEach(function(d){if(d.getAttribute('data-color')===_color)d.style.outline='2px solid var(--text)'})},100);
+  setTimeout(function(){
+    var dots=document.querySelectorAll('.color-dot');dots.forEach(function(d){if(d.getAttribute('data-color')===_color)d.style.outline='2px solid var(--text)'});
+    /* Fill Google redirect URI on page load */
+    var _rUris=document.querySelectorAll('.google-redirect-uri');_rUris.forEach(function(el){el.textContent=location.origin+'/api/google/callback'});
+  },100);
 
   /* --- Sidebar toggle (mobile) --- */
   window.toggleSidebar=function(){
