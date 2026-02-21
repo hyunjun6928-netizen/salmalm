@@ -200,11 +200,18 @@
   var _copyId=0;
   function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
   function _renderToolBlocks(t){
-    /* Convert <tool_call>...</tool_call> and <tool_result>...</tool_result> to collapsible UI */
+    /* Merge consecutive tool_call+tool_result into single compact block */
+    t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>\s*<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,callBody,resultBody){
+      var name2=(callBody.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
+      var preview2=resultBody.length>300?resultBody.substring(0,300)+'…':resultBody;
+      return '<details class="tool-block"><summary class="tool-header">🔧 <b>'+name2+'</b> <span style="margin-left:auto;font-size:10px;opacity:0.6">✓ done</span></summary><pre class="tool-body">'+preview2.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+    });
+    /* Remaining unmatched tool_call (no result yet) */
     t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g,function(_,body){
       var name='tool';var args='';
       try{var parsed=JSON.parse(body.trim());name=parsed.name||'tool';args=JSON.stringify(parsed.arguments||parsed,null,2)}catch(e){args=body.trim()}
-      return '<details class="tool-block"><summary class="tool-header">🔧 <strong>'+name+'</strong></summary><pre class="tool-body">'+args.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+      if(args.length>200)args=args.substring(0,200)+'…';
+      return '<details class="tool-block"><summary class="tool-header">🔧 <strong>'+name+'</strong> <span style="margin-left:auto;font-size:10px;opacity:0.6">⏳</span></summary><pre class="tool-body">'+args.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
     });
     t=t.replace(/<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,body){
       var preview=body.trim();if(preview.length>300)preview=preview.substring(0,300)+'...';
