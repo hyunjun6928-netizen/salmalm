@@ -601,6 +601,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         self._json({"current_model": llm_router.current_model})
 
+    def _get_api_onboarding(self):
+        """GET /api/onboarding — return onboarding status."""
+        needs = self._needs_onboarding() if vault.is_unlocked else False
+        self._json({"needs_onboarding": needs, "vault_unlocked": vault.is_unlocked})
+
     def _get_soul(self):
         if not self._require_auth("user"):
             return
@@ -1173,6 +1178,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         "/api/llm-router/providers": "_get_llm_router_providers",
         "/api/llm-router/current": "_get_llm_router_current",
         "/api/soul": "_get_soul",
+        "/api/onboarding": "_get_api_onboarding",
         "/api/routing": "_get_routing",
         "/api/failover": "_get_failover",
         "/api/cron": "_get_cron",
@@ -3457,15 +3463,31 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             return
         action = body.get("action")
         if action == "set":
-            vault.set(body["key"], body["value"])
-            self._json({"ok": True})
+            key = body.get("key")
+            value = body.get("value")
+            if not key:
+                self._json({"error": "key required"}, 400)
+                return
+            try:
+                vault.set(key, value)
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"error": f"Vault error: {type(e).__name__}: {e}"}, 500)
         elif action == "get":
-            val = vault.get(body["key"])
+            key = body.get("key")
+            if not key:
+                self._json({"error": "key required"}, 400)
+                return
+            val = vault.get(key)
             self._json({"value": val})
         elif action == "keys":
             self._json({"keys": vault.keys()})
         elif action == "delete":
-            vault.delete(body["key"])
+            key = body.get("key")
+            if not key:
+                self._json({"error": "key required"}, 400)
+                return
+            vault.delete(key)
             self._json({"ok": True})
         elif action == "change_password":
             old_pw = body.get("old_password", "")
