@@ -1068,6 +1068,9 @@
     });
     var sel=document.getElementById('s-lang');
     if(sel)sel.value=_lang;
+    /* Toggle Google guide language */
+    var _gEn=document.querySelector('.google-guide-en');var _gKr=document.querySelector('.google-guide-kr');
+    if(_gEn&&_gKr){_gEn.style.display=_lang==='ko'?'none':'';_gKr.style.display=_lang==='ko'?'':'none'}
     /* Refresh tools list on lang change */
     var th2=document.getElementById('tools-header');
     if(th2&&_allTools.length)th2.textContent='🛠️ '+(_lang==='ko'?'도구':'Tools')+' ('+_allTools.length+') ▾';
