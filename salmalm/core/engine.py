@@ -643,6 +643,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         use_thinking = getattr(session, 'thinking_enabled', False)
         iteration = 0
         consecutive_errors = 0
+        _recent_tool_calls = []  # Loop detection: track recent (name, args_hash) tuples
         _session_id = getattr(session, 'id', '')
         import os as _os
         _max_iter = int(_os.environ.get('SALMALM_MAX_TOOL_ITER', str(self.MAX_TOOL_ITERATIONS)))
@@ -818,6 +819,22 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                         return response
                 else:
                     consecutive_errors = 0
+
+                # Loop detection: 같은 도구+인자 반복 호출 감지
+                import hashlib as _hl
+                for tc in result.get('tool_calls', []):
+                    _sig = (tc.get('name', ''), _hl.md5(json.dumps(tc.get('arguments', {}), sort_keys=True).encode()).hexdigest()[:8])
+                    _recent_tool_calls.append(_sig)
+                # 최근 6회 중 같은 시그니처가 3회 이상이면 루프
+                if len(_recent_tool_calls) >= 6:
+                    from collections import Counter as _Counter
+                    _freq = _Counter(_recent_tool_calls[-6:])
+                    _top = _freq.most_common(1)[0]
+                    if _top[1] >= 3:
+                        log.warning(f"[BREAK] Loop detected: {_top[0][0]} called {_top[1]}x with same args in last 6 iterations")
+                        response = f"⚠️ Infinite loop detected — tool `{_top[0][0]}` repeating with same arguments. Stopping."
+                        session.add_assistant(response)
+                        return response
 
                 self._append_tool_results(
                     session, provider, result,
