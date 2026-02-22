@@ -1104,8 +1104,8 @@
     var _dEn=document.querySelector('.dc-guide-en');var _dKr=document.querySelector('.dc-guide-kr');
     if(_dEn&&_dKr){_dEn.style.display=_lang==='ko'?'none':'';_dKr.style.display=_lang==='ko'?'':'none'}
     /* Toggle eng-en / eng-kr spans */
-    document.querySelectorAll('.eng-en').forEach(function(el){el.style.display=_lang==='ko'?'none':''});
-    document.querySelectorAll('.eng-kr').forEach(function(el){el.style.display=_lang==='ko'?'':'none'})
+    document.querySelectorAll('.eng-en').forEach(function(el){el.style.display=_lang==='ko'?'none':'inline'});
+    document.querySelectorAll('.eng-kr').forEach(function(el){el.style.display=_lang==='ko'?'inline':'none'})
     /* Refresh tools list on lang change */
     var th2=document.getElementById('tools-header');
     if(th2&&_allTools.length)th2.textContent='🛠️ '+(_lang==='ko'?'도구':'Tools')+' ('+_allTools.length+') ▾';
