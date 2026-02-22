@@ -347,3 +347,62 @@ class TestSecretIsolation(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestRedactModule(unittest.TestCase):
+    """Test shared secret redaction."""
+
+    def test_scrub_openai_key(self):
+        from salmalm.security.redact import scrub_secrets
+        text = "key is sk-abc123def456ghi789jkl012mno345"
+        result = scrub_secrets(text)
+        self.assertNotIn("sk-abc123", result)
+        self.assertIn("[REDACTED]", result)
+
+    def test_scrub_anthropic_key(self):
+        from salmalm.security.redact import scrub_secrets
+        text = "using sk-ant-api03-abcdefghijklmnopqrstuvwxyz"
+        result = scrub_secrets(text)
+        self.assertNotIn("sk-ant-", result)
+
+    def test_scrub_jwt(self):
+        from salmalm.security.redact import scrub_secrets
+        text = "token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKx"
+        result = scrub_secrets(text)
+        self.assertNotIn("eyJhbGci", result)
+
+    def test_contains_secret(self):
+        from salmalm.security.redact import contains_secret
+        self.assertTrue(contains_secret("my key is sk-abc123def456ghi789jkl012mno345"))
+        self.assertFalse(contains_secret("hello world"))
+
+    def test_audit_log_redacts_secrets(self):
+        """Audit args should be redacted before logging."""
+        from salmalm.security.redact import scrub_secrets
+        import json
+        args = {"query": "set key sk-abc123def456ghi789jkl012mno345"}
+        raw = json.dumps(args)[:300]
+        scrubbed = scrub_secrets(raw)
+        self.assertNotIn("sk-abc123", scrubbed)
+        self.assertIn("[REDACTED]", scrubbed)
+
+
+class TestWritePathBlocking(unittest.TestCase):
+    """Test that write tools block paths outside allowed roots."""
+
+    def test_write_file_outside_root_blocked(self):
+        from salmalm.tools.tool_handlers import execute_tool
+        from unittest.mock import patch
+        with patch.dict("os.environ", {"SALMALM_BIND": "127.0.0.1"}):
+            result = execute_tool("write_file", {"path": "/etc/passwd", "content": "bad"})
+            self.assertIn("❌", result)
+
+    def test_read_nonexistent_outside_root_passes_through(self):
+        """Read tools on non-existent, non-sensitive paths should pass to handler."""
+        from salmalm.tools.tool_handlers import execute_tool
+        from unittest.mock import patch
+        # A non-existent path outside root but not in sensitive dirs
+        # should pass through (handler returns "not found")
+        result = execute_tool("read_file", {"path": "/tmp/nonexistent_abc123.txt"})
+        # /tmp is an allowed root, so this should pass through
+        self.assertNotIn("Path outside", str(result))

@@ -77,7 +77,13 @@ def execute_tool(name: str, args: dict) -> str:
     """Execute a tool and return result string. Auto-dispatches to remote node if available."""
     import os as _os
 
-    audit_log("tool_exec", f"{name}: {json.dumps(args, ensure_ascii=False)[:200]}")
+    try:
+        from salmalm.security.redact import scrub_secrets
+
+        _audit_preview = scrub_secrets(json.dumps(args, ensure_ascii=False)[:200])
+    except Exception:
+        _audit_preview = json.dumps(args, ensure_ascii=False)[:200]
+    audit_log("tool_exec", f"{name}: {_audit_preview}")
 
     # Defense-in-depth: tool tier re-verification at registry level
     # (supplements web middleware check — catches internal call paths)

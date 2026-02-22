@@ -91,11 +91,17 @@ def execute_tool(name: str, args: dict) -> str:
             # Home read requires opt-in
             home_read_ok = os.environ.get("SALMALM_ALLOW_HOME_READ") and resolved.startswith(str(_P.home()))
             if not in_allowed and not home_read_ok:
-                # Only block if the path actually exists (real traversal attempt)
-                # Non-existent paths are harmless — let the handler give "not found"
-                if _P(resolved).exists() or _P(val).exists():
+                # Write-capable tools: always block outside allowed roots
+                # (prevents creating files in arbitrary locations)
+                _WRITE_TOOLS = {
+                    "write_file", "create_file", "append_file", "save_file",
+                    "move_file", "copy_file", "rename_file", "patch_file",
+                    "download_file", "write_note", "save_note",
+                }
+                is_write = name in _WRITE_TOOLS
+                if is_write or _P(resolved).exists() or _P(val).exists():
                     return f"❌ Path outside allowed directories: {key}={val} / 허용 디렉토리 외부 경로 차단: denied"
-                # For non-existent paths outside allowed dirs, still block
+                # For non-existent read paths outside allowed dirs, still block
                 # absolute paths that clearly target sensitive dirs
                 _sensitive = (
                     "/etc/",
@@ -121,7 +127,13 @@ def execute_tool(name: str, args: dict) -> str:
                 continue  # exec tool handles its own safety
             args[key] = re.sub(r"\$\{?\w+\}?", "", val)
 
-    _audit_args = json.dumps(args, ensure_ascii=False)[:300]
+    _audit_args_raw = json.dumps(args, ensure_ascii=False)[:300]
+    try:
+        from salmalm.security.redact import scrub_secrets
+
+        _audit_args = scrub_secrets(_audit_args_raw)
+    except Exception:
+        _audit_args = _audit_args_raw
     _session_id = args.pop("_session_id", "")  # Injected by engine
     audit_log(
         "tool_exec",
@@ -130,19 +142,8 @@ def execute_tool(name: str, args: dict) -> str:
         detail_dict={"tool": name, "args_preview": _audit_args},
     )
 
-    # Tool tier check — critical tools blocked when externally exposed without auth
-    try:
-        import os as _os
-
-        bind = _os.environ.get("SALMALM_BIND", "127.0.0.1")
-        if bind != "127.0.0.1":
-            from salmalm.web.middleware import get_tool_tier
-
-            tier = get_tool_tier(name)
-            if tier == "critical":
-                log.warning(f"[SECURITY] Critical tool '{name}' invoked on external bind")
-    except Exception:
-        pass
+    # Tool tier enforcement is handled by tool_registry.execute_tool()
+    # via _authenticated arg (injected by engine from session state).
 
     # Try remote node dispatch first (if gateway has registered nodes)
     try:

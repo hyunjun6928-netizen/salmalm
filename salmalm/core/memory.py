@@ -44,30 +44,18 @@ class MemoryManager:
         re.compile(r"^\s*#{1,3}\s", re.M),  # Headers = section markers
     ]
 
-    # Secret patterns — lines matching these are NEVER stored in memory.
-    # Detected secrets are redacted + warning logged instead of curated.
-    _SECRET_PATTERNS = [
-        re.compile(r"\b(sk-[a-zA-Z0-9]{20,})\b"),  # OpenAI keys
-        re.compile(r"\b(AIza[a-zA-Z0-9_-]{30,})\b"),  # Google API keys
-        re.compile(r"\b(xoxb-[a-zA-Z0-9-]+)\b"),  # Slack tokens
-        re.compile(r"\b(ghp_[a-zA-Z0-9]{36,})\b"),  # GitHub PATs
-        re.compile(r"\b(AKIA[A-Z0-9]{16})\b"),  # AWS access keys
-        re.compile(r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\."),  # JWT tokens
-        re.compile(r"\b(password|비밀번호|credential|API.?key)\s*[:=]\s*\S+", re.I),  # key=value secrets
-    ]
+    # Secret detection/redaction delegated to shared utility
+    @staticmethod
+    def _contains_secret(text: str) -> bool:
+        from salmalm.security.redact import contains_secret
 
-    @classmethod
-    def _contains_secret(cls, text: str) -> bool:
-        """Check if text contains potential secrets."""
-        return any(pat.search(text) for pat in cls._SECRET_PATTERNS)
+        return contains_secret(text)
 
-    @classmethod
-    def _scrub_secrets(cls, text: str) -> str:
-        """Redact secrets from text, keeping context."""
-        result = text
-        for pat in cls._SECRET_PATTERNS:
-            result = pat.sub("[REDACTED]", result)
-        return result
+    @staticmethod
+    def _scrub_secrets(text: str) -> str:
+        from salmalm.security.redact import scrub_secrets
+
+        return scrub_secrets(text)
 
     def __init__(self):
         self._search = None  # Lazy — set after TFIDFSearch is ready
