@@ -4,7 +4,7 @@ SalmAlm implements the [Model Context Protocol (MCP)](https://modelcontextprotoc
 
 ## What This Means
 
-You can use SalmAlm's 32 tools (code execution, web search, file I/O, RAG, etc.) from **any MCP-compatible AI client**:
+You can use SalmAlm's 66 tools (code execution, web search, file I/O, RAG, etc.) from **any MCP-compatible AI client**:
 
 - **Claude Desktop** / **Claude Code**
 - **Cursor** (AI code editor)

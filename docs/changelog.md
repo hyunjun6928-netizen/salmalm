@@ -7,9 +7,9 @@ See the full changelog at [CHANGELOG.md on GitHub](https://github.com/hyunjun692
 
 ## v0.14.0 (Latest / 최신)
 
-Current release with 58+ tools, multi-channel support, and enterprise security features.
+Current release with 66 tools, multi-channel support, and enterprise security features.
 
-58개 이상의 도구, 멀티채널 지원, 엔터프라이즈 보안 기능을 갖춘 현재 릴리스.
+66개 내장 도구, 멀티채널 지원, 엔터프라이즈 보안 기능을 갖춘 현재 릴리스.
 
 ## v0.12.4
 

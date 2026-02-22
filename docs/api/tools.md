@@ -1,9 +1,9 @@
 # Tools Module API
 # 도구 모듈 API
 
-The `salmalm.tools` package implements all 58+ built-in tools.
+The `salmalm.tools` package implements all 66 built-in tools.
 
-`salmalm.tools` 패키지는 58개 이상의 내장 도구를 모두 구현합니다.
+`salmalm.tools` 패키지는 66개의 내장 도구를 모두 구현합니다.
 
 ## `salmalm.tools.tool_registry`
 
@@ -18,9 +18,9 @@ if-elif 체인을 대체하는 데코레이터 기반 도구 디스패치 시스
 
 ## `salmalm.tools.tools`
 
-Tool definitions — JSON schemas for all 58+ tools used in LLM system prompt.
+Tool definitions — JSON schemas for all 66 tools used in LLM system prompt.
 
-도구 정의 — LLM 시스템 프롬프트에 사용되는 58개 이상의 도구 JSON 스키마.
+도구 정의 — LLM 시스템 프롬프트에 사용되는 66개 내장 도구 JSON 스키마.
 
 ## Tool Handler Modules / 도구 핸들러 모듈
 

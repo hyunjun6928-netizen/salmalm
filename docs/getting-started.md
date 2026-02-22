@@ -106,6 +106,6 @@ curl http://localhost:18800/api/health
 ## Next Steps / 다음 단계
 
 - Read the [Commands Reference](commands.md) / [명령어 레퍼런스](commands.md) 참조
-- Explore [58+ Tools](tools.md) / [58개 이상의 도구](tools.md) 탐색
+- Explore [58+ Tools](tools.md) / [66개의 도구](tools.md) 탐색
 - Set up [Telegram/Discord](features/channels.md) / [텔레그램/디스코드](features/channels.md) 설정
 - Configure [deployment](deployment.md) / [배포](deployment.md) 설정

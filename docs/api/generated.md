@@ -326,7 +326,7 @@ Generated from source docstrings. Run `python docs/gen_api.py` to update.
   — Run the full shutdown sequence.
 
 
-## tools/ — Tools — 58+ Built-in Tools / 도구 — 58개 이상 내장 도구
+## tools/ — Tools — 58+ Built-in Tools / 도구 — 66개 내장 도구
 
 ### `salmalm.tools.__init__`
 
@@ -358,7 +358,7 @@ Generated from source docstrings. Run `python docs/gen_api.py` to update.
 
 ### `salmalm.tools.tools`
 
-> SalmAlm tool definitions — schema for all 32 tools.
+> SalmAlm tool definitions — schema for all 66 tools.
 
 
 ### `salmalm.tools.tools_agent`

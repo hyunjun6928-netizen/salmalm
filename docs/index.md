@@ -5,9 +5,9 @@
 
 ---
 
-**SalmAlm** is a pure-Python personal AI gateway that turns any LLM API into a fully-featured AI assistant with 58+ built-in tools, multi-channel support (Web, Telegram, Discord), and zero external dependencies.
+**SalmAlm** is a pure-Python personal AI gateway that turns any LLM API into a fully-featured AI assistant with 66 built-in tools, multi-channel support (Web, Telegram, Discord), and zero external dependencies.
 
-**SalmAlm**은 순수 파이썬으로 작성된 개인 AI 게이트웨이로, 어떤 LLM API든 58개 이상의 내장 도구, 멀티채널 지원(Web, Telegram, Discord)을 갖춘 완전한 AI 비서로 변환합니다. 외부 의존성이 없습니다.
+**SalmAlm**은 순수 파이썬으로 작성된 개인 AI 게이트웨이로, 어떤 LLM API든 66개의 내장 도구, 멀티채널 지원(Web, Telegram, Discord)을 갖춘 완전한 AI 비서로 변환합니다. 외부 의존성이 없습니다.
 
 ## Quick Start / 빠른 시작
 
@@ -26,7 +26,7 @@ Open **http://localhost:18800** and start chatting!
 |---|---|
 | 🤖 Multi-model routing | Opus/Sonnet/Haiku auto-select / 멀티모델 자동 라우팅 |
 | 🧠 Extended thinking | Deep reasoning mode / 확장 사고 모드 |
-| 🔧 58+ built-in tools | File, web, exec, email, calendar, and more / 파일, 웹, 실행, 이메일, 캘린더 등 |
+| 🔧 66 built-in tools | File, web, exec, email, calendar, and more / 파일, 웹, 실행, 이메일, 캘린더 등 |
 | 💬 30+ slash commands | Full control via chat / 채팅으로 완전한 제어 |
 | 🔗 Telegram & Discord | Multi-channel integration / 멀티채널 통합 |
 | 📊 SLA & Monitoring | 99.9% uptime tracking / 업타임 모니터링 |
