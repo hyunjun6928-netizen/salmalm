@@ -693,16 +693,79 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
     </div>
     <!-- Auto Routing -->
     <div class="settings-card">
-      <h3 data-i18n="h-routing">🔀 Auto Routing Models</h3>
-      <p style="font-size:12px;color:var(--text2);margin:4px 0 8px" data-i18n="routing-desc">When "Auto Routing" is selected, messages are classified by complexity and routed to these models:</p>
-      <label style="font-size:12px" data-i18n="lbl-route-simple">⚡ Simple (greetings, short questions)</label>
-      <select id="route-simple" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
-      <label style="font-size:12px" data-i18n="lbl-route-moderate">🔧 Moderate (code, analysis, summaries)</label>
-      <select id="route-moderate" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
-      <label style="font-size:12px" data-i18n="lbl-route-complex">💎 Complex (architecture, long reasoning)</label>
-      <select id="route-complex" class="route-select" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;margin-bottom:8px"></select>
-      <button data-action="saveRouting" style="padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px" data-i18n="btn-save-routing">Save Routing</button>
-      <span id="route-status" style="font-size:11px;color:var(--text2);margin-left:8px"></span>
+      <h3 data-i18n="h-routing">🔀 Auto Routing / 자동 라우팅</h3>
+      <p style="font-size:12px;color:var(--text2);margin:4px 0 12px;line-height:1.8">
+        SalmAlm automatically classifies each message by complexity and routes it to the optimal model.<br>
+        This saves money by using cheap models for simple tasks and powerful models only when needed.<br>
+        삶앎은 각 메시지의 복잡도를 자동 분류하여 최적의 모델로 라우팅합니다. 간단한 작업에 저렴한 모델을, 복잡한 작업에만 강력한 모델을 사용하여 비용을 절감합니다.
+      </p>
+
+      <!-- How classification works -->
+      <details style="margin-bottom:16px">
+        <summary style="font-size:13px;color:var(--accent2);cursor:pointer;font-weight:600">📖 How does classification work? / 분류는 어떻게 작동하나요?</summary>
+        <div style="font-size:12px;color:var(--text2);margin-top:10px;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);line-height:2">
+          <b>⚡ Simple</b> — Short messages &lt;50 chars, greetings, yes/no, emoji<br>
+          &nbsp;&nbsp;&nbsp;Examples: "안녕", "ㅋㅋ", "ok", "고마워", "뭐해", "잘자"<br>
+          <b>🔧 Moderate</b> — Code keywords, analysis, summaries, 50-500 chars<br>
+          &nbsp;&nbsp;&nbsp;Examples: "이 코드 리뷰해줘", "요약해줘", "번역해줘"<br>
+          <b>💎 Complex</b> — Architecture, system design, long messages &gt;500 chars, thinking mode<br>
+          &nbsp;&nbsp;&nbsp;Examples: "처음부터 API 서버 설계해줘", "전체 마이그레이션 계획"<br>
+          <br>
+          <b>⚡ Simple</b> — 50자 미만 짧은 메시지, 인사, 예/아니오, 이모지<br>
+          <b>🔧 Moderate</b> — 코드, 분석, 요약, 번역 키워드 포함, 50~500자<br>
+          <b>💎 Complex</b> — 아키텍처, 설계, 500자 이상 긴 메시지, thinking 모드 활성화 시
+        </div>
+      </details>
+
+      <!-- Tier selectors with cost info -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="border-left:3px solid #4ade80;padding-left:14px">
+          <label style="font-size:13px;font-weight:600">⚡ Simple <span style="font-size:11px;font-weight:400;color:var(--text2)">(~60% of messages / 메시지의 ~60%)</span></label>
+          <div style="font-size:11px;color:var(--text2);margin:4px 0 6px;line-height:1.6">
+            Greetings, short questions, casual chat. No tools needed.<br>
+            인사, 짧은 질문, 잡담. 도구 불필요.
+            <span style="color:#4ade80">Default: Haiku — $0.25/$1.25 per M tokens (cheapest)</span>
+          </div>
+          <select id="route-simple" class="route-select" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"></select>
+        </div>
+
+        <div style="border-left:3px solid #facc15;padding-left:14px">
+          <label style="font-size:13px;font-weight:600">🔧 Moderate <span style="font-size:11px;font-weight:400;color:var(--text2)">(~25% of messages / 메시지의 ~25%)</span></label>
+          <div style="font-size:11px;color:var(--text2);margin:4px 0 6px;line-height:1.6">
+            Code review, analysis, summaries, search, translations.<br>
+            코드 리뷰, 분석, 요약, 검색, 번역.
+            <span style="color:#facc15">Default: Sonnet — $3/$15 per M tokens (balanced)</span>
+          </div>
+          <select id="route-moderate" class="route-select" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"></select>
+        </div>
+
+        <div style="border-left:3px solid #f97316;padding-left:14px">
+          <label style="font-size:13px;font-weight:600">💎 Complex <span style="font-size:11px;font-weight:400;color:var(--text2)">(~15% of messages / 메시지의 ~15%)</span></label>
+          <div style="font-size:11px;color:var(--text2);margin:4px 0 6px;line-height:1.6">
+            System design, architecture, long reasoning, thinking mode tasks.<br>
+            시스템 설계, 아키텍처, 긴 추론, thinking 모드 작업.
+            <span style="color:#f97316">Default: Sonnet — $3/$15 per M tokens. Set Opus for maximum quality ($15/$75).</span>
+          </div>
+          <select id="route-complex" class="route-select" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"></select>
+        </div>
+      </div>
+
+      <!-- Cost comparison -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:16px;font-size:12px;line-height:2">
+        <b>💰 Estimated Daily Cost (100 calls/day) / 예상 일일 비용 (100회/일):</b><br>
+        🟢 <b>Default (Haiku+Sonnet+Sonnet):</b> ~$1.23/day ($37/month)<br>
+        🟡 <b>All Sonnet:</b> ~$3.50/day ($105/month)<br>
+        🔴 <b>All Opus:</b> ~$35/day ($1,050/month)<br>
+        🟣 <b>Haiku+Sonnet+Opus:</b> ~$5.80/day ($174/month) — <span style="color:var(--accent)">Best quality/cost balance</span><br>
+        <br>
+        <span style="color:var(--text2)">💡 Tip: Use <code>/model opus</code> in chat to temporarily override for a single session without changing these defaults.<br>
+        💡 팁: 채팅에서 <code>/model opus</code>로 이 기본값을 바꾸지 않고 현재 세션만 일시적으로 오버라이드할 수 있습니다.</span>
+      </div>
+
+      <div style="margin-top:14px;display:flex;align-items:center;gap:8px">
+        <button data-action="saveRouting" style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600" data-i18n="btn-save-routing">💾 Save Routing / 저장</button>
+        <span id="route-status" style="font-size:12px;color:var(--text2)"></span>
+      </div>
     </div>
     <!-- Ollama -->
     <div class="settings-card">
