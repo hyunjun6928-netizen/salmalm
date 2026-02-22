@@ -33,8 +33,13 @@ def _try_cli_oauth(provider: str) -> Optional[str]:
     """Try to read OAuth access token from CLI auth files.
 
     Returns access_token string or None.
+    Requires SALMALM_CLI_OAUTH=1 (opt-in) to avoid silently reading
+    credentials from other applications without user consent.
     """
     import pathlib
+
+    if not _os.environ.get("SALMALM_CLI_OAUTH"):
+        return None
 
     home = pathlib.Path.home()
 
