@@ -297,7 +297,19 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 all_tools.append(t)
                 seen.add(t['name'])
 
-        # ── Dynamic tool selection: zero tools for chat, minimal for others ──
+        # ── Dynamic tool selection (disable with SALMALM_ALL_TOOLS=1) ──
+        import os as _os
+        if _os.environ.get('SALMALM_ALL_TOOLS', '0') == '1':
+            # Legacy mode: send all tools, skip filtering
+            if provider == 'google':
+                return [{'name': t['name'], 'description': t['description'],
+                         'parameters': t['input_schema']} for t in all_tools]
+            elif provider == 'anthropic':
+                return [{'name': t['name'], 'description': t['description'],
+                         'input_schema': t['input_schema']} for t in all_tools]
+            return [{'name': t['name'], 'description': t['description'],
+                     'parameters': t['input_schema']} for t in all_tools]
+
         # chat/memory/creative with no keyword match → NO tools (pure LLM)
         # Other intents → small core set + intent + keyword matched
         _NO_TOOL_INTENTS = {'chat', 'memory', 'creative'}
@@ -569,9 +581,18 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                  f"think={use_thinking}, budget={thinking_budget}, "
                  f"score={classification.get('score', 0)})")
 
-        # PHASE 1: PLANNING — disabled for token optimization
-        # Planning prompt was injecting extra system messages (~150 tok/call).
-        # LLMs plan naturally when system prompt says "Think step by step".
+        # PHASE 1: PLANNING — opt-in via SALMALM_PLANNING=1 or settings toggle
+        import os as _os
+        if _os.environ.get('SALMALM_PLANNING', '0') == '1':
+            if classification['intent'] in ('code', 'analysis') and classification.get('score', 0) >= 2:
+                plan_msg = {'role': 'system', 'content': self.PLAN_PROMPT, '_plan_injected': True}
+                last_user_idx = None
+                for i in range(len(session.messages) - 1, -1, -1):
+                    if session.messages[i].get('role') == 'user':
+                        last_user_idx = i
+                        break
+                if last_user_idx is not None:
+                    session.messages.insert(last_user_idx, plan_msg)
 
         # PHASE 2: EXECUTE — tool loop
         try:

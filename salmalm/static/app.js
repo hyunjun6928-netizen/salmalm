@@ -1159,6 +1159,14 @@
         if(_vk.indexOf('discord_guild_id')>=0){var _dg=document.getElementById('sk-discord-guild');if(_dg)_dg.placeholder='••••••••• (saved)'}
       });
     if(window.checkGoogleStatus)window.checkGoogleStatus();
+    /* Load engine optimization settings */
+    fetch('/api/engine/settings').then(function(r){return r.json()}).then(function(d){
+      var dt=document.getElementById('eng-dynamic-tools');if(dt)dt.checked=!!d.dynamic_tools;
+      var pl=document.getElementById('eng-planning');if(pl)pl.checked=!!d.planning;
+      var rf=document.getElementById('eng-reflection');if(rf)rf.checked=!!d.reflection;
+      var cp=document.getElementById('eng-compaction');if(cp)cp.value=String(d.compaction_threshold||30000);
+      var cc=document.getElementById('eng-cost-cap');if(cc)cc.value=d.cost_cap||'';
+    }).catch(function(){});
     if(window._checkTgStatus)window._checkTgStatus();
     if(window._checkDcStatus)window._checkDcStatus();
     fetch('/api/status').then(function(r){return r.json()}).then(function(d){
@@ -1942,6 +1950,21 @@
     else if(a==='save-telegram-owner')window.saveKey('telegram_owner_id','sk-telegram-owner');
     else if(a==='save-discord-token'){window.saveKey('discord_token','sk-discord-token');setTimeout(window._checkDcStatus,1000)}
     else if(a==='save-discord-guild')window.saveKey('discord_guild_id','sk-discord-guild');
+    else if(a==='saveEngineSettings'){
+      var payload={
+        dynamic_tools:!!document.getElementById('eng-dynamic-tools').checked,
+        planning:!!document.getElementById('eng-planning').checked,
+        reflection:!!document.getElementById('eng-reflection').checked,
+        compaction_threshold:parseInt(document.getElementById('eng-compaction').value)||30000,
+        cost_cap:document.getElementById('eng-cost-cap').value.trim()
+      };
+      fetch('/api/engine/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+        .then(function(r){return r.json()}).then(function(d){
+          var re=document.getElementById('eng-save-result');
+          if(re)re.innerHTML='<span style="color:#4ade80">✅ Saved</span>';
+          setTimeout(function(){if(re)re.innerHTML=''},3000);
+        }).catch(function(e){var re=document.getElementById('eng-save-result');if(re)re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>'})
+    }
     else if(a==='googleConnect')window.googleConnect();
     else if(a==='googleDisconnect')window.googleDisconnect();
     else if(a==='changePw')window.changePw();

@@ -1203,6 +1203,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         "/api/thoughts": "_get_thoughts",
         "/api/thoughts/stats": "_get_thoughts_stats",
         "/api/features": "_get_features",
+        "/api/engine/settings": "_get_api_engine_settings",
         "/api/tools/list": "_get_tools_list",
         "/api/commands": "_get_commands",
         "/setup": "_get_setup",
@@ -3939,6 +3940,43 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         except Exception as e:
             self._json({"error": str(e)[:500]}, 500)
 
+    def _get_api_engine_settings(self):
+        """GET /api/engine/settings — return current engine optimization toggles."""
+        import os
+        from salmalm.constants import COMPACTION_THRESHOLD
+        self._json({
+            'dynamic_tools': os.environ.get('SALMALM_ALL_TOOLS', '0') != '1',
+            'planning': os.environ.get('SALMALM_PLANNING', '0') == '1',
+            'reflection': os.environ.get('SALMALM_REFLECT', '0') == '1',
+            'compaction_threshold': COMPACTION_THRESHOLD,
+            'cost_cap': os.environ.get('SALMALM_COST_CAP', ''),
+        })
+
+    def _post_api_engine_settings(self):
+        """POST /api/engine/settings — toggle engine optimization settings."""
+        import os, salmalm.constants as _const
+        body = self._body
+        if 'dynamic_tools' in body:
+            os.environ['SALMALM_ALL_TOOLS'] = '0' if body['dynamic_tools'] else '1'
+        if 'planning' in body:
+            os.environ['SALMALM_PLANNING'] = '1' if body['planning'] else '0'
+        if 'reflection' in body:
+            os.environ['SALMALM_REFLECT'] = '1' if body['reflection'] else '0'
+        if 'compaction_threshold' in body:
+            try:
+                val = int(body['compaction_threshold'])
+                if 10000 <= val <= 200000:
+                    _const.COMPACTION_THRESHOLD = val
+            except (ValueError, TypeError):
+                pass
+        if 'cost_cap' in body:
+            cap = str(body['cost_cap']).strip()
+            if cap:
+                os.environ['SALMALM_COST_CAP'] = cap
+            elif 'SALMALM_COST_CAP' in os.environ:
+                del os.environ['SALMALM_COST_CAP']
+        self._json({'ok': True})
+
     def _post_api_thoughts(self):
         body = self._body
         from salmalm.features.thoughts import thought_stream
@@ -4011,6 +4049,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         "/api/sla/config": "_post_api_sla_config",
         "/api/node/execute": "_post_api_node_execute",
         "/api/thoughts": "_post_api_thoughts",
+        "/api/engine/settings": "_post_api_engine_settings",
     }
 
     def _do_post_inner(self):

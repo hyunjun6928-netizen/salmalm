@@ -535,6 +535,41 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
   </div>
   </div><!-- end settings-general -->
   <div id="settings-features" style="display:none">
+    <div class="settings-card" id="engine-opt-card">
+      <h3>⚡ Engine Optimization / 엔진 최적화</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6" data-i18n="engine-opt-desc">Control token usage and response quality trade-offs.</p>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <label style="font-size:13px;display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="eng-dynamic-tools" checked style="width:18px;height:18px">
+          <div><b>Dynamic Tool Loading</b><br><span style="font-size:11px;color:var(--text2)">Only send relevant tools per request (saves ~90% tool tokens) / 요청별 필요한 도구만 전송 (도구 토큰 ~90% 절감)</span></div>
+        </label>
+        <label style="font-size:13px;display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="eng-planning" style="width:18px;height:18px">
+          <div><b>Planning Phase</b><br><span style="font-size:11px;color:var(--text2)">Inject planning prompt before complex tasks (+~150 tok/call) / 복잡한 작업 전 계획 프롬프트 주입 (+~150 토큰/호출)</span></div>
+        </label>
+        <label style="font-size:13px;display:flex;align-items:center;gap:10px;cursor:pointer">
+          <input type="checkbox" id="eng-reflection" style="width:18px;height:18px">
+          <div><b>Self-Reflection</b><br><span style="font-size:11px;color:var(--text2)">Verify code/analysis with a second LLM call (doubles cost for complex tasks) / 코드/분석 응답을 2차 LLM 호출로 검증 (복잡 작업 비용 2배)</span></div>
+        </label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="font-size:13px;margin:0"><b>Compaction</b></label>
+          <select id="eng-compaction" style="width:auto;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+            <option value="15000">Aggressive (15K) / 적극적</option>
+            <option value="30000" selected>Balanced (30K) / 균형</option>
+            <option value="60000">Relaxed (60K) / 여유</option>
+            <option value="120000">Maximum (120K) / 최대</option>
+          </select>
+          <span style="font-size:11px;color:var(--text2)">Context compaction threshold / 컨텍스트 압축 임계값</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="font-size:13px;margin:0"><b>Cost Cap</b></label>
+          <input id="eng-cost-cap" type="text" placeholder="e.g. 5.00 ($/day)" style="width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+          <span style="font-size:11px;color:var(--text2)">Daily spending limit / 일일 비용 한도 ($)</span>
+        </div>
+      </div>
+      <button class="btn" data-action="saveEngineSettings" style="margin-top:14px">💾 Save / 저장</button>
+      <span id="eng-save-result" style="font-size:12px;margin-left:8px"></span>
+    </div>
     <div style="margin-bottom:16px"><input id="features-search" type="text" placeholder="Search features..." data-i18n="features-search-ph" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:14px"></div>
     <div id="features-list"></div>
     <div id="features-empty" style="display:none;text-align:center;padding:40px;color:var(--text2);font-size:14px" data-i18n="features-empty">No features found.</div>
