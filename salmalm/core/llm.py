@@ -308,7 +308,8 @@ def _call_provider(
         return _call_google(api_key, model_id, messages, max_tokens, tools=tools)
     elif provider == "ollama":
         ollama_url = vault.get("ollama_url") or "http://localhost:11434/v1"
-        return _call_openai("ollama", model_id, messages, tools, max_tokens, ollama_url)
+        ollama_api_key = vault.get("ollama_api_key") or "ollama"
+        return _call_openai(ollama_api_key, model_id, messages, tools, max_tokens, ollama_url)
     elif provider == "openrouter":
         return _call_openai(api_key, model_id, messages, tools, max_tokens, "https://openrouter.ai/api/v1")
     elif provider in ("deepseek", "meta-llama", "mistralai", "qwen"):

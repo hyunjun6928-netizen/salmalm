@@ -337,7 +337,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             "google_api_key",
         ]
         has_api_key = any(vault.get(k) for k in providers)
-        has_ollama = bool(vault.get("ollama_url"))
+        has_ollama = bool(vault.get("ollama_url") or vault.get("ollama_api_key"))
         return not (has_api_key or has_ollama)
 
     def _auto_unlock_localhost(self):

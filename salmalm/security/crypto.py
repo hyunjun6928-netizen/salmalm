@@ -227,6 +227,7 @@ class Vault:
         "brave_api_key": "BRAVE_SEARCH_API_KEY",
         "openrouter_api_key": "OPENROUTER_API_KEY",
         "ollama_url": "OLLAMA_URL",
+        "ollama_api_key": "OLLAMA_API_KEY",
         "telegram_token": "TELEGRAM_TOKEN",
         "telegram_owner_id": "TELEGRAM_OWNER_ID",
         "discord_token": "DISCORD_TOKEN",
