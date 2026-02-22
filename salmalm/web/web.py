@@ -3951,6 +3951,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             'compaction_threshold': COMPACTION_THRESHOLD,
             'cost_cap': os.environ.get('SALMALM_COST_CAP', ''),
             'max_tool_iterations': int(os.environ.get('SALMALM_MAX_TOOL_ITER', '15')),
+            'cache_ttl': int(os.environ.get('SALMALM_CACHE_TTL', '3600')),
+            'batch_api': os.environ.get('SALMALM_BATCH_API', '0') == '1',
+            'file_presummary': os.environ.get('SALMALM_FILE_PRESUMMARY', '0') == '1',
+            'early_stop': os.environ.get('SALMALM_EARLY_STOP', '0') == '1',
         })
 
     def _post_api_engine_settings(self):
@@ -3978,6 +3982,20 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     os.environ['SALMALM_MAX_TOOL_ITER'] = str(val)
             except (ValueError, TypeError):
                 pass
+        if 'cache_ttl' in body:
+            try:
+                val = int(body['cache_ttl'])
+                if 0 <= val <= 86400:
+                    os.environ['SALMALM_CACHE_TTL'] = str(val)
+                    _const.CACHE_TTL = val
+            except (ValueError, TypeError):
+                pass
+        if 'batch_api' in body:
+            os.environ['SALMALM_BATCH_API'] = '1' if body['batch_api'] else '0'
+        if 'file_presummary' in body:
+            os.environ['SALMALM_FILE_PRESUMMARY'] = '1' if body['file_presummary'] else '0'
+        if 'early_stop' in body:
+            os.environ['SALMALM_EARLY_STOP'] = '1' if body['early_stop'] else '0'
         if 'cost_cap' in body:
             cap = str(body['cost_cap']).strip()
             if cap:

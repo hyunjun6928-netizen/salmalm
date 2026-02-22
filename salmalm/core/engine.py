@@ -433,7 +433,23 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
     def _truncate_tool_result(self, result: str, tool_name: str = '') -> str:
         """Truncate tool result based on tool type to prevent context explosion."""
+        import os as _os
         result = self._redact_secrets(result)
+        # File pre-summarization: summarize large file reads with Haiku
+        if (_os.environ.get('SALMALM_FILE_PRESUMMARY', '0') == '1'
+                and tool_name in ('read_file', 'web_fetch')
+                and len(result) > 5000):
+            try:
+                from salmalm.core.llm import call_llm
+                summary = call_llm(
+                    model='anthropic/claude-haiku-3.5-20241022',
+                    messages=[{'role': 'user',
+                               'content': f'Summarize this content concisely, preserving key facts, code structure, and important details:\n\n{result[:15000]}'}],
+                    max_tokens=1024, tools=None)
+                if summary.get('content'):
+                    return f'[Pre-summarized by Haiku — original {len(result)} chars]\n\n{summary["content"]}'
+            except Exception:
+                pass  # Fall through to normal truncation
         limit = self._TOOL_TRUNCATE_LIMITS.get(tool_name, self.MAX_TOOL_RESULT_CHARS)
         if len(result) > limit:
             return result[:limit] + \

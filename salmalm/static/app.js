@@ -1177,6 +1177,10 @@
       var cp=document.getElementById('eng-compaction');if(cp)cp.value=String(d.compaction_threshold||30000);
       var cc=document.getElementById('eng-cost-cap');if(cc)cc.value=d.cost_cap||'';
       var mi=document.getElementById('eng-max-tool-iter');if(mi)mi.value=String(d.max_tool_iterations||15);
+      var ct=document.getElementById('eng-cache-ttl');if(ct)ct.value=String(d.cache_ttl||3600);
+      var ba=document.getElementById('eng-batch-api');if(ba)ba.checked=!!d.batch_api;
+      var fp=document.getElementById('eng-file-presummary');if(fp)fp.checked=!!d.file_presummary;
+      var es=document.getElementById('eng-early-stop');if(es)es.checked=!!d.early_stop;
     }).catch(function(){});
     if(window._checkTgStatus)window._checkTgStatus();
     if(window._checkDcStatus)window._checkDcStatus();
@@ -1972,6 +1976,10 @@
         reflection:!!document.getElementById('eng-reflection').checked,
         compaction_threshold:parseInt(document.getElementById('eng-compaction').value)||30000,
         max_tool_iterations:parseInt(document.getElementById('eng-max-tool-iter').value)||15,
+        cache_ttl:parseInt(document.getElementById('eng-cache-ttl').value)||3600,
+        batch_api:!!document.getElementById('eng-batch-api').checked,
+        file_presummary:!!document.getElementById('eng-file-presummary').checked,
+        early_stop:!!document.getElementById('eng-early-stop').checked,
         cost_cap:document.getElementById('eng-cost-cap').value.trim()
       };
       fetch('/api/engine/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})

@@ -185,8 +185,11 @@ async def _call_llm_streaming(messages, model=None, tools=None,
     Handles streaming interruptions gracefully — preserves partial content.
     """
     def _run():
+        import os as _os
+        _early_stop = _os.environ.get('SALMALM_EARLY_STOP', '0') == '1'
         final_result = None
         accumulated_text = []
+        _has_tool_calls = False
         try:
             for event in _stream_anthropic(messages, model=model, tools=tools,
                                            max_tokens=max_tokens, thinking=thinking):
@@ -197,6 +200,18 @@ async def _call_llm_streaming(messages, model=None, tools=None,
                     delta = event.get('delta', {})
                     if delta.get('type') == 'text_delta':
                         accumulated_text.append(delta.get('text', ''))
+                if event.get('type') == 'content_block_start':
+                    cb = event.get('content_block', {})
+                    if cb.get('type') == 'tool_use':
+                        _has_tool_calls = True
+                # Early stop: if text-only response looks complete, break
+                if (_early_stop and not _has_tool_calls and not tools
+                        and len(accumulated_text) > 5):
+                    tail = ''.join(accumulated_text[-3:]).rstrip()
+                    if (tail.endswith(('.', '!', '?', '。', '！', '？', '```'))
+                            and len(''.join(accumulated_text)) > 200):
+                        log.info("[EARLY_STOP] Response looks complete, stopping stream")
+                        break
                 if event.get('type') == 'message_end':
                     final_result = event
                 elif event.get('type') == 'error':

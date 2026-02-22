@@ -839,23 +839,102 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           </div>
         </div>
 
+        <!-- Cache TTL -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <span class="eng-en"><span style="font-size:14px"><b>🗄️ Response Cache TTL</b></span></span><span class="eng-kr"><span style="font-size:14px"><b>🗄️ 응답 캐시 유효시간</b></span></span>
+          </div>
+          <div style="margin-bottom:8px">
+            <select id="eng-cache-ttl" style="width:auto;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+              <option value="0">Disabled (0)</option>
+              <option value="1800">30 min</option>
+              <option value="3600" selected>1 hour</option>
+              <option value="14400">4 hours</option>
+              <option value="43200">12 hours</option>
+              <option value="86400">24 hours</option>
+            </select>
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8">
+            <span class="eng-en">How long identical (tool-free) query responses are cached. Cached hits cost <span style="color:#4ade80">$0</span> — no API call made.<br>
+            Higher TTL = more cache hits = more savings, but responses may be stale.<br>
+            <b>Recommended:</b> 4-24h for general use. Disable for real-time data needs (weather, stocks).</span>
+            <span class="eng-kr">동일한 (도구 미사용) 쿼리 응답을 캐시하는 시간입니다. 캐시 히트 시 비용 <span style="color:#4ade80">$0</span> — API 호출 없음.<br>
+            TTL이 높을수록 캐시 히트 증가 = 비용 절감, 단 응답이 오래될 수 있음.<br>
+            <b>권장:</b> 일반 사용 4-24시간. 실시간 데이터(날씨, 환율) 필요 시 비활성화.</span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> No response caching. Every message triggers a fresh API call.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 응답 캐시 없음. 모든 메시지가 새 API 호출을 트리거.</span></span>
+          </div>
+        </div>
+
+        <!-- Batch API -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <label style="font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
+            <input type="checkbox" id="eng-batch-api" style="width:18px;height:18px">
+            <span class="eng-en"><b>📦 Batch API Mode</b></span><span class="eng-kr"><b>📦 배치 API 모드</b></span>
+          </label>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;padding-left:28px">
+            <span class="eng-en"><b>ON:</b> Non-interactive tasks (summaries, analysis, translations) are queued and sent via Anthropic Batch API at <span style="color:#4ade80">50% discount</span>. Responses may take 1-60 min instead of instant.<br>
+            <b>Best for:</b> Batch processing, document analysis, offline summarization.<br>
+            <b>OFF (default):</b> All requests processed in real-time.</span>
+            <span class="eng-kr"><b>ON:</b> 비대화형 작업(요약, 분석, 번역)을 Anthropic 배치 API로 전송하여 <span style="color:#4ade80">50% 할인</span>. 응답에 1-60분 소요 가능.<br>
+            <b>추천 상황:</b> 대량 처리, 문서 분석, 오프라인 요약.<br>
+            <b>OFF (기본):</b> 모든 요청을 실시간으로 처리.</span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> No batch API support. All requests are real-time.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 배치 API 미지원. 모든 요청이 실시간 처리.</span></span>
+          </div>
+        </div>
+
+        <!-- File Pre-summarization -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <label style="font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
+            <input type="checkbox" id="eng-file-presummary" style="width:18px;height:18px">
+            <span class="eng-en"><b>📄 File Pre-summarization</b></span><span class="eng-kr"><b>📄 파일 사전 요약</b></span>
+          </label>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;padding-left:28px">
+            <span class="eng-en"><b>ON:</b> Large file contents (&gt;5KB) are first summarized by Haiku before being sent to the main model. Reduces input tokens by <span style="color:#4ade80">50-80%</span> for file-heavy tasks.<br>
+            <b>Cost:</b> Extra Haiku call (~$0.001) but saves $0.01-0.05 on Sonnet/Opus input.<br>
+            <b>Trade-off:</b> Summary may lose fine details. Disable for precise code review.<br>
+            <b>OFF (default):</b> Full file contents sent to the main model as-is.</span>
+            <span class="eng-kr"><b>ON:</b> 대용량 파일(&gt;5KB)을 메인 모델에 보내기 전에 Haiku로 먼저 요약합니다. 파일 중심 작업에서 입력 토큰 <span style="color:#4ade80">50-80% 절감</span>.<br>
+            <b>비용:</b> Haiku 호출 추가 (~$0.001) 하지만 Sonnet/Opus 입력에서 $0.01-0.05 절약.<br>
+            <b>트레이드오프:</b> 요약 시 세부사항 손실 가능. 정밀한 코드 리뷰에는 비활성화 권장.<br>
+            <b>OFF (기본):</b> 파일 내용 전체를 메인 모델에 그대로 전송.</span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Sends full file contents. Uses <code>read</code> tool with offset/limit for large files to control token usage manually.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 파일 내용 전체 전송. 대용량 파일은 <code>read</code> 도구의 offset/limit으로 토큰 사용량을 수동 제어.</span></span>
+          </div>
+        </div>
+
+        <!-- Streaming Early Stop -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <label style="font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
+            <input type="checkbox" id="eng-early-stop" style="width:18px;height:18px">
+            <span class="eng-en"><b>⏹️ Streaming Early Stop</b></span><span class="eng-kr"><b>⏹️ 스트리밍 조기 중단</b></span>
+          </label>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;padding-left:28px">
+            <span class="eng-en"><b>ON:</b> Detects when the AI response is semantically complete (e.g., ends with punctuation, code block closed) and stops generation early. Saves <span style="color:#4ade80">10-30% output tokens</span> on verbose responses.<br>
+            <b>Trade-off:</b> May occasionally cut off longer explanations.<br>
+            <b>OFF (default):</b> Model generates until it naturally stops or hits max_tokens.</span>
+            <span class="eng-kr"><b>ON:</b> AI 응답이 의미적으로 완성되면(마침표, 코드 블록 닫힘 등) 생성을 조기 중단합니다. 장황한 응답에서 <span style="color:#4ade80">출력 토큰 10-30% 절감</span>.<br>
+            <b>트레이드오프:</b> 긴 설명이 간혹 잘릴 수 있음.<br>
+            <b>OFF (기본):</b> 모델이 자연스럽게 중단하거나 max_tokens에 도달할 때까지 생성.</span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> No early stop. Model generates until completion. Uses <code>reasoning_effort</code> parameter to control verbosity at the model level.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 조기 중단 없음. 모델이 완성될 때까지 생성. <code>reasoning_effort</code> 파라미터로 모델 레벨에서 장황함을 제어.</span></span>
+          </div>
+        </div>
+
       </div>
 
       <!-- Summary bar -->
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:20px;font-size:12px;line-height:1.8">
         <span class="eng-en"><b>💡 Recommended Presets:</b><br>
-        🟢 <b>Maximum Savings:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 15K · Cap $2/day<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.001/turn, Coding ~$0.01/turn</span><br>
-        🟡 <b>Balanced:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 30K · Cap $10/day<br>
+        🟢 <b>Maximum Savings:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 15K · Cache 24h · Early Stop ✅ · File Summary ✅ · Cap $2/day<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.0005/turn, Coding ~$0.008/turn</span><br>
+        🟡 <b>Balanced:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 30K · Cache 4h · Cap $10/day<br>
         &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.002/turn, Coding ~$0.02/turn</span><br>
-        🔴 <b>Maximum Quality:</b> Dynamic Tools ❌ · Planning ✅ · Reflection ✅ · Compaction 120K · No cap<br>
+        🔴 <b>Maximum Quality:</b> Dynamic Tools ❌ · Planning ✅ · Reflection ✅ · Compaction 120K · Cache off · No cap<br>
         &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.05/turn, Coding ~$0.15/turn</span></span>
         <span class="eng-kr"><b>💡 권장 프리셋:</b><br>
-        🟢 <b>최대 절약:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 15K · Cap $2/day<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.001/턴, 코딩 ~$0.01/턴</span><br>
-        🟡 <b>균형:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 30K · Cap $10/day<br>
+        🟢 <b>최대 절약:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 15K · Cache 24h · Early Stop ✅ · File Summary ✅ · Cap $2/day<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.0005/턴, 코딩 ~$0.008/턴</span><br>
+        🟡 <b>균형:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 30K · Cache 4h · Cap $10/day<br>
         &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.002/턴, 코딩 ~$0.02/턴</span><br>
-        🔴 <b>최대 품질:</b> Dynamic Tools ❌ · Planning ✅ · Reflection ✅ · Compaction 120K · No cap<br>
+        🔴 <b>최대 품질:</b> Dynamic Tools ❌ · Planning ✅ · Reflection ✅ · Compaction 120K · Cache off · No cap<br>
         &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.05/턴, 코딩 ~$0.15/턴</span></span>
       </div>
 
