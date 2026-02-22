@@ -293,8 +293,23 @@ async def run_server():
             try:
                 from salmalm.channels.discord_bot import discord_bot
                 discord_bot.configure(dc_token, dc_guild)
+
+                # Register message handler → core engine
+                async def _discord_message_handler(content, raw_data):
+                    import time as _t
+                    _author = raw_data.get('author', {})
+                    _user_id = _author.get('id', 'unknown')
+                    _channel_id = raw_data.get('channel_id', '')
+                    _session_id = f'discord_{_channel_id}'
+                    _start = _t.time()
+                    from salmalm.core.engine import process_message
+                    response = await process_message(_session_id, content)
+                    _elapsed = _t.time() - _start
+                    return f"{response}\n\n⏱️ {_elapsed:.1f}s" if response else None
+
+                discord_bot.on_message(_discord_message_handler)
                 asyncio.create_task(discord_bot.poll())
-                log.info("[DISCORD] Bot configured, starting polling...")
+                log.info("[DISCORD] Bot configured, message handler registered, starting polling...")
             except Exception as e:
                 log.warning(f"[DISCORD] Failed to start: {e}")
 
