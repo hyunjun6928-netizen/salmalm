@@ -805,14 +805,14 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                         valid_tools, on_tool)
                     tool_outputs.update(exec_outputs)
 
-                # Circuit breaker: 연속 에러 감지
+                # Circuit breaker: 연속 에러 감지 (❌ prefix only)
                 errors = sum(1 for v in tool_outputs.values()
-                             if '❌' in str(v) or 'error' in str(v).lower())
+                             if str(v).startswith('❌'))
                 if errors > 0:
                     consecutive_errors += errors
                     if consecutive_errors >= self.MAX_CONSECUTIVE_ERRORS:
                         log.warning(f"[BREAK] {consecutive_errors} consecutive tool errors — stopping loop")
-                        err_summary = '\n'.join(f"• {v}" for v in tool_outputs.values() if '❌' in str(v))
+                        err_summary = '\n'.join(f"• {v}" for v in tool_outputs.values() if str(v).startswith('❌'))
                         response = f"⚠️ Tool errors detected, stopping:\n{err_summary}"
                         session.add_assistant(response)
                         return response
