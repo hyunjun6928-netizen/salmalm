@@ -1081,9 +1081,11 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
     <!-- Ollama -->
     <div class="settings-card">
       <h3>🦙 Ollama (Local LLM)</h3>
-      <label data-i18n="lbl-ollama">Ollama URL</label>
+      <label data-i18n="lbl-ollama">Ollama / Local LLM URL</label>
       <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
-      <button data-action="saveOllama" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px" data-i18n="btn-save-ollama">Save Ollama URL</button>
+      <label style="margin-top:8px;font-size:12px;color:var(--text2)">🔑 <span data-i18n="lbl-ollama-key">API Key (optional — only if your endpoint requires auth)</span></label>
+      <input id="s-ollama-key" type="password" placeholder="Bearer token" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      <button data-action="saveOllama" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px" data-i18n="btn-save-ollama">Save Local LLM Config</button>
     </div>
     <!-- API Keys -->
     <div class="settings-card">

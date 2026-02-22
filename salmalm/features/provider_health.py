@@ -46,7 +46,8 @@ class ProviderHealthCheck:
 
         ollama_url = vault.get('ollama_url') if vault.is_unlocked else None
         if ollama_url:
-            results['ollama'] = self._test_ollama(ollama_url)
+            ollama_key = vault.get('ollama_api_key') if vault.is_unlocked else None
+            results['ollama'] = self._test_ollama(ollama_url, ollama_key)
         else:
             results['ollama'] = 'not configured'
 
@@ -118,14 +119,24 @@ class ProviderHealthCheck:
         except Exception as e:
             return f'error: {str(e)[:100]}'
 
-    def _test_ollama(self, url: str) -> str:
+    def _test_ollama(self, url: str, api_key: str = None) -> str:
         try:
             import urllib.request
-            req = urllib.request.Request(f"{url.rstrip('/')}/api/tags")
-            resp = urllib.request.urlopen(req, timeout=5)
-            data = json.loads(resp.read())
-            model_count = len(data.get('models', []))
-            return f'ok ({model_count} models)'
+            base = url.rstrip('/')
+            headers = {}
+            if api_key:
+                headers['Authorization'] = f'Bearer {api_key}'
+            # Try /api/tags first (native Ollama), then /models (OpenAI-compat)
+            for endpoint in (f'{base}/api/tags', f'{base}/models'):
+                try:
+                    req = urllib.request.Request(endpoint, headers=headers)
+                    resp = urllib.request.urlopen(req, timeout=5)
+                    data = json.loads(resp.read())
+                    count = len(data.get('models', data.get('data', [])))
+                    return f'ok ({count} models)'
+                except Exception:
+                    continue
+            return 'offline: no models endpoint responded'
         except Exception as e:
             return f'offline: {str(e)[:100]}'
 

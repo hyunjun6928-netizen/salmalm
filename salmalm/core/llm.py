@@ -153,7 +153,7 @@ def call_llm(messages: List[Dict[str, Any]], model: Optional[str] = None,
     if provider in _openrouter_providers:
         api_key = vault.get('openrouter_api_key')
     elif provider == 'ollama':
-        api_key = 'ollama'  # Ollama doesn't need real API key
+        api_key = vault.get('ollama_api_key') or 'ollama'
     elif provider == 'google':
         api_key = vault.get('google_api_key') or vault.get('gemini_api_key')
     else:
@@ -377,7 +377,7 @@ def _call_openai(api_key: str, model_id: str, messages: List[Dict[str, Any]],
     if tools:
         body['tools'] = [{'type': 'function', 'function': t} for t in tools]
     headers = {'Content-Type': 'application/json'}
-    if api_key and api_key != 'ollama':
+    if api_key and api_key not in ('ollama', ''):
         headers['Authorization'] = f'Bearer {api_key}'
     resp = _http_post(
         f'{base_url}/chat/completions',

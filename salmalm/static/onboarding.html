@@ -98,9 +98,12 @@ button:disabled{opacity:0.5;cursor:not-allowed}
   </div>
   <div class="divider"></div>
   <div class="field">
-    <label>🦙 Ollama URL (Local — no key needed)</label>
+    <label>🦙 Ollama / Local LLM URL</label>
     <input type="text" id="ollama" placeholder="http://localhost:11434/v1">
     <div class="hint">Free local AI. <a href="https://ollama.com" target="_blank" style="color:#7c5cfc">Install →</a></div>
+    <label style="margin-top:8px">🔑 Local LLM API Key <span style="color:#888">(optional)</span></label>
+    <input type="password" id="ollama-key" placeholder="Bearer token if your endpoint requires auth">
+    <div class="hint">Only needed if your local LLM server requires authentication (e.g. LiteLLM proxy, vLLM with auth).</div>
   </div>
   <div class="btn-row">
     <button class="btn-secondary" onclick="goStep(0)">← Back</button>
@@ -211,6 +214,8 @@ function getKeys(){
   });
   const ollama=document.getElementById('ollama').value.trim();
   if(ollama) body.ollama_url=ollama;
+  const ollamaKey=document.getElementById('ollama-key').value.trim();
+  if(ollamaKey) body.ollama_api_key=ollamaKey;
   return body;
 }
 

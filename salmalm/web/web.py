@@ -604,16 +604,44 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         providers = []
         for name, cfg in PROVIDERS.items():
-            providers.append(
-                {
-                    "name": name,
-                    "available": is_provider_available(name),
-                    "env_key": cfg.get("env_key", ""),
-                    "models": [
-                        {"name": m, "full": f"{name}/{m}"} for m in cfg["models"]
-                    ],
-                }
-            )
+            if name == "ollama":
+                # Fetch real models from local endpoint instead of hardcoded list
+                try:
+                    from salmalm.features.model_detect import model_detector
+                    detected = model_detector.detect_all(force=True)
+                    local_models = [
+                        {"name": m["name"], "full": m["id"]}
+                        for m in detected
+                        if m.get("provider") == "ollama"
+                    ]
+                except Exception:
+                    local_models = [
+                        {"name": m, "full": f"ollama/{m}"}
+                        for m in cfg["models"]
+                    ]
+                providers.append(
+                    {
+                        "name": name,
+                        "available": is_provider_available(name) or bool(local_models),
+                        "env_key": "",
+                        "models": local_models or [
+                            {"name": m, "full": f"ollama/{m}"}
+                            for m in cfg["models"]
+                        ],
+                    }
+                )
+            else:
+                providers.append(
+                    {
+                        "name": name,
+                        "available": is_provider_available(name),
+                        "env_key": cfg.get("env_key", ""),
+                        "models": [
+                            {"name": m, "full": f"{name}/{m}"}
+                            for m in cfg["models"]
+                        ],
+                    }
+                )
         # Check session-level override (more accurate than global router state)
         _cur = llm_router.current_model
         try:
@@ -3741,6 +3769,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         if ollama_url:
             vault.set("ollama_url", ollama_url)
             saved.append("ollama")
+        ollama_key = body.get("ollama_api_key", "").strip()
+        if ollama_key:
+            vault.set("ollama_api_key", ollama_key)
+            saved.append("ollama_key")
         # Test all provided keys
         from salmalm.core.llm import _http_post  # noqa: F811
 
