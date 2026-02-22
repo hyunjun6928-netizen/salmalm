@@ -719,7 +719,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             잡담 → <span style="color:#4ade80">0개 (0 토큰)</span> · 날씨/일정 → <span style="color:#facc15">7-12개 (~750 토큰)</span> · 코딩 → <span style="color:#f97316">11개 (~700 토큰)</span><br>
             <b>OFF:</b> 매번 62개 도구 전부 전송 → <span style="color:#f87171">요청당 ~7,750 토큰 오버헤드</span><br>
             <span style="color:var(--accent)">💰 Opus 기준 ON vs OFF 차이: 하루 100회 호출 시 <b>~$10/day 절감</b></span></span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw does this too!</b> Uses "Skills" to load tools on-demand. Core tools (file, search) are always available.</span><span class="eng-kr">🆚 <b>오픈클로도 비슷!</b> "스킬" 시스템으로 필요한 도구만 불러옵니다. 다만 기본 도구(파일, 검색 등)는 항상 켜져 있어요.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Always <b>all tools ON</b> (no dynamic loading). Uses "Skills" to load extra tools on-demand.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 항상 <b>모든 도구 ON</b> (동적 로딩 없음). 대신 "스킬" 시스템으로 추가 도구를 필요 시 로드.</span></span>
           </div>
         </div>
 
@@ -736,7 +736,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <span class="eng-kr"><b>ON:</b> 복잡한 코드/분석 작업 전에 AI가 접근 방법을 먼저 계획하도록 프롬프트를 주입합니다. 다단계 작업의 정확도를 높일 수 있습니다.<br>
             <b>비용:</b> <span style="color:#f97316">복잡한 요청당 +~150 입력 토큰</span> (Opus 기준 ~$0.002/호출)<br>
             <b>OFF (기본):</b> AI가 응답 내에서 자연스럽게 계획합니다. 대부분의 작업에 충분합니다.</span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw skips this.</b> Instead uses "extended thinking" mode — the model plans internally at no extra cost.</span><span class="eng-kr">🆚 <b>오픈클로는 이 기능 없음.</b> 대신 "확장 사고(reasoning)" 모드로 모델이 알아서 계획을 세웁니다. 별도 비용 없이 모델 내부에서 처리.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Planning <b>OFF</b>. Uses "extended thinking" mode instead — model plans internally.</span><span class="eng-kr">🆚 <b>오픈클로:</b> Planning <b>OFF</b>. 별도 계획 단계 없이 "확장 사고(reasoning)" 모드로 모델이 내부에서 계획.</span></span>
           </div>
         </div>
 
@@ -755,7 +755,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>비용:</b> <span style="color:#f87171">복잡한 작업 비용 2배</span> (LLM 2회 호출). 예: $0.05 코딩 응답 → $0.10<br>
             <b>추천 상황:</b> 프로덕션 코드, 보안 감사, 정확도가 속도보다 중요한 분석<br>
             <b>OFF (기본):</b> 단일 패스 생성. 더 빠르고 저렴합니다. 대부분의 작업에 충분한 품질.</span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw skips this.</b> Focuses on getting it right the first time. Extended thinking mode serves as a built-in quality check.</span><span class="eng-kr">🆚 <b>오픈클로는 이 기능 없음.</b> 한 번에 좋은 답변을 내는 것에 집중합니다. 확장 사고 모드가 검증 역할을 대신해요.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Reflection <b>OFF</b>. Single-pass response. Extended thinking serves as built-in quality check.</span><span class="eng-kr">🆚 <b>오픈클로:</b> Reflection <b>OFF</b>. 두 번째 검증 호출 없이 한 번에 답변. 확장 사고 모드가 검증 역할을 대신.</span></span>
           </div>
         </div>
 
@@ -783,7 +783,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>30K (균형):</b> 적절한 중간값. <span style="color:#facc15">턴당 평균 ~$0.02</span><br>
             <b>60K (여유):</b> 더 많은 히스토리 유지. <span style="color:#f97316">턴당 평균 ~$0.04</span><br>
             <b>120K (최대):</b> 전체 컨텍스트 유지. 긴 코딩 세션에 적합. <span style="color:#f87171">턴당 평균 ~$0.08</span></span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw does this too!</b> Auto-compacts long conversations. But the threshold isn't user-configurable.</span><span class="eng-kr">🆚 <b>오픈클로도 사용!</b> 대화가 길어지면 자동으로 요약 압축합니다. 다만 임계값을 사용자가 조절할 수는 없어요.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Auto-compaction <b>ON</b>, threshold fixed internally (~<b>60-120K</b>). Not user-configurable.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 자동 압축 <b>ON</b>, 임계값은 내부 고정 (사용자 조절 불가). 대략 <b>60-120K</b> 수준.</span></span>
           </div>
         </div>
 
@@ -817,7 +817,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>15 (기본):</b> 적절한 균형 — 멀티 파일 편집 처리 가능. <span style="color:#f97316">턴당 최대 ~6K 토큰</span><br>
             <b>25 (확장):</b> 복잡한 리팩토링, 다중 도구 체인. <span style="color:#f87171">턴당 최대 ~10K 토큰</span><br>
             <b>40 (최대):</b> 긴 자율 코딩 세션. <span style="color:#f87171">턴당 최대 ~16K 토큰 — 비용 주의!</span></span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw has no limit.</b> The AI keeps using tools until it decides to stop. More freedom, but costs can be unpredictable.</span><span class="eng-kr">🆚 <b>오픈클로는 제한 없음.</b> AI가 알아서 멈출 때까지 계속 도구를 사용합니다. 무한 루프만 내부적으로 감지해서 방지해요. 자유롭지만 비용이 예측 불가능할 수 있어요.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> <b>♾️ Unlimited</b>. AI uses tools until it decides to stop. Internal loop detection only.</span><span class="eng-kr">🆚 <b>오픈클로:</b> <b>♾️ 무제한</b>. AI가 스스로 멈출 때까지 도구 사용. 무한 루프만 내부 감지로 방지.</span></span>
           </div>
         </div>
 
@@ -836,7 +836,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>Suggested values:</b> Casual use: <span style="color:#4ade80">$1-2/day</span> · Active use: <span style="color:#facc15">$5-10/day</span> · Heavy dev: <span style="color:#f97316">$20-50/day</span></span>
             <span class="eng-kr">일일 비용이 이 한도에 도달하면 다음 날(UTC 기준)까지 새 요청 처리를 중단합니다. 비워두면 제한 없음.<br>
             <b>권장값:</b> 가벼운 사용: <span style="color:#4ade80">$1-2/일</span> · 활발한 사용: <span style="color:#facc15">$5-10/일</span> · 집중 개발: <span style="color:#f97316">$20-50/일</span></span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw has no auto-cap.</b> You can check costs via <code>/status</code>, but it won't stop automatically. You monitor manually.</span><span class="eng-kr">🆚 <b>오픈클로는 자동 한도 없음.</b> <code>/status</code>로 비용을 확인할 수 있지만, 자동으로 멈추지는 않아요. 직접 모니터링해야 합니다.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Daily cap <b>none</b>. Manual monitoring via <code>/status</code> only.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 일일 한도 <b>없음</b>. <code>/status</code>로 수동 확인만 가능.</span></span>
           </div>
         </div>
 
@@ -862,7 +862,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <span class="eng-kr">동일한 (도구 미사용) 쿼리 응답을 캐시하는 시간입니다. 캐시 히트 시 비용 <span style="color:#4ade80">$0</span> — API 호출 없음.<br>
             TTL이 높을수록 캐시 히트 증가 = 비용 절감, 단 응답이 오래될 수 있음.<br>
             <b>권장:</b> 일반 사용 4-24시간. 실시간 데이터(날씨, 환율) 필요 시 비활성화.</span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw doesn't cache.</b> Every message makes a fresh API call. This is a SalmAlm-exclusive cost saver.</span><span class="eng-kr">🆚 <b>오픈클로는 캐시 없음.</b> 같은 질문을 해도 매번 새로 API를 호출합니다. 삶앎만의 비용 절감 기능이에요.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Response cache <b>OFF</b>. Every message = fresh API call. (SalmAlm exclusive)</span><span class="eng-kr">🆚 <b>오픈클로:</b> 응답 캐시 <b>OFF</b>. 같은 질문도 매번 새 API 호출. (삶앎 전용 기능)</span></span>
           </div>
         </div>
 
@@ -879,7 +879,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <span class="eng-kr"><b>ON:</b> 비대화형 작업(요약, 분석, 번역)을 Anthropic 배치 API로 전송하여 <span style="color:#4ade80">50% 할인</span>. 응답에 1-60분 소요 가능.<br>
             <b>추천 상황:</b> 대량 처리, 문서 분석, 오프라인 요약.<br>
             <b>OFF (기본):</b> 모든 요청을 실시간으로 처리.</span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw doesn't support this.</b> All requests are instant. SalmAlm can queue non-urgent tasks at half price.</span><span class="eng-kr">🆚 <b>오픈클로는 미지원.</b> 모든 요청이 즉시 처리됩니다. 삶앎은 급하지 않은 작업을 모아서 반값에 처리할 수 있어요.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Batch API <b>OFF</b> (not supported). All requests real-time. (SalmAlm exclusive)</span><span class="eng-kr">🆚 <b>오픈클로:</b> Batch API <b>OFF</b> (미지원). 모든 요청 실시간 처리. (삶앎 전용 기능)</span></span>
           </div>
         </div>
 
@@ -898,7 +898,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>비용:</b> Haiku 호출 추가 (~$0.001) 하지만 Sonnet/Opus 입력에서 $0.01-0.05 절약.<br>
             <b>트레이드오프:</b> 요약 시 세부사항 손실 가능. 정밀한 코드 리뷰에는 비활성화 권장.<br>
             <b>OFF (기본):</b> 파일 내용 전체를 메인 모델에 그대로 전송.</span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw does it manually.</b> The AI reads files in chunks using offset/limit. No automatic summarization.</span><span class="eng-kr">🆚 <b>오픈클로는 수동 방식.</b> 파일을 부분적으로 읽는 도구(offset/limit)를 AI가 직접 사용합니다. 자동 요약은 없어요.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> File pre-summary <b>OFF</b>. Full file sent, AI manually chunks with offset/limit.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 파일 사전 요약 <b>OFF</b>. 파일 전체 전송 후 AI가 offset/limit으로 수동 분할 읽기.</span></span>
           </div>
         </div>
 
@@ -915,7 +915,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <span class="eng-kr"><b>ON:</b> AI 응답이 의미적으로 완성되면(마침표, 코드 블록 닫힘 등) 생성을 조기 중단합니다. 장황한 응답에서 <span style="color:#4ade80">출력 토큰 10-30% 절감</span>.<br>
             <b>트레이드오프:</b> 긴 설명이 간혹 잘릴 수 있음.<br>
             <b>OFF (기본):</b> 모델이 자연스럽게 중단하거나 max_tokens에 도달할 때까지 생성.</span><br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw takes a different approach.</b> Uses <code>reasoning_effort</code> to make the model concise from the start, rather than stopping mid-stream.</span><span class="eng-kr">🆚 <b>오픈클로는 다른 방식.</b> <code>reasoning_effort</code> 설정으로 모델이 처음부터 간결하게 답하도록 조절합니다. 생성 중 중단은 하지 않아요.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Early Stop <b>OFF</b>. Uses <code>reasoning_effort</code> to control verbosity from the start.</span><span class="eng-kr">🆚 <b>오픈클로:</b> Early Stop <b>OFF</b>. 대신 <code>reasoning_effort</code>로 처음부터 간결하게 답하도록 조절.</span></span>
           </div>
         </div>
 
@@ -984,7 +984,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
         This saves money by using cheap models for simple tasks and powerful models only when needed.</span>
         <span class="eng-kr">삶앎은 각 메시지의 복잡도를 자동 분류하여 최적의 모델로 라우팅합니다.<br>
         간단한 작업에 저렴한 모델을, 복잡한 작업에만 강력한 모델을 사용하여 비용을 절감합니다.</span><br>
-        <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw is manual.</b> One model per session — you switch with <code>/model opus</code> etc. It won't auto-pick a cheaper model for simple messages.</span><span class="eng-kr">🆚 <b>오픈클로는 수동 선택.</b> 한 세션에서 하나의 모델만 사용하고, <code>/model opus</code> 같은 명령으로 직접 바꿔야 합니다. 자동으로 저렴한 모델을 골라주지 않아요.</span></span>
+        <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Auto Routing <b>OFF</b>. One model per session. Manual switch via <code>/model opus</code> only.</span><span class="eng-kr">🆚 <b>오픈클로:</b> Auto Routing <b>OFF</b>. 세션당 하나의 모델 고정. <code>/model opus</code>로 수동 전환만 가능.</span></span>
       </p>
 
       <!-- How classification works -->
