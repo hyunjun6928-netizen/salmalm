@@ -1171,7 +1171,7 @@
     if(window.checkGoogleStatus)window.checkGoogleStatus();
     /* Load engine optimization settings */
     fetch('/api/engine/settings').then(function(r){return r.json()}).then(function(d){
-      var dt=document.getElementById('eng-dynamic-tools');if(dt)dt.checked=!!d.dynamic_tools;
+      /* dynamic_tools always ON — no toggle needed */
       var pl=document.getElementById('eng-planning');if(pl)pl.checked=!!d.planning;
       var rf=document.getElementById('eng-reflection');if(rf)rf.checked=!!d.reflection;
       var cp=document.getElementById('eng-compaction');if(cp)cp.value=String(d.compaction_threshold||30000);
@@ -1978,7 +1978,7 @@
     else if(a==='save-discord-guild')window.saveKey('discord_guild_id','sk-discord-guild');
     else if(a==='saveEngineSettings'){
       var payload={
-        dynamic_tools:!!document.getElementById('eng-dynamic-tools').checked,
+        dynamic_tools:true,
         planning:!!document.getElementById('eng-planning').checked,
         reflection:!!document.getElementById('eng-reflection').checked,
         compaction_threshold:parseInt(document.getElementById('eng-compaction').value)||30000,
