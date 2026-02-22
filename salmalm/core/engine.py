@@ -523,18 +523,19 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 })
 
     def _should_reflect(self, classification: dict, response: str, iteration: int) -> bool:
-        """Determine if response needs self-reflection pass."""
+        """Determine if response needs self-reflection pass.
+        Disabled by default for token optimization — reflection doubles LLM cost.
+        Enable with SALMALM_REFLECT=1 env var."""
         import os as _os
-        if _os.environ.get('SALMALM_REFLECT', '1') == '0':
+        if _os.environ.get('SALMALM_REFLECT', '0') != '1':
             return False
-        # Only reflect on complex tasks with significant responses
         if classification['intent'] not in ('code', 'analysis'):
             return False
-        if iteration > 20:  # Already iterated a lot
+        if iteration > 20:
             return False
-        if len(response) < 100:  # Too short to be code/analysis
+        if len(response) < 100:
             return False
-        if classification.get('score', 0) >= 3:  # High confidence complex task
+        if classification.get('score', 0) >= 3:
             return True
         return False
 
@@ -568,20 +569,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                  f"think={use_thinking}, budget={thinking_budget}, "
                  f"score={classification.get('score', 0)})")
 
-        # PHASE 1: PLANNING — inject plan prompt for complex tasks
-        if classification['intent'] in ('code', 'analysis') and classification.get('score', 0) >= 2:
-            # Inject planning instruction before the last user message
-            plan_msg = {'role': 'system', 'content': self.PLAN_PROMPT, '_plan_injected': True}
-            # Find the last user message index to insert before it
-            last_user_idx = None
-            for i in range(len(session.messages) - 1, -1, -1):
-                if session.messages[i].get('role') == 'user':
-                    last_user_idx = i
-                    break
-            if last_user_idx is not None:
-                session.messages.insert(last_user_idx, plan_msg)
-            else:
-                session.messages.insert(-1, plan_msg)
+        # PHASE 1: PLANNING — disabled for token optimization
+        # Planning prompt was injecting extra system messages (~150 tok/call).
+        # LLMs plan naturally when system prompt says "Think step by step".
 
         # PHASE 2: EXECUTE — tool loop
         try:
