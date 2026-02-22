@@ -95,10 +95,10 @@ _TIER_CANDIDATES = {
     'moderate': [
         ('openai/gpt-4.1-mini', 'openai_api_key'),           # $0.4/$1.6
         ('google/gemini-2.5-flash', 'google_api_key'),        # $0.15/$0.6
-        ('anthropic/claude-haiku-3.5-20241022', 'anthropic_api_key'),  # $1/$5
         ('openai/o4-mini', 'openai_api_key'),                 # $1.1/$4.4
         ('openai/gpt-4.1', 'openai_api_key'),                 # $2/$8
-        ('anthropic/claude-sonnet-4-20250514', 'anthropic_api_key'),  # $3/$15
+        ('anthropic/claude-sonnet-4-20250514', 'anthropic_api_key'),  # $3/$15 (balanced)
+        ('anthropic/claude-haiku-3.5-20241022', 'anthropic_api_key'),  # $1/$5 (last resort)
     ],
     'complex': [
         ('openai/gpt-4.1', 'openai_api_key'),                # $2/$8
