@@ -283,6 +283,8 @@ async def run_server():
                 asyncio.create_task(telegram_bot.poll())
 
     # ── Phase 12: Discord Bot ──
+    if not vault.is_unlocked:
+        log.warning("[DISCORD] Skipped — vault is locked. Unlock vault to enable Discord.")
     if vault.is_unlocked:
         dc_token = vault.get('discord_token')
         dc_guild = vault.get('discord_guild_id')
