@@ -802,7 +802,7 @@ window._i18n={
       'tab-general':'⚙️ General','tab-features':'📖 Features',
       'features-search-ph':'Search features...','features-empty':'No features found.',
       'h-model':'🤖 Model Settings','h-keys':'🔑 API Key Management','h-update':'🔄 Update','h-lang':'🌐 Language','h-color':'Accent Color',
-      'lbl-model':'Default Model','lbl-ollama':'Ollama / Local LLM URL','lbl-ollama-key':'API Key (Optional — only if your endpoint requires auth)',
+      'lbl-model':'Default Model','lbl-ollama':'Local LLM Endpoint URL (Ollama / LM Studio / vLLM)','lbl-ollama-key':'API Key (Optional — only if your endpoint requires auth)',
       'btn-save':'Save','btn-test':'Test','btn-check':'Check for Updates','btn-update':'⬆️ Update',
       'btn-export':'📥 Export','btn-send':'Send',
       'lbl-anthropic':'Anthropic API Key','lbl-openai':'OpenAI API Key',
@@ -921,7 +921,7 @@ window._i18n={
       'tab-general':'⚙️ 일반','tab-features':'📖 기능 가이드',
       'features-search-ph':'기능 검색...','features-empty':'검색 결과가 없습니다.',
       'h-model':'🤖 모델 설정','h-keys':'🔑 API 키 관리','h-update':'🔄 업데이트','h-lang':'🌐 언어','h-color':'테마 색상',
-      'lbl-model':'기본 모델','lbl-ollama':'Ollama / 로컬 LLM URL','lbl-ollama-key':'API 키 (선택 — 인증이 필요한 엔드포인트만)',
+      'lbl-model':'기본 모델','lbl-ollama':'로컬 LLM 엔드포인트 URL (Ollama / LM Studio / vLLM)','lbl-ollama-key':'API 키 (선택 — 인증이 필요한 엔드포인트만)',
       'btn-save':'저장','btn-test':'테스트','btn-check':'업데이트 확인','btn-update':'⬆️ 업데이트',
       'btn-export':'📥 내보내기','btn-send':'전송',
       'lbl-anthropic':'Anthropic API 키','lbl-openai':'OpenAI API 키',
@@ -1317,7 +1317,8 @@ window._i18n={
         h+='<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg)">';
         h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
         h+='<span style="font-size:18px">'+icon+'</span>';
-        h+='<span style="font-weight:600;font-size:14px">'+p.name.charAt(0).toUpperCase()+p.name.slice(1)+'</span>';
+        var displayName=p.name==='ollama'?(kr?'로컬 LLM':'Local LLM'):p.name.charAt(0).toUpperCase()+p.name.slice(1);
+        h+='<span style="font-weight:600;font-size:14px">'+displayName+'</span>';
         h+=status;
         var statusText=p.available?(kr?'연결됨':'Connected'):((p.name==='ollama')?(kr?'오프라인':'Offline'):(kr?'키 없음':'No key'));
         h+='<span style="font-size:11px;color:var(--text2);margin-left:auto">'+statusText+'</span>';

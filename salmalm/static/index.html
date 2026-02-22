@@ -1083,11 +1083,15 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
         <span class="eng-kr">⚡ <b>자동 최적화</b>는 보유한 API 키를 분석하여, 프로바이더를 교차 활용해 각 티어별 가장 저렴한 모델을 자동 선택합니다.</span>
       </div>
     </div>
-    <!-- Ollama -->
+    <!-- Local LLM -->
     <div class="settings-card">
-      <h3>🦙 Ollama (Local LLM)</h3>
-      <label data-i18n="lbl-ollama">Ollama / Local LLM URL</label>
+      <h3>🦙 <span class="eng-en">Local LLM (Ollama / LM Studio / vLLM)</span><span class="eng-kr">로컬 LLM (Ollama / LM Studio / vLLM)</span></h3>
+      <label data-i18n="lbl-ollama">Local LLM Endpoint URL</label>
       <input id="s-ollama-url" type="text" placeholder="http://localhost:11434/v1" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+      <div style="margin-top:4px;font-size:11px;color:var(--text2);line-height:1.6">
+        <span class="eng-en">Common endpoints: <b>Ollama</b> → <code>http://localhost:11434/v1</code> · <b>LM Studio</b> → <code>http://localhost:1234/v1</code> · <b>vLLM</b> → <code>http://localhost:8000/v1</code></span>
+        <span class="eng-kr">주요 엔드포인트: <b>Ollama</b> → <code>http://localhost:11434/v1</code> · <b>LM Studio</b> → <code>http://localhost:1234/v1</code> · <b>vLLM</b> → <code>http://localhost:8000/v1</code></span>
+      </div>
       <label style="margin-top:8px;font-size:12px;color:var(--text2)">🔑 <span data-i18n="lbl-ollama-key">API Key (optional — only if your endpoint requires auth)</span></label>
       <input id="s-ollama-key" type="password" placeholder="Bearer token" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
       <button data-action="saveOllama" style="margin-top:4px;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:12px" data-i18n="btn-save-ollama">Save Local LLM Config</button>

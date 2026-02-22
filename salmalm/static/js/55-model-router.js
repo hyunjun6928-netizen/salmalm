@@ -41,7 +41,8 @@
         h+='<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg)">';
         h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
         h+='<span style="font-size:18px">'+icon+'</span>';
-        h+='<span style="font-weight:600;font-size:14px">'+p.name.charAt(0).toUpperCase()+p.name.slice(1)+'</span>';
+        var displayName=p.name==='ollama'?(kr?'로컬 LLM':'Local LLM'):p.name.charAt(0).toUpperCase()+p.name.slice(1);
+        h+='<span style="font-weight:600;font-size:14px">'+displayName+'</span>';
         h+=status;
         var statusText=p.available?(kr?'연결됨':'Connected'):((p.name==='ollama')?(kr?'오프라인':'Offline'):(kr?'키 없음':'No key'));
         h+='<span style="font-size:11px;color:var(--text2);margin-left:auto">'+statusText+'</span>';
