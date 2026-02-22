@@ -1,4 +1,6 @@
 (function(){
+
+  /* ═══ 00-core.js ═══ */
   const chat=document.getElementById('chat'),input=document.getElementById('input'),
     btn=document.getElementById('send-btn'),costEl=document.getElementById('cost-display'),
     modelBadge=document.getElementById('model-badge'),settingsEl=document.getElementById('settings'),
@@ -9,9 +11,8 @@
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
 
-  /* Global error handlers — catch unhandled promise rejections silently */
-  window.addEventListener('unhandledrejection',function(e){e.preventDefault();console.warn('Unhandled:',e.reason)});
 
+  /* ═══ 05-sessions.js ═══ */
   /* --- Session Management --- */
   function _genId(){return 's_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6)}
   function _storageKey(sid){return 'salm_chat_'+sid}
@@ -124,6 +125,8 @@
     }).catch(function(){});
   };
 
+
+  /* ═══ 10-restore.js ═══ */
   /* --- Restore chat history (deferred until i18n t() is ready) --- */
   window._pendingRestore=function(){
     var stored=localStorage.getItem(_storageKey(_currentSession));
@@ -133,6 +136,8 @@
     loadSessionList();
   };
 
+
+  /* ═══ 12-export.js ═══ */
   /* --- Export chat --- */
   window.exportChat=function(fmt){
     var hist=JSON.parse(localStorage.getItem('salm_chat')||'[]');
@@ -154,11 +159,15 @@
     }
   };
 
+
+  /* ═══ 14-newchat.js ═══ */
   /* --- New chat --- */
   window.newChat=function(){
     window.newSession();
   };
 
+
+  /* ═══ 16-theme.js ═══ */
   /* --- Theme --- */
   var _theme=localStorage.getItem('salm_theme')||'light';
   var _color=localStorage.getItem('salm_color')||'';
@@ -184,12 +193,16 @@
     var _rUris=document.querySelectorAll('.google-redirect-uri');_rUris.forEach(function(el){el.textContent=location.origin+'/api/google/callback'});
   },100);
 
+
+  /* ═══ 18-sidebar.js ═══ */
   /* --- Sidebar toggle (mobile) --- */
   window.toggleSidebar=function(){
     var sb=document.getElementById('sidebar'),ov=document.getElementById('side-overlay');
     sb.classList.toggle('open');ov.classList.toggle('open');
   };
 
+
+  /* ═══ 19-quickcmd.js ═══ */
   /* --- Quick command from sidebar --- */
   window.quickCmd=function(msg){
     input.value=msg;input.focus();
@@ -198,6 +211,8 @@
     var sb=document.getElementById('sidebar');if(sb.classList.contains('open'))toggleSidebar();
   };
 
+
+  /* ═══ 20-helpers.js ═══ */
   /* --- Helpers --- */
   var _copyId=0;
   function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -459,6 +474,8 @@
     b.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div>'+(label?' '+label:'');
   }
 
+
+  /* ═══ 25-files.js ═══ */
   /* --- File handling --- */
   window.setFile=function(file){
     if(file.type.startsWith('image/')&&file.size>5*1024*1024){alert(t('img-too-large'));return}
@@ -474,6 +491,8 @@
   };
   window.clearFile=function(){pendingFile=null;filePrev.style.display='none';imgPrev.style.display='none'};
 
+
+  /* ═══ 26-paste.js ═══ */
   /* --- Ctrl+V --- */
   document.addEventListener('paste',function(e){
     var items=e.clipboardData&&e.clipboardData.items;if(!items)return;
@@ -482,6 +501,8 @@
     }
   });
 
+
+  /* ═══ 27-dragdrop.js ═══ */
   /* --- Drag & drop --- */
   /* Fullscreen dropzone overlay */
   var _dragCtr=0;
@@ -495,6 +516,8 @@
   document.addEventListener('drop',function(e){e.preventDefault();_dragCtr=0;_dropOv.style.display='none';
     var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)window.setFile(f)});
 
+
+  /* ═══ 30-websocket.js ═══ */
   /* --- WebSocket Connection Manager --- */
   var _ws=null,_wsReady=false,_wsBackoff=500,_wsMaxBackoff=5000,_wsTimer=null,_wsPingTimer=null;
   var _wsPendingResolve=null,_wsSendStart=0;
@@ -589,6 +612,8 @@
   /* Connect on load */
   _wsConnect();
 
+
+  /* ═══ 35-chat-send.js ═══ */
   /* --- Send via WebSocket with SSE fallback --- */
   function _sendViaWs(msg,session){
     return new Promise(function(resolve){
@@ -668,6 +693,8 @@
     }
   }
 
+
+  /* ═══ 36-dosend.js ═══ */
   /* --- Send --- */
   async function doSend(){
     var t=input.value.trim();
@@ -745,6 +772,8 @@
   }
   window.doSend=doSend;
 
+
+  /* ═══ 37-keyhandler.js ═══ */
   /* --- Key handler --- */
   input.addEventListener('keydown',function(e){
     if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doSend()}
@@ -752,6 +781,252 @@
   input.addEventListener('input',function(){input.style.height='auto';input.style.height=Math.min(input.scrollHeight,150)+'px'});
   btn.addEventListener('click',function(){doSend()});
 
+
+  /* ═══ 38-i18n-data.js ═══ */
+// Auto-extracted i18n translations — do not edit inline in app.js
+window._i18n={
+    en:{
+      'nav-chat':'💬 Chat','nav-settings':'⚙️ Settings','nav-dashboard':'📈 Dashboard',
+      'tab-general':'⚙️ General','tab-features':'📖 Features',
+      'features-search-ph':'Search features...','features-empty':'No features found.',
+      'h-model':'🤖 Model Settings','h-keys':'🔑 API Key Management','h-update':'🔄 Update','h-lang':'🌐 Language','h-color':'Accent Color',
+      'lbl-model':'Default Model','lbl-ollama':'Ollama / Local LLM URL','lbl-ollama-key':'API Key (Optional — only if your endpoint requires auth)',
+      'btn-save':'Save','btn-test':'Test','btn-check':'Check for Updates','btn-update':'⬆️ Update',
+      'btn-export':'📥 Export','btn-send':'Send',
+      'lbl-anthropic':'Anthropic API Key','lbl-openai':'OpenAI API Key',
+      'lbl-xai':'xAI API Key (Grok)','lbl-google':'Google API Key (Gemini)','lbl-brave':'Brave Search API Key',
+      'welcome-title':'Welcome to SalmAlm','welcome-sub':'Your personal AI gateway',
+      'input-ph':'Type a message...',
+      'usage-input':'Input','usage-output':'Output','usage-cost':'Cost','usage-uptime':'Uptime',
+      'h-vault':'🗝️ Stored Keys','h-usage':'📊 Usage',
+      'update-uptodate':'✅ You are up to date','update-checking':'⏳ Checking PyPI...',
+      'update-new':'🆕 New version','update-available':'available!','update-download':'⬇️ Download',
+      'update-installing':'Running pip install --upgrade salmalm...',
+      'nav-webchat':'Web Chat','nav-sysmon':'System Monitor','nav-memory':'Memory',
+      'nav-cost':'Cost Tracker','nav-cron':'Cron Manager','nav-python':'Python Exec',
+      'nav-image':'Image Gen','nav-tts':'TTS','nav-calendar':'Calendar','nav-mail':'Mail',
+      'nav-weather':'Weather','nav-rss':'RSS','nav-remind':'Reminders','nav-translate':'Translate',
+      'nav-workflow':'Workflows','nav-qr':'QR Code','nav-notify':'Notifications','nav-fileindex':'File Search',
+      'btn-save-ollama':'Save Local LLM Config','btn-newchat':'🗨 New Chat',
+      'sec-chats':'💬 Chats','sec-channels':'Channels','sec-admin':'Admin','sec-manage':'Manage',
+      'h-password':'🔒 Master Password',
+      'pw-current':'Current Password','pw-new':'New Password','pw-confirm':'Confirm New Password',
+      'pw-new-hint':'New password (4+ chars, leave empty to remove)','pw-confirm-hint':'Re-enter new password',
+      'pw-change':'Change','pw-remove':'Remove Password','pw-set':'Set Password',
+      'pw-not-set':'No password is currently set.',
+      'pw-min4':'Password (4+ characters)','pw-reenter':'Re-enter',
+      'pw-mismatch':'New passwords do not match','pw-changed':'✅ Password changed',
+      'pw-fail':'❌ Change failed','pw-enter-current':'Please enter current password',
+      'h-routing':'🔀 Auto Routing Models',
+      'routing-desc':'When "Auto Routing" is selected, messages are classified by complexity and routed to these models:',
+      'lbl-route-simple':'⚡ Simple (greetings, short questions)',
+      'lbl-route-moderate':'🔧 Moderate (code, analysis, summaries)',
+      'lbl-route-complex':'💎 Complex (architecture, long reasoning)',
+      'btn-save-routing':'Save Routing',
+      'h-soul':'📜 SOUL.md (Custom System Prompt)',
+      'soul-desc':'Set a custom system prompt. It will be prepended to all conversations.',
+      'soul-path':'~/.salmalm/SOUL.md · Leave empty to restore default',
+      'soul-ph':'# My Custom Persona\n\nYou are ...',
+      'btn-save-soul':'💾 Save','btn-reset-soul':'🔄 Reset',
+      'h-google-oauth':'🔗 Google Integration (Calendar & Gmail)',
+      'google-oauth-desc':'OAuth2 integration is required for Google Calendar and Gmail features.',
+      'google-oauth-console':'Create an OAuth 2.0 Client ID at Google Cloud Console.',
+      'lbl-google-client-id':'Google Client ID','lbl-google-client-secret':'Google Client Secret',
+      'btn-google-connect':'🔗 Connect Google Account','btn-google-disconnect':'Disconnect',
+      'google-guide-title':'📋 Setup Guide',
+      'google-guide-1':'Google Cloud Console → Create/Select Project',
+      'google-guide-2':'APIs & Services → Credentials → Create OAuth 2.0 Client ID',
+      'google-guide-3':'Application type: Web application',
+      'google-guide-4':'Authorized redirect URI:',
+      'google-guide-5':'Enter Client ID and Client Secret above',
+      'google-guide-6':'Click Connect Google Account',
+      'google-connected':'🟢 Connected','google-not-connected':'⚪ Not connected',
+      'google-no-client-id':'❌ Save Client ID first',
+      'google-redirecting':'🔗 Redirecting to Google login...',
+      'google-confirm-disconnect':'Disconnect Google integration?',
+      'google-disconnected':'✅ Google integration disconnected',
+      'search-ph':'🔍 Search conversations... (Ctrl+K)',
+      'search-hint':'Esc to close · Enter to select · Type to search',
+      'search-type-to-search':'Type to search across all conversations',
+      'search-no-results':'No results for',
+      'search-error':'Search error',
+      'shortcut-title':'⌨️ Keyboard Shortcuts',
+      'shortcut-search':'Search sessions',
+      'shortcut-newchat':'New chat','shortcut-sidebar':'Toggle sidebar',
+      'shortcut-escape':'Close modal / settings','shortcut-cmdpalette':'Command palette','shortcut-help':'This help',
+      'btn-close':'Close',
+      'drop-overlay':'📎 Drop image or file here',
+      'input-hint':'Enter to send · Shift+Enter newline · Ctrl+V paste · Drag&Drop files',
+      'thinking-on':'🧠 Extended Thinking: ON','thinking-off':'Extended Thinking: OFF',
+      'btn-thinking-title':'Extended Thinking','btn-attach-title':'Attach file',
+      'tg-desc':'Connect a Telegram bot to chat with your AI from Telegram.',
+      'lbl-tg-token':'Bot Token','lbl-tg-owner':'Owner Chat ID',
+      'tg-connected':'Connected','tg-disconnected':'Not connected',
+      'tg-guide-title':'📋 Setup Guide (click to expand)',
+      'dc-desc':'Connect a Discord bot to chat with your AI in Discord servers.',
+      'lbl-dc-token':'Bot Token','lbl-dc-guild':'Server (Guild) ID',
+      'dc-connected':'Connected','dc-disconnected':'Not connected',
+      'dc-guide-title':'📋 Setup Guide (click to expand)',
+      'btn-mic-title':'Voice input','btn-tts-title':'Read aloud',
+      'btn-branch-title':'Branch from here','btn-regen-title':'Regenerate',
+      'confirm-delete':'Delete this conversation?',
+      'no-sessions':'No conversations yet',
+      'new-session-msg':'😈 New conversation started.',
+      'no-chat-export':'No chat to export.',
+      'welcome-msg':'😈 Welcome to SalmAlm!\n\nUse on Telegram and Web simultaneously.\nCtrl+V paste image · Drag&Drop · Enter to send\nType /help for commands',
+      'dash-back':'← Back to Chat','dash-title':'📈 Dashboard','dash-desc':'See where tokens go, when sessions spike, and what drives cost.','dash-filters':'Filters','dash-loading':'Loading...',
+      'sidebar-running':'Running',
+      'sidebar-channels':'📡 Channels',
+      'sidebar-tools':'🛠️ Tools ▾',
+      'filter-ph':'Search sessions...','filter-no-results':'No results',
+      'img-too-large':'Image too large (max 5MB)','mic-denied':'Microphone access denied.','mic-hint-localhost':'💡 Try accessing via http://localhost:18800 instead of 127.0.0.1 (Chrome requires secure context for microphone).',
+      'rollback-done':'⏪ Rolled back','rollback-pairs':'message pair(s).',
+      'rollback-fail':'❌ Rollback failed:','branch-fail':'❌ Branch failed:',
+      'upload-fail':'❌ Upload failed:','upload-error':'❌ Upload error:',
+      'btn-edit':'Edit','btn-delete':'Delete',
+      'confirm-delete-msg':'Delete this message and its response?',
+      'confirm-regen-after-edit':'Regenerate response after edit?',
+      'edit-save':'Save','edit-cancel':'Cancel',
+      'msg-edited':'✏️ Message edited','msg-deleted':'🗑️ Message deleted',
+      'cmd-placeholder':'Type a command...',
+      'cmd-new-chat':'New Chat','cmd-export':'Export Chat','cmd-settings':'Settings',
+      'cmd-search':'Search','cmd-theme':'Toggle Theme','cmd-sidebar':'Toggle Sidebar',
+      'cmd-dashboard':'Dashboard',
+      'shortcut-cmdpalette':'Command palette',
+      'btn-cancel-gen':'Stop generating','gen-cancelled':'Generation cancelled.','queue-empty':'Type a message first','queue-btn-title':'Add to queue','queue-clear':'Queue has ','queue-clear2':' messages. Clear?','stop-btn-title':'Stop generating',
+      'mr-active':'Active Model','mr-providers-title':'📦 Models by Provider','mr-providers-desc':'Click a model to switch. Pricing per 1M tokens (input / output).','mr-keys-desc':'Enter API keys to enable providers. Keys are tested in real-time.',
+      'nav-sessions':'📋 Sessions','nav-docs':'📖 Docs','nav-cron':'⏰ Cron Jobs','nav-memory':'🧠 Memory',
+      'cron-title':'⏰ Cron Jobs','cron-add':'➕ Add Job','cron-name':'Name','cron-interval':'Interval (seconds)','cron-schedule':'Schedule','cron-at':'Run at (optional)','cron-prompt':'Prompt','btn-cancel':'Cancel',
+      'mem-title':'🧠 Memory','mem-select':'Select a memory file to view',
+      'sess-title':'📋 Sessions','sess-search-ph':'Search sessions...',
+      'ch-title':'📡 Channels','docs-title':'📖 Documentation','docs-search-ph':'Search docs...',
+      'tab-debug':'🔬 Debug','h-debug':'🔬 Debug Diagnostics',
+      'tab-logs':'📋 Logs','h-logs':'📋 Server Logs',
+      'pwa-install-text':'Install SalmAlm as an app','pwa-install-btn':'Install','pwa-dismiss':'Later',
+    },
+    ko:{
+      'nav-chat':'💬 채팅','nav-settings':'⚙️ 설정','nav-dashboard':'📈 대시보드',
+      'tab-general':'⚙️ 일반','tab-features':'📖 기능 가이드',
+      'features-search-ph':'기능 검색...','features-empty':'검색 결과가 없습니다.',
+      'h-model':'🤖 모델 설정','h-keys':'🔑 API 키 관리','h-update':'🔄 업데이트','h-lang':'🌐 언어','h-color':'테마 색상',
+      'lbl-model':'기본 모델','lbl-ollama':'Ollama / 로컬 LLM URL','lbl-ollama-key':'API 키 (선택 — 인증이 필요한 엔드포인트만)',
+      'btn-save':'저장','btn-test':'테스트','btn-check':'업데이트 확인','btn-update':'⬆️ 업데이트',
+      'btn-export':'📥 내보내기','btn-send':'전송',
+      'lbl-anthropic':'Anthropic API 키','lbl-openai':'OpenAI API 키',
+      'lbl-xai':'xAI API 키 (Grok)','lbl-google':'Google API 키 (Gemini)','lbl-brave':'Brave Search API 키',
+      'welcome-title':'삶앎에 오신 것을 환영합니다','welcome-sub':'나만의 AI 게이트웨이',
+      'input-ph':'메시지를 입력하세요...',
+      'usage-input':'입력','usage-output':'출력','usage-cost':'비용','usage-uptime':'가동시간',
+      'h-vault':'🗝️ 저장된 키','h-usage':'📊 사용량',
+      'update-uptodate':'✅ 최신 버전입니다','update-checking':'⏳ PyPI 확인 중...',
+      'update-new':'🆕 새 버전','update-available':'사용 가능!','update-download':'⬇️ 다운로드',
+      'update-installing':'pip install --upgrade salmalm 실행 중...',
+      'nav-webchat':'웹 채팅','nav-sysmon':'시스템 모니터','nav-memory':'메모리',
+      'nav-cost':'비용 추적','nav-cron':'크론 관리','nav-python':'Python 실행',
+      'nav-image':'이미지 생성','nav-tts':'음성 합성','nav-calendar':'캘린더','nav-mail':'메일',
+      'nav-weather':'날씨','nav-rss':'뉴스 피드','nav-remind':'리마인더','nav-translate':'번역',
+      'nav-workflow':'워크플로우','nav-qr':'QR 코드','nav-notify':'알림','nav-fileindex':'파일 검색',
+      'btn-save-ollama':'로컬 LLM 설정 저장','btn-newchat':'🗨 새 대화',
+      'sec-chats':'💬 대화','sec-channels':'채널','sec-admin':'관리','sec-manage':'관리',
+      'h-password':'🔒 마스터 비밀번호',
+      'pw-current':'현재 비밀번호','pw-new':'새 비밀번호','pw-confirm':'새 비밀번호 확인',
+      'pw-new-hint':'새 비밀번호 (4자 이상, 비우면 해제)','pw-confirm-hint':'새 비밀번호 다시 입력',
+      'pw-change':'변경','pw-remove':'비밀번호 해제','pw-set':'비밀번호 설정',
+      'pw-not-set':'현재 비밀번호가 설정되어 있지 않습니다.',
+      'pw-min4':'비밀번호 (4자 이상)','pw-reenter':'다시 입력',
+      'pw-mismatch':'새 비밀번호가 일치하지 않습니다','pw-changed':'✅ 비밀번호가 변경되었습니다',
+      'pw-fail':'❌ 변경 실패','pw-enter-current':'현재 비밀번호를 입력하세요',
+      'h-routing':'🔀 자동 라우팅 모델',
+      'routing-desc':'자동 라우팅을 선택하면, 메시지가 복잡도에 따라 분류되어 해당 모델로 전달됩니다:',
+      'lbl-route-simple':'⚡ 간단 (인사, 짧은 질문)',
+      'lbl-route-moderate':'🔧 보통 (코드, 분석, 요약)',
+      'lbl-route-complex':'💎 복잡 (설계, 긴 추론)',
+      'btn-save-routing':'라우팅 저장',
+      'h-soul':'📜 SOUL.md (커스텀 시스템 프롬프트)',
+      'soul-desc':'커스텀 시스템 프롬프트를 설정합니다. 모든 대화의 앞에 삽입됩니다.',
+      'soul-path':'~/.salmalm/SOUL.md · 비우면 기본값 복원',
+      'soul-ph':'# 나만의 페르소나\n\n당신은 ...',
+      'btn-save-soul':'💾 저장','btn-reset-soul':'🔄 초기화',
+      'h-google-oauth':'🔗 Google 연동 (Calendar & Gmail)',
+      'google-oauth-desc':'Google Calendar, Gmail 기능을 사용하려면 OAuth2 연동이 필요합니다.',
+      'google-oauth-console':'Google Cloud Console에서 OAuth 2.0 Client ID를 생성하세요.',
+      'lbl-google-client-id':'Google Client ID','lbl-google-client-secret':'Google Client Secret',
+      'btn-google-connect':'🔗 Google 계정 연결','btn-google-disconnect':'연결 해제',
+      'google-guide-title':'📋 설정 가이드',
+      'google-guide-1':'Google Cloud Console → 프로젝트 생성/선택',
+      'google-guide-2':'API 및 서비스 → 사용자 인증 정보 → OAuth 2.0 클라이언트 ID 만들기',
+      'google-guide-3':'애플리케이션 유형: 웹 애플리케이션',
+      'google-guide-4':'승인된 리디렉션 URI:',
+      'google-guide-5':'Client ID와 Client Secret을 위에 입력',
+      'google-guide-6':'🔗 Google 계정 연결 클릭',
+      'google-connected':'🟢 연결됨','google-not-connected':'⚪ 연결 안됨',
+      'google-no-client-id':'❌ Client ID를 먼저 저장하세요',
+      'google-redirecting':'🔗 Google 로그인 페이지로 이동합니다...',
+      'google-confirm-disconnect':'Google 연동을 해제하시겠습니까?',
+      'google-disconnected':'✅ Google 연동이 해제되었습니다',
+      'search-ph':'🔍 대화 검색... (Ctrl+K)',
+      'search-hint':'Esc 닫기 · Enter 선택 · 입력하여 검색',
+      'search-type-to-search':'모든 대화에서 검색합니다',
+      'search-no-results':'검색 결과 없음:',
+      'search-error':'검색 오류',
+      'shortcut-title':'⌨️ 키보드 단축키',
+      'shortcut-search':'세션 검색',
+      'shortcut-newchat':'새 대화','shortcut-sidebar':'사이드바 토글',
+      'shortcut-escape':'모달 / 설정 닫기','shortcut-cmdpalette':'커맨드 팔레트','shortcut-help':'이 도움말',
+      'btn-close':'닫기',
+      'drop-overlay':'📎 이미지 또는 파일을 놓으세요',
+      'input-hint':'Enter 전송 · Shift+Enter 줄바꿈 · Ctrl+V 붙여넣기 · 파일 드래그&드롭',
+      'thinking-on':'🧠 확장 사고 모드: 켜짐','thinking-off':'확장 사고 모드: 꺼짐',
+      'btn-thinking-title':'확장 사고 모드','btn-attach-title':'파일 첨부',
+      'tg-desc':'Telegram 봇을 연결하여 Telegram에서 AI와 대화할 수 있습니다.',
+      'lbl-tg-token':'봇 토큰','lbl-tg-owner':'소유자 Chat ID',
+      'tg-connected':'연결됨','tg-disconnected':'연결 안 됨',
+      'tg-guide-title':'📋 설정 가이드 (클릭하여 펼치기)',
+      'dc-desc':'Discord 봇을 연결하여 Discord 서버에서 AI와 대화할 수 있습니다.',
+      'lbl-dc-token':'봇 토큰','lbl-dc-guild':'서버 (Guild) ID',
+      'dc-connected':'연결됨','dc-disconnected':'연결 안 됨',
+      'dc-guide-title':'📋 설정 가이드 (클릭하여 펼치기)',
+      'btn-mic-title':'음성 입력','btn-tts-title':'소리로 듣기',
+      'btn-branch-title':'여기서 분기','btn-regen-title':'다시 생성',
+      'confirm-delete':'이 대화를 삭제하시겠습니까?',
+      'no-sessions':'아직 대화가 없습니다',
+      'new-session-msg':'😈 새 대화가 시작되었습니다.',
+      'no-chat-export':'내보낼 대화가 없습니다.',
+      'welcome-msg':'😈 삶앎에 오신 것을 환영합니다!\n\nTelegram과 웹에서 동시에 사용할 수 있습니다.\nCtrl+V 이미지 붙여넣기 · 드래그&드롭 · Enter로 전송\n/help로 명령어 확인',
+      'dash-back':'← 채팅으로 돌아가기','dash-title':'📈 대시보드','dash-desc':'토큰 사용처, 세션 추이, 비용 분석을 확인하세요.','dash-filters':'필터','dash-loading':'불러오는 중...',
+      'sidebar-running':'실행 중',
+      'sidebar-channels':'📡 채널',
+      'sidebar-tools':'🛠️ 도구 ▾',
+      'filter-ph':'세션 검색...','filter-no-results':'결과 없음',
+      'img-too-large':'이미지가 너무 큽니다 (최대 5MB)','mic-denied':'마이크 접근이 거부되었습니다.','mic-hint-localhost':'💡 127.0.0.1 대신 http://localhost:18800 으로 접속해보세요 (Chrome은 보안 컨텍스트에서만 마이크를 허용합니다).',
+      'rollback-done':'⏪ 되돌리기 완료:','rollback-pairs':'개의 메시지 쌍',
+      'rollback-fail':'❌ 되돌리기 실패:','branch-fail':'❌ 분기 실패:',
+      'upload-fail':'❌ 업로드 실패:','upload-error':'❌ 업로드 오류:',
+      'btn-edit':'편집','btn-delete':'삭제',
+      'confirm-delete-msg':'이 메시지와 응답을 삭제하시겠습니까?',
+      'confirm-regen-after-edit':'편집 후 응답을 재생성하시겠습니까?',
+      'edit-save':'저장','edit-cancel':'취소',
+      'msg-edited':'✏️ 메시지가 편집되었습니다','msg-deleted':'🗑️ 메시지가 삭제되었습니다',
+      'cmd-placeholder':'명령어 입력...',
+      'cmd-new-chat':'새 대화','cmd-export':'대화 내보내기','cmd-settings':'설정',
+      'cmd-search':'검색','cmd-theme':'테마 전환','cmd-sidebar':'사이드바 전환',
+      'cmd-dashboard':'대시보드',
+      'shortcut-cmdpalette':'커맨드 팔레트',
+      'btn-cancel-gen':'생성 중단','gen-cancelled':'생성이 중단되었습니다.','queue-empty':'먼저 메시지를 입력하세요','queue-btn-title':'큐에 추가','queue-clear':'큐에 ','queue-clear2':'개의 메시지가 있습니다. 비우시겠습니까?','stop-btn-title':'생성 중단',
+      'mr-active':'활성 모델','mr-providers-title':'📦 프로바이더별 모델','mr-providers-desc':'모델을 클릭하면 전환됩니다. 가격: 1M 토큰당 (입력 / 출력).','mr-keys-desc':'API 키를 입력하면 프로바이더가 활성화됩니다. 키는 실시간으로 테스트됩니다.',
+      'nav-sessions':'📋 세션','nav-docs':'📖 문서','nav-cron':'⏰ 크론 작업','nav-memory':'🧠 기억',
+      'cron-title':'⏰ 크론 작업','cron-add':'➕ 작업 추가','cron-name':'이름','cron-interval':'간격 (초)','cron-schedule':'스케줄','cron-at':'실행 시각 (선택)','cron-prompt':'프롬프트','btn-cancel':'취소',
+      'mem-title':'🧠 기억','mem-select':'보려는 기억 파일을 선택하세요',
+      'sess-title':'📋 세션 관리','sess-search-ph':'세션 검색...',
+      'ch-title':'📡 채널','docs-title':'📖 문서','docs-search-ph':'문서 검색...',
+      'tab-debug':'🔬 디버그','h-debug':'🔬 디버그 진단',
+      'tab-logs':'📋 로그','h-logs':'📋 서버 로그',
+      'pwa-install-text':'SalmAlm을 앱으로 설치','pwa-install-btn':'설치','pwa-dismiss':'나중에',
+    }
+  };
+
+
+  /* ═══ 40-i18n.js ═══ */
   /* --- i18n --- */
   var _i18n=window._i18n||{en:{},ko:{}};
   var _lang=localStorage.getItem('salmalm-lang')||(navigator.language&&navigator.language.startsWith('ko')?'ko':'en');
@@ -884,6 +1159,9 @@
     if(ts){ts.placeholder=_lang==='ko'?'도구 검색...':'Search tools...';_renderToolsList(ts.value)}
   }
   window.setLang=function(v){_lang=v;localStorage.setItem('salmalm-lang',v);applyLang();if(typeof renderFeatures==='function')renderFeatures(document.getElementById('features-search')?document.getElementById('features-search').value:'');};
+
+
+  /* ═══ 45-settings.js ═══ */
   /* --- Settings --- */
   var dashView=document.getElementById('dashboard-view');
   var sessView=document.getElementById('sessions-view');
@@ -962,6 +1240,8 @@
   };
   window.showUsage=function(){window.showDashboard()};
 
+
+  /* ═══ 50-tabs.js ═══ */
   /* --- Settings Tabs --- */
   document.querySelectorAll('.settings-tab').forEach(function(tab){
     tab.addEventListener('click',function(){
@@ -980,6 +1260,8 @@
     });
   });
 
+
+  /* ═══ 55-model-router.js ═══ */
   /* --- Model Router Tab --- */
   /* Model pricing data (per 1M tokens: input/output) */
   var _MODEL_PRICES={
@@ -1048,6 +1330,87 @@
     });
   };
 
+
+  /* ═══ 58-features-data.js ═══ */
+// Auto-extracted feature categories data
+  window.FEATURE_CATEGORIES=[
+    {id:'core',icon:'🤖',title:'Core AI',title_kr:'핵심 AI',features:[
+      {name:'Multi-model Routing',name_kr:'멀티 모델 라우팅',desc:'Auto-routes to haiku/sonnet/opus based on complexity. Supports Codex CLI / Claude Code OAuth tokens.',desc_kr:'복잡도에 따라 haiku/sonnet/opus 자동 선택. Codex CLI / Claude Code OAuth 토큰도 지원.',command:'/model'},
+      {name:'Extended Thinking',name_kr:'확장 사고',desc:'Deep reasoning for complex tasks',desc_kr:'복잡한 작업을 위한 심층 추론',command:'/thinking on'},
+      {name:'Context Compaction',name_kr:'컨텍스트 압축',desc:'Auto-summarize long sessions',desc_kr:'긴 세션 자동 요약',command:'/compact'},
+      {name:'Prompt Caching',name_kr:'프롬프트 캐싱',desc:'Anthropic cache for cost savings',desc_kr:'Anthropic 캐시로 비용 절감',command:'/context'},
+      {name:'Self-Evolving Prompt',name_kr:'자가 진화 프롬프트',desc:'AI learns your preferences over time',desc_kr:'대화할수록 선호도 자동 학습',command:'/evolve status'},
+      {name:'Mood-Aware Response',name_kr:'기분 감지 응답',desc:'Adjusts tone based on your emotion',desc_kr:'감정에 따라 톤 자동 조절',command:'/mood on'},
+      {name:'A/B Split Response',name_kr:'A/B 분할 응답',desc:'Two perspectives on one question',desc_kr:'하나의 질문에 두 관점 동시 응답',command:'/split'}
+    ]},
+    {id:'tools',icon:'🔧',title:'Tools',title_kr:'도구',features:[
+      {name:'Web Search',name_kr:'웹 검색',desc:'Search the internet',desc_kr:'인터넷 검색'},
+      {name:'Code Execution',name_kr:'코드 실행',desc:'Run code with sandbox protection',desc_kr:'샌드박스 보호 하에 코드 실행',command:'/bash'},
+      {name:'File Operations',name_kr:'파일 작업',desc:'Read, write, edit files',desc_kr:'파일 읽기/쓰기/편집'},
+      {name:'Browser Automation',name_kr:'브라우저 자동화',desc:'Web browsing, screenshots, form fill (pip install salmalm[browser])',desc_kr:'웹 브라우징, 스크린샷, 폼 입력 (pip install salmalm[browser])',command:'/screen'},
+      {name:'Image Vision',name_kr:'이미지 분석',desc:'Analyze images with AI',desc_kr:'AI로 이미지 분석'},
+      {name:'TTS / STT',name_kr:'음성 입출력',desc:'Text-to-speech and speech-to-text',desc_kr:'텍스트↔음성 변환'},
+      {name:'PDF Extraction',name_kr:'PDF 추출',desc:'Extract text from PDFs',desc_kr:'PDF에서 텍스트 추출'}
+    ]},
+    {id:'personal',icon:'👤',title:'Personal Assistant',title_kr:'개인 비서',features:[
+      {name:'Daily Briefing',name_kr:'데일리 브리핑',desc:'Morning/evening digest',desc_kr:'아침/저녁 종합 브리핑',command:'/life'},
+      {name:'Smart Reminders',name_kr:'스마트 리마인더',desc:'Natural language time parsing',desc_kr:'자연어 시간 파싱'},
+      {name:'Expense Tracker',name_kr:'가계부',desc:'Track spending by category',desc_kr:'카테고리별 지출 추적'},
+      {name:'Pomodoro Timer',name_kr:'포모도로 타이머',desc:'25min focus sessions',desc_kr:'25분 집중 세션'},
+      {name:'Notes & Links',name_kr:'메모 & 링크',desc:'Save and search notes/links',desc_kr:'메모와 링크 저장/검색'},
+      {name:'Routines',name_kr:'루틴',desc:'Daily habit tracking',desc_kr:'일일 습관 추적'},
+      {name:'Google Calendar',name_kr:'구글 캘린더',desc:'View, add, delete events',desc_kr:'일정 보기/추가/삭제'},
+      {name:'Gmail',name_kr:'지메일',desc:'Read, send, search emails',desc_kr:'이메일 읽기/보내기/검색'},
+      {name:'Life Dashboard',name_kr:'인생 대시보드',desc:'All-in-one life overview',desc_kr:'원페이지 인생 현황판',command:'/life'}
+    ]},
+    {id:'unique',icon:'✨',title:'Unique Features',title_kr:'독자 기능',features:[
+      {name:'Thought Stream',name_kr:'생각 스트림',desc:'Quick thought timeline with tags',desc_kr:'해시태그 기반 생각 타임라인',command:'/think'},
+      {name:'Time Capsule',name_kr:'타임캡슐',desc:'Messages to your future self',desc_kr:'미래의 나에게 보내는 메시지',command:'/capsule'},
+      {name:"Dead Man's Switch",name_kr:'데드맨 스위치',desc:'Emergency actions on inactivity',desc_kr:'비활동 시 긴급 조치',command:'/deadman'},
+      {name:'Shadow Mode',name_kr:'분신술',desc:'AI replies in your style when away',desc_kr:'부재 시 내 말투로 대리 응답',command:'/shadow on'},
+      {name:'Encrypted Vault',name_kr:'비밀 금고',desc:'Double-encrypted private chat',desc_kr:'이중 암호화 비밀 대화',command:'/vault open'},
+      {name:'Agent-to-Agent',name_kr:'AI간 통신',desc:'Negotiate with other SalmAlm instances',desc_kr:'다른 SalmAlm과 자동 협상',command:'/a2a'}
+    ]},
+    {id:'infra',icon:'⚙️',title:'Infrastructure',title_kr:'인프라',features:[
+      {name:'Workflow Engine',name_kr:'워크플로우 엔진',desc:'Multi-step automation pipelines',desc_kr:'다단계 자동화 파이프라인',command:'/workflow'},
+      {name:'MCP Marketplace',name_kr:'MCP 마켓',desc:'One-click MCP server install',desc_kr:'MCP 서버 원클릭 설치',command:'/mcp catalog'},
+      {name:'Plugin System',name_kr:'플러그인',desc:'Extend with custom plugins',desc_kr:'커스텀 플러그인으로 확장'},
+      {name:'Multi-Agent',name_kr:'다중 에이전트',desc:'Isolated sub-agents for parallel work',desc_kr:'병렬 작업용 격리 서브에이전트',command:'/subagents'},
+      {name:'Sandboxing',name_kr:'샌드박싱',desc:'OS-native sandbox (bubblewrap/sandbox-exec/rlimit)',desc_kr:'OS 기본 샌드박스 (bubblewrap/sandbox-exec/rlimit)'},
+      {name:'Mesh Network',name_kr:'메시 네트워크',desc:'P2P networking between SalmAlm instances',desc_kr:'SalmAlm 인스턴스 간 P2P 네트워킹'},
+      {name:'Canvas',name_kr:'캔버스',desc:'Local HTML/code/chart preview server (:18803)',desc_kr:'로컬 HTML/코드/차트 프리뷰 서버 (:18803)'},
+      {name:'OAuth Auth',name_kr:'OAuth 인증',desc:'Anthropic/OpenAI subscription auth',desc_kr:'API 키 없이 구독 인증',command:'/oauth'},
+      {name:'Prompt Caching',name_kr:'프롬프트 캐싱',desc:'Reduce API costs with caching',desc_kr:'캐싱으로 API 비용 절감',command:'/context'}
+    ]},
+    {id:'channels',icon:'📱',title:'Channels',title_kr:'채널',features:[
+      {name:'Web UI',name_kr:'웹 UI',desc:'Full-featured web interface',desc_kr:'풀기능 웹 인터페이스'},
+      {name:'Telegram',name_kr:'텔레그램',desc:'Bot with topics, reactions, groups',desc_kr:'토픽/반응/그룹 지원 봇'},
+      {name:'Discord',name_kr:'디스코드',desc:'Bot with threads and reactions',desc_kr:'스레드/반응 지원 봇'},
+      {name:'Slack',name_kr:'슬랙',desc:'Event API + Web API',desc_kr:'Event API + Web API'},
+      {name:'PWA',name_kr:'PWA',desc:'Install as desktop/mobile app',desc_kr:'데스크톱/모바일 앱 설치'}
+    ]},
+    {id:'commands',icon:'⌨️',title:'Commands',title_kr:'명령어',features:[
+      {name:'/help',desc:'Show help',desc_kr:'도움말'},{name:'/status',desc:'Session status',desc_kr:'세션 상태'},
+      {name:'/model',desc:'Switch model',desc_kr:'모델 전환'},{name:'/compact',desc:'Compress context',desc_kr:'컨텍스트 압축'},
+      {name:'/context',desc:'Token breakdown',desc_kr:'토큰 분석'},{name:'/usage',desc:'Token/cost tracking',desc_kr:'토큰/비용 추적'},
+      {name:'/think',desc:'Record a thought / set thinking level',desc_kr:'생각 기록 / 사고 레벨'},
+      {name:'/persona',desc:'Switch persona',desc_kr:'페르소나 전환'},{name:'/branch',desc:'Branch conversation',desc_kr:'대화 분기'},
+      {name:'/rollback',desc:'Rollback messages',desc_kr:'메시지 롤백'},{name:'/life',desc:'Life dashboard',desc_kr:'인생 대시보드'},
+      {name:'/remind',desc:'Set reminder',desc_kr:'리마인더 설정'},{name:'/expense',desc:'Track expense',desc_kr:'지출 기록'},
+      {name:'/pomodoro',desc:'Start pomodoro',desc_kr:'포모도로 시작'},{name:'/note',desc:'Save note',desc_kr:'메모 저장'},
+      {name:'/link',desc:'Save link',desc_kr:'링크 저장'},{name:'/routine',desc:'Manage routines',desc_kr:'루틴 관리'},
+      {name:'/shadow',desc:'Shadow mode',desc_kr:'분신술'},{name:'/vault',desc:'Encrypted vault',desc_kr:'비밀 금고'},
+      {name:'/capsule',desc:'Time capsule',desc_kr:'타임캡슐'},{name:'/deadman',desc:"Dead man's switch",desc_kr:'데드맨 스위치'},
+      {name:'/a2a',desc:'Agent-to-agent',desc_kr:'AI간 통신'},{name:'/workflow',desc:'Workflow engine',desc_kr:'워크플로우'},
+      {name:'/mcp',desc:'MCP management',desc_kr:'MCP 관리'},{name:'/subagents',desc:'Sub-agents',desc_kr:'서브에이전트'},
+      {name:'/oauth',desc:'OAuth setup',desc_kr:'OAuth 설정'},{name:'/bash',desc:'Run shell command',desc_kr:'셸 명령 실행'},
+      {name:'/screen',desc:'Browser control',desc_kr:'브라우저 제어'},{name:'/evolve',desc:'Evolving prompt',desc_kr:'진화 프롬프트'},
+      {name:'/mood',desc:'Mood detection',desc_kr:'감정 감지'},{name:'/split',desc:'A/B split',desc_kr:'A/B 분할'}
+    ]}
+  ];
+
+
+  /* ═══ 60-features.js ═══ */
   /* --- Features Guide --- */
   var FEATURE_CATEGORIES=window.FEATURE_CATEGORIES||[];
 
@@ -1081,6 +1444,8 @@
   }
   document.getElementById('features-search').addEventListener('input',function(){renderFeatures(this.value)});
 
+
+  /* ═══ 65-users.js ═══ */
   /* ── Users Panel (Multi-tenant) ── */
   window.loadUsers=function(){
     fetch('/api/users',{headers:{'Authorization':'Bearer '+(_tok||localStorage.getItem('salm_token')||'')}})
@@ -1143,6 +1508,8 @@
       body:JSON.stringify({registration_mode:this.value})});
   });
 
+
+  /* ═══ 70-dashboard.js ═══ */
   var _dashMode='tokens';
   window.showDashboard=function(){
     _hideAll();dashView.style.display='block';
@@ -1379,6 +1746,8 @@
     });
   };
 
+
+  /* ═══ 75-ui.js ═══ */
   /* --- Drag highlight --- */
   var ia=document.getElementById('input-area');
   ia.addEventListener('dragenter',function(e){e.preventDefault();ia.classList.add('drag-over')});
@@ -1426,6 +1795,8 @@
   var _hlObs=new MutationObserver(highlightCode);
   _hlObs.observe(chat,{childList:true,subtree:true});
 
+
+  /* ═══ 80-shortcuts.js ═══ */
   /* --- Keyboard shortcuts + modals --- */
   var _shortcutModal=document.createElement('div');_shortcutModal.id='shortcut-modal';
   _shortcutModal.style.cssText='display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;z-index:10000;min-width:320px;box-shadow:0 20px 60px rgba(0,0,0,0.5)';
@@ -1512,6 +1883,8 @@
     },300);
   });
 
+
+  /* ═══ 82-welcome.js ═══ */
   /* --- Welcome (only if no history) --- */
   if(!JSON.parse(localStorage.getItem('salm_chat')||'[]').length){
     addMsg('assistant',t('welcome-msg'),'system');
@@ -1532,6 +1905,8 @@
     if(dcB){dcB.textContent=ch.discord?'ON':'OFF';dcB.style.background=ch.discord?'#5865F2':'var(--bg3)';dcB.style.color=ch.discord?'#fff':'var(--text2)'}
   }).catch(()=>{});
 
+
+  /* ═══ 84-polling.js ═══ */
   /* --- Notification polling (30s) --- */
   setInterval(async()=>{
     if(!_tok)return;
@@ -1544,6 +1919,9 @@
       }
     }catch(e){}
   },30000);
+
+
+  /* ═══ 85-export-menu.js ═══ */
   /* --- Export menu toggle --- */
   window.toggleExportMenu=function(){var m=document.getElementById('export-menu');m.classList.toggle('open')};
   document.addEventListener('click',function(e){if(!e.target.closest('.export-dropdown')){var m=document.getElementById('export-menu');if(m)m.classList.remove('open')}});
@@ -1574,6 +1952,8 @@
     inp.click();
   };
 
+
+  /* ═══ 90-cmdpalette.js ═══ */
   /* --- Command Palette (Ctrl+Shift+P) --- */
   var _cmdPalette=document.createElement('div');_cmdPalette.id='cmd-palette';
   _cmdPalette.innerHTML='<input id="cmd-input" type="text" placeholder="'+t('cmd-placeholder')+'" autocomplete="off"><div id="cmd-results"></div>';
@@ -1628,6 +2008,8 @@
     if(filtered[idx]){_closeCmdPalette();filtered[idx].action();}
   });
 
+
+  /* ═══ 92-pwa.js ═══ */
   /* --- PWA Install Prompt --- */
   var _deferredPrompt=null;
   var _pwaBanner=document.createElement('div');_pwaBanner.id='pwa-install';
@@ -1642,6 +2024,8 @@
   /* --- Toast notification --- */
   window._toast=function(msg,ms){ms=ms||2000;var d=document.createElement('div');d.textContent=msg;d.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg3);color:var(--text);padding:8px 20px;border-radius:10px;font-size:13px;z-index:9999;box-shadow:0 2px 12px rgba(0,0,0,0.2);opacity:0;transition:opacity 0.2s';document.body.appendChild(d);requestAnimationFrame(function(){d.style.opacity='1'});setTimeout(function(){d.style.opacity='0';setTimeout(function(){d.remove()},300)},ms)};
 
+
+  /* ═══ 95-events.js ═══ */
   /* --- CSP-safe event delegation --- */
   var _qcMap={'qc-help':'/help','qc-sysmon':'Check system status','qc-memory':'Show memory files',
     'qc-cost':'Show cost report','qc-cron':'Show cron jobs','qc-python':'Calculate 1+1 in Python',
@@ -1830,6 +2214,8 @@
     else if(a==='unlock'&&typeof unlock==='function')unlock();
   });
 
+
+  /* ═══ 97-voice.js ═══ */
   /* STT — Voice Input */
   /* --- Extended Thinking Toggle --- */
   var _thinkingOn=false;
@@ -1891,6 +2277,8 @@
     });
   };
 
+
+  /* ═══ 98-rename.js ═══ */
   /* --- Double-click to rename session title --- */
   document.addEventListener('dblclick',function(e){
     var el=e.target.closest('.session-title');if(!el)return;
@@ -1923,6 +2311,8 @@
     }).catch(function(){});
   },3000);
 
+
+  /* ═══ 99-migration.js ═══ */
   /* --- Agent Migration (에이전트 이동) --- */
   window.exportAgent=function(){
     var s=document.getElementById('exp-sessions').checked?'1':'0';
@@ -2270,4 +2660,5 @@
   });
 
   /* ── Model Router Tab (v2) ── */
+
 })();
