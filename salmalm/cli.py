@@ -42,6 +42,34 @@ def _install_shortcut():
         _ensure_windows_shortcut()
         return
 
+    # Detect WSL → create Windows .bat on real Desktop
+    is_wsl = 'microsoft' in os.uname().release.lower() if hasattr(os, 'uname') else False
+    if is_wsl:
+        # Find Windows username and Desktop path
+        try:
+            import subprocess as _sp
+            win_user = _sp.check_output(
+                ['cmd.exe', '/C', 'echo', '%USERNAME%'],
+                stderr=_sp.DEVNULL, text=True
+            ).strip()
+            win_desktop = f'/mnt/c/Users/{win_user}/Desktop'
+            if not os.path.isdir(win_desktop):
+                # Fallback: try OneDrive Desktop
+                win_desktop = f'/mnt/c/Users/{win_user}/OneDrive/Desktop'
+            if os.path.isdir(win_desktop):
+                bat_path = os.path.join(win_desktop, 'SalmAlm.bat')
+                bat_content = f'''@echo off
+title SalmAlm
+wsl -e bash -lc "salmalm --open"
+pause
+'''
+                with open(bat_path, 'w', encoding='utf-8') as f:
+                    f.write(bat_content)
+                logger.info(f"[PIN] Created {bat_path} — double-click to start SalmAlm from WSL!")
+                return
+        except Exception as e:
+            logger.warning(f"[PIN] WSL shortcut failed: {e}, falling back to Linux .desktop")
+
     # Linux (.desktop) / macOS (.command)
     desktop = os.path.join(os.path.expanduser('~'), 'Desktop')
     if not os.path.isdir(desktop):
