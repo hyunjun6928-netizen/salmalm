@@ -3955,7 +3955,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_engine_settings(self):
         """POST /api/engine/settings — toggle engine optimization settings."""
-        import os, salmalm.constants as _const
+        import os
+        import salmalm.constants as _const
         body = self._body
         if 'dynamic_tools' in body:
             os.environ['SALMALM_ALL_TOOLS'] = '0' if body['dynamic_tools'] else '1'

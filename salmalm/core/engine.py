@@ -625,10 +625,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                             on_tool, classification, tier, on_token=None,
                             on_status=None):
         use_thinking = getattr(session, 'thinking_enabled', False)
-        _thinking_budget = 10000 if use_thinking else 0
         iteration = 0
         consecutive_errors = 0
         _session_id = getattr(session, 'id', '')
+        import os as _os
         _max_iter = int(_os.environ.get('SALMALM_MAX_TOOL_ITER', str(self.MAX_TOOL_ITERATIONS)))
         while iteration < _max_iter:
             # Abort check (생성 중지 체크) — LibreChat style
