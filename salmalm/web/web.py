@@ -350,6 +350,20 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         # 1. Try OS keychain first (most secure)
         if vault.try_keychain_unlock():
             return True
+        # 1b. Try .vault_auto file (WSL/no-keychain fallback)
+        try:
+            _pw_hint_file = VAULT_FILE.parent / '.vault_auto'  # noqa: F405
+            if _pw_hint_file.exists():
+                _hint = _pw_hint_file.read_text(encoding='utf-8').strip()
+                if _hint:
+                    import base64
+                    _auto_pw = base64.b64decode(_hint).decode()
+                else:
+                    _auto_pw = ""
+                if vault.unlock(_auto_pw, save_to_keychain=True):
+                    return True
+        except Exception:
+            pass
         pw = os.environ.get("SALMALM_VAULT_PW", "")
         if pw:
             import warnings
@@ -2372,9 +2386,22 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 self._json({"error": "Password must be at least 4 characters"}, 400)
                 return
         try:
-            vault.create(pw if use_pw else "")
+            _vault_pw = pw if use_pw else ""
+            vault.create(_vault_pw)
             # Auto-unlock vault after creation so API keys can be saved immediately
-            vault.unlock(pw if use_pw else "", save_to_keychain=True)
+            vault.unlock(_vault_pw, save_to_keychain=True)
+            # Save password hint file for auto-unlock on restart (WSL lacks keychain)
+            try:
+                _pw_hint_file = VAULT_FILE.parent / '.vault_auto'  # noqa: F405
+                if not use_pw:
+                    _pw_hint_file.write_text('', encoding='utf-8')
+                else:
+                    # Store obfuscated pw for auto-unlock (local machine only)
+                    import base64
+                    _pw_hint_file.write_text(base64.b64encode(_vault_pw.encode()).decode(), encoding='utf-8')
+                _pw_hint_file.chmod(0o600)
+            except Exception:
+                pass
             audit_log("setup", f"vault created {'with' if use_pw else 'without'} password")
         except RuntimeError:
             # cryptography not installed and fallback not enabled —
