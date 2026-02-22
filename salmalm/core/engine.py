@@ -326,15 +326,46 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         # Filter: only include tools that exist in all_tools
         all_tools = [t for t in all_tools if t['name'] in selected_names]
 
+        # ── Schema compression: strip param descriptions, keep only required + type ──
+        def _compress_schema(schema):
+            if not schema or not isinstance(schema, dict):
+                return schema
+            props = schema.get('properties', {})
+            required = set(schema.get('required', []))
+            compressed = {}
+            for k, v in props.items():
+                # Keep only type (and enum if present) — drop description
+                entry = {'type': v.get('type', 'string')}
+                if 'enum' in v:
+                    entry['enum'] = v['enum']
+                if 'items' in v:
+                    entry['items'] = {'type': v['items'].get('type', 'string')} if isinstance(v.get('items'), dict) else v['items']
+                compressed[k] = entry
+            result = {'type': 'object', 'properties': compressed}
+            if required:
+                result['required'] = list(required)
+            return result
+
+        def _compress_desc(desc):
+            """Truncate description to first sentence, max 80 chars."""
+            if not desc:
+                return desc
+            # First sentence
+            for sep in ['. ', '.\n', '; ']:
+                idx = desc.find(sep)
+                if 0 < idx < 80:
+                    return desc[:idx + 1]
+            return desc[:80].rstrip() + ('…' if len(desc) > 80 else '')
+
         if provider == 'google':
-            return [{'name': t['name'], 'description': t['description'],
-                     'parameters': t['input_schema']} for t in all_tools]
+            return [{'name': t['name'], 'description': _compress_desc(t['description']),
+                     'parameters': _compress_schema(t['input_schema'])} for t in all_tools]
         elif provider in ('openai', 'xai', 'deepseek', 'meta-llama'):
-            return [{'name': t['name'], 'description': t['description'],
-                     'parameters': t['input_schema']} for t in all_tools]
+            return [{'name': t['name'], 'description': _compress_desc(t['description']),
+                     'parameters': _compress_schema(t['input_schema'])} for t in all_tools]
         elif provider == 'anthropic':
-            return [{'name': t['name'], 'description': t['description'],
-                     'input_schema': t['input_schema']} for t in all_tools]
+            return [{'name': t['name'], 'description': _compress_desc(t['description']),
+                     'input_schema': _compress_schema(t['input_schema'])} for t in all_tools]
         return all_tools
 
     # Max chars per tool result sent to LLM context (default + per-type overrides)
