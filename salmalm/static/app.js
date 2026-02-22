@@ -818,6 +818,14 @@
       'input-hint':'Enter to send · Shift+Enter newline · Ctrl+V paste · Drag&Drop files',
       'thinking-on':'🧠 Extended Thinking: ON','thinking-off':'Extended Thinking: OFF',
       'btn-thinking-title':'Extended Thinking','btn-attach-title':'Attach file',
+      'tg-desc':'Connect a Telegram bot to chat with your AI from Telegram.',
+      'lbl-tg-token':'Bot Token','lbl-tg-owner':'Owner Chat ID',
+      'tg-connected':'Connected','tg-disconnected':'Not connected',
+      'tg-guide-title':'📋 Setup Guide (click to expand)',
+      'dc-desc':'Connect a Discord bot to chat with your AI in Discord servers.',
+      'lbl-dc-token':'Bot Token','lbl-dc-guild':'Server (Guild) ID',
+      'dc-connected':'Connected','dc-disconnected':'Not connected',
+      'dc-guide-title':'📋 Setup Guide (click to expand)',
       'btn-mic-title':'Voice input','btn-tts-title':'Read aloud',
       'btn-branch-title':'Branch from here','btn-regen-title':'Regenerate',
       'confirm-delete':'Delete this conversation?',
@@ -929,6 +937,14 @@
       'input-hint':'Enter 전송 · Shift+Enter 줄바꿈 · Ctrl+V 붙여넣기 · 파일 드래그&드롭',
       'thinking-on':'🧠 확장 사고 모드: 켜짐','thinking-off':'확장 사고 모드: 꺼짐',
       'btn-thinking-title':'확장 사고 모드','btn-attach-title':'파일 첨부',
+      'tg-desc':'Telegram 봇을 연결하여 Telegram에서 AI와 대화할 수 있습니다.',
+      'lbl-tg-token':'봇 토큰','lbl-tg-owner':'소유자 Chat ID',
+      'tg-connected':'연결됨','tg-disconnected':'연결 안 됨',
+      'tg-guide-title':'📋 설정 가이드 (클릭하여 펼치기)',
+      'dc-desc':'Discord 봇을 연결하여 Discord 서버에서 AI와 대화할 수 있습니다.',
+      'lbl-dc-token':'봇 토큰','lbl-dc-guild':'서버 (Guild) ID',
+      'dc-connected':'연결됨','dc-disconnected':'연결 안 됨',
+      'dc-guide-title':'📋 설정 가이드 (클릭하여 펼치기)',
       'btn-mic-title':'음성 입력','btn-tts-title':'소리로 듣기',
       'btn-branch-title':'여기서 분기','btn-regen-title':'다시 생성',
       'confirm-delete':'이 대화를 삭제하시겠습니까?',
@@ -1082,6 +1098,11 @@
     /* Toggle Google guide language */
     var _gEn=document.querySelector('.google-guide-en');var _gKr=document.querySelector('.google-guide-kr');
     if(_gEn&&_gKr){_gEn.style.display=_lang==='ko'?'none':'';_gKr.style.display=_lang==='ko'?'':'none'}
+    /* Toggle Telegram/Discord guide language */
+    var _tEn=document.querySelector('.tg-guide-en');var _tKr=document.querySelector('.tg-guide-kr');
+    if(_tEn&&_tKr){_tEn.style.display=_lang==='ko'?'none':'';_tKr.style.display=_lang==='ko'?'':'none'}
+    var _dEn=document.querySelector('.dc-guide-en');var _dKr=document.querySelector('.dc-guide-kr');
+    if(_dEn&&_dKr){_dEn.style.display=_lang==='ko'?'none':'';_dKr.style.display=_lang==='ko'?'':'none'}
     /* Refresh tools list on lang change */
     var th2=document.getElementById('tools-header');
     if(th2&&_allTools.length)th2.textContent='🛠️ '+(_lang==='ko'?'도구':'Tools')+' ('+_allTools.length+') ▾';
@@ -1129,8 +1150,17 @@
     }).catch(function(){});
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'keys'})})
       .then(function(r){return r.json()}).then(function(d){
-        document.getElementById('vault-keys').innerHTML=d.keys.map(function(k){return '<div style="padding:4px 0;font-size:13px;color:var(--text2)">🔑 '+k+'</div>'}).join('')});
+        document.getElementById('vault-keys').innerHTML=d.keys.map(function(k){return '<div style="padding:4px 0;font-size:13px;color:var(--text2)">🔑 '+k+'</div>'}).join('');
+        /* Show saved indicator on Telegram/Discord fields */
+        var _vk=d.keys||[];
+        if(_vk.indexOf('telegram_token')>=0){var _ti=document.getElementById('sk-telegram-token');if(_ti)_ti.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('telegram_owner_id')>=0){var _to=document.getElementById('sk-telegram-owner');if(_to)_to.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('discord_token')>=0){var _di=document.getElementById('sk-discord-token');if(_di)_di.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('discord_guild_id')>=0){var _dg=document.getElementById('sk-discord-guild');if(_dg)_dg.placeholder='••••••••• (saved)'}
+      });
     if(window.checkGoogleStatus)window.checkGoogleStatus();
+    if(window._checkTgStatus)window._checkTgStatus();
+    if(window._checkDcStatus)window._checkDcStatus();
     fetch('/api/status').then(function(r){return r.json()}).then(function(d){
       var u=d.usage,h='<div style="font-size:13px;line-height:2">📥 Input: '+u.total_input.toLocaleString()+' tokens<br>📤 Output: '+u.total_output.toLocaleString()+' tokens<br>💰 Cost: $'+u.total_cost.toFixed(4)+'<br>⏱️ Uptime: '+u.elapsed_hours+'h</div>';
       if(u.by_model){h+='<div style="margin-top:12px;font-size:12px">';for(var m in u.by_model){var v=u.by_model[m];h+='<div style="padding:4px 0;color:var(--text2)">'+m+': '+v.calls+'calls · $'+v.cost.toFixed(4)+'</div>'}h+='</div>'}
@@ -1547,6 +1577,19 @@
       re.innerHTML=d.ok?'<span style="color:#4ade80">'+d.result+'</span>':'<span style="color:#f87171">'+d.result+'</span>'})
     .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ Error: '+e.message+'</span>'})
   };
+  /* Telegram/Discord connection status */
+  window._checkTgStatus=function(){
+    var el=document.getElementById('tg-conn-status');if(!el)return;
+    fetch('/api/channels').then(function(r){return r.json()}).then(function(d){
+      if(d.telegram){el.innerHTML='🟢 <span data-i18n="tg-connected">Connected</span>';el.style.color='#4ade80'}
+      else{el.innerHTML='⚪ <span data-i18n="tg-disconnected">Not connected</span>';el.style.color='var(--text2)'}
+    }).catch(function(){})};
+  window._checkDcStatus=function(){
+    var el=document.getElementById('dc-conn-status');if(!el)return;
+    fetch('/api/channels').then(function(r){return r.json()}).then(function(d){
+      if(d.discord){el.innerHTML='🟢 <span data-i18n="dc-connected">Connected</span>';el.style.color='#4ade80'}
+      else{el.innerHTML='⚪ <span data-i18n="dc-disconnected">Not connected</span>';el.style.color='var(--text2)'}
+    }).catch(function(){})};
   window.googleConnect=function(){
     var re=document.getElementById('google-result');
     re.innerHTML='<span style="color:var(--text2)">⏳ Checking credentials...</span>';
@@ -1895,6 +1938,10 @@
     else if(a==='save-brave')window.saveKey('brave_api_key','sk-brave');
     else if(a==='save-google-client-id')window.saveKey('google_client_id','sk-google-client-id');
     else if(a==='save-google-client-secret')window.saveKey('google_client_secret','sk-google-client-secret');
+    else if(a==='save-telegram-token'){window.saveKey('telegram_token','sk-telegram-token');setTimeout(window._checkTgStatus,1000)}
+    else if(a==='save-telegram-owner')window.saveKey('telegram_owner_id','sk-telegram-owner');
+    else if(a==='save-discord-token'){window.saveKey('discord_token','sk-discord-token');setTimeout(window._checkDcStatus,1000)}
+    else if(a==='save-discord-guild')window.saveKey('discord_guild_id','sk-discord-guild');
     else if(a==='googleConnect')window.googleConnect();
     else if(a==='googleDisconnect')window.googleDisconnect();
     else if(a==='changePw')window.changePw();

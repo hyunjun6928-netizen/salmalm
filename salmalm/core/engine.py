@@ -104,11 +104,11 @@ class TaskClassifier:
                               'bug', '버그', 'fix', '수정', 'refactor', '리팩', 'debug', '디버그',
                               'API', 'server', '서버', 'deploy', '배포', 'build', '빌드',
                               '개발', '코딩', '프로그래밍'],
-                 'tier': 3, 'thinking': True},
+                 'tier': 3, 'thinking': False},
         'analysis': {'keywords': ['analyze', '분석', 'compare', '비교', 'review', '리뷰',
                                   'audit', '감사', 'security', '보안', 'performance', '성능',
                                   '검토', '조사', '평가', '진단'],
-                     'tier': 3, 'thinking': True},
+                     'tier': 3, 'thinking': False},
         'creative': {'keywords': ['write', '작성', 'story', '이야기', 'poem', '시',
                                   'translate', '번역', 'summarize', '요약', '글'],
                      'tier': 2, 'thinking': False},
@@ -297,11 +297,27 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 all_tools.append(t)
                 seen.add(t['name'])
 
-        # ── Tool injection: always provide all tools ──
-        # Previously filtered by intent, but this prevented LLM from using
-        # tools when intent classification was wrong (e.g. "파일 목록" → chat).
-        # Keyword-triggered tools are still boosted but never restrict.
-        # All 62 tools are always available — LLM decides what to use.
+        # ── Dynamic tool selection: core + intent + keyword matched ──
+        # Always include core tools (memory, file, exec basics) to prevent
+        # intent misclassification from breaking functionality.
+        # Then add intent-specific + keyword-matched tools on top.
+        _CORE_TOOLS = {
+            'read_file', 'write_file', 'edit_file', 'exec', 'exec_session',
+            'memory_read', 'memory_write', 'memory_search',
+            'web_search', 'web_fetch', 'sub_agent', 'ui_control',
+        }
+        selected_names = set(_CORE_TOOLS)
+        # Add intent-specific tools
+        if intent and intent in INTENT_TOOLS:
+            selected_names.update(INTENT_TOOLS[intent])
+        # Add keyword-matched tools
+        if user_message:
+            msg_lower = user_message.lower()
+            for kw, tool_names in _KEYWORD_TOOLS.items():
+                if kw in msg_lower:
+                    selected_names.update(tool_names)
+        # Filter: only include tools that exist in all_tools
+        all_tools = [t for t in all_tools if t['name'] in selected_names]
 
         if provider == 'google':
             return [{'name': t['name'], 'description': t['description'],
@@ -555,8 +571,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     async def _execute_loop(self, session, user_message, model_override,
                             on_tool, classification, tier, on_token=None,
                             on_status=None):
-        use_thinking = classification['thinking'] or getattr(session, 'thinking_enabled', False)
-        _thinking_budget = classification['thinking_budget'] or (10000 if use_thinking else 0)  # noqa: F841
+        use_thinking = getattr(session, 'thinking_enabled', False)
+        _thinking_budget = 10000 if use_thinking else 0
         iteration = 0
         consecutive_errors = 0
         _session_id = getattr(session, 'id', '')
@@ -991,11 +1007,22 @@ async def _process_message_inner(session_id: str, user_message: str,
     # Classify and run through Intelligence Engine
     classification = TaskClassifier.classify(user_message, len(session.messages))
 
-    # Override thinking based on session-level toggle
-    if session.thinking_enabled:
-        classification['thinking'] = True
-        if classification['thinking_budget'] == 0:
-            classification['thinking_budget'] = 10000
+    # Thinking is user-controlled only (via /thinking toggle or 🧠 button)
+    classification['thinking'] = getattr(session, 'thinking_enabled', False)
+    classification['thinking_budget'] = 10000 if classification['thinking'] else 0
+
+    # Suggest thinking mode for complex tasks when it's OFF
+    if not classification['thinking'] and classification['tier'] >= 3 and classification['score'] >= 4:
+        _suggest_key = f"_thinking_suggested_{getattr(session, 'id', '')}"
+        if not getattr(session, _suggest_key, False):
+            setattr(session, _suggest_key, True)  # Only suggest once per session
+            _hint = ("\n\n💡 *이 작업은 복잡해 보입니다. "
+                     "🧠 Extended Thinking을 켜면 더 정확한 결과를 얻을 수 있습니다.* "
+                     "`/thinking on` 또는 🧠 버튼을 눌러주세요."
+                     "\n💡 *This looks complex. Enable 🧠 Extended Thinking for better results.* "
+                     "Use `/thinking on` or the 🧠 button.")
+            # Inject as a system hint that will be appended to the response later
+            session._thinking_hint = _hint
 
     # Multi-model routing: select optimal model if no override
     selected_model = model_override
@@ -1084,6 +1111,12 @@ async def _process_message_inner(session_id: str, user_message: str,
         })
     except Exception:
         pass
+
+    # Append thinking mode suggestion if flagged
+    _hint = getattr(session, '_thinking_hint', None)
+    if _hint:
+        response = response + _hint
+        del session._thinking_hint
 
     return response
 
