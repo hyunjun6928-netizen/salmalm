@@ -297,25 +297,32 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 all_tools.append(t)
                 seen.add(t['name'])
 
-        # ── Dynamic tool selection: core + intent + keyword matched ──
-        # Always include core tools (memory, file, exec basics) to prevent
-        # intent misclassification from breaking functionality.
-        # Then add intent-specific + keyword-matched tools on top.
+        # ── Dynamic tool selection: zero tools for chat, minimal for others ──
+        # chat/memory/creative with no keyword match → NO tools (pure LLM)
+        # Other intents → small core set + intent + keyword matched
+        _NO_TOOL_INTENTS = {'chat', 'memory', 'creative'}
         _CORE_TOOLS = {
-            'read_file', 'write_file', 'edit_file', 'exec', 'exec_session',
-            'memory_read', 'memory_write', 'memory_search',
-            'web_search', 'web_fetch', 'sub_agent', 'ui_control',
+            'read_file', 'write_file', 'edit_file', 'exec',
+            'web_search', 'web_fetch',
         }
-        selected_names = set(_CORE_TOOLS)
-        # Add intent-specific tools
-        if intent and intent in INTENT_TOOLS:
-            selected_names.update(INTENT_TOOLS[intent])
-        # Add keyword-matched tools
+
+        # Check keyword matches first
+        keyword_matched = set()
         if user_message:
             msg_lower = user_message.lower()
             for kw, tool_names in _KEYWORD_TOOLS.items():
                 if kw in msg_lower:
-                    selected_names.update(tool_names)
+                    keyword_matched.update(tool_names)
+
+        # Zero-tool path: chat/memory/creative with no keyword triggers
+        if intent in _NO_TOOL_INTENTS and not keyword_matched:
+            return []  # Pure LLM — no tool schema overhead
+
+        # Tool path: core + intent + keyword
+        selected_names = set(_CORE_TOOLS)
+        if intent and intent in INTENT_TOOLS:
+            selected_names.update(INTENT_TOOLS[intent])
+        selected_names.update(keyword_matched)
         # Filter: only include tools that exist in all_tools
         all_tools = [t for t in all_tools if t['name'] in selected_names]
 
