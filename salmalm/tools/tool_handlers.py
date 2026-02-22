@@ -87,9 +87,13 @@ def execute_tool(name: str, args: dict) -> str:
             # Also resolve relative to WORKSPACE_DIR
             if not _P(val).is_absolute():
                 resolved = str((WORKSPACE_DIR / val).resolve())
-            in_allowed = any(resolved.startswith(root) for root in _allowed_roots)
+            resolved_path = _P(resolved)
+            in_allowed = any(
+                resolved_path == _P(root) or resolved_path.is_relative_to(_P(root))
+                for root in _allowed_roots
+            )
             # Home read requires opt-in
-            home_read_ok = os.environ.get("SALMALM_ALLOW_HOME_READ") and resolved.startswith(str(_P.home()))
+            home_read_ok = os.environ.get("SALMALM_ALLOW_HOME_READ") and resolved_path.is_relative_to(_P.home())
             if not in_allowed and not home_read_ok:
                 # Write-capable tools: always block outside allowed roots
                 # (prevents creating files in arbitrary locations)

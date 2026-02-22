@@ -1297,14 +1297,24 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self._html(_tmpl.ONBOARDING_HTML)
 
     def _get_api_sessions(self):
-        if not self._require_auth("user"):
+        _auth_user = self._require_auth("user")
+        if not _auth_user:
             return
         from salmalm.core import _get_db
 
         conn = _get_db()
-        rows = conn.execute(
-            "SELECT session_id, updated_at, title, parent_session_id FROM session_store ORDER BY updated_at DESC"
-        ).fetchall()
+        # User-scoped session list (user_id=0 or NULL = legacy/local = show all)
+        _uid = _auth_user.get("id", 0)
+        if _uid and _uid > 0:
+            rows = conn.execute(
+                "SELECT session_id, updated_at, title, parent_session_id FROM session_store "
+                "WHERE user_id=? OR user_id IS NULL ORDER BY updated_at DESC",
+                (_uid,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT session_id, updated_at, title, parent_session_id FROM session_store ORDER BY updated_at DESC"
+            ).fetchall()
         sessions = []
         for r in rows:
             sid = r[0]
@@ -2042,14 +2052,17 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self.wfile.write(svg.encode())
 
         elif self.path.startswith("/api/agent/export"):
-            if not self._require_auth("user"):
-                return
+            # Vault export requires admin role
             from urllib.parse import parse_qs, urlparse
 
             qs = parse_qs(urlparse(self.path).query)
+            inc_vault = qs.get("vault", ["0"])[0] == "1"
+            _min_role = "admin" if inc_vault else "user"
+            _export_user = self._require_auth(_min_role)
+            if not _export_user:
+                return
             inc_sessions = qs.get("sessions", ["1"])[0] == "1"
             inc_data = qs.get("data", ["1"])[0] == "1"
-            inc_vault = qs.get("vault", ["0"])[0] == "1"
             import zipfile
             import io
             import json as _json
@@ -2084,7 +2097,14 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     from salmalm.core import _get_db
 
                     conn = _get_db()
-                    rows = conn.execute("SELECT session_id, messages, title FROM session_store").fetchall()
+                    _export_uid = _export_user.get("id", 0)
+                    if _export_uid and _export_uid > 0:
+                        rows = conn.execute(
+                            "SELECT session_id, messages, title FROM session_store WHERE user_id=? OR user_id IS NULL",
+                            (_export_uid,),
+                        ).fetchall()
+                    else:
+                        rows = conn.execute("SELECT session_id, messages, title FROM session_store").fetchall()
                     sessions = []
                     for r in rows:
                         sessions.append(

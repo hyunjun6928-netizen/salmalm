@@ -83,6 +83,10 @@ def _get_db() -> sqlite3.Connection:
             conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
         except Exception:
             pass
+        try:
+            conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
+        except Exception:
+            pass
         conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
@@ -118,6 +122,10 @@ def _init_audit_db():
         pass
     try:
         conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
     except Exception:
         pass
     conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (

@@ -159,7 +159,6 @@ def _run_playwright_script(script: str, args: list, timeout: int = 60) -> dict:
             pass
 
 
-@register("browser")
 def _is_internal_url(url: str) -> bool:
     """Check if URL targets internal/private network (SSRF prevention)."""
     try:
@@ -185,6 +184,7 @@ def _is_internal_url(url: str) -> bool:
     return False
 
 
+@register("browser")
 def handle_browser(args: dict) -> str:
     """Browser automation — OpenClaw snapshot/act pattern.
 
@@ -207,7 +207,7 @@ def handle_browser(args: dict) -> str:
         )
 
     # SSRF: block internal/private URLs when externally bound
-    def _check_url_safe(url: str) -> str | None:
+    def _check_url_safe(url: str):
         if url.startswith("about:"):
             return None
         if _is_internal_url(url):
