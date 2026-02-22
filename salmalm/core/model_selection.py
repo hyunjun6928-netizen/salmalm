@@ -61,25 +61,25 @@ def save_routing_config(config: dict) -> None:
 # ── Cost-per-1M-token table (input/output) for auto-optimization ──
 _MODEL_COSTS = {
     # Anthropic
-    'anthropic/claude-haiku-3.5-20241022':   (1.0, 5.0),
-    'anthropic/claude-sonnet-4-20250514':    (3.0, 15.0),
-    'anthropic/claude-opus-4-6':             (5.0, 25.0),
+    'anthropic/claude-haiku-3.5-20241022': (1.0, 5.0),
+    'anthropic/claude-sonnet-4-20250514': (3.0, 15.0),
+    'anthropic/claude-opus-4-6': (5.0, 25.0),
     # OpenAI
-    'openai/gpt-4.1-nano':                   (0.1, 0.4),
-    'openai/gpt-4.1-mini':                   (0.4, 1.6),
-    'openai/gpt-4.1':                        (2.0, 8.0),
-    'openai/gpt-5.3-codex':                  (2.0, 8.0),
-    'openai/gpt-5.1-codex':                  (1.5, 6.0),
-    'openai/o4-mini':                        (1.1, 4.4),
+    'openai/gpt-4.1-nano': (0.1, 0.4),
+    'openai/gpt-4.1-mini': (0.4, 1.6),
+    'openai/gpt-4.1': (2.0, 8.0),
+    'openai/gpt-5.3-codex': (2.0, 8.0),
+    'openai/gpt-5.1-codex': (1.5, 6.0),
+    'openai/o4-mini': (1.1, 4.4),
     # Google
-    'google/gemini-2.5-flash':               (0.15, 0.6),
-    'google/gemini-3-flash-preview':         (0.15, 0.6),
-    'google/gemini-2.5-pro':                 (1.25, 10.0),
-    'google/gemini-3-pro-preview':           (1.25, 10.0),
+    'google/gemini-2.5-flash': (0.15, 0.6),
+    'google/gemini-3-flash-preview': (0.15, 0.6),
+    'google/gemini-2.5-pro': (1.25, 10.0),
+    'google/gemini-3-pro-preview': (1.25, 10.0),
     # xAI
-    'xai/grok-3-mini':                       (0.3, 0.5),
-    'xai/grok-3':                            (3.0, 15.0),
-    'xai/grok-4':                            (3.0, 15.0),
+    'xai/grok-3-mini': (0.3, 0.5),
+    'xai/grok-3': (3.0, 15.0),
+    'xai/grok-4': (3.0, 15.0),
 }
 
 # Tier candidates: (model_id, provider_key_name)

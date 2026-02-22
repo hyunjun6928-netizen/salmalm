@@ -58,7 +58,7 @@ def _install_shortcut():
                 win_desktop = f'/mnt/c/Users/{win_user}/OneDrive/Desktop'
             if os.path.isdir(win_desktop):
                 bat_path = os.path.join(win_desktop, 'SalmAlm.bat')
-                bat_content = f'''@echo off
+                bat_content = '''@echo off
 title SalmAlm
 wsl -e bash -lc "salmalm --open"
 pause

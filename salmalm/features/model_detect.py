@@ -44,7 +44,6 @@ class ModelDetector:
         self._cache_ts = now
         return models
 
-
     def _detect_local_models(self, base_url: str, api_key: Optional[str] = None) -> List[Dict]:
         """Detect models from local LLM endpoint. Tries /models, /v1/models, /api/tags."""
         import urllib.request

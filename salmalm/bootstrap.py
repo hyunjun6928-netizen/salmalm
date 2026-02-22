@@ -304,8 +304,6 @@ async def run_server():
                 # Register message handler → core engine
                 async def _discord_message_handler(content, raw_data):
                     import time as _t
-                    _author = raw_data.get('author', {})
-                    _user_id = _author.get('id', 'unknown')
                     _channel_id = raw_data.get('channel_id', '')
                     _session_id = f'discord_{_channel_id}'
                     _start = _t.time()

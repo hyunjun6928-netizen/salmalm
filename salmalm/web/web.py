@@ -2533,7 +2533,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         audit_log("restart", "user-initiated restart")
         self._json({"ok": True, "message": "Restarting..."})
         # Graceful restart: flush response, then replace process after a short delay
-        import threading, sys as _sys
+        import threading
+        import sys as _sys
 
         def _do_restart():
             import time
@@ -3042,8 +3043,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 'model': model, 'provider': provider, 'name': name,
                 'cost_input': cost[0], 'cost_output': cost[1],
             }
-        self._json({"ok": True, "config": config, "summary": summary,
-                     "keys_used": available_keys})
+        self._json({
+            "ok": True, "config": config,
+            "summary": summary, "keys_used": available_keys
+        })
 
     def _post_api_failover(self):
         body = self._body
@@ -3923,8 +3926,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         except Exception as e:
             log.warning(f"[ONBOARDING] Auto-routing failed (ignored): {e}")
         test_result = " | ".join(test_results) if test_results else "Keys saved."
-        self._json({"ok": True, "saved": saved, "test_result": test_result,
-                     "routing": routing_config})
+        self._json({
+            "ok": True, "saved": saved,
+            "test_result": test_result, "routing": routing_config
+        })
         return
 
     def _post_api_onboarding_preferences(self):
