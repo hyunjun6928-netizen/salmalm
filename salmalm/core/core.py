@@ -1530,6 +1530,16 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                 })
                 log.info(f"[NOTE] Restored compaction summary for {session_id} ({len(prev_summary)} chars)")
 
+            # Apply onboarding model as session default (used as routing fallback)
+            try:
+                from salmalm.security.crypto import vault
+                if vault.is_unlocked:
+                    dm = vault.get('default_model')
+                    if dm and dm != 'auto':
+                        _sessions[session_id]._default_model = dm
+            except Exception:
+                pass
+
             log.info(
                 f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)"
             )

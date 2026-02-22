@@ -82,10 +82,13 @@ def select_model(message: str, session) -> Tuple[str, str]:
         'moderate': _MODELS.get('sonnet', ''),
         'complex': _MODELS.get('sonnet', ''),
     }
-    _default_fallback = getattr(session, '_default_model', None) or _MODELS.get('sonnet', '')
+    _default_fallback = getattr(session, '_default_model', None)
+    # If user chose a model during onboarding, use it for complex tier
+    if _default_fallback and not rc.get('complex'):
+        _tier_defaults['complex'] = _default_fallback
     for k in ('simple', 'moderate', 'complex'):
         if not rc[k]:
-            rc[k] = _tier_defaults.get(k, _default_fallback)
+            rc[k] = _tier_defaults.get(k, _MODELS.get('sonnet', ''))
     msg_lower = message.lower()
     msg_len = len(message)
 
