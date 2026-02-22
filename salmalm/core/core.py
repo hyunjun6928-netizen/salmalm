@@ -1530,13 +1530,14 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                 })
                 log.info(f"[NOTE] Restored compaction summary for {session_id} ({len(prev_summary)} chars)")
 
-            # Apply onboarding model as session default (used as routing fallback)
+            # Apply onboarding model as session default
             try:
                 from salmalm.security.crypto import vault
                 if vault.is_unlocked:
                     dm = vault.get('default_model')
                     if dm and dm != 'auto':
                         _sessions[session_id]._default_model = dm
+                        _sessions[session_id].model_override = dm
             except Exception:
                 pass
 
