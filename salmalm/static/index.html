@@ -537,37 +537,134 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
   <div id="settings-features" style="display:none">
     <div class="settings-card" id="engine-opt-card">
       <h3>⚡ Engine Optimization / 엔진 최적화</h3>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6" data-i18n="engine-opt-desc">Control token usage and response quality trade-offs.</p>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <label style="font-size:13px;display:flex;align-items:center;gap:10px;cursor:pointer">
-          <input type="checkbox" id="eng-dynamic-tools" checked style="width:18px;height:18px">
-          <div><b>Dynamic Tool Loading</b><br><span style="font-size:11px;color:var(--text2)">Only send relevant tools per request (saves ~90% tool tokens) / 요청별 필요한 도구만 전송 (도구 토큰 ~90% 절감)</span></div>
-        </label>
-        <label style="font-size:13px;display:flex;align-items:center;gap:10px;cursor:pointer">
-          <input type="checkbox" id="eng-planning" style="width:18px;height:18px">
-          <div><b>Planning Phase</b><br><span style="font-size:11px;color:var(--text2)">Inject planning prompt before complex tasks (+~150 tok/call) / 복잡한 작업 전 계획 프롬프트 주입 (+~150 토큰/호출)</span></div>
-        </label>
-        <label style="font-size:13px;display:flex;align-items:center;gap:10px;cursor:pointer">
-          <input type="checkbox" id="eng-reflection" style="width:18px;height:18px">
-          <div><b>Self-Reflection</b><br><span style="font-size:11px;color:var(--text2)">Verify code/analysis with a second LLM call (doubles cost for complex tasks) / 코드/분석 응답을 2차 LLM 호출로 검증 (복잡 작업 비용 2배)</span></div>
-        </label>
-        <div style="display:flex;align-items:center;gap:10px">
-          <label style="font-size:13px;margin:0"><b>Compaction</b></label>
-          <select id="eng-compaction" style="width:auto;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
-            <option value="15000">Aggressive (15K) / 적극적</option>
-            <option value="30000" selected>Balanced (30K) / 균형</option>
-            <option value="60000">Relaxed (60K) / 여유</option>
-            <option value="120000">Maximum (120K) / 최대</option>
-          </select>
-          <span style="font-size:11px;color:var(--text2)">Context compaction threshold / 컨텍스트 압축 임계값</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <label style="font-size:13px;margin:0"><b>Cost Cap</b></label>
-          <input id="eng-cost-cap" type="text" placeholder="e.g. 5.00 ($/day)" style="width:120px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
-          <span style="font-size:11px;color:var(--text2)">Daily spending limit / 일일 비용 한도 ($)</span>
-        </div>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.8">
+        Control how SalmAlm balances <b>cost</b> vs <b>quality</b>. All changes take effect immediately without restart.<br>
+        삶앎의 <b>비용</b>과 <b>품질</b> 균형을 조절합니다. 모든 변경은 재시작 없이 즉시 적용됩니다.
+      </p>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--text2);line-height:1.8">
+        📊 <b>Cost Breakdown / 비용 구조</b><br>
+        Every LLM call includes: <b>System Prompt</b> (~310 tok) + <b>Tool Schemas</b> (0~700 tok) + <b>Chat History</b> (varies) + <b>Your Message</b><br>
+        매 LLM 호출에 포함: <b>시스템 프롬프트</b> (~310 토큰) + <b>도구 스키마</b> (0~700 토큰) + <b>대화 히스토리</b> (가변) + <b>사용자 메시지</b><br>
+        <span style="color:var(--accent)">💡 Opus: $15/1M input, $75/1M output · Sonnet: $3/$15 · Haiku: $0.25/$1.25</span>
       </div>
-      <button class="btn" data-action="saveEngineSettings" style="margin-top:14px">💾 Save / 저장</button>
+
+      <div style="display:flex;flex-direction:column;gap:20px">
+
+        <!-- Dynamic Tool Loading -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <label style="font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
+            <input type="checkbox" id="eng-dynamic-tools" checked style="width:18px;height:18px">
+            <b>🔧 Dynamic Tool Loading / 동적 도구 로딩</b>
+          </label>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;padding-left:28px">
+            <b>ON (recommended):</b> Only sends relevant tools based on your message intent.<br>
+            Chat/casual → <span style="color:#4ade80">0 tools (0 tok)</span> · Weather/calendar → <span style="color:#facc15">7-12 tools (~750 tok)</span> · Coding → <span style="color:#f97316">11 tools (~700 tok)</span><br>
+            <b>OFF:</b> Always sends all 62 tools every call → <span style="color:#f87171">~7,750 tok overhead per request</span><br>
+            <br>
+            <b>ON (권장):</b> 메시지 의도에 따라 필요한 도구만 전송합니다.<br>
+            잡담 → <span style="color:#4ade80">0개 (0 토큰)</span> · 날씨/일정 → <span style="color:#facc15">7-12개 (~750 토큰)</span> · 코딩 → <span style="color:#f97316">11개 (~700 토큰)</span><br>
+            <b>OFF:</b> 매번 62개 도구 전부 전송 → <span style="color:#f87171">요청당 ~7,750 토큰 오버헤드</span><br>
+            <span style="color:var(--accent)">💰 Opus 기준 ON vs OFF 차이: 하루 100회 호출 시 <b>~$10/day 절감</b></span>
+          </div>
+        </div>
+
+        <!-- Planning Phase -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <label style="font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
+            <input type="checkbox" id="eng-planning" style="width:18px;height:18px">
+            <b>📋 Planning Phase / 계획 단계</b>
+          </label>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;padding-left:28px">
+            <b>ON:</b> Before complex code/analysis tasks, injects a planning prompt that asks the AI to outline its approach before executing. Can improve accuracy for multi-step tasks.<br>
+            <b>Cost:</b> <span style="color:#f97316">+~150 input tokens per complex request</span> (~$0.002/call on Opus)<br>
+            <b>OFF (default):</b> AI plans naturally within its response. Sufficient for most tasks.<br>
+            <br>
+            <b>ON:</b> 복잡한 코드/분석 작업 전에 AI가 접근 방법을 먼저 계획하도록 프롬프트를 주입합니다. 다단계 작업의 정확도를 높일 수 있습니다.<br>
+            <b>비용:</b> <span style="color:#f97316">복잡한 요청당 +~150 입력 토큰</span> (Opus 기준 ~$0.002/호출)<br>
+            <b>OFF (기본):</b> AI가 응답 내에서 자연스럽게 계획합니다. 대부분의 작업에 충분합니다.
+          </div>
+        </div>
+
+        <!-- Self-Reflection -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <label style="font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
+            <input type="checkbox" id="eng-reflection" style="width:18px;height:18px">
+            <b>🔍 Self-Reflection / 자기 검증</b>
+          </label>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;padding-left:28px">
+            <b>ON:</b> After generating code or analysis, makes a <b>second full LLM call</b> to review and improve the response. Catches bugs, hallucinations, and incomplete answers.<br>
+            <b>Cost:</b> <span style="color:#f87171">Doubles the cost for complex tasks</span> (2x LLM calls). E.g., a coding response that costs $0.05 → $0.10.<br>
+            <b>Best for:</b> Production code, security audits, critical analysis where accuracy matters more than speed.<br>
+            <b>OFF (default):</b> Single-pass generation. Faster and cheaper. Quality is still good for most tasks.<br>
+            <br>
+            <b>ON:</b> 코드/분석 생성 후 <b>두 번째 LLM 호출</b>로 응답을 검토하고 개선합니다. 버그, 환각, 불완전한 답변을 잡아냅니다.<br>
+            <b>비용:</b> <span style="color:#f87171">복잡한 작업 비용 2배</span> (LLM 2회 호출). 예: $0.05 코딩 응답 → $0.10<br>
+            <b>추천 상황:</b> 프로덕션 코드, 보안 감사, 정확도가 속도보다 중요한 분석<br>
+            <b>OFF (기본):</b> 단일 패스 생성. 더 빠르고 저렴합니다. 대부분의 작업에 충분한 품질.
+          </div>
+        </div>
+
+        <!-- Compaction Threshold -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <span style="font-size:14px"><b>📦 Compaction Threshold / 컨텍스트 압축 임계값</b></span>
+          </div>
+          <div style="margin-bottom:8px">
+            <select id="eng-compaction" style="width:auto;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+              <option value="15000">Aggressive (15K)</option>
+              <option value="30000" selected>Balanced (30K)</option>
+              <option value="60000">Relaxed (60K)</option>
+              <option value="120000">Maximum (120K)</option>
+            </select>
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8">
+            Controls when old messages are summarized to free up context space. Lower = more frequent compaction = lower cost per turn but may lose details.<br>
+            <b>15K (Aggressive):</b> Compacts often. Best for cost savings. <span style="color:#4ade80">~$0.01/turn avg on Opus</span><br>
+            <b>30K (Balanced):</b> Good middle ground. <span style="color:#facc15">~$0.02/turn avg</span><br>
+            <b>60K (Relaxed):</b> Keeps more history. <span style="color:#f97316">~$0.04/turn avg</span><br>
+            <b>120K (Maximum):</b> Full context retention. Best for long coding sessions. <span style="color:#f87171">~$0.08/turn avg</span><br>
+            <br>
+            이전 메시지를 요약하여 컨텍스트 공간을 확보하는 시점을 제어합니다. 낮을수록 더 자주 압축 = 턴당 비용 절감, 세부사항 손실 가능.<br>
+            <b>15K (적극적):</b> 자주 압축. 비용 절감 최적. <span style="color:#4ade80">Opus 기준 턴당 평균 ~$0.01</span><br>
+            <b>30K (균형):</b> 적절한 중간값. <span style="color:#facc15">턴당 평균 ~$0.02</span><br>
+            <b>60K (여유):</b> 더 많은 히스토리 유지. <span style="color:#f97316">턴당 평균 ~$0.04</span><br>
+            <b>120K (최대):</b> 전체 컨텍스트 유지. 긴 코딩 세션에 적합. <span style="color:#f87171">턴당 평균 ~$0.08</span>
+          </div>
+        </div>
+
+        <!-- Cost Cap -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <span style="font-size:14px"><b>💸 Daily Cost Cap / 일일 비용 한도</b></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span style="font-size:14px">$</span>
+            <input id="eng-cost-cap" type="text" placeholder="e.g. 5.00" style="width:100px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px">
+            <span style="font-size:12px;color:var(--text2)">/ day</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8">
+            When daily spending reaches this limit, the AI will stop processing new requests until the next day (UTC reset). Leave empty for no limit.<br>
+            <b>Suggested values:</b> Casual use: <span style="color:#4ade80">$1-2/day</span> · Active use: <span style="color:#facc15">$5-10/day</span> · Heavy dev: <span style="color:#f97316">$20-50/day</span><br>
+            <br>
+            일일 비용이 이 한도에 도달하면 다음 날(UTC 기준)까지 새 요청 처리를 중단합니다. 비워두면 제한 없음.<br>
+            <b>권장값:</b> 가벼운 사용: <span style="color:#4ade80">$1-2/일</span> · 활발한 사용: <span style="color:#facc15">$5-10/일</span> · 집중 개발: <span style="color:#f97316">$20-50/일</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Summary bar -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:20px;font-size:12px;line-height:1.8">
+        <b>💡 Recommended Presets / 권장 프리셋:</b><br>
+        🟢 <b>Maximum Savings:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 15K · Cap $2/day<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">최대 절약: 잡담 ~$0.001/턴, 코딩 ~$0.01/턴</span><br>
+        🟡 <b>Balanced:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 30K · Cap $10/day<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">균형: 잡담 ~$0.002/턴, 코딩 ~$0.02/턴</span><br>
+        🔴 <b>Maximum Quality:</b> Dynamic Tools ❌ · Planning ✅ · Reflection ✅ · Compaction 120K · No cap<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">최대 품질: 잡담 ~$0.05/턴, 코딩 ~$0.15/턴</span>
+      </div>
+
+      <button class="btn" data-action="saveEngineSettings" style="margin-top:16px;font-size:14px;padding:10px 24px">💾 Save / 저장</button>
       <span id="eng-save-result" style="font-size:12px;margin-left:8px"></span>
     </div>
     <div style="margin-bottom:16px"><input id="features-search" type="text" placeholder="Search features..." data-i18n="features-search-ph" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:14px"></div>
