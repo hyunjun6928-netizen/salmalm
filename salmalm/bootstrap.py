@@ -193,14 +193,23 @@ async def run_server():
         webbrowser.open(url)
 
     # ── Phase 5: Vault Auto-unlock ──
-    if not vault.is_unlocked and not VAULT_FILE.exists():
+    _bind_addr = os.environ.get("SALMALM_BIND", "127.0.0.1")
+    _is_external_bind = _bind_addr not in ("127.0.0.1", "::1", "localhost")
+    if _is_external_bind and not os.environ.get("SALMALM_AUTO_UNLOCK"):
+        log.warning(
+            "[VAULT] Auto-unlock disabled on external bind (%s). "
+            "Set SALMALM_AUTO_UNLOCK=1 to override, or unlock manually via web UI.",
+            _bind_addr,
+        )
+    elif not vault.is_unlocked and not VAULT_FILE.exists():
         # Fresh install: create vault with empty password
         try:
             vault.create("", save_to_keychain=False)
             log.info("[VAULT] Created new vault (no password)")
         except Exception as _e:
             log.warning(f"[VAULT] Auto-create failed: {_e}")
-    if not vault.is_unlocked and VAULT_FILE.exists():
+    _allow_auto_unlock = not _is_external_bind or os.environ.get("SALMALM_AUTO_UNLOCK")
+    if _allow_auto_unlock and not vault.is_unlocked and VAULT_FILE.exists():
         # 1. Try OS keychain
         if vault.try_keychain_unlock():
             log.info("[UNLOCK] Vault auto-unlocked from keychain")

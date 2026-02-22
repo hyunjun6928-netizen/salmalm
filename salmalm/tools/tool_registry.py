@@ -86,7 +86,8 @@ def execute_tool(name: str, args: dict) -> str:
         try:
             from salmalm.web.middleware import is_tool_allowed_external
 
-            if not is_tool_allowed_external(name, is_authenticated=False, bind_addr=bind):
+            _is_auth = bool(args.pop("_authenticated", False))
+            if not is_tool_allowed_external(name, is_authenticated=_is_auth, bind_addr=bind):
                 log.warning(f"[SECURITY] Tool '{name}' blocked: external bind + restricted tier")
                 return f'❌ Tool "{name}" is restricted on externally-exposed instances'
         except ImportError:

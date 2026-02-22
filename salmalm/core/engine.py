@@ -417,6 +417,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             t0 = _time.time()
             try:
                 tc["arguments"]["_session_id"] = getattr(self._session, "id", "")
+                tc["arguments"]["_authenticated"] = getattr(self._session, "authenticated", False)
                 result = self._truncate_tool_result(execute_tool(tc["name"], tc["arguments"]), tool_name=tc["name"])
                 elapsed = _time.time() - t0
                 audit_log(
@@ -452,6 +453,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             _metrics["tool_calls"] += 1
             start_times[tc["id"]] = _time.time()
             tc["arguments"]["_session_id"] = getattr(self._session, "id", "")
+            tc["arguments"]["_authenticated"] = getattr(self._session, "authenticated", False)
             f = self._tool_executor.submit(execute_tool, tc["name"], tc["arguments"])
             futures[tc["id"]] = (f, tc)
         outputs = {}
