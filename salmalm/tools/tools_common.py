@@ -235,7 +235,7 @@ def _make_pinned_opener(resolved_ip: str, hostname: str):
     """
     import http.client
     import urllib.request
-    import ssl
+    import ssl  # noqa: F401
 
     class _PinnedHTTPConnection(http.client.HTTPConnection):
         def connect(self):

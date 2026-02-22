@@ -15,7 +15,7 @@ def _ensure_modules():
     if _modules_loaded:
         return
     _modules_loaded = True
-    from salmalm import (
+    from salmalm import (  # noqa: F401
         tools_file,
         tools_web,
         tools_exec,

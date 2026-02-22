@@ -15,7 +15,7 @@ import base64
 import threading  # noqa: F401
 from pathlib import Path
 
-from salmalm.constants import (
+from salmalm.constants import (  # noqa: F401
     EXEC_ALLOWLIST,
     EXEC_BLOCKLIST,
     EXEC_BLOCKLIST_PATTERNS,

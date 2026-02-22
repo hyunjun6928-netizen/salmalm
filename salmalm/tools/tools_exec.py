@@ -9,7 +9,7 @@ import time
 from salmalm.tools.tool_registry import register
 from salmalm.tools.tools_common import _is_safe_command
 from salmalm.constants import WORKSPACE_DIR
-from salmalm.security.exec_approvals import (
+from salmalm.security.exec_approvals import (  # noqa: F401
     check_approval,
     check_env_override,
     BackgroundSession,  # noqa: F401

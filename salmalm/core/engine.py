@@ -7,7 +7,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple  # noqa: F401
 
-from salmalm.constants import (
+from salmalm.constants import (  # noqa: F401
     VERSION,
     INTENT_SHORT_MSG,
     INTENT_COMPLEX_MSG,  # noqa: F401
@@ -32,7 +32,7 @@ _shutting_down = False
 _active_requests = 0
 _active_requests_lock = _threading.Lock()
 _active_requests_event = _threading.Event()  # signaled when _active_requests == 0
-from salmalm.core import (
+from salmalm.core import (  # noqa: F401
     router,
     compact_messages,
     get_session,
@@ -95,7 +95,7 @@ from salmalm.core.model_selection import (  # noqa: F401
     _COMPLEX_KEYWORDS,
     _MODEL_NAME_FIXES,
 )
-from salmalm.constants import MODELS as _MODELS  # noqa: F401
+from salmalm.constants import MODELS as _MODELS  # noqa: F401  # noqa: F401
 
 # Backward-compat re-exports
 get_routing_config = _load_routing_config
