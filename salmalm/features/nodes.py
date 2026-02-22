@@ -460,8 +460,16 @@ class GatewayRegistry:
                 return node
         return None
 
+    @staticmethod
+    def _sign_payload(payload: bytes, secret: str) -> str:
+        """HMAC-SHA256 sign a payload for request integrity verification."""
+        import hmac as _hmac
+        import hashlib
+
+        return _hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+
     def dispatch(self, node_id: str, tool_name: str, tool_args: dict, timeout: int = 60) -> dict:
-        """Dispatch a tool call to a specific node."""
+        """Dispatch a tool call to a specific node with HMAC-signed payloads."""
         node = self._nodes.get(node_id)
         if not node:
             return {"error": f"Node {node_id} not found"}
@@ -475,15 +483,31 @@ class GatewayRegistry:
             {
                 "tool": tool_name,
                 "args": tool_args,
+                "timestamp": int(time.time()),
+                "nonce": os.urandom(8).hex(),
             }
         ).encode()
+
+        # HMAC signature for payload integrity
+        if node["token"]:
+            headers["X-Signature"] = self._sign_payload(payload, node["token"])
 
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                result = json.loads(resp.read())
+                raw = resp.read(5 * 1024 * 1024)  # 5MB max response
+                result = json.loads(raw)
+                if not isinstance(result, dict):
+                    return {"error": "Node returned non-dict response"}
                 node["tool_calls"] += 1
+                # Validate response has expected structure
+                if "error" in result and isinstance(result["error"], str):
+                    node["errors"] += 1
+                    return {"error": f"Node error: {result['error'][:200]}"}
                 return result  # type: ignore[no-any-return]
+        except json.JSONDecodeError:
+            node["errors"] += 1
+            return {"error": "Node returned invalid JSON"}
         except Exception as e:
             node["errors"] += 1
             return {"error": f"Node dispatch failed: {str(e)[:200]}"}

@@ -151,8 +151,8 @@ def execute_tool(name: str, args: dict) -> str:
 
         if gateway._nodes:
             result = gateway.dispatch_auto(name, args)
-            if result and "error" not in result:
-                return result.get("result", str(result))  # type: ignore[no-any-return]
+            if isinstance(result, dict) and "error" not in result and "result" in result:
+                return str(result["result"])
     except Exception:
         pass  # Fall through to local execution
 
@@ -229,6 +229,9 @@ def _execute_inner(name: str, args: dict) -> str:
                     img_path = WORKSPACE_DIR / img_path
                 if not img_path.exists():
                     return f"❌ Image not found: {image_path}"
+                _MAX_IMG_MB = 20
+                if img_path.stat().st_size > _MAX_IMG_MB * 1024 * 1024:
+                    return f"❌ Image too large (max {_MAX_IMG_MB}MB)"
                 ext = img_path.suffix.lower()
                 mime_map = {
                     ".png": "image/png",
@@ -307,13 +310,18 @@ def _execute_inner(name: str, args: dict) -> str:
             audio_path = args.get("audio_path", "")
             audio_b64 = args.get("audio_base64", "")
             lang = args.get("language", "ko")
+            _MAX_AUDIO_MB = 25  # Whisper API limit
             if audio_path:
                 fpath = Path(audio_path).expanduser()
                 if not fpath.exists():
                     return f"❌ File not found: {audio_path}"
+                if fpath.stat().st_size > _MAX_AUDIO_MB * 1024 * 1024:
+                    return f"❌ Audio file too large (max {_MAX_AUDIO_MB}MB)"
                 audio_data = fpath.read_bytes()
                 fname = fpath.name
             elif audio_b64:
+                if len(audio_b64) > _MAX_AUDIO_MB * 1024 * 1024 * 4 // 3:
+                    return f"❌ Audio base64 too large (max ~{_MAX_AUDIO_MB}MB decoded)"
                 audio_data = base64.b64decode(audio_b64)
                 fname = "audio.webm"
             else:
@@ -381,6 +389,10 @@ def _handle_tts_generate(args: dict) -> str:
     text = args.get("text", "")
     if not text:
         return "❌ text is required"
+    _MAX_TTS_CHARS = 5000
+    if len(text) > _MAX_TTS_CHARS:
+        text = text[:_MAX_TTS_CHARS]
+        log.warning(f"[TTS] Input truncated to {_MAX_TTS_CHARS} chars")
     provider = args.get("provider", "google")
     language = args.get("language", "ko-KR")
     output_path = args.get("output", "")
