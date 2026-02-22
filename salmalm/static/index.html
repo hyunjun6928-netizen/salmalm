@@ -234,6 +234,8 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
   #filter-modal{width:100%;max-width:100%;left:0;transform:none;border-radius:0;top:0;height:100vh;max-height:100vh}
   input,textarea,select{font-size:16px!important}
 }
+/* i18n: hide Korean by default, toggle via JS */
+.eng-kr{display:none}
 </style></head><body>
 
 <div id="sidebar">
@@ -687,15 +689,16 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
   </div><!-- end settings-general -->
   <div id="settings-features" style="display:none">
     <div class="settings-card" id="engine-opt-card">
-      <h3>⚡ Engine Optimization / 엔진 최적화</h3>
+      <h3><span class="eng-en">⚡ Engine Optimization</span><span class="eng-kr">⚡ 엔진 최적화</span></h3>
       <p style="font-size:12px;color:var(--text2);margin-bottom:8px;line-height:1.8">
-        Control how SalmAlm balances <b>cost</b> vs <b>quality</b>. All changes take effect immediately without restart.<br>
-        삶앎의 <b>비용</b>과 <b>품질</b> 균형을 조절합니다. 모든 변경은 재시작 없이 즉시 적용됩니다.
+        <span class="eng-en">Control how SalmAlm balances <b>cost</b> vs <b>quality</b>. All changes take effect immediately without restart.</span>
+        <span class="eng-kr">삶앎의 <b>비용</b>과 <b>품질</b> 균형을 조절합니다. 모든 변경은 재시작 없이 즉시 적용됩니다.</span>
       </p>
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--text2);line-height:1.8">
-        📊 <b>Cost Breakdown / 비용 구조</b><br>
-        Every LLM call includes: <b>System Prompt</b> (~310 tok) + <b>Tool Schemas</b> (0~700 tok) + <b>Chat History</b> (varies) + <b>Your Message</b><br>
-        매 LLM 호출에 포함: <b>시스템 프롬프트</b> (~310 토큰) + <b>도구 스키마</b> (0~700 토큰) + <b>대화 히스토리</b> (가변) + <b>사용자 메시지</b><br>
+        <span class="eng-en">📊 <b>Cost Breakdown</b><br>
+        Every LLM call includes: <b>System Prompt</b> (~310 tok) + <b>Tool Schemas</b> (0~700 tok) + <b>Chat History</b> (varies) + <b>Your Message</b></span>
+        <span class="eng-kr">📊 <b>비용 구조</b><br>
+        매 LLM 호출에 포함: <b>시스템 프롬프트</b> (~310 토큰) + <b>도구 스키마</b> (0~700 토큰) + <b>대화 히스토리</b> (가변) + <b>사용자 메시지</b></span><br>
         <span style="color:var(--accent)">💡 Opus: $15/1M input, $75/1M output · Sonnet: $3/$15 · Haiku: $0.25/$1.25</span>
       </div>
 
@@ -705,20 +708,18 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
         <div style="border-left:3px solid var(--accent);padding-left:14px">
           <label style="font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
             <input type="checkbox" id="eng-dynamic-tools" checked style="width:18px;height:18px">
-            <b>🔧 Dynamic Tool Loading / 동적 도구 로딩</b>
+            <span class="eng-en"><b>🔧 Dynamic Tool Loading</b></span><span class="eng-kr"><b>🔧 동적 도구 로딩</b></span>
           </label>
           <div style="font-size:12px;color:var(--text2);line-height:1.8;padding-left:28px">
-            <b>ON (recommended):</b> Only sends relevant tools based on your message intent.<br>
+            <span class="eng-en"><b>ON (recommended):</b> Only sends relevant tools based on your message intent.<br>
             Chat/casual → <span style="color:#4ade80">0 tools (0 tok)</span> · Weather/calendar → <span style="color:#facc15">7-12 tools (~750 tok)</span> · Coding → <span style="color:#f97316">11 tools (~700 tok)</span><br>
             <b>OFF:</b> Always sends all 62 tools every call → <span style="color:#f87171">~7,750 tok overhead per request</span><br>
-            <br>
-            <b>ON (권장):</b> 메시지 의도에 따라 필요한 도구만 전송합니다.<br>
+            <span style="color:var(--accent)">💰 ON vs OFF difference: ~<b>$10/day savings</b> at 100 calls/day on Opus</span></span>
+            <span class="eng-kr"><b>ON (권장):</b> 메시지 의도에 따라 필요한 도구만 전송합니다.<br>
             잡담 → <span style="color:#4ade80">0개 (0 토큰)</span> · 날씨/일정 → <span style="color:#facc15">7-12개 (~750 토큰)</span> · 코딩 → <span style="color:#f97316">11개 (~700 토큰)</span><br>
             <b>OFF:</b> 매번 62개 도구 전부 전송 → <span style="color:#f87171">요청당 ~7,750 토큰 오버헤드</span><br>
-            <span style="color:var(--accent)">💰 Opus 기준 ON vs OFF 차이: 하루 100회 호출 시 <b>~$10/day 절감</b></span><br>
-            <br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> Uses <b>Skills</b> — reads SKILL.md on-demand when task matches a skill description. Tools are always available but skills load lazily.<br>
-            🆚 <b>오픈클로:</b> <b>스킬</b> 시스템 사용 — 작업이 스킬 설명에 매칭되면 SKILL.md를 온디맨드로 로드. 도구는 항상 사용 가능하되 스킬은 지연 로딩.</span>
+            <span style="color:var(--accent)">💰 Opus 기준 ON vs OFF 차이: 하루 100회 호출 시 <b>~$10/day 절감</b></span></span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Uses <b>Skills</b> — reads SKILL.md on-demand when task matches a skill description. Tools are always available but skills load lazily.</span><span class="eng-kr">🆚 <b>오픈클로:</b> <b>스킬</b> 시스템 사용 — 작업이 스킬 설명에 매칭되면 SKILL.md를 온디맨드로 로드. 도구는 항상 사용 가능하되 스킬은 지연 로딩.</span></span>
           </div>
         </div>
 
@@ -726,19 +727,16 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
         <div style="border-left:3px solid var(--accent);padding-left:14px">
           <label style="font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
             <input type="checkbox" id="eng-planning" style="width:18px;height:18px">
-            <b>📋 Planning Phase / 계획 단계</b>
+            <span class="eng-en"><b>📋 Planning Phase</b></span><span class="eng-kr"><b>📋 계획 단계</b></span>
           </label>
           <div style="font-size:12px;color:var(--text2);line-height:1.8;padding-left:28px">
-            <b>ON:</b> Before complex code/analysis tasks, injects a planning prompt that asks the AI to outline its approach before executing. Can improve accuracy for multi-step tasks.<br>
+            <span class="eng-en"><b>ON:</b> Before complex code/analysis tasks, injects a planning prompt that asks the AI to outline its approach before executing. Can improve accuracy for multi-step tasks.<br>
             <b>Cost:</b> <span style="color:#f97316">+~150 input tokens per complex request</span> (~$0.002/call on Opus)<br>
-            <b>OFF (default):</b> AI plans naturally within its response. Sufficient for most tasks.<br>
-            <br>
-            <b>ON:</b> 복잡한 코드/분석 작업 전에 AI가 접근 방법을 먼저 계획하도록 프롬프트를 주입합니다. 다단계 작업의 정확도를 높일 수 있습니다.<br>
+            <b>OFF (default):</b> AI plans naturally within its response. Sufficient for most tasks.</span>
+            <span class="eng-kr"><b>ON:</b> 복잡한 코드/분석 작업 전에 AI가 접근 방법을 먼저 계획하도록 프롬프트를 주입합니다. 다단계 작업의 정확도를 높일 수 있습니다.<br>
             <b>비용:</b> <span style="color:#f97316">복잡한 요청당 +~150 입력 토큰</span> (Opus 기준 ~$0.002/호출)<br>
-            <b>OFF (기본):</b> AI가 응답 내에서 자연스럽게 계획합니다. 대부분의 작업에 충분합니다.<br>
-            <br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> No separate planning phase. Uses <b>extended thinking</b> (reasoning mode) for complex tasks — model plans internally.<br>
-            🆚 <b>오픈클로:</b> 별도 계획 단계 없음. 복잡한 작업에 <b>확장 사고</b>(reasoning 모드)를 사용 — 모델이 내부적으로 계획.</span>
+            <b>OFF (기본):</b> AI가 응답 내에서 자연스럽게 계획합니다. 대부분의 작업에 충분합니다.</span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> No separate planning phase. Uses <b>extended thinking</b> (reasoning mode) for complex tasks — model plans internally.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 별도 계획 단계 없음. 복잡한 작업에 <b>확장 사고</b>(reasoning 모드)를 사용 — 모델이 내부적으로 계획.</span></span>
           </div>
         </div>
 
@@ -746,28 +744,25 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
         <div style="border-left:3px solid var(--accent);padding-left:14px">
           <label style="font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:6px">
             <input type="checkbox" id="eng-reflection" style="width:18px;height:18px">
-            <b>🔍 Self-Reflection / 자기 검증</b>
+            <span class="eng-en"><b>🔍 Self-Reflection</b></span><span class="eng-kr"><b>🔍 자기 검증</b></span>
           </label>
           <div style="font-size:12px;color:var(--text2);line-height:1.8;padding-left:28px">
-            <b>ON:</b> After generating code or analysis, makes a <b>second full LLM call</b> to review and improve the response. Catches bugs, hallucinations, and incomplete answers.<br>
+            <span class="eng-en"><b>ON:</b> After generating code or analysis, makes a <b>second full LLM call</b> to review and improve the response. Catches bugs, hallucinations, and incomplete answers.<br>
             <b>Cost:</b> <span style="color:#f87171">Doubles the cost for complex tasks</span> (2x LLM calls). E.g., a coding response that costs $0.05 → $0.10.<br>
             <b>Best for:</b> Production code, security audits, critical analysis where accuracy matters more than speed.<br>
-            <b>OFF (default):</b> Single-pass generation. Faster and cheaper. Quality is still good for most tasks.<br>
-            <br>
-            <b>ON:</b> 코드/분석 생성 후 <b>두 번째 LLM 호출</b>로 응답을 검토하고 개선합니다. 버그, 환각, 불완전한 답변을 잡아냅니다.<br>
+            <b>OFF (default):</b> Single-pass generation. Faster and cheaper. Quality is still good for most tasks.</span>
+            <span class="eng-kr"><b>ON:</b> 코드/분석 생성 후 <b>두 번째 LLM 호출</b>로 응답을 검토하고 개선합니다. 버그, 환각, 불완전한 답변을 잡아냅니다.<br>
             <b>비용:</b> <span style="color:#f87171">복잡한 작업 비용 2배</span> (LLM 2회 호출). 예: $0.05 코딩 응답 → $0.10<br>
             <b>추천 상황:</b> 프로덕션 코드, 보안 감사, 정확도가 속도보다 중요한 분석<br>
-            <b>OFF (기본):</b> 단일 패스 생성. 더 빠르고 저렴합니다. 대부분의 작업에 충분한 품질.<br>
-            <br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> No self-reflection pass. Relies on model's native reasoning + <b>extended thinking</b> for accuracy.<br>
-            🆚 <b>오픈클로:</b> 자기 검증 패스 없음. 모델의 네이티브 추론 + <b>확장 사고</b>로 정확도 확보.</span>
+            <b>OFF (기본):</b> 단일 패스 생성. 더 빠르고 저렴합니다. 대부분의 작업에 충분한 품질.</span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> No self-reflection pass. Relies on model's native reasoning + <b>extended thinking</b> for accuracy.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 자기 검증 패스 없음. 모델의 네이티브 추론 + <b>확장 사고</b>로 정확도 확보.</span></span>
           </div>
         </div>
 
         <!-- Compaction Threshold -->
         <div style="border-left:3px solid var(--accent);padding-left:14px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-            <span style="font-size:14px"><b>📦 Compaction Threshold / 컨텍스트 압축 임계값</b></span>
+            <span class="eng-en"><span style="font-size:14px"><b>📦 Compaction Threshold</b></span></span><span class="eng-kr"><span style="font-size:14px"><b>📦 컨텍스트 압축 임계값</b></span></span>
           </div>
           <div style="margin-bottom:8px">
             <select id="eng-compaction" style="width:auto;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
@@ -778,27 +773,24 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             </select>
           </div>
           <div style="font-size:12px;color:var(--text2);line-height:1.8">
-            Controls when old messages are summarized to free up context space. Lower = more frequent compaction = lower cost per turn but may lose details.<br>
+            <span class="eng-en">Controls when old messages are summarized to free up context space. Lower = more frequent compaction = lower cost per turn but may lose details.<br>
             <b>15K (Aggressive):</b> Compacts often. Best for cost savings. <span style="color:#4ade80">~$0.01/turn avg on Opus</span><br>
             <b>30K (Balanced):</b> Good middle ground. <span style="color:#facc15">~$0.02/turn avg</span><br>
             <b>60K (Relaxed):</b> Keeps more history. <span style="color:#f97316">~$0.04/turn avg</span><br>
-            <b>120K (Maximum):</b> Full context retention. Best for long coding sessions. <span style="color:#f87171">~$0.08/turn avg</span><br>
-            <br>
-            이전 메시지를 요약하여 컨텍스트 공간을 확보하는 시점을 제어합니다. 낮을수록 더 자주 압축 = 턴당 비용 절감, 세부사항 손실 가능.<br>
+            <b>120K (Maximum):</b> Full context retention. Best for long coding sessions. <span style="color:#f87171">~$0.08/turn avg</span></span>
+            <span class="eng-kr">이전 메시지를 요약하여 컨텍스트 공간을 확보하는 시점을 제어합니다. 낮을수록 더 자주 압축 = 턴당 비용 절감, 세부사항 손실 가능.<br>
             <b>15K (적극적):</b> 자주 압축. 비용 절감 최적. <span style="color:#4ade80">Opus 기준 턴당 평균 ~$0.01</span><br>
             <b>30K (균형):</b> 적절한 중간값. <span style="color:#facc15">턴당 평균 ~$0.02</span><br>
             <b>60K (여유):</b> 더 많은 히스토리 유지. <span style="color:#f97316">턴당 평균 ~$0.04</span><br>
-            <b>120K (최대):</b> 전체 컨텍스트 유지. 긴 코딩 세션에 적합. <span style="color:#f87171">턴당 평균 ~$0.08</span><br>
-            <br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> Auto-compacts conversation history into summaries when context grows large. Not user-configurable — handled internally.<br>
-            🆚 <b>오픈클로:</b> 컨텍스트가 커지면 대화 히스토리를 자동 요약 압축. 사용자 설정 불가 — 내부적으로 처리.</span>
+            <b>120K (최대):</b> 전체 컨텍스트 유지. 긴 코딩 세션에 적합. <span style="color:#f87171">턴당 평균 ~$0.08</span></span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Auto-compacts conversation history into summaries when context grows large. Not user-configurable — handled internally.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 컨텍스트가 커지면 대화 히스토리를 자동 요약 압축. 사용자 설정 불가 — 내부적으로 처리.</span></span>
           </div>
         </div>
 
         <!-- Max Tool Iterations -->
         <div style="border-left:3px solid var(--accent);padding-left:14px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-            <span style="font-size:14px"><b>🔄 Max Tool Iterations / 최대 도구 반복 횟수</b></span>
+            <span class="eng-en"><span style="font-size:14px"><b>🔄 Max Tool Iterations</b></span></span><span class="eng-kr"><span style="font-size:14px"><b>🔄 최대 도구 반복 횟수</b></span></span>
           </div>
           <div style="margin-bottom:8px">
             <select id="eng-max-tool-iter" style="width:auto;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
@@ -810,30 +802,28 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             </select>
           </div>
           <div style="font-size:12px;color:var(--text2);line-height:1.8">
-            Maximum number of tool calls the AI can make in a single response. When reached, the AI stops and returns "Reached maximum tool iterations."<br>
+            <span class="eng-en">Maximum number of tool calls the AI can make in a single response. When reached, the AI stops and returns "Reached maximum tool iterations."<br>
             Higher values allow complex multi-step tasks (file editing, multi-search) to complete, but cost more tokens per turn.<br>
             <b>5 (Conservative):</b> Simple tasks only. Limits runaway loops. <span style="color:#4ade80">Cheapest — caps output at ~2K tok/turn</span><br>
             <b>10 (Moderate):</b> Most coding tasks complete. <span style="color:#facc15">~4K tok/turn max</span><br>
             <b>15 (Default):</b> Good balance — handles multi-file edits. <span style="color:#f97316">~6K tok/turn max</span><br>
             <b>25 (Extended):</b> Complex refactoring, multi-tool chains. <span style="color:#f87171">~10K tok/turn max</span><br>
-            <b>40 (Maximum):</b> Long autonomous coding sessions. <span style="color:#f87171">~16K tok/turn max — expensive!</span><br>
-            <br>
-            AI가 한 번의 응답에서 실행할 수 있는 최대 도구 호출 횟수입니다. 도달 시 "Reached maximum tool iterations" 메시지와 함께 중단됩니다.<br>
+            <b>40 (Maximum):</b> Long autonomous coding sessions. <span style="color:#f87171">~16K tok/turn max — expensive!</span></span>
+            <span class="eng-kr">AI가 한 번의 응답에서 실행할 수 있는 최대 도구 호출 횟수입니다. 도달 시 "Reached maximum tool iterations" 메시지와 함께 중단됩니다.<br>
             높을수록 복잡한 다단계 작업(파일 편집, 다중 검색)이 완료되지만, 턴당 토큰 비용이 증가합니다.<br>
             <b>5 (보수적):</b> 단순 작업만. 폭주 루프 방지. <span style="color:#4ade80">최저 비용</span><br>
-            <b>15 (기본):</b> 적절한 균형 — 멀티 파일 편집 처리 가능<br>
-            <b>25 (확장):</b> 복잡한 리팩토링, 다중 도구 체인<br>
-            <b>40 (최대):</b> 긴 자율 코딩 세션. <span style="color:#f87171">비용 주의!</span><br>
-            <br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> No hard iteration limit exposed to users. Tool loops run until the model decides to stop or hits provider context limits. Internal loop detection prevents infinite cycles.<br>
-            🆚 <b>오픈클로:</b> 사용자에게 노출된 반복 제한 없음. 모델이 스스로 중단하거나 프로바이더 컨텍스트 한도에 도달할 때까지 실행. 내부 루프 감지로 무한 순환 방지.</span>
+            <b>10 (보통):</b> 대부분의 코딩 작업 완료 가능. <span style="color:#facc15">턴당 최대 ~4K 토큰</span><br>
+            <b>15 (기본):</b> 적절한 균형 — 멀티 파일 편집 처리 가능. <span style="color:#f97316">턴당 최대 ~6K 토큰</span><br>
+            <b>25 (확장):</b> 복잡한 리팩토링, 다중 도구 체인. <span style="color:#f87171">턴당 최대 ~10K 토큰</span><br>
+            <b>40 (최대):</b> 긴 자율 코딩 세션. <span style="color:#f87171">턴당 최대 ~16K 토큰 — 비용 주의!</span></span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> No hard iteration limit exposed to users. Tool loops run until the model decides to stop or hits provider context limits. Internal loop detection prevents infinite cycles.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 사용자에게 노출된 반복 제한 없음. 모델이 스스로 중단하거나 프로바이더 컨텍스트 한도에 도달할 때까지 실행. 내부 루프 감지로 무한 순환 방지.</span></span>
           </div>
         </div>
 
         <!-- Cost Cap -->
         <div style="border-left:3px solid var(--accent);padding-left:14px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-            <span style="font-size:14px"><b>💸 Daily Cost Cap / 일일 비용 한도</b></span>
+            <span class="eng-en"><span style="font-size:14px"><b>💸 Daily Cost Cap</b></span></span><span class="eng-kr"><span style="font-size:14px"><b>💸 일일 비용 한도</b></span></span>
           </div>
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
             <span style="font-size:14px">$</span>
@@ -841,14 +831,11 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <span style="font-size:12px;color:var(--text2)">/ day</span>
           </div>
           <div style="font-size:12px;color:var(--text2);line-height:1.8">
-            When daily spending reaches this limit, the AI will stop processing new requests until the next day (UTC reset). Leave empty for no limit.<br>
-            <b>Suggested values:</b> Casual use: <span style="color:#4ade80">$1-2/day</span> · Active use: <span style="color:#facc15">$5-10/day</span> · Heavy dev: <span style="color:#f97316">$20-50/day</span><br>
-            <br>
-            일일 비용이 이 한도에 도달하면 다음 날(UTC 기준)까지 새 요청 처리를 중단합니다. 비워두면 제한 없음.<br>
-            <b>권장값:</b> 가벼운 사용: <span style="color:#4ade80">$1-2/일</span> · 활발한 사용: <span style="color:#facc15">$5-10/일</span> · 집중 개발: <span style="color:#f97316">$20-50/일</span><br>
-            <br>
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> Tracks cost per session via <code>/status</code>. No hard daily cap — user monitors manually.<br>
-            🆚 <b>오픈클로:</b> <code>/status</code>로 세션별 비용 추적. 하드 일일 한도 없음 — 사용자가 수동 모니터링.</span>
+            <span class="eng-en">When daily spending reaches this limit, the AI will stop processing new requests until the next day (UTC reset). Leave empty for no limit.<br>
+            <b>Suggested values:</b> Casual use: <span style="color:#4ade80">$1-2/day</span> · Active use: <span style="color:#facc15">$5-10/day</span> · Heavy dev: <span style="color:#f97316">$20-50/day</span></span>
+            <span class="eng-kr">일일 비용이 이 한도에 도달하면 다음 날(UTC 기준)까지 새 요청 처리를 중단합니다. 비워두면 제한 없음.<br>
+            <b>권장값:</b> 가벼운 사용: <span style="color:#4ade80">$1-2/일</span> · 활발한 사용: <span style="color:#facc15">$5-10/일</span> · 집중 개발: <span style="color:#f97316">$20-50/일</span></span><br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Tracks cost per session via <code>/status</code>. No hard daily cap — user monitors manually.</span><span class="eng-kr">🆚 <b>오픈클로:</b> <code>/status</code>로 세션별 비용 추적. 하드 일일 한도 없음 — 사용자가 수동 모니터링.</span></span>
           </div>
         </div>
 
@@ -856,16 +843,23 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
 
       <!-- Summary bar -->
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:20px;font-size:12px;line-height:1.8">
-        <b>💡 Recommended Presets / 권장 프리셋:</b><br>
+        <span class="eng-en"><b>💡 Recommended Presets:</b><br>
         🟢 <b>Maximum Savings:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 15K · Cap $2/day<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">최대 절약: 잡담 ~$0.001/턴, 코딩 ~$0.01/턴</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.001/turn, Coding ~$0.01/turn</span><br>
         🟡 <b>Balanced:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 30K · Cap $10/day<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">균형: 잡담 ~$0.002/턴, 코딩 ~$0.02/턴</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.002/turn, Coding ~$0.02/turn</span><br>
         🔴 <b>Maximum Quality:</b> Dynamic Tools ❌ · Planning ✅ · Reflection ✅ · Compaction 120K · No cap<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">최대 품질: 잡담 ~$0.05/턴, 코딩 ~$0.15/턴</span>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.05/turn, Coding ~$0.15/turn</span></span>
+        <span class="eng-kr"><b>💡 권장 프리셋:</b><br>
+        🟢 <b>최대 절약:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 15K · Cap $2/day<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.001/턴, 코딩 ~$0.01/턴</span><br>
+        🟡 <b>균형:</b> Dynamic Tools ✅ · Planning ❌ · Reflection ❌ · Compaction 30K · Cap $10/day<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.002/턴, 코딩 ~$0.02/턴</span><br>
+        🔴 <b>최대 품질:</b> Dynamic Tools ❌ · Planning ✅ · Reflection ✅ · Compaction 120K · No cap<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.05/턴, 코딩 ~$0.15/턴</span></span>
       </div>
 
-      <button class="btn" data-action="saveEngineSettings" style="margin-top:16px;font-size:14px;padding:10px 24px">💾 Save / 저장</button>
+      <button class="btn" data-action="saveEngineSettings" style="margin-top:16px;font-size:14px;padding:10px 24px"><span class="eng-en">💾 Save</span><span class="eng-kr">💾 저장</span></button>
       <span id="eng-save-result" style="font-size:12px;margin-left:8px"></span>
     </div>
     <div style="margin-bottom:16px"><input id="features-search" type="text" placeholder="Search features..." data-i18n="features-search-ph" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:14px"></div>
@@ -886,10 +880,10 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
         </select>
       </div>
       <div id="mr-routing-hint" style="padding:10px 16px;font-size:12px;color:var(--text2);line-height:1.6;display:none;background:var(--bg);border-radius:0 0 10px 10px;border-top:1px solid var(--border)">
-        ⚠️ <b>Fixed model selected</b> — Auto Routing is disabled. All messages use this model regardless of complexity.<br>
-        Select <b>🔄 Auto Routing</b> above to enable cost-optimized routing (Haiku for chat, Sonnet for code).<br>
-        ⚠️ <b>고정 모델 선택됨</b> — 자동 라우팅이 비활성화됩니다. 복잡도에 관계없이 모든 메시지가 이 모델을 사용합니다.<br>
-        비용 최적화 라우팅을 사용하려면 위에서 <b>🔄 Auto Routing</b>을 선택하세요.
+        <span class="eng-en">⚠️ <b>Fixed model selected</b> — Auto Routing is disabled. All messages use this model regardless of complexity.<br>
+        Select <b>🔄 Auto Routing</b> above to enable cost-optimized routing (Haiku for chat, Sonnet for code).</span>
+        <span class="eng-kr">⚠️ <b>고정 모델 선택됨</b> — 자동 라우팅이 비활성화됩니다. 복잡도에 관계없이 모든 메시지가 이 모델을 사용합니다.<br>
+        비용 최적화 라우팅을 사용하려면 위에서 <b>🔄 Auto Routing</b>을 선택하세요.</span>
       </div>
     </div>
     <!-- Provider Cards -->
@@ -902,59 +896,60 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
     <div class="settings-card">
       <h3 data-i18n="h-routing">🔀 Auto Routing / 자동 라우팅</h3>
       <p style="font-size:12px;color:var(--text2);margin:4px 0 12px;line-height:1.8">
-        SalmAlm automatically classifies each message by complexity and routes it to the optimal model.<br>
-        This saves money by using cheap models for simple tasks and powerful models only when needed.<br>
-        삶앎은 각 메시지의 복잡도를 자동 분류하여 최적의 모델로 라우팅합니다. 간단한 작업에 저렴한 모델을, 복잡한 작업에만 강력한 모델을 사용하여 비용을 절감합니다.<br>
-        <br>
-        <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> Uses a single model per session (default or <code>/model</code> override). No auto-routing — user manually selects model. Model aliases supported (e.g. <code>gemini</code>, <code>gpt</code>, <code>opus</code>).<br>
-        🆚 <b>오픈클로:</b> 세션당 단일 모델 사용 (기본값 또는 <code>/model</code> 오버라이드). 자동 라우팅 없음 — 사용자가 수동 선택. 모델 별칭 지원 (예: <code>gemini</code>, <code>gpt</code>, <code>opus</code>).</span>
+        <span class="eng-en">SalmAlm automatically classifies each message by complexity and routes it to the optimal model.<br>
+        This saves money by using cheap models for simple tasks and powerful models only when needed.</span>
+        <span class="eng-kr">삶앎은 각 메시지의 복잡도를 자동 분류하여 최적의 모델로 라우팅합니다.<br>
+        간단한 작업에 저렴한 모델을, 복잡한 작업에만 강력한 모델을 사용하여 비용을 절감합니다.</span><br>
+        <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Uses a single model per session (default or <code>/model</code> override). No auto-routing — user manually selects model. Model aliases supported (e.g. <code>gemini</code>, <code>gpt</code>, <code>opus</code>).</span><span class="eng-kr">🆚 <b>오픈클로:</b> 세션당 단일 모델 사용 (기본값 또는 <code>/model</code> 오버라이드). 자동 라우팅 없음 — 사용자가 수동 선택. 모델 별칭 지원 (예: <code>gemini</code>, <code>gpt</code>, <code>opus</code>).</span></span>
       </p>
 
       <!-- How classification works -->
       <details style="margin-bottom:16px">
-        <summary style="font-size:13px;color:var(--accent2);cursor:pointer;font-weight:600">📖 How does classification work? / 분류는 어떻게 작동하나요?</summary>
+        <summary style="font-size:13px;color:var(--accent2);cursor:pointer;font-weight:600"><span class="eng-en">📖 How does classification work?</span><span class="eng-kr">📖 분류는 어떻게 작동하나요?</span></summary>
         <div style="font-size:12px;color:var(--text2);margin-top:10px;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--border);line-height:2">
-          <b>⚡ Simple</b> — Short messages &lt;50 chars, greetings, yes/no, emoji<br>
+          <span class="eng-en"><b>⚡ Simple</b> — Short messages &lt;50 chars, greetings, yes/no, emoji<br>
           &nbsp;&nbsp;&nbsp;Examples: "안녕", "ㅋㅋ", "ok", "고마워", "뭐해", "잘자"<br>
           <b>🔧 Moderate</b> — Code keywords, analysis, summaries, 50-500 chars<br>
           &nbsp;&nbsp;&nbsp;Examples: "이 코드 리뷰해줘", "요약해줘", "번역해줘"<br>
           <b>💎 Complex</b> — Architecture, system design, long messages &gt;500 chars, thinking mode<br>
-          &nbsp;&nbsp;&nbsp;Examples: "처음부터 API 서버 설계해줘", "전체 마이그레이션 계획"<br>
-          <br>
-          <b>⚡ Simple</b> — 50자 미만 짧은 메시지, 인사, 예/아니오, 이모지<br>
+          &nbsp;&nbsp;&nbsp;Examples: "처음부터 API 서버 설계해줘", "전체 마이그레이션 계획"</span>
+          <span class="eng-kr"><b>⚡ Simple</b> — 50자 미만 짧은 메시지, 인사, 예/아니오, 이모지<br>
+          &nbsp;&nbsp;&nbsp;예시: "안녕", "ㅋㅋ", "ok", "고마워", "뭐해", "잘자"<br>
           <b>🔧 Moderate</b> — 코드, 분석, 요약, 번역 키워드 포함, 50~500자<br>
-          <b>💎 Complex</b> — 아키텍처, 설계, 500자 이상 긴 메시지, thinking 모드 활성화 시
+          &nbsp;&nbsp;&nbsp;예시: "이 코드 리뷰해줘", "요약해줘", "번역해줘"<br>
+          <b>💎 Complex</b> — 아키텍처, 설계, 500자 이상 긴 메시지, thinking 모드 활성화 시<br>
+          &nbsp;&nbsp;&nbsp;예시: "처음부터 API 서버 설계해줘", "전체 마이그레이션 계획"</span>
         </div>
       </details>
 
       <!-- Tier selectors with cost info -->
       <div style="display:flex;flex-direction:column;gap:16px">
         <div style="border-left:3px solid #4ade80;padding-left:14px">
-          <label style="font-size:13px;font-weight:600">⚡ Simple <span style="font-size:11px;font-weight:400;color:var(--text2)">(~60% of messages / 메시지의 ~60%)</span></label>
+          <label style="font-size:13px;font-weight:600">⚡ Simple <span style="font-size:11px;font-weight:400;color:var(--text2)"><span class="eng-en">(~60% of messages)</span><span class="eng-kr">(메시지의 ~60%)</span></span></label>
           <div style="font-size:11px;color:var(--text2);margin:4px 0 6px;line-height:1.6">
-            Greetings, short questions, casual chat. No tools needed.<br>
-            인사, 짧은 질문, 잡담. 도구 불필요.
+            <span class="eng-en">Greetings, short questions, casual chat. No tools needed.</span>
+            <span class="eng-kr">인사, 짧은 질문, 잡담. 도구 불필요.</span>
             <span style="color:#4ade80">Default: Haiku — $0.25/$1.25 per M tokens (cheapest)</span>
           </div>
           <select id="route-simple" class="route-select" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"></select>
         </div>
 
         <div style="border-left:3px solid #facc15;padding-left:14px">
-          <label style="font-size:13px;font-weight:600">🔧 Moderate <span style="font-size:11px;font-weight:400;color:var(--text2)">(~25% of messages / 메시지의 ~25%)</span></label>
+          <label style="font-size:13px;font-weight:600">🔧 Moderate <span style="font-size:11px;font-weight:400;color:var(--text2)"><span class="eng-en">(~25% of messages)</span><span class="eng-kr">(메시지의 ~25%)</span></span></label>
           <div style="font-size:11px;color:var(--text2);margin:4px 0 6px;line-height:1.6">
-            Code review, analysis, summaries, search, translations.<br>
-            코드 리뷰, 분석, 요약, 검색, 번역.
+            <span class="eng-en">Code review, analysis, summaries, search, translations.</span>
+            <span class="eng-kr">코드 리뷰, 분석, 요약, 검색, 번역.</span>
             <span style="color:#facc15">Default: Sonnet — $3/$15 per M tokens (balanced)</span>
           </div>
           <select id="route-moderate" class="route-select" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"></select>
         </div>
 
         <div style="border-left:3px solid #f97316;padding-left:14px">
-          <label style="font-size:13px;font-weight:600">💎 Complex <span style="font-size:11px;font-weight:400;color:var(--text2)">(~15% of messages / 메시지의 ~15%)</span></label>
+          <label style="font-size:13px;font-weight:600">💎 Complex <span style="font-size:11px;font-weight:400;color:var(--text2)"><span class="eng-en">(~15% of messages)</span><span class="eng-kr">(메시지의 ~15%)</span></span></label>
           <div style="font-size:11px;color:var(--text2);margin:4px 0 6px;line-height:1.6">
-            System design, architecture, long reasoning, thinking mode tasks.<br>
-            시스템 설계, 아키텍처, 긴 추론, thinking 모드 작업.
-            <span style="color:#f97316">Default: Sonnet — $3/$15 per M tokens. Set Opus for maximum quality ($15/$75).</span>
+            <span class="eng-en">System design, architecture, long reasoning, thinking mode tasks.</span>
+            <span class="eng-kr">시스템 설계, 아키텍처, 긴 추론, thinking 모드 작업.</span>
+            <span style="color:#f97316"><span class="eng-en">Default: Sonnet — $3/$15 per M tokens. Set Opus for maximum quality ($15/$75).</span><span class="eng-kr">기본: Sonnet — $3/$15 per M tokens. 최대 품질은 Opus 설정 ($15/$75).</span></span>
           </div>
           <select id="route-complex" class="route-select" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px"></select>
         </div>
@@ -962,14 +957,13 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
 
       <!-- Cost comparison -->
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:16px;font-size:12px;line-height:2">
-        <b>💰 Estimated Daily Cost (100 calls/day) / 예상 일일 비용 (100회/일):</b><br>
+        <span class="eng-en"><b>💰 Estimated Daily Cost (100 calls/day):</b></span><span class="eng-kr"><b>💰 예상 일일 비용 (100회/일):</b></span><br>
         🟢 <b>Default (Haiku+Sonnet+Sonnet):</b> ~$1.23/day ($37/month)<br>
         🟡 <b>All Sonnet:</b> ~$3.50/day ($105/month)<br>
         🔴 <b>All Opus:</b> ~$35/day ($1,050/month)<br>
-        🟣 <b>Haiku+Sonnet+Opus:</b> ~$5.80/day ($174/month) — <span style="color:var(--accent)">Best quality/cost balance</span><br>
+        🟣 <b>Haiku+Sonnet+Opus:</b> ~$5.80/day ($174/month) — <span style="color:var(--accent)"><span class="eng-en">Best quality/cost balance</span><span class="eng-kr">최적 품질/비용 균형</span></span><br>
         <br>
-        <span style="color:var(--text2)">💡 Tip: Use <code>/model opus</code> in chat to temporarily override for a single session without changing these defaults.<br>
-        💡 팁: 채팅에서 <code>/model opus</code>로 이 기본값을 바꾸지 않고 현재 세션만 일시적으로 오버라이드할 수 있습니다.</span>
+        <span style="color:var(--text2)"><span class="eng-en">💡 Tip: Use <code>/model opus</code> in chat to temporarily override for a single session without changing these defaults.</span><span class="eng-kr">💡 팁: 채팅에서 <code>/model opus</code>로 이 기본값을 바꾸지 않고 현재 세션만 일시적으로 오버라이드할 수 있습니다.</span></span>
       </div>
 
       <div style="margin-top:14px;display:flex;align-items:center;gap:8px">
