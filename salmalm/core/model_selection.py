@@ -93,20 +93,23 @@ _TIER_CANDIDATES = {
         ('anthropic/claude-haiku-3.5-20241022', 'anthropic_api_key'),  # $1/$5
     ],
     'moderate': [
-        ('openai/gpt-4.1-mini', 'openai_api_key'),           # $0.4/$1.6
+        ('openai/gpt-4.1-mini', 'openai_api_key'),           # $0.4/$1.6 — best value
         ('google/gemini-2.5-flash', 'google_api_key'),        # $0.15/$0.6
+        ('xai/grok-3-mini', 'xai_api_key'),                   # $0.3/$0.5
         ('openai/o4-mini', 'openai_api_key'),                 # $1.1/$4.4
+        ('google/gemini-2.5-pro', 'google_api_key'),          # $1.25/$10
         ('openai/gpt-4.1', 'openai_api_key'),                 # $2/$8
+        ('xai/grok-3', 'xai_api_key'),                        # $3/$15
         ('anthropic/claude-sonnet-4-20250514', 'anthropic_api_key'),  # $3/$15 (balanced)
         ('anthropic/claude-haiku-3.5-20241022', 'anthropic_api_key'),  # $1/$5 (last resort)
     ],
     'complex': [
-        ('openai/gpt-4.1', 'openai_api_key'),                # $2/$8
-        ('openai/gpt-5.3-codex', 'openai_api_key'),          # $2/$8
-        ('anthropic/claude-sonnet-4-20250514', 'anthropic_api_key'),  # $3/$15
+        ('openai/gpt-4.1', 'openai_api_key'),                # $2/$8 — strong + cheap
         ('google/gemini-3-pro-preview', 'google_api_key'),    # $1.25/$10
         ('xai/grok-4', 'xai_api_key'),                       # $3/$15
-        ('anthropic/claude-opus-4-6', 'anthropic_api_key'),   # $5/$25
+        ('anthropic/claude-sonnet-4-20250514', 'anthropic_api_key'),  # $3/$15 — balanced
+        ('openai/gpt-5.2-codex', 'openai_api_key'),          # $2/$8
+        ('google/gemini-2.5-pro', 'google_api_key'),          # $1.25/$10
     ],
 }
 
