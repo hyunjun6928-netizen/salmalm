@@ -150,13 +150,20 @@ def execute_tool(name: str, args: dict) -> str:
     # via _authenticated arg (injected by engine from session state).
 
     # Irreversible action gate — require explicit confirmation for destructive ops
-    _IRREVERSIBLE_TOOLS = {
-        "email_send": "send email",
-        "gmail": "send email via Gmail",
-        "calendar_delete": "delete calendar event",
+    _IRREVERSIBLE_ACTIONS = {
+        ("email_send", None): "send email",  # None = any action
+        ("gmail", "send"): "send email via Gmail",
+        ("gmail", "delete"): "delete email via Gmail",
+        ("calendar_delete", None): "delete calendar event",
+        ("calendar_add", None): "create calendar event",  # external side-effect
+        ("google_calendar", "delete"): "delete calendar event",
+        ("google_calendar", "create"): "create calendar event",
     }
-    if name in _IRREVERSIBLE_TOOLS and not args.pop("_confirmed", False):
-        action_desc = _IRREVERSIBLE_TOOLS[name]
+    _tool_action = args.get("action", "")
+    _is_irreversible = (name, _tool_action) in _IRREVERSIBLE_ACTIONS or (name, None) in _IRREVERSIBLE_ACTIONS
+    _action_desc = _IRREVERSIBLE_ACTIONS.get((name, _tool_action)) or _IRREVERSIBLE_ACTIONS.get((name, None), "")
+    if _is_irreversible and not args.pop("_confirmed", False):
+        action_desc = _action_desc
         preview = _audit_args[:150]
         return (
             f"⚠️ Confirmation required to {action_desc}.\n"
