@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """SalmAlm Stability Engine — health monitoring, auto-recovery, watchdog.
 
 Provides production-grade stability:
@@ -13,6 +14,7 @@ Provides production-grade stability:
 
 
 import os
+
 try:
     import resource
 except ImportError:
@@ -32,8 +34,7 @@ from salmalm.security.crypto import log
 class CircuitBreaker:
     """Track error rates per component. Trip after threshold."""
 
-    def __init__(self, threshold: int = 5, window_sec: int = 300,
-                 cooldown_sec: int = 60):
+    def __init__(self, threshold: int = 5, window_sec: int = 300, cooldown_sec: int = 60):
         self.threshold = threshold
         self.window_sec = window_sec
         self.cooldown_sec = cooldown_sec
@@ -46,10 +47,12 @@ class CircuitBreaker:
         with self._lock:
             if component not in self._errors:
                 self._errors[component] = deque(maxlen=100)
-            self._errors[component].append({
-                "time": time.time(),
-                "error": error[:200],
-            })
+            self._errors[component].append(
+                {
+                    "time": time.time(),
+                    "error": error[:200],
+                }
+            )
 
     def record_success(self, component: str):
         """Record successful operation — helps reset breaker."""
@@ -75,8 +78,7 @@ class CircuitBreaker:
 
             if recent >= self.threshold:
                 self._tripped[component] = now
-                log.warning(f"[FAST] Circuit breaker tripped: {component} "
-                            f"({recent} errors in {self.window_sec}s)")
+                log.warning(f"[FAST] Circuit breaker tripped: {component} ({recent} errors in {self.window_sec}s)")
                 return True
             return False
 
@@ -196,6 +198,7 @@ class HealthMonitor:
 
     def _check_vault(self) -> dict:
         from salmalm.security.crypto import vault
+
         return {
             "status": "ok" if vault.is_unlocked else "locked",
             "locked": not vault.is_unlocked,
@@ -204,9 +207,9 @@ class HealthMonitor:
     def _check_telegram(self) -> dict:
         try:
             from salmalm.core import _tg_bot
+
             if _tg_bot and _tg_bot.token:
-                return {"status": "ok", "running": True,
-                        "owner": bool(_tg_bot.owner_id)}
+                return {"status": "ok", "running": True, "owner": bool(_tg_bot.owner_id)}
             return {"status": "not_configured"}
         except Exception as e:
             return {"status": "error", "error": str(e)[:100]}
@@ -214,6 +217,7 @@ class HealthMonitor:
     def _check_websocket(self) -> dict:
         try:
             from salmalm.web.ws import ws_server
+
             return {
                 "status": "ok" if ws_server._running else "stopped",
                 "running": ws_server._running,
@@ -226,6 +230,7 @@ class HealthMonitor:
     def _check_rag(self) -> dict:
         try:
             from salmalm.features.rag import rag_engine
+
             stats = rag_engine.get_stats()
             return {
                 "status": "ok" if stats["total_chunks"] > 0 else "empty",
@@ -237,6 +242,7 @@ class HealthMonitor:
     def _check_mcp(self) -> dict:
         try:
             from salmalm.features.mcp import mcp_manager
+
             servers = mcp_manager.list_servers()
             connected = sum(1 for s in servers if s.get("connected"))
             return {
@@ -251,6 +257,7 @@ class HealthMonitor:
     def _check_cron(self) -> dict:
         try:
             from salmalm.core import cron
+
             return {
                 "status": "ok" if cron._running else "stopped",
                 "running": cron._running,
@@ -261,6 +268,7 @@ class HealthMonitor:
 
     def _check_database(self) -> dict:
         import sqlite3
+
         try:
             conn = sqlite3.connect(str(AUDIT_DB))
             count = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
@@ -310,6 +318,7 @@ class HealthMonitor:
             try:
                 if comp == "websocket":
                     from salmalm.web.ws import ws_server
+
                     if not ws_server._running:
                         await ws_server.start()
                         recovered.append(comp)
@@ -317,14 +326,17 @@ class HealthMonitor:
 
                 elif comp == "rag" and status.get("status") == "empty":
                     from salmalm.features.rag import rag_engine
+
                     rag_engine.reindex(force=True)
                     recovered.append(comp)
                     log.info(f"[FIX] Auto-recovered: {comp}")
 
                 elif comp == "cron":
                     from salmalm.core import cron
+
                     if not cron._running:
                         import asyncio
+
                         asyncio.create_task(cron.run())
                         recovered.append(comp)
                         log.info(f"[FIX] Auto-recovered: {comp}")
@@ -386,14 +398,18 @@ class HealthMonitor:
 
 # ── Watchdog async task ──────────────────────────────────────
 
+
 async def watchdog_tick(monitor: HealthMonitor):
     """Periodic watchdog check — run via cron every 5 minutes."""
     health = monitor.check_health()
 
     # Log warnings for degraded components
     if health["status"] != "healthy":
-        degraded = [name for name, s in health["components"].items()
-                    if s.get("status") not in ("ok", "not_configured", "locked")]
+        degraded = [
+            name
+            for name, s in health["components"].items()
+            if s.get("status") not in ("ok", "not_configured", "locked")
+        ]
         if degraded:
             log.warning(f"[WARN] Degraded components: {', '.join(degraded)}")
 

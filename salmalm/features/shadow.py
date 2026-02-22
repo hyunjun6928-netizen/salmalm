@@ -31,15 +31,10 @@ _EMOJI_RE = re.compile(
     re.UNICODE,
 )
 
-_SPLIT_SUGGEST_PATTERNS = re.compile(
-    r"(어떻게\s*생각|장단점|비교해\s*줘|찬반|pros\s*and\s*cons)", re.IGNORECASE
-)
+_SPLIT_SUGGEST_PATTERNS = re.compile(r"(어떻게\s*생각|장단점|비교해\s*줘|찬반|pros\s*and\s*cons)", re.IGNORECASE)
 
 # Stop words to exclude from frequent-word analysis
-_STOP_WORDS = frozenset(
-    "은는이가을를에서의도와로으로만도까지부터"
-    "그 이 저 것 수 더 잘 좀 안 못 다 또".split()
-)
+_STOP_WORDS = frozenset("은는이가을를에서의도와로으로만도까지부터그 이 저 것 수 더 잘 좀 안 못 다 또".split())
 
 
 class ShadowMode:
@@ -58,9 +53,7 @@ class ShadowMode:
         try:
             if _PROFILE_PATH.exists():
                 self.profile = json.loads(_PROFILE_PATH.read_text("utf-8"))
-                self.confidence_threshold = self.profile.get(
-                    "confidence_threshold", 70
-                )
+                self.confidence_threshold = self.profile.get("confidence_threshold", 70)
         except Exception as exc:
             log.warning("shadow: failed to load profile: %s", exc)
 
@@ -68,9 +61,7 @@ class ShadowMode:
         try:
             _PROFILE_DIR.mkdir(parents=True, exist_ok=True)
             self.profile["confidence_threshold"] = self.confidence_threshold
-            _PROFILE_PATH.write_text(
-                json.dumps(self.profile, ensure_ascii=False, indent=2), "utf-8"
-            )
+            _PROFILE_PATH.write_text(json.dumps(self.profile, ensure_ascii=False, indent=2), "utf-8")
         except Exception as exc:
             log.warning("shadow: failed to save profile: %s", exc)
 
@@ -79,9 +70,7 @@ class ShadowMode:
     def learn(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyse *user* messages and build a style profile."""
         user_msgs: List[str] = [
-            m["content"]
-            for m in messages
-            if m.get("role") == "user" and isinstance(m.get("content"), str)
+            m["content"] for m in messages if m.get("role") == "user" and isinstance(m.get("content"), str)
         ]
         if not user_msgs:
             return self.profile
@@ -107,11 +96,7 @@ class ShadowMode:
         emoji_top = [e for e, _ in emoji_counter.most_common(10)]
 
         # Response speed pattern (gap analysis via timestamps if available)
-        timestamps = [
-            m.get("timestamp", 0)
-            for m in messages
-            if m.get("role") == "user" and m.get("timestamp")
-        ]
+        timestamps = [m.get("timestamp", 0) for m in messages if m.get("role") == "user" and m.get("timestamp")]
         speed_label = "unknown"
         if len(timestamps) >= 2:
             gaps = [
@@ -129,9 +114,7 @@ class ShadowMode:
             count = sum(len(pat.findall(m)) for m in user_msgs)
             if count:
                 style_scores[style_name] = count
-        dominant_style = (
-            max(style_scores, key=style_scores.get) if style_scores else "혼합"
-        )
+        dominant_style = max(style_scores, key=style_scores.get) if style_scores else "혼합"
 
         # Sentence-start patterns
         start_counter: Counter = Counter()
@@ -176,9 +159,7 @@ class ShadowMode:
         ]
         return "\n".join(lines)
 
-    def generate_proxy_response(
-        self, incoming_message: str, confidence: int = 80
-    ) -> str:
+    def generate_proxy_response(self, incoming_message: str, confidence: int = 80) -> str:
         """Generate a proxy response. If confidence is below threshold, return a polite away message."""
         if confidence < self.confidence_threshold:
             return f"주인이 자리를 비웠소.{self.suffix}"
@@ -198,9 +179,7 @@ class ShadowMode:
 
     # ── Command handling ─────────────────────────────────────
 
-    def handle_command(
-        self, args: str, session_messages: Optional[List[Dict[str, Any]]] = None
-    ) -> str:
+    def handle_command(self, args: str, session_messages: Optional[List[Dict[str, Any]]] = None) -> str:
         """Handle /shadow subcommands. Returns response text."""
         parts = args.strip().split(maxsplit=1)
         sub = parts[0].lower() if parts else ""

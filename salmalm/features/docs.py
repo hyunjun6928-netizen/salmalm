@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """SalmAlm API Documentation — auto-generated from tool definitions and endpoints.
 
 Serves an interactive API documentation page at /docs.
@@ -14,59 +15,58 @@ def generate_api_docs_html() -> str:
 
     # Build tool docs
     tool_rows = []
-    for t in sorted(TOOL_DEFINITIONS, key=lambda x: x['name']):  # type: ignore[arg-type, return-value]
-        params = t.get('input_schema', {}).get('properties', {})  # type: ignore[attr-defined]
-        required = t.get('input_schema', {}).get('required', [])  # type: ignore[attr-defined]
+    for t in sorted(TOOL_DEFINITIONS, key=lambda x: x["name"]):  # type: ignore[arg-type, return-value]
+        params = t.get("input_schema", {}).get("properties", {})  # type: ignore[attr-defined]
+        required = t.get("input_schema", {}).get("required", [])  # type: ignore[attr-defined]
         param_list = []
         for pname, pinfo in params.items():
-            req = ' <span class="req">*</span>' if pname in required else ''
-            ptype = pinfo.get('type', 'any')
-            desc = pinfo.get('description', '')
-            enum = pinfo.get('enum', [])
-            enum_str = f' <code>({"|".join(enum)})</code>' if enum else ''
+            req = ' <span class="req">*</span>' if pname in required else ""
+            ptype = pinfo.get("type", "any")
+            desc = pinfo.get("description", "")
+            enum = pinfo.get("enum", [])
+            enum_str = f" <code>({'|'.join(enum)})</code>" if enum else ""
             param_list.append(
                 f'<div class="param"><code>{pname}</code>{req} '
                 f'<span class="type">{ptype}</span>{enum_str} — {desc}</div>'
             )
-        params_html = '\n'.join(param_list) if param_list else '<div class="param">No parameters</div>'
-        tool_rows.append(f'''
+        params_html = "\n".join(param_list) if param_list else '<div class="param">No parameters</div>'
+        tool_rows.append(f"""
         <div class="tool">
-            <div class="tool-name">{t['name']}</div>
-            <div class="tool-desc">{t.get('description', '')}</div>
+            <div class="tool-name">{t["name"]}</div>
+            <div class="tool-desc">{t.get("description", "")}</div>
             <div class="params">{params_html}</div>
-        </div>''')
+        </div>""")
 
     endpoints = [
-        ('GET', '/api/status', 'Version, usage, current model'),
-        ('GET', '/api/health', 'Full health check (8 components)'),
-        ('POST', '/api/chat', 'Send message {"message": "...", "session": "web"}'),
-        ('POST', '/api/unlock', 'Unlock vault {"password": "..."}'),
-        ('GET', '/api/rag', 'RAG index statistics'),
-        ('GET', '/api/rag/search?q=...', 'BM25 search'),
-        ('GET', '/api/mcp', 'MCP servers and tools'),
-        ('GET', '/api/nodes', 'Remote nodes'),
-        ('GET', '/api/ws/status', 'WebSocket server status'),
-        ('GET', '/api/dashboard', 'Sessions, usage, cron, plugins'),
-        ('GET', '/api/cron', 'Cron jobs'),
-        ('GET', '/api/plugins', 'Loaded plugins'),
-        ('GET', '/api/notifications', 'Pending notifications'),
-        ('POST', '/api/upload', 'Upload file (multipart)'),
-        ('POST', '/api/config/telegram', 'Configure Telegram bot'),
-        ('POST', '/api/auth/login', 'Authenticate {"username": "...", "password": "..."}'),
-        ('POST', '/api/auth/register', 'Create user (admin only)'),
-        ('GET', '/api/auth/users', 'List users (admin only)'),
-        ('GET', '/api/metrics', 'Request metrics'),
-        ('GET', '/api/cert', 'TLS certificate info'),
-        ('WS', 'ws://host:18801', 'WebSocket real-time streaming'),
+        ("GET", "/api/status", "Version, usage, current model"),
+        ("GET", "/api/health", "Full health check (8 components)"),
+        ("POST", "/api/chat", 'Send message {"message": "...", "session": "web"}'),
+        ("POST", "/api/unlock", 'Unlock vault {"password": "..."}'),
+        ("GET", "/api/rag", "RAG index statistics"),
+        ("GET", "/api/rag/search?q=...", "BM25 search"),
+        ("GET", "/api/mcp", "MCP servers and tools"),
+        ("GET", "/api/nodes", "Remote nodes"),
+        ("GET", "/api/ws/status", "WebSocket server status"),
+        ("GET", "/api/dashboard", "Sessions, usage, cron, plugins"),
+        ("GET", "/api/cron", "Cron jobs"),
+        ("GET", "/api/plugins", "Loaded plugins"),
+        ("GET", "/api/notifications", "Pending notifications"),
+        ("POST", "/api/upload", "Upload file (multipart)"),
+        ("POST", "/api/config/telegram", "Configure Telegram bot"),
+        ("POST", "/api/auth/login", 'Authenticate {"username": "...", "password": "..."}'),
+        ("POST", "/api/auth/register", "Create user (admin only)"),
+        ("GET", "/api/auth/users", "List users (admin only)"),
+        ("GET", "/api/metrics", "Request metrics"),
+        ("GET", "/api/cert", "TLS certificate info"),
+        ("WS", "ws://host:18801", "WebSocket real-time streaming"),
     ]
 
-    endpoint_rows = '\n'.join(
-        f'<tr><td><span class="method method-{m.lower()}">{m}</span></td>'
-        f'<td><code>{p}</code></td><td>{d}</td></tr>'
+    endpoint_rows = "\n".join(
+        f'<tr><td><span class="method method-{m.lower()}">{m}</span></td><td><code>{p}</code></td><td>{d}</td></tr>'
         for m, p, d in endpoints
     )
 
-    return f'''<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SalmAlm API Documentation v{VERSION}</title>
@@ -139,9 +139,9 @@ a:hover{{text-decoration:underline}}
 </ul>
 
 <h2>🔧 Tools ({len(TOOL_DEFINITIONS)})</h2>
-{''.join(tool_rows)}
+{"".join(tool_rows)}
 
 <div style="margin-top:24px;padding:12px 0;border-top:1px solid var(--border);color:var(--text2);font-size:13px;text-align:center">
 SalmAlm v{VERSION} — <a href="https://github.com/hyunjun6928-netizen/salmalm">GitHub</a>
 </div>
-</div></body></html>'''
+</div></body></html>"""

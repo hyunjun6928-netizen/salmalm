@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """SalmAlm Browser Automation — Chrome DevTools Protocol (CDP) over WebSocket.
 
 Pure stdlib. No Playwright/Selenium/Puppeteer needed.
@@ -71,6 +72,7 @@ class CDPConnection:
 
             # WebSocket handshake (as client)
             import os
+
             key = base64.b64encode(os.urandom(16)).decode()
             request = (
                 f"GET {path} HTTP/1.1\r\n"
@@ -87,7 +89,7 @@ class CDPConnection:
             # Read response
             while True:
                 line = await asyncio.wait_for(self._reader.readline(), timeout=5)
-                if line == b'\r\n' or not line:
+                if line == b"\r\n" or not line:
                     break
 
             self._connected = True
@@ -126,7 +128,7 @@ class CDPConnection:
         future = asyncio.get_event_loop().create_future()
         self._pending[msg_id] = future
 
-        await self._send_frame(json.dumps(msg).encode('utf-8'))
+        await self._send_frame(json.dumps(msg).encode("utf-8"))
 
         try:
             result = await asyncio.wait_for(future, timeout=timeout)
@@ -144,6 +146,7 @@ class CDPConnection:
     async def _send_frame(self, data: bytes):
         """Send masked WebSocket frame (client must mask)."""
         import os
+
         mask_key = os.urandom(4)
         masked = bytes(b ^ mask_key[i % 4] for i, b in enumerate(data))
 
@@ -152,9 +155,9 @@ class CDPConnection:
         if length < 126:
             header += bytes([0x80 | length])  # MASK bit set
         elif length < 65536:
-            header += bytes([0x80 | 126]) + struct.pack('!H', length)
+            header += bytes([0x80 | 126]) + struct.pack("!H", length)
         else:
-            header += bytes([0x80 | 127]) + struct.pack('!Q', length)
+            header += bytes([0x80 | 127]) + struct.pack("!Q", length)
 
         self._writer.write(header + mask_key + masked)  # type: ignore[union-attr]
         await self._writer.drain()  # type: ignore[union-attr]
@@ -176,8 +179,7 @@ class CDPConnection:
                     fut = self._pending.pop(msg["id"], None)
                     if fut and not fut.done():
                         if "error" in msg:
-                            fut.set_exception(
-                                RuntimeError(f"CDP error: {msg['error'].get('message', '')}"))
+                            fut.set_exception(RuntimeError(f"CDP error: {msg['error'].get('message', '')}"))
                         else:
                             fut.set_result(msg.get("result", {}))
                 elif "method" in msg:
@@ -204,18 +206,18 @@ class CDPConnection:
 
             if length == 126:
                 data = await self._reader.readexactly(2)  # type: ignore[union-attr]
-                length = struct.unpack('!H', data)[0]
+                length = struct.unpack("!H", data)[0]
             elif length == 127:
                 data = await self._reader.readexactly(8)  # type: ignore[union-attr]
-                length = struct.unpack('!Q', data)[0]
+                length = struct.unpack("!Q", data)[0]
 
             if length > 64 * 1024 * 1024:
                 return None
 
-            payload = await self._reader.readexactly(length) if length > 0 else b''  # type: ignore[union-attr]
+            payload = await self._reader.readexactly(length) if length > 0 else b""  # type: ignore[union-attr]
 
             if opcode == 0x1:  # Text
-                return payload.decode('utf-8', errors='replace')
+                return payload.decode("utf-8", errors="replace")
             elif opcode == 0x8:  # Close
                 return None
             elif opcode == 0x9:  # Ping → Pong
@@ -309,8 +311,7 @@ class BrowserController:
                 pass
         return result
 
-    async def screenshot(self, full_page: bool = False,
-                         format: str = "png", quality: int = 80) -> str:
+    async def screenshot(self, full_page: bool = False, format: str = "png", quality: int = 80) -> str:
         """Take screenshot, return base64 encoded image."""
         if not self.connected:
             return ""
@@ -322,7 +323,8 @@ class BrowserController:
             metrics = await self._cdp.send("Page.getLayoutMetrics")  # type: ignore[union-attr]
             content = metrics.get("contentSize", {})
             params["clip"] = {  # type: ignore[assignment]
-                "x": 0, "y": 0,
+                "x": 0,
+                "y": 0,
                 "width": content.get("width", 1280),
                 "height": content.get("height", 720),
                 "scale": 1,
@@ -335,7 +337,8 @@ class BrowserController:
         if not self.connected:
             return ""
         result = await self.evaluate(
-            "document.body ? document.body.innerText : document.documentElement.textContent || ''")
+            "document.body ? document.body.innerText : document.documentElement.textContent || ''"
+        )
         return result.get("value", "")  # type: ignore[no-any-return]
 
     async def get_html(self) -> str:
@@ -354,11 +357,14 @@ class BrowserController:
         """Execute JavaScript and return result."""
         if not self.connected:
             return {"error": "Not connected"}
-        result = await self._cdp.send("Runtime.evaluate", {  # type: ignore[union-attr]
-            "expression": expression,
-            "returnByValue": return_by_value,
-            "awaitPromise": True,
-        })
+        result = await self._cdp.send(
+            "Runtime.evaluate",
+            {  # type: ignore[union-attr]
+                "expression": expression,
+                "returnByValue": return_by_value,
+                "awaitPromise": True,
+            },
+        )
         remote = result.get("result", {})
         if remote.get("type") == "undefined":
             return {"value": None}
@@ -403,9 +409,11 @@ class BrowserController:
             req = urllib.request.Request(url)
             with urllib.request.urlopen(req, timeout=5) as resp:
                 targets = json.loads(resp.read())
-            return [{"id": t["id"], "title": t.get("title", ""),
-                     "url": t.get("url", ""), "type": t.get("type", "")}
-                    for t in targets if t.get("type") == "page"]
+            return [
+                {"id": t["id"], "title": t.get("title", ""), "url": t.get("url", ""), "type": t.get("type", "")}
+                for t in targets
+                if t.get("type") == "page"
+            ]
         except Exception as e:
             return [{"error": str(e)}]
 
@@ -423,10 +431,13 @@ class BrowserController:
         """Generate PDF of current page, return base64."""
         if not self.connected:
             return ""
-        result = await self._cdp.send("Page.printToPDF", {  # type: ignore[union-attr]
-            "printBackground": True,
-            "preferCSSPageSize": True,
-        })
+        result = await self._cdp.send(
+            "Page.printToPDF",
+            {  # type: ignore[union-attr]
+                "printBackground": True,
+                "preferCSSPageSize": True,
+            },
+        )
         return result.get("data", "")  # type: ignore[no-any-return]
 
     def get_console_logs(self, limit: int = 50) -> List[str]:
@@ -451,8 +462,12 @@ class BrowserManager:
 
     # Common Chrome/Chromium binary paths
     _CHROME_NAMES = [
-        "google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
-        "brave-browser", "microsoft-edge",
+        "google-chrome",
+        "google-chrome-stable",
+        "chromium",
+        "chromium-browser",
+        "brave-browser",
+        "microsoft-edge",
     ]
     _CHROME_PATHS = [
         "/usr/bin/google-chrome",
@@ -478,6 +493,7 @@ class BrowserManager:
         if self._chrome_path:
             return self._chrome_path
         import shutil as _shutil
+
         for name in self._CHROME_NAMES:
             path = _shutil.which(name)
             if path:
@@ -492,6 +508,7 @@ class BrowserManager:
     async def launch(self, url: str = "about:blank", headless: bool = True) -> bool:
         """Launch Chrome and connect via CDP."""
         import os as _os  # noqa: F401
+
         chrome = self.find_chrome()
         if not chrome:
             log.error("[BROWSER] No Chrome/Chromium found")
@@ -518,7 +535,9 @@ class BrowserManager:
 
         try:
             self._process = subprocess.Popen(
-                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
         except Exception as e:
             log.error(f"[BROWSER] Failed to launch Chrome: {e}")
@@ -536,6 +555,7 @@ class BrowserManager:
             if "DevTools listening on" in text:
                 # Extract port from ws://127.0.0.1:PORT/...
                 import re
+
                 m = re.search(r"ws://[\w.]+:(\d+)/", text)
                 if m:
                     port = int(m.group(1))
@@ -585,6 +605,7 @@ class BrowserManager:
             self._process = None
         if self._tmpdir:
             import shutil as _shutil
+
             _shutil.rmtree(self._tmpdir, ignore_errors=True)
             self._tmpdir = None
 

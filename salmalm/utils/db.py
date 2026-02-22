@@ -1,4 +1,5 @@
 """SQLite common patterns — DB 초기화, 연결 래퍼."""
+
 from __future__ import annotations
 
 import logging

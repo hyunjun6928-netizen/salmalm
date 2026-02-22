@@ -2,6 +2,7 @@
 
 stdlib-only. SQLite 저장, mood.py 연동.
 """
+
 from __future__ import annotations
 
 import logging
@@ -20,13 +21,13 @@ JOURNAL_DB = BASE_DIR / "journal.db"
 
 # Simple mood keywords for analysis
 _MOOD_KEYWORDS = {
-    'happy': ['기쁘', '좋아', '행복', '최고', '감사', 'happy', 'great', 'awesome', 'love', '신나', 'ㅋㅋ', 'ㅎㅎ'],
-    'sad': ['슬프', '우울', '힘들', '외로', 'sad', 'depressed', 'lonely', 'ㅠㅠ', 'ㅜㅜ'],
-    'angry': ['화나', '짜증', '열받', 'angry', 'furious', 'annoyed'],
-    'anxious': ['걱정', '불안', '초조', 'anxious', 'worried', 'stressed'],
-    'tired': ['피곤', '졸려', '지친', 'tired', 'exhausted'],
-    'excited': ['기대', '설레', '신나', 'excited', 'thrilled'],
-    'neutral': [],
+    "happy": ["기쁘", "좋아", "행복", "최고", "감사", "happy", "great", "awesome", "love", "신나", "ㅋㅋ", "ㅎㅎ"],
+    "sad": ["슬프", "우울", "힘들", "외로", "sad", "depressed", "lonely", "ㅠㅠ", "ㅜㅜ"],
+    "angry": ["화나", "짜증", "열받", "angry", "furious", "annoyed"],
+    "anxious": ["걱정", "불안", "초조", "anxious", "worried", "stressed"],
+    "tired": ["피곤", "졸려", "지친", "tired", "exhausted"],
+    "excited": ["기대", "설레", "신나", "excited", "thrilled"],
+    "neutral": [],
 }
 
 
@@ -57,13 +58,18 @@ def _detect_mood(text: str) -> tuple:
             scores[mood] = count
 
     if not scores:
-        return 'neutral', 0.5
+        return "neutral", 0.5
 
     best = max(scores, key=scores.get)
     # Score: positive moods > 0.5, negative < 0.5
     mood_valence = {
-        'happy': 0.9, 'excited': 0.85, 'neutral': 0.5,
-        'tired': 0.35, 'anxious': 0.3, 'sad': 0.2, 'angry': 0.15,
+        "happy": 0.9,
+        "excited": 0.85,
+        "neutral": 0.5,
+        "tired": 0.35,
+        "anxious": 0.3,
+        "sad": 0.2,
+        "angry": 0.15,
     }
     return best, mood_valence.get(best, 0.5)
 
@@ -99,12 +105,20 @@ class JournalManager:
         self.conn.execute(
             "INSERT INTO journal_entries (date, content, mood, mood_score, auto_generated, created_at) "
             "VALUES (?, ?, ?, ?, 0, ?)",
-            (today, text, mood, score, now))
+            (today, text, mood, score, now),
+        )
         self.conn.commit()
 
-        mood_emoji = {'happy': '😊', 'sad': '😢', 'angry': '😡', 'anxious': '😰',
-                      'tired': '😴', 'excited': '🤩', 'neutral': '😐'}
-        emoji = mood_emoji.get(mood, '📝')
+        mood_emoji = {
+            "happy": "😊",
+            "sad": "😢",
+            "angry": "😡",
+            "anxious": "😰",
+            "tired": "😴",
+            "excited": "🤩",
+            "neutral": "😐",
+        }
+        emoji = mood_emoji.get(mood, "📝")
         return f"📝 일지 작성 완료! {emoji} 감정: {mood} ({score:.0%})"
 
     def review(self, date: str) -> str:
@@ -112,7 +126,8 @@ class JournalManager:
         rows = self.conn.execute(
             "SELECT content, mood, mood_score, created_at, auto_generated "
             "FROM journal_entries WHERE date=? ORDER BY created_at",
-            (date,)).fetchall()
+            (date,),
+        ).fetchall()
 
         if not rows:
             return f"📖 {date}의 일지가 없습니다."
@@ -120,8 +135,15 @@ class JournalManager:
         lines = [f"📖 **{date} 일지**\n"]
         for content, mood, score, created, auto in rows:
             tag = "🤖 자동" if auto else "✍️"
-            mood_emoji = {'happy': '😊', 'sad': '😢', 'angry': '😡', 'anxious': '😰',
-                          'tired': '😴', 'excited': '🤩', 'neutral': '😐'}.get(mood, '📝')
+            mood_emoji = {
+                "happy": "😊",
+                "sad": "😢",
+                "angry": "😡",
+                "anxious": "😰",
+                "tired": "😴",
+                "excited": "🤩",
+                "neutral": "😐",
+            }.get(mood, "📝")
             lines.append(f"{tag} {mood_emoji} {content[:200]}")
         return "\n".join(lines)
 
@@ -136,9 +158,7 @@ class JournalManager:
         now = datetime.now(KST).isoformat()
 
         # Get existing entries for today
-        rows = self.conn.execute(
-            "SELECT content FROM journal_entries WHERE date=?",
-            (today,)).fetchall()
+        rows = self.conn.execute("SELECT content FROM journal_entries WHERE date=?", (today,)).fetchall()
 
         if not rows and not conversations:
             return "📝 오늘 기록된 일지가 없습니다."
@@ -154,7 +174,8 @@ class JournalManager:
         self.conn.execute(
             "INSERT INTO journal_entries (date, content, mood, mood_score, auto_generated, created_at) "
             "VALUES (?, ?, ?, ?, 1, ?)",
-            (today, summary, mood, score, now))
+            (today, summary, mood, score, now),
+        )
         self.conn.commit()
 
         return f"🤖 **오늘의 자동 일지**\n{summary}"
@@ -169,9 +190,7 @@ class JournalManager:
 
         for i in range(days - 1, -1, -1):
             date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
-            rows = self.conn.execute(
-                "SELECT mood, mood_score FROM journal_entries WHERE date=?",
-                (date,)).fetchall()
+            rows = self.conn.execute("SELECT mood, mood_score FROM journal_entries WHERE date=?", (date,)).fetchall()
 
             if rows:
                 avg_score = sum(r[1] for r in rows) / len(rows)
@@ -188,8 +207,15 @@ class JournalManager:
             if score is not None:
                 bar_len = int(score * 10)
                 bar = "█" * bar_len + "░" * (10 - bar_len)
-                emoji = {'happy': '😊', 'sad': '😢', 'angry': '😡', 'anxious': '😰',
-                         'tired': '😴', 'excited': '🤩', 'neutral': '😐'}.get(mood, '📝')
+                emoji = {
+                    "happy": "😊",
+                    "sad": "😢",
+                    "angry": "😡",
+                    "anxious": "😰",
+                    "tired": "😴",
+                    "excited": "🤩",
+                    "neutral": "😐",
+                }.get(mood, "📝")
                 lines.append(f"{day_label} {bar} {emoji} {score:.0%}")
             else:
                 lines.append(f"{day_label} {'·' * 10} (기록 없음)")
@@ -206,9 +232,10 @@ class JournalManager:
         """기존 mood.py 연동."""
         try:
             from salmalm.features.mood import detect_mood
+
             result = detect_mood(text)
             if result:
-                return result.get('mood', 'neutral')
+                return result.get("mood", "neutral")
         except (ImportError, Exception):
             pass
         return None
@@ -218,10 +245,10 @@ class JournalManager:
         rows = self.conn.execute(
             "SELECT id, content, mood, mood_score, auto_generated, created_at "
             "FROM journal_entries WHERE date=? ORDER BY created_at",
-            (date,)).fetchall()
+            (date,),
+        ).fetchall()
         return [
-            {"id": r[0], "content": r[1], "mood": r[2], "mood_score": r[3],
-             "auto": bool(r[4]), "created_at": r[5]}
+            {"id": r[0], "content": r[1], "mood": r[2], "mood_score": r[3], "auto": bool(r[4]), "created_at": r[5]}
             for r in rows
         ]
 
@@ -238,6 +265,7 @@ def get_journal(db_path: Optional[Path] = None) -> JournalManager:
 
 
 # ── Command handler ──
+
 
 async def handle_journal_command(cmd: str, session=None, **kw) -> Optional[str]:
     """Handle /journal commands."""
@@ -280,12 +308,14 @@ async def handle_journal_command(cmd: str, session=None, **kw) -> Optional[str]:
 
 # ── Registration ──
 
+
 def register_journal_commands(command_router):
     """Register /journal command."""
     from salmalm.features.commands import COMMAND_DEFS
-    COMMAND_DEFS['/journal'] = 'AI Journal (write|today|review|mood|summary)'
-    if hasattr(command_router, '_prefix_handlers'):
-        command_router._prefix_handlers.append(('/journal', handle_journal_command))
+
+    COMMAND_DEFS["/journal"] = "AI Journal (write|today|review|mood|summary)"
+    if hasattr(command_router, "_prefix_handlers"):
+        command_router._prefix_handlers.append(("/journal", handle_journal_command))
 
 
 def register_journal_tools():
@@ -298,18 +328,22 @@ def register_journal_tools():
         cmd = f"/journal {sub} {text}".strip()
         return await handle_journal_command(cmd)
 
-    register_dynamic("ai_journal", _journal_tool, {
-        "name": "ai_journal",
-        "description": "AI Journal - write entries, review, mood trends",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subcommand": {
-                    "type": "string",
-                    "enum": ["write", "today", "review", "mood", "summary"],
+    register_dynamic(
+        "ai_journal",
+        _journal_tool,
+        {
+            "name": "ai_journal",
+            "description": "AI Journal - write entries, review, mood trends",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subcommand": {
+                        "type": "string",
+                        "enum": ["write", "today", "review", "mood", "summary"],
+                    },
+                    "text": {"type": "string", "description": "Journal text or date"},
                 },
-                "text": {"type": "string", "description": "Journal text or date"},
+                "required": ["subcommand"],
             },
-            "required": ["subcommand"]
-        }
-    })
+        },
+    )

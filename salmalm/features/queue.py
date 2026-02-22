@@ -7,6 +7,7 @@ Modes:
   steer-backlog     — Like steer but keeps history of skipped messages
   interrupt         — Cancel current request and process new message immediately
 """
+
 import logging
 import threading
 import time
@@ -18,25 +19,25 @@ logger = logging.getLogger(__name__)
 
 
 class QueueMode(Enum):
-    COLLECT = 'collect'
-    STEER = 'steer'
-    FOLLOWUP = 'followup'
-    STEER_BACKLOG = 'steer-backlog'
-    INTERRUPT = 'interrupt'
+    COLLECT = "collect"
+    STEER = "steer"
+    FOLLOWUP = "followup"
+    STEER_BACKLOG = "steer-backlog"
+    INTERRUPT = "interrupt"
 
 
 @dataclass
 class QueuedMessage:
     text: str
     timestamp: float = field(default_factory=time.time)
-    session_id: str = ''
-    user_id: str = ''
+    session_id: str = ""
+    user_id: str = ""
 
 
 class MessageQueue:
     """Per-session message queue with configurable modes."""
 
-    def __init__(self, mode: str = 'collect', max_size: int = 50):
+    def __init__(self, mode: str = "collect", max_size: int = 50):
         self._mode = QueueMode(mode) if isinstance(mode, str) else mode
         self._queue: deque[QueuedMessage] = deque(maxlen=max_size)
         self._backlog: list[QueuedMessage] = []
@@ -65,42 +66,42 @@ class MessageQueue:
     def cancel_requested(self) -> bool:
         return self._cancel_flag.is_set()
 
-    def enqueue(self, text: str, session_id: str = '', user_id: str = '') -> dict:
+    def enqueue(self, text: str, session_id: str = "", user_id: str = "") -> dict:
         """Add message to queue. Returns action dict for the caller."""
         msg = QueuedMessage(text=text, session_id=session_id, user_id=user_id)
 
         with self._lock:
             if not self._processing:
                 # Not busy — process immediately
-                return {'action': 'process', 'message': msg}
+                return {"action": "process", "message": msg}
 
             if self._mode == QueueMode.COLLECT:
                 self._queue.append(msg)
-                return {'action': 'queued', 'position': len(self._queue)}
+                return {"action": "queued", "position": len(self._queue)}
 
             elif self._mode == QueueMode.STEER:
                 self._queue.clear()
                 self._queue.append(msg)
-                return {'action': 'steered', 'message': msg}
+                return {"action": "steered", "message": msg}
 
             elif self._mode == QueueMode.FOLLOWUP:
                 self._queue.append(msg)
-                return {'action': 'followup', 'position': len(self._queue)}
+                return {"action": "followup", "position": len(self._queue)}
 
             elif self._mode == QueueMode.STEER_BACKLOG:
                 # Move current queue to backlog, replace with new
                 self._backlog.extend(self._queue)
                 self._queue.clear()
                 self._queue.append(msg)
-                return {'action': 'steered', 'backlog_size': len(self._backlog)}
+                return {"action": "steered", "backlog_size": len(self._backlog)}
 
             elif self._mode == QueueMode.INTERRUPT:
                 self._cancel_flag.set()
                 self._queue.clear()
                 self._queue.append(msg)
-                return {'action': 'interrupt', 'message': msg}
+                return {"action": "interrupt", "message": msg}
 
-        return {'action': 'queued'}
+        return {"action": "queued"}
 
     def drain(self) -> list[QueuedMessage]:
         """Get all queued messages and clear the queue."""
@@ -114,11 +115,11 @@ class MessageQueue:
         """Drain queue and format as follow-up context string."""
         msgs = self.drain()
         if not msgs:
-            return ''
+            return ""
         parts = []
         for m in msgs:
             parts.append(f"[follow-up] {m.text}")
-        return '\n'.join(parts)
+        return "\n".join(parts)
 
     def get_backlog(self) -> list[QueuedMessage]:
         """Get and clear the backlog (steer-backlog mode)."""
@@ -139,10 +140,10 @@ class MessageQueue:
 
     def status(self) -> dict:
         return {
-            'mode': self._mode.value,
-            'pending': len(self._queue),
-            'backlog': len(self._backlog),
-            'processing': self._processing,
+            "mode": self._mode.value,
+            "pending": len(self._queue),
+            "backlog": len(self._backlog),
+            "processing": self._processing,
         }
 
 
@@ -151,7 +152,7 @@ _queues: dict[str, MessageQueue] = {}
 _queues_lock = threading.Lock()
 
 
-def get_queue(session_id: str = 'default', mode: str = 'collect') -> MessageQueue:
+def get_queue(session_id: str = "default", mode: str = "collect") -> MessageQueue:
     """Get or create a message queue for a session."""
     with _queues_lock:
         if session_id not in _queues:
@@ -167,7 +168,7 @@ def set_queue_mode(session_id: str, mode: str) -> str:
     return f"Queue mode: {old} → {mode}"
 
 
-def queue_status(session_id: str = 'default') -> dict:
+def queue_status(session_id: str = "default") -> dict:
     """Get queue status for a session."""
     q = get_queue(session_id)
     return q.status()

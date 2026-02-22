@@ -4,6 +4,7 @@ Workflows are JSON files stored in ~/.salmalm/workflows/.
 Supports: variable substitution, conditionals, parallel steps, error handling,
 triggers (cron, manual, webhook, event).
 """
+
 import json
 import re
 import threading
@@ -13,8 +14,8 @@ from typing import Any, Dict, List, Optional
 
 from salmalm.constants import KST
 
-WORKFLOWS_DIR = Path.home() / '.salmalm' / 'workflows'
-WORKFLOW_LOG_DIR = WORKFLOWS_DIR / 'logs'
+WORKFLOWS_DIR = Path.home() / ".salmalm" / "workflows"
+WORKFLOW_LOG_DIR = WORKFLOWS_DIR / "logs"
 
 
 def _ensure_dirs():
@@ -24,17 +25,19 @@ def _ensure_dirs():
 
 # ── Variable Substitution ────────────────────────────────────
 
-_VAR_RE = re.compile(r'\{\{(\w+)\.(\w+)\}\}')
+_VAR_RE = re.compile(r"\{\{(\w+)\.(\w+)\}\}")
 
 
 def _substitute(template: str, context: Dict[str, Any]) -> str:
     """Replace {{step_id.field}} with values from context."""
+
     def _repl(m):
         step_id, field = m.group(1), m.group(2)
         step_data = context.get(step_id, {})
         if isinstance(step_data, dict):
             return str(step_data.get(field, m.group(0)))
         return str(step_data)
+
     return _VAR_RE.sub(_repl, template)
 
 
@@ -53,28 +56,29 @@ def _substitute_params(params: dict, context: Dict[str, Any]) -> dict:
 
 # ── Condition Evaluation ─────────────────────────────────────
 
+
 def _eval_condition(cond: str, context: Dict[str, Any]) -> bool:
     """Evaluate simple condition like '{{step.count}} > 0'."""
     resolved = _substitute(cond, context)
     try:
         # Only allow simple comparisons
         resolved = resolved.strip()
-        for op in ['>=', '<=', '!=', '==', '>', '<']:
+        for op in [">=", "<=", "!=", "==", ">", "<"]:
             if op in resolved:
                 parts = resolved.split(op, 1)
                 left = _to_num(parts[0].strip())
                 right = _to_num(parts[1].strip())
-                if op == '>':
+                if op == ">":
                     return left > right
-                if op == '<':
+                if op == "<":
                     return left < right
-                if op == '>=':
+                if op == ">=":
                     return left >= right
-                if op == '<=':
+                if op == "<=":
                     return left <= right
-                if op == '==':
+                if op == "==":
                     return left == right
-                if op == '!=':
+                if op == "!=":
                     return left != right
         return bool(resolved)
     except Exception:
@@ -90,16 +94,16 @@ def _to_num(s: str):
 
 # ── Step Execution ───────────────────────────────────────────
 
+
 class StepResult:
-    def __init__(self, step_id: str, success: bool, result: Any = None, error: str = ''):
+    def __init__(self, step_id: str, success: bool, result: Any = None, error: str = ""):
         self.step_id = step_id
         self.success = success
         self.result = result
         self.error = error
 
     def to_dict(self) -> dict:
-        return {'step_id': self.step_id, 'success': self.success,
-                'result': self.result, 'error': self.error}
+        return {"step_id": self.step_id, "success": self.success, "result": self.result, "error": self.error}
 
 
 class WorkflowEngine:
@@ -115,23 +119,25 @@ class WorkflowEngine:
     def list_workflows(self) -> List[dict]:
         _ensure_dirs()
         workflows = []
-        for f in WORKFLOWS_DIR.glob('*.json'):
-            if f.name == 'logs':
+        for f in WORKFLOWS_DIR.glob("*.json"):
+            if f.name == "logs":
                 continue
             try:
                 with open(f) as fh:
                     wf = json.load(fh)
-                    workflows.append({
-                        'name': wf.get('name', f.stem),
-                        'trigger': wf.get('trigger', {}),
-                        'steps': len(wf.get('steps', [])),
-                    })
+                    workflows.append(
+                        {
+                            "name": wf.get("name", f.stem),
+                            "trigger": wf.get("trigger", {}),
+                            "steps": len(wf.get("steps", [])),
+                        }
+                    )
             except Exception:
                 continue
         return workflows
 
     def get_workflow(self, name: str) -> Optional[dict]:
-        path = WORKFLOWS_DIR / f'{name}.json'
+        path = WORKFLOWS_DIR / f"{name}.json"
         if not path.exists():
             return None
         with open(path) as f:
@@ -139,84 +145,84 @@ class WorkflowEngine:
 
     def save_workflow(self, workflow: dict) -> str:
         _ensure_dirs()
-        name = workflow.get('name', '')
+        name = workflow.get("name", "")
         if not name:
-            return '❌ workflow name is required'
-        path = WORKFLOWS_DIR / f'{name}.json'
-        with open(path, 'w') as f:
+            return "❌ workflow name is required"
+        path = WORKFLOWS_DIR / f"{name}.json"
+        with open(path, "w") as f:
             json.dump(workflow, f, ensure_ascii=False, indent=2)
-        return f'✅ 워크플로우 저장됨: {name}'
+        return f"✅ 워크플로우 저장됨: {name}"
 
     def delete_workflow(self, name: str) -> str:
-        path = WORKFLOWS_DIR / f'{name}.json'
+        path = WORKFLOWS_DIR / f"{name}.json"
         if not path.exists():
-            return f'❌ 워크플로우 없음: {name}'
+            return f"❌ 워크플로우 없음: {name}"
         path.unlink()
-        return f'🗑️ 워크플로우 삭제됨: {name}'
+        return f"🗑️ 워크플로우 삭제됨: {name}"
 
     # ── Execution ────────────────────────────────────────────
 
     def run(self, name: str) -> dict:
         wf = self.get_workflow(name)
         if not wf:
-            return {'success': False, 'error': f'Workflow not found: {name}'}
+            return {"success": False, "error": f"Workflow not found: {name}"}
         return self.execute(wf)
 
     def execute(self, workflow: dict) -> dict:
-        steps = workflow.get('steps', [])
-        on_error = workflow.get('on_error', 'stop')
+        steps = workflow.get("steps", [])
+        on_error = workflow.get("on_error", "stop")
         context: Dict[str, Any] = {}
         results: List[dict] = []
         started = datetime.now(KST).isoformat()
 
         for step in steps:
             # Handle parallel steps
-            if 'parallel' in step:
-                parallel_results = self._run_parallel(step['parallel'], context)
+            if "parallel" in step:
+                parallel_results = self._run_parallel(step["parallel"], context)
                 for pr in parallel_results:
-                    context[pr['step_id']] = {'result': pr.get('result', ''), 'count': 1 if pr['success'] else 0}
+                    context[pr["step_id"]] = {"result": pr.get("result", ""), "count": 1 if pr["success"] else 0}
                     results.append(pr)
                 continue
 
-            step_id = step.get('id', f'step_{len(results)}')
+            step_id = step.get("id", f"step_{len(results)}")
             # Check condition
-            cond = step.get('if')
+            cond = step.get("if")
             if cond and not _eval_condition(cond, context):
-                results.append({'step_id': step_id, 'success': True, 'result': 'skipped (condition false)'})
-                context[step_id] = {'result': 'skipped', 'count': 0}
+                results.append({"step_id": step_id, "success": True, "result": "skipped (condition false)"})
+                context[step_id] = {"result": "skipped", "count": 0}
                 continue
 
             sr = self._execute_step(step, context)
             results.append(sr.to_dict())
-            context[step_id] = {'result': sr.result or '', 'count': 1 if sr.success else 0}
+            context[step_id] = {"result": sr.result or "", "count": 1 if sr.success else 0}
 
             if not sr.success:
-                if on_error == 'stop':
+                if on_error == "stop":
                     break
-                elif on_error == 'retry':
+                elif on_error == "retry":
                     sr2 = self._execute_step(step, context)
                     results.append(sr2.to_dict())
-                    context[step_id] = {'result': sr2.result or '', 'count': 1 if sr2.success else 0}
-                    if not sr2.success and on_error == 'stop':
+                    context[step_id] = {"result": sr2.result or "", "count": 1 if sr2.success else 0}
+                    if not sr2.success and on_error == "stop":
                         break
 
         run_result = {
-            'workflow': workflow.get('name', 'unnamed'),
-            'success': all(r.get('success', False) for r in results),
-            'started': started,
-            'finished': datetime.now(KST).isoformat(),
-            'results': results,
+            "workflow": workflow.get("name", "unnamed"),
+            "success": all(r.get("success", False) for r in results),
+            "started": started,
+            "finished": datetime.now(KST).isoformat(),
+            "results": results,
         }
-        self._log_run(workflow.get('name', 'unnamed'), run_result)
+        self._log_run(workflow.get("name", "unnamed"), run_result)
         return run_result
 
     def _execute_step(self, step: dict, context: Dict[str, Any]) -> StepResult:
-        step_id = step.get('id', 'unknown')
-        tool = step.get('tool', '')
-        params = _substitute_params(step.get('params', {}), context)
+        step_id = step.get("id", "unknown")
+        tool = step.get("tool", "")
+        params = _substitute_params(step.get("params", {}), context)
 
         if not self._tool_executor:
-            return StepResult(step_id, False, error='No tool executor configured')
+            return StepResult(step_id, False, error="No tool executor configured")
         try:
             result = self._tool_executor(tool, params)
             return StepResult(step_id, True, result=result)
@@ -230,7 +236,7 @@ class WorkflowEngine:
 
         def _run(s):
             sr = self._execute_step(s, context)
-            result_map[s.get('id', 'unknown')] = sr.to_dict()
+            result_map[s.get("id", "unknown")] = sr.to_dict()
 
         for s in steps:
             t = threading.Thread(target=_run, args=(s,))
@@ -239,8 +245,8 @@ class WorkflowEngine:
         for t in threads:
             t.join(timeout=30)
         for s in steps:
-            sid = s.get('id', 'unknown')
-            results.append(result_map.get(sid, {'step_id': sid, 'success': False, 'error': 'timeout'}))
+            sid = s.get("id", "unknown")
+            results.append(result_map.get(sid, {"step_id": sid, "success": False, "error": "timeout"}))
         return results
 
     # ── Logging ──────────────────────────────────────────────
@@ -248,17 +254,17 @@ class WorkflowEngine:
     def _log_run(self, name: str, result: dict):
         try:
             _ensure_dirs()
-            log_path = WORKFLOW_LOG_DIR / f'{name}.jsonl'
-            with open(log_path, 'a') as f:
-                f.write(json.dumps(result, ensure_ascii=False) + '\n')
+            log_path = WORKFLOW_LOG_DIR / f"{name}.jsonl"
+            with open(log_path, "a") as f:
+                f.write(json.dumps(result, ensure_ascii=False) + "\n")
         except Exception:
             pass
 
     def get_logs(self, name: str, limit: int = 10) -> List[dict]:
-        log_path = WORKFLOW_LOG_DIR / f'{name}.jsonl'
+        log_path = WORKFLOW_LOG_DIR / f"{name}.jsonl"
         if not log_path.exists():
             return []
-        lines = log_path.read_text().strip().split('\n')
+        lines = log_path.read_text().strip().split("\n")
         results = []
         for line in lines[-limit:]:
             try:
@@ -272,99 +278,108 @@ class WorkflowEngine:
     def get_presets(self) -> List[dict]:
         return [
             {
-                'name': 'morning_briefing',
-                'description': '아침 이메일+캘린더+날씨 종합',
-                'trigger': {'type': 'cron', 'schedule': '0 8 * * *'},
-                'steps': [
-                    {'id': 'cal', 'tool': 'calendar_list', 'params': {'period': 'today'}},
-                    {'id': 'brief', 'tool': 'send_message', 'params': {'message': '☀️ 오늘 일정:\n{{cal.result}}'}},
+                "name": "morning_briefing",
+                "description": "아침 이메일+캘린더+날씨 종합",
+                "trigger": {"type": "cron", "schedule": "0 8 * * *"},
+                "steps": [
+                    {"id": "cal", "tool": "calendar_list", "params": {"period": "today"}},
+                    {"id": "brief", "tool": "send_message", "params": {"message": "☀️ 오늘 일정:\n{{cal.result}}"}},
                 ],
-                'on_error': 'skip',
+                "on_error": "skip",
             },
             {
-                'name': 'expense_report',
-                'description': '월말 가계부 리포트 생성',
-                'trigger': {'type': 'cron', 'schedule': '0 20 L * *'},
-                'steps': [
-                    {'id': 'expenses', 'tool': 'expense', 'params': {'action': 'list', 'period': 'month'}},
-                    {'id': 'report', 'tool': 'send_message', 'params': {'message': '💰 월간 리포트:\n{{expenses.result}}'}},
+                "name": "expense_report",
+                "description": "월말 가계부 리포트 생성",
+                "trigger": {"type": "cron", "schedule": "0 20 L * *"},
+                "steps": [
+                    {"id": "expenses", "tool": "expense", "params": {"action": "list", "period": "month"}},
+                    {
+                        "id": "report",
+                        "tool": "send_message",
+                        "params": {"message": "💰 월간 리포트:\n{{expenses.result}}"},
+                    },
                 ],
-                'on_error': 'stop',
+                "on_error": "stop",
             },
             {
-                'name': 'backup_memories',
-                'description': '주간 메모리 파일 백업',
-                'trigger': {'type': 'cron', 'schedule': '0 2 * * 0'},
-                'steps': [
-                    {'id': 'backup', 'tool': 'exec', 'params': {'command': 'tar czf ~/.salmalm/backup_$(date +%Y%m%d).tar.gz ~/.salmalm/memory/'}},
+                "name": "backup_memories",
+                "description": "주간 메모리 파일 백업",
+                "trigger": {"type": "cron", "schedule": "0 2 * * 0"},
+                "steps": [
+                    {
+                        "id": "backup",
+                        "tool": "exec",
+                        "params": {"command": "tar czf ~/.salmalm/backup_$(date +%Y%m%d).tar.gz ~/.salmalm/memory/"},
+                    },
                 ],
-                'on_error': 'stop',
+                "on_error": "stop",
             },
         ]
 
     def install_preset(self, name: str) -> str:
         for p in self.get_presets():
-            if p['name'] == name:
+            if p["name"] == name:
                 return self.save_workflow(p)
-        return f'❌ 프리셋 없음: {name}'
+        return f"❌ 프리셋 없음: {name}"
 
 
 # ── Chat Command Handler ─────────────────────────────────────
 
+
 def handle_workflow_command(text: str) -> str:
     engine = WorkflowEngine()
     parts = text.strip().split(None, 2)
-    sub = parts[1] if len(parts) > 1 else 'list'
+    sub = parts[1] if len(parts) > 1 else "list"
 
-    if sub == 'list':
+    if sub == "list":
         wfs = engine.list_workflows()
         if not wfs:
-            return '📋 등록된 워크플로우가 없습니다.'
-        lines = ['📋 **워크플로우 목록**']
+            return "📋 등록된 워크플로우가 없습니다."
+        lines = ["📋 **워크플로우 목록**"]
         for w in wfs:
-            lines.append(f'  • **{w["name"]}** — {w["steps"]}단계, 트리거: {w["trigger"].get("type", "manual")}')
-        return '\n'.join(lines)
+            lines.append(f"  • **{w['name']}** — {w['steps']}단계, 트리거: {w['trigger'].get('type', 'manual')}")
+        return "\n".join(lines)
 
-    if sub == 'run':
-        name = parts[2] if len(parts) > 2 else ''
+    if sub == "run":
+        name = parts[2] if len(parts) > 2 else ""
         if not name:
-            return '❌ 사용법: /workflow run <name>'
+            return "❌ 사용법: /workflow run <name>"
         result = engine.run(name)
-        if result.get('success'):
+        if result.get("success"):
             return f'✅ 워크플로우 "{name}" 실행 완료'
         return f'❌ 워크플로우 "{name}" 실행 실패: {result.get("error", "")}'
 
-    if sub == 'delete':
-        name = parts[2] if len(parts) > 2 else ''
+    if sub == "delete":
+        name = parts[2] if len(parts) > 2 else ""
         if not name:
-            return '❌ 사용법: /workflow delete <name>'
+            return "❌ 사용법: /workflow delete <name>"
         return engine.delete_workflow(name)
 
-    if sub == 'log':
-        name = parts[2] if len(parts) > 2 else ''
+    if sub == "log":
+        name = parts[2] if len(parts) > 2 else ""
         if not name:
-            return '❌ 사용법: /workflow log <name>'
+            return "❌ 사용법: /workflow log <name>"
         logs = engine.get_logs(name)
         if not logs:
             return f'📜 "{name}" 실행 이력 없음'
         lines = [f'📜 **"{name}" 실행 이력** ({len(logs)}건)']
         for lg in logs[-5:]:
-            status = '✅' if lg.get('success') else '❌'
-            lines.append(f'  {status} {lg.get("started", "?")} → {lg.get("finished", "?")}')
-        return '\n'.join(lines)
+            status = "✅" if lg.get("success") else "❌"
+            lines.append(f"  {status} {lg.get('started', '?')} → {lg.get('finished', '?')}")
+        return "\n".join(lines)
 
-    if sub == 'presets':
+    if sub == "presets":
         presets = engine.get_presets()
-        lines = ['📦 **워크플로우 프리셋**']
+        lines = ["📦 **워크플로우 프리셋**"]
         for p in presets:
-            lines.append(f'  • **{p["name"]}** — {p["description"]}')
-        lines.append('\n설치: /workflow install <name>')
-        return '\n'.join(lines)
+            lines.append(f"  • **{p['name']}** — {p['description']}")
+        lines.append("\n설치: /workflow install <name>")
+        return "\n".join(lines)
 
-    if sub == 'install':
-        name = parts[2] if len(parts) > 2 else ''
+    if sub == "install":
+        name = parts[2] if len(parts) > 2 else ""
         if not name:
-            return '❌ 사용법: /workflow install <name>'
+            return "❌ 사용법: /workflow install <name>"
         return engine.install_preset(name)
 
-    return '❓ 사용법: /workflow [list|run|delete|log|presets|install] [name]'
+    return "❓ 사용법: /workflow [list|run|delete|log|presets|install] [name]"

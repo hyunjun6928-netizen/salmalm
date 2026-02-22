@@ -77,6 +77,7 @@ def save_config(cfg: dict) -> None:
 
 # ── Data ──
 
+
 @dataclass
 class QueuedMessage:
     text: str
@@ -86,6 +87,7 @@ class QueuedMessage:
 @dataclass
 class SessionOptions:
     """Per-session overrides, set via /queue command."""
+
     mode: Optional[QueueMode] = None
     debounce_ms: Optional[int] = None
     cap: Optional[int] = None
@@ -94,7 +96,10 @@ class SessionOptions:
 
 # ── Overflow ──
 
-def apply_overflow(pending: List[QueuedMessage], cap: int, policy: DropPolicy) -> Tuple[List[QueuedMessage], Optional[str]]:
+
+def apply_overflow(
+    pending: List[QueuedMessage], cap: int, policy: DropPolicy
+) -> Tuple[List[QueuedMessage], Optional[str]]:
     """Enforce cap on pending list. Returns (trimmed_list, summary_or_none)."""
     if len(pending) <= cap:
         return pending, None
@@ -119,6 +124,7 @@ def apply_overflow(pending: List[QueuedMessage], cap: int, policy: DropPolicy) -
 
 
 # ── QueueLane ──
+
 
 class QueueLane:
     """Per-session FIFO lane with serial execution guarantee.
@@ -319,6 +325,7 @@ def _merge_messages(messages: List[QueuedMessage]) -> str:
 
 # ── MessageQueue (global manager) ──
 
+
 class MessageQueue:
     """Global message queue manager with lane-based concurrency control.
 
@@ -462,8 +469,7 @@ class MessageQueue:
             return
         self._cleanup_ts = now
         with self._lock:
-            stale = [sid for sid, lane in self._lanes.items()
-                     if now - lane.last_active > max_idle]
+            stale = [sid for sid, lane in self._lanes.items() if now - lane.last_active > max_idle]
             for sid in stale:
                 del self._lanes[sid]
             if stale:

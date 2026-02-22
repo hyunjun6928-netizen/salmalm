@@ -4,6 +4,7 @@ GET /health → JSON with LLM status, memory, active sessions, uptime, disk, ver
 200 = healthy, 503 = unhealthy.
 stdlib-only.
 """
+
 from __future__ import annotations
 
 import os
@@ -33,48 +34,49 @@ def get_health_report() -> dict:
       - threads: active thread count
     """
     report: dict = {
-        'status': 'healthy',
-        'version': VERSION,
-        'uptime_seconds': round(time.time() - _start_time),
-        'uptime_human': _format_uptime(),
+        "status": "healthy",
+        "version": VERSION,
+        "uptime_seconds": round(time.time() - _start_time),
+        "uptime_human": _format_uptime(),
     }
     issues = []
 
     # LLM connectivity (cached probe, not real API call on every check)
-    report['llm'] = _check_llm_status()
-    if not report['llm'].get('connected'):
-        issues.append('llm')
+    report["llm"] = _check_llm_status()
+    if not report["llm"].get("connected"):
+        issues.append("llm")
 
     # Memory
     mem_mb = _get_memory_mb()
-    report['memory_mb'] = mem_mb
+    report["memory_mb"] = mem_mb
     if mem_mb > 500:
-        issues.append('memory')
+        issues.append("memory")
 
     # Active sessions
     try:
         from salmalm.core.core import _sessions
-        report['active_sessions'] = len(_sessions)
+
+        report["active_sessions"] = len(_sessions)
     except Exception:
-        report['active_sessions'] = 0
+        report["active_sessions"] = 0
 
     # Disk
     disk = _get_disk_info()
-    report['disk'] = disk
-    if disk.get('free_mb', 9999) < 100:
-        issues.append('disk')
+    report["disk"] = disk
+    if disk.get("free_mb", 9999) < 100:
+        issues.append("disk")
 
     # Threads
-    report['threads'] = threading.active_count()
+    report["threads"] = threading.active_count()
 
     # Determine status
-    if len(issues) >= 2 or 'disk' in issues:
-        report['status'] = 'unhealthy'
+    if len(issues) >= 2 or "disk" in issues:
+        report["status"] = "unhealthy"
     elif issues:
-        report['status'] = 'degraded'
+        report["status"] = "degraded"
 
     if issues:
-        report['issues'] = issues
+        report["issues"] = issues
 
     return report
 
@@ -99,9 +101,9 @@ def _get_memory_mb() -> float:
             pass
     # Fallback: /proc/self/status
     try:
-        with open('/proc/self/status') as f:
+        with open("/proc/self/status") as f:
             for line in f:
-                if line.startswith('VmRSS:'):
+                if line.startswith("VmRSS:"):
                     return round(int(line.split()[1]) / 1024, 1)
     except Exception:
         pass
@@ -113,9 +115,9 @@ def _get_disk_info() -> dict:
     try:
         stat = os.statvfs(str(BASE_DIR))
         return {
-            'free_mb': round(stat.f_bavail * stat.f_frsize / (1024 * 1024), 1),
-            'total_mb': round(stat.f_blocks * stat.f_frsize / (1024 * 1024), 1),
-            'usage_pct': round(100 * (1 - stat.f_bavail / max(stat.f_blocks, 1)), 1),
+            "free_mb": round(stat.f_bavail * stat.f_frsize / (1024 * 1024), 1),
+            "total_mb": round(stat.f_blocks * stat.f_frsize / (1024 * 1024), 1),
+            "usage_pct": round(100 * (1 - stat.f_bavail / max(stat.f_blocks, 1)), 1),
         }
     except Exception:
         return {}
@@ -134,25 +136,27 @@ def _check_llm_status() -> dict:
     if now - _llm_status_ts < _LLM_CHECK_INTERVAL and _llm_status_cache:
         return _llm_status_cache
 
-    result: dict = {'connected': False}
+    result: dict = {"connected": False}
     try:
         from salmalm.features.stability import health_monitor
+
         breaker = health_monitor.circuit_breaker.get_status()
-        llm_breaker = breaker.get('llm', {})
-        if llm_breaker.get('tripped'):
-            result['connected'] = False
-            result['error'] = llm_breaker.get('last_error', 'circuit breaker tripped')
+        llm_breaker = breaker.get("llm", {})
+        if llm_breaker.get("tripped"):
+            result["connected"] = False
+            result["error"] = llm_breaker.get("last_error", "circuit breaker tripped")
         else:
             # Check if any API key is configured
             from salmalm.security.crypto import vault
-            providers = ['anthropic_api_key', 'openai_api_key', 'xai_api_key', 'google_api_key']
+
+            providers = ["anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key"]
             has_key = any(vault.get(k) for k in providers)
-            has_ollama = bool(vault.get('ollama_url'))
-            result['connected'] = has_key or has_ollama
-            if not result['connected']:
-                result['error'] = 'no API keys configured'
+            has_ollama = bool(vault.get("ollama_url"))
+            result["connected"] = has_key or has_ollama
+            if not result["connected"]:
+                result["error"] = "no API keys configured"
     except Exception as e:
-        result['error'] = str(e)[:100]
+        result["error"] = str(e)[:100]
 
     _llm_status_cache = result
     _llm_status_ts = now

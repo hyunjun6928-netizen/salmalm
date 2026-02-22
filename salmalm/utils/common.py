@@ -1,4 +1,5 @@
 """Common helpers — 날짜, JSON, 파일 I/O 공통 유틸."""
+
 from __future__ import annotations
 
 import json
@@ -14,6 +15,7 @@ log = logging.getLogger(__name__)
 def now_kst() -> datetime:
     """Return current datetime in KST."""
     from salmalm.constants import KST
+
     return datetime.now(KST)
 
 

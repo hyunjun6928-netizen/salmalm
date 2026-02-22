@@ -22,65 +22,79 @@ log = logging.getLogger(__name__)
 
 class RoutePolicy:
     """Security policy for a single route."""
-    __slots__ = ('auth', 'audit', 'csrf', 'rate')
 
-    def __init__(self, auth: str = 'required', audit: bool = True,
-                 csrf: bool = False, rate: Optional[str] = None):
-        self.auth = auth      # "none" | "optional" | "required"
-        self.audit = audit    # log to audit trail
-        self.csrf = csrf      # require CSRF token (POST)
-        self.rate = rate      # None | "user" | "ip"
+    __slots__ = ("auth", "audit", "csrf", "rate")
+
+    def __init__(self, auth: str = "required", audit: bool = True, csrf: bool = False, rate: Optional[str] = None):
+        self.auth = auth  # "none" | "optional" | "required"
+        self.audit = audit  # log to audit trail
+        self.csrf = csrf  # require CSRF token (POST)
+        self.rate = rate  # None | "user" | "ip"
 
 
 # Default policies by route pattern
 _ROUTE_POLICIES: Dict[str, RoutePolicy] = {}
 
 # Well-known public routes (no auth needed)
-_PUBLIC_ROUTES = frozenset({
-    '/', '/setup', '/unlock', '/health', '/api/health',
-    '/static/app.js', '/static/index.html',
-    '/icon-192.svg', '/icon-512.svg', '/manifest.json',
-    '/api/auth/login', '/api/auth/status',
-    '/favicon.ico',
-})
+_PUBLIC_ROUTES = frozenset(
+    {
+        "/",
+        "/setup",
+        "/unlock",
+        "/health",
+        "/api/health",
+        "/static/app.js",
+        "/static/index.html",
+        "/icon-192.svg",
+        "/icon-512.svg",
+        "/manifest.json",
+        "/api/auth/login",
+        "/api/auth/status",
+        "/favicon.ico",
+    }
+)
 
 # Routes that MUST have auth even on loopback
-_SENSITIVE_ROUTES = frozenset({
-    '/api/vault/unlock', '/api/vault/lock',
-    '/api/admin/restart', '/api/admin/shutdown',
-    '/bash',
-})
+_SENSITIVE_ROUTES = frozenset(
+    {
+        "/api/vault/unlock",
+        "/api/vault/lock",
+        "/api/admin/restart",
+        "/api/admin/shutdown",
+        "/bash",
+    }
+)
 
 
-def get_route_policy(path: str, method: str = 'GET') -> RoutePolicy:
+def get_route_policy(path: str, method: str = "GET") -> RoutePolicy:
     """Get security policy for a route. Returns sensible defaults."""
     if path in _ROUTE_POLICIES:
         return _ROUTE_POLICIES[path]
 
     # Public routes
     if path in _PUBLIC_ROUTES:
-        return RoutePolicy(auth='none', audit=False, csrf=False)
+        return RoutePolicy(auth="none", audit=False, csrf=False)
 
     # Static files
-    if path.startswith('/static/'):
-        return RoutePolicy(auth='none', audit=False, csrf=False)
+    if path.startswith("/static/"):
+        return RoutePolicy(auth="none", audit=False, csrf=False)
 
     # Sensitive routes — always require auth
     if path in _SENSITIVE_ROUTES:
-        return RoutePolicy(auth='required', audit=True, csrf=True)
+        return RoutePolicy(auth="required", audit=True, csrf=True)
 
     # API routes default to auth required
-    if path.startswith('/api/'):
-        is_write = method in ('POST', 'PUT', 'DELETE', 'PATCH')
+    if path.startswith("/api/"):
+        is_write = method in ("POST", "PUT", "DELETE", "PATCH")
         return RoutePolicy(
-            auth='required',
+            auth="required",
             audit=is_write,
             csrf=is_write,
-            rate='user' if is_write else None,
+            rate="user" if is_write else None,
         )
 
     # Default: require auth, audit writes
-    return RoutePolicy(auth='required', audit=method != 'GET')
+    return RoutePolicy(auth="required", audit=method != "GET")
 
 
 def register_route_policy(path: str, policy: RoutePolicy) -> None:
@@ -92,7 +106,7 @@ def register_route_policy(path: str, policy: RoutePolicy) -> None:
 
 _rate_buckets: Dict[str, list] = {}  # key -> [timestamp, ...]
 _RATE_WINDOW = 60  # seconds
-_RATE_LIMIT = 60   # requests per window (per IP)
+_RATE_LIMIT = 60  # requests per window (per IP)
 
 
 def check_rate_limit(key: str) -> bool:
@@ -111,10 +125,11 @@ def check_rate_limit(key: str) -> bool:
 
 # ── External exposure safety checks ──
 
+
 def check_external_exposure_safety(bind_addr: str, handler) -> list:
     """When binding to 0.0.0.0, verify safety requirements are met.
     Returns list of warning strings. Empty = safe."""
-    if bind_addr == '127.0.0.1':
+    if bind_addr == "127.0.0.1":
         return []
 
     warnings = []
@@ -122,10 +137,12 @@ def check_external_exposure_safety(bind_addr: str, handler) -> list:
     # Check if auth is configured
     import os
     from salmalm.constants import DATA_DIR
-    db_path = DATA_DIR / 'salmalm.db'
+
+    db_path = DATA_DIR / "salmalm.db"
     if db_path.exists():
         try:
             import sqlite3
+
             conn = sqlite3.connect(str(db_path))
             cur = conn.execute("SELECT COUNT(*) FROM users WHERE password_hash IS NOT NULL")
             count = cur.fetchone()[0]
@@ -139,12 +156,11 @@ def check_external_exposure_safety(bind_addr: str, handler) -> list:
             pass
     else:
         warnings.append(
-            "⚠️  SECURITY: No database found. First-time setup should be done on localhost "
-            "before binding to 0.0.0.0."
+            "⚠️  SECURITY: No database found. First-time setup should be done on localhost before binding to 0.0.0.0."
         )
 
     # Check if dangerous tools should be restricted
-    if not os.environ.get('SALMALM_EXTERNAL_TOOLS_OK'):
+    if not os.environ.get("SALMALM_EXTERNAL_TOOLS_OK"):
         warnings.append(
             "ℹ️  Dangerous tools (exec, bash, file_write, browser) require authentication "
             "when bound to 0.0.0.0. Set SALMALM_EXTERNAL_TOOLS_OK=1 to suppress this warning."
@@ -155,33 +171,44 @@ def check_external_exposure_safety(bind_addr: str, handler) -> list:
 
 # ── Tool risk tiers ──
 
-TOOL_TIER_CRITICAL = frozenset({
-    'exec', 'bash', 'file_write', 'file_delete', 'python_eval',
-    'browser_action', 'sandbox_exec',
-})
-TOOL_TIER_HIGH = frozenset({
-    'http_request', 'send_email', 'file_read',
-    'mesh_task', 'mesh_broadcast',
-})
+TOOL_TIER_CRITICAL = frozenset(
+    {
+        "exec",
+        "bash",
+        "file_write",
+        "file_delete",
+        "python_eval",
+        "browser_action",
+        "sandbox_exec",
+    }
+)
+TOOL_TIER_HIGH = frozenset(
+    {
+        "http_request",
+        "send_email",
+        "file_read",
+        "mesh_task",
+        "mesh_broadcast",
+    }
+)
 TOOL_TIER_NORMAL = frozenset()  # everything else
 
 
 def get_tool_tier(tool_name: str) -> str:
     """Get risk tier for a tool: 'critical', 'high', or 'normal'."""
     if tool_name in TOOL_TIER_CRITICAL:
-        return 'critical'
+        return "critical"
     if tool_name in TOOL_TIER_HIGH:
-        return 'high'
-    return 'normal'
+        return "high"
+    return "normal"
 
 
-def is_tool_allowed_external(tool_name: str, is_authenticated: bool,
-                             bind_addr: str) -> bool:
+def is_tool_allowed_external(tool_name: str, is_authenticated: bool, bind_addr: str) -> bool:
     """Check if a tool can be used given current context.
     Critical tools require auth when externally exposed."""
-    if bind_addr == '127.0.0.1':
+    if bind_addr == "127.0.0.1":
         return True  # Loopback = trusted
     tier = get_tool_tier(tool_name)
-    if tier == 'critical' and not is_authenticated:
+    if tier == "critical" and not is_authenticated:
         return False
     return True

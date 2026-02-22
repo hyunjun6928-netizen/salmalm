@@ -6,6 +6,7 @@ stdlib-only. Provides:
   - Token-budgeted context assembly
   - /context show, /context budget <tokens>
 """
+
 from __future__ import annotations
 
 import logging
@@ -28,16 +29,78 @@ def estimate_tokens(text: str) -> int:
 
 def extract_keywords(text: str, top_n: int = 10) -> List[str]:
     """Extract top keywords from text using simple TF analysis."""
-    _STOP = frozenset([
-        'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-        'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
-        'that', 'this', 'it', 'not', 'if', 'so', 'as', 'by', 'from',
-        'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would',
-        'can', 'could', 'may', 'might', 'i', 'you', 'he', 'she', 'we', 'they',
-        '의', '가', '이', '은', '는', '을', '를', '에', '에서', '로', '으로',
-        '와', '과', '도', '만', '하다', '있다', '되다', '하는', '있는',
-    ])
-    words = re.findall(r'[a-zA-Z가-힣]{2,}', text.lower())
+    _STOP = frozenset(
+        [
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "and",
+            "or",
+            "but",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "with",
+            "that",
+            "this",
+            "it",
+            "not",
+            "if",
+            "so",
+            "as",
+            "by",
+            "from",
+            "has",
+            "have",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "can",
+            "could",
+            "may",
+            "might",
+            "i",
+            "you",
+            "he",
+            "she",
+            "we",
+            "they",
+            "의",
+            "가",
+            "이",
+            "은",
+            "는",
+            "을",
+            "를",
+            "에",
+            "에서",
+            "로",
+            "으로",
+            "와",
+            "과",
+            "도",
+            "만",
+            "하다",
+            "있다",
+            "되다",
+            "하는",
+            "있는",
+        ]
+    )
+    words = re.findall(r"[a-zA-Z가-힣]{2,}", text.lower())
     counts = Counter(w for w in words if w not in _STOP)
     return [w for w, _ in counts.most_common(top_n)]
 
@@ -53,10 +116,10 @@ def relevance_score(keywords: List[str], text: str) -> float:
 
 class ContextChunk:
     """A piece of context with metadata."""
-    __slots__ = ('source', 'content', 'relevance', 'tokens', 'timestamp')
 
-    def __init__(self, source: str, content: str, relevance: float = 0.0,
-                 timestamp: float = 0.0):
+    __slots__ = ("source", "content", "relevance", "tokens", "timestamp")
+
+    def __init__(self, source: str, content: str, relevance: float = 0.0, timestamp: float = 0.0):
         self.source = source
         self.content = content
         self.relevance = relevance
@@ -64,7 +127,7 @@ class ContextChunk:
         self.timestamp = timestamp or time.time()
 
     def __repr__(self):
-        return f'ContextChunk({self.source}, rel={self.relevance:.2f}, tok={self.tokens})'
+        return f"ContextChunk({self.source}, rel={self.relevance:.2f}, tok={self.tokens})"
 
 
 class SmartContextWindow:
@@ -97,10 +160,7 @@ class SmartContextWindow:
 
     def analyze_topic(self) -> List[str]:
         """Analyze current conversation topic from recent messages."""
-        text = ' '.join(
-            m.get('content', '') for m in self._recent_messages
-            if isinstance(m.get('content'), str)
-        )
+        text = " ".join(m.get("content", "") for m in self._recent_messages if isinstance(m.get("content"), str))
         return extract_keywords(text)
 
     def gather_context(self, sources: Optional[List[Dict]] = None) -> List[ContextChunk]:
@@ -114,15 +174,15 @@ class SmartContextWindow:
         # Score provided sources
         if sources:
             for s in sources:
-                content = s.get('content', '')
+                content = s.get("content", "")
                 if not content:
                     continue
                 rel = relevance_score(keywords, content)
                 chunk = ContextChunk(
-                    source=s.get('source', 'unknown'),
+                    source=s.get("source", "unknown"),
                     content=content,
                     relevance=rel,
-                    timestamp=s.get('timestamp', 0),
+                    timestamp=s.get("timestamp", 0),
                 )
                 candidates.append(chunk)
 
@@ -142,22 +202,22 @@ class SmartContextWindow:
     def build_context_string(self) -> str:
         """Build the injected context as a single string."""
         if not self._injected:
-            return ''
+            return ""
         parts = []
         for c in self._injected:
-            parts.append(f'[{c.source}] (relevance: {c.relevance:.2f})\n{c.content}')
-        return '\n---\n'.join(parts)
+            parts.append(f"[{c.source}] (relevance: {c.relevance:.2f})\n{c.content}")
+        return "\n---\n".join(parts)
 
     def show(self) -> str:
         """Format current injected context for display."""
         if not self._injected:
-            return '📋 No context currently injected.'
-        lines = [f'**Smart Context** (budget: {self._budget} tokens, used: {self.used_tokens})\n']
+            return "📋 No context currently injected."
+        lines = [f"**Smart Context** (budget: {self._budget} tokens, used: {self.used_tokens})\n"]
         for c in self._injected:
-            preview = c.content[:80].replace('\n', ' ')
-            lines.append(f'• [{c.source}] rel={c.relevance:.2f} tok={c.tokens} — {preview}…')
-        lines.append(f'\n_Remaining: {self.remaining_tokens} tokens_')
-        return '\n'.join(lines)
+            preview = c.content[:80].replace("\n", " ")
+            lines.append(f"• [{c.source}] rel={c.relevance:.2f} tok={c.tokens} — {preview}…")
+        lines.append(f"\n_Remaining: {self.remaining_tokens} tokens_")
+        return "\n".join(lines)
 
     def clear(self) -> None:
         """Clear injected context."""
@@ -172,44 +232,50 @@ smart_context = SmartContextWindow()
 # Command handlers
 # ---------------------------------------------------------------------------
 
+
 def handle_context_command(cmd: str, session=None, **kw) -> str:
     """Handle /context show | /context budget <tokens>."""
     parts = cmd.strip().split()
-    sub = parts[1] if len(parts) > 1 else 'show'
+    sub = parts[1] if len(parts) > 1 else "show"
 
-    if sub == 'show':
+    if sub == "show":
         return smart_context.show()
 
-    if sub == 'budget':
+    if sub == "budget":
         if len(parts) < 3:
-            return f'Current budget: {smart_context.budget} tokens\nUsage: `/context budget <tokens>`'
+            return f"Current budget: {smart_context.budget} tokens\nUsage: `/context budget <tokens>`"
         try:
             n = int(parts[2])
             smart_context.budget = n
-            return f'✅ Context budget set to {smart_context.budget} tokens'
+            return f"✅ Context budget set to {smart_context.budget} tokens"
         except ValueError:
-            return '❌ Invalid number'
+            return "❌ Invalid number"
 
-    if sub == 'clear':
+    if sub == "clear":
         smart_context.clear()
-        return '🗑️ Context cleared.'
+        return "🗑️ Context cleared."
 
-    return '❌ Usage: `/context show|budget <tokens>|clear`'
+    return "❌ Usage: `/context show|budget <tokens>|clear`"
 
 
 def register_commands(router: object) -> None:
     """Register /context commands."""
-    router.register_prefix('/context', handle_context_command)
+    router.register_prefix("/context", handle_context_command)
 
 
 def register_tools(registry_module: Optional[object] = None) -> None:
     """Register smart context tools."""
     try:
         from salmalm.tools.tool_registry import register_dynamic
-        register_dynamic('context_show', lambda args: smart_context.show(), {
-            'name': 'context_show',
-            'description': 'Show currently injected smart context',
-            'input_schema': {'type': 'object', 'properties': {}},
-        })
+
+        register_dynamic(
+            "context_show",
+            lambda args: smart_context.show(),
+            {
+                "name": "context_show",
+                "description": "Show currently injected smart context",
+                "input_schema": {"type": "object", "properties": {}},
+            },
+        )
     except Exception as e:
-        log.warning(f'Failed to register context tools: {e}')
+        log.warning(f"Failed to register context tools: {e}")

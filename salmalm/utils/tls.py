@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """SalmAlm TLS — Self-signed certificate generation + HTTPS server wrapper.
 
 Pure stdlib (ssl module). Generates self-signed certs on first run.
@@ -34,13 +35,29 @@ def ensure_cert(cn: str = "localhost", days: int = 365) -> bool:
 
     # Try OpenSSL first
     try:
-        subprocess.run([
-            "openssl", "req", "-x509", "-newkey", "rsa:2048",
-            "-keyout", str(KEY_FILE), "-out", str(CERT_FILE),
-            "-days", str(days), "-nodes",
-            "-subj", f"/CN={cn}/O=SalmAlm/C=KR",
-            "-addext", f"subjectAltName=DNS:{cn},DNS:localhost,IP:127.0.0.1",
-        ], capture_output=True, check=True, timeout=30)
+        subprocess.run(
+            [
+                "openssl",
+                "req",
+                "-x509",
+                "-newkey",
+                "rsa:2048",
+                "-keyout",
+                str(KEY_FILE),
+                "-out",
+                str(CERT_FILE),
+                "-days",
+                str(days),
+                "-nodes",
+                "-subj",
+                f"/CN={cn}/O=SalmAlm/C=KR",
+                "-addext",
+                f"subjectAltName=DNS:{cn},DNS:localhost,IP:127.0.0.1",
+            ],
+            capture_output=True,
+            check=True,
+            timeout=30,
+        )
         os.chmod(str(KEY_FILE), 0o600)
         log.info(f"[LOCK] Self-signed certificate generated: {CERT_FILE}")
         return True
@@ -51,11 +68,11 @@ def ensure_cert(cn: str = "localhost", days: int = 365) -> bool:
     try:
         # Python 3.10+ has ssl.create_default_context but no cert generation
         # Use subprocess with python -c as last resort
-        _script = '''  # noqa: F841
+        _script = """  # noqa: F841
 import ssl, tempfile, subprocess, os
 # Generate using openssl via python
 subprocess.run(["openssl", "version"], capture_output=True, check=True)
-'''
+"""
         log.warning("[LOCK] OpenSSL not available. TLS disabled.")
         log.warning("   Install OpenSSL or use a reverse proxy for HTTPS.")
         return False
@@ -73,7 +90,7 @@ def create_ssl_context() -> Optional[ssl.SSLContext]:
         ctx.load_cert_chain(str(CERT_FILE), str(KEY_FILE))
         # Security settings
         ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-        ctx.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS')
+        ctx.set_ciphers("ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS")
         log.info("[LOCK] TLS context created (TLS 1.2+)")
         return ctx
     except Exception as e:
@@ -81,8 +98,7 @@ def create_ssl_context() -> Optional[ssl.SSLContext]:
         return None
 
 
-def create_https_server(address: tuple, handler_class,
-                        ssl_context: Optional[ssl.SSLContext] = None):
+def create_https_server(address: tuple, handler_class, ssl_context: Optional[ssl.SSLContext] = None):
     """Create a ThreadingHTTPServer with optional TLS."""
     server = http.server.ThreadingHTTPServer(address, handler_class)
 
@@ -90,9 +106,7 @@ def create_https_server(address: tuple, handler_class,
         ssl_context = create_ssl_context()
 
     if ssl_context:
-        server.socket = ssl_context.wrap_socket(
-            server.socket, server_side=True
-        )
+        server.socket = ssl_context.wrap_socket(server.socket, server_side=True)
         log.info(f"[LOCK] HTTPS server on {address[0]}:{address[1]}")
     else:
         log.info(f"[WEB] HTTP server on {address[0]}:{address[1]} (no TLS)")
@@ -110,9 +124,10 @@ def get_cert_info() -> dict:
     if CERT_FILE.exists():
         try:
             result = subprocess.run(
-                ["openssl", "x509", "-in", str(CERT_FILE), "-noout",
-                 "-subject", "-dates", "-fingerprint"],
-                capture_output=True, text=True, timeout=10
+                ["openssl", "x509", "-in", str(CERT_FILE), "-noout", "-subject", "-dates", "-fingerprint"],
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode == 0:
                 for line in result.stdout.strip().splitlines():

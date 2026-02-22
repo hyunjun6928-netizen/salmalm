@@ -4,6 +4,7 @@ EmbeddedBlockChunker: accumulates streaming tokens and emits properly-split
 Markdown-safe chunks respecting code fences, break-point priorities, channel
 limits, and optional human-like pacing.
 """
+
 from __future__ import annotations
 
 import json
@@ -28,18 +29,19 @@ CHANNEL_DEFAULTS: Dict[str, dict] = {
 
 # ── Break-point priorities (higher = preferred) ─────────────
 
-BREAK_PARAGRAPH = 5     # \n\n
-BREAK_NEWLINE = 4       # \n
-BREAK_SENTENCE = 3      # sentence-ending punctuation followed by space
-BREAK_WHITESPACE = 2    # any whitespace
-BREAK_HARD = 1          # forced mid-word
+BREAK_PARAGRAPH = 5  # \n\n
+BREAK_NEWLINE = 4  # \n
+BREAK_SENTENCE = 3  # sentence-ending punctuation followed by space
+BREAK_WHITESPACE = 2  # any whitespace
+BREAK_HARD = 1  # forced mid-word
 
-_SENTENCE_END = re.compile(r'[.!?。！？]\s')
+_SENTENCE_END = re.compile(r"[.!?。！？]\s")
 
 
 @dataclass
 class ChunkerConfig:
     """Configuration for EmbeddedBlockChunker."""
+
     channel: str = CHANNEL_TELEGRAM
     # Coalescing
     minChars: int = 200
@@ -47,8 +49,8 @@ class ChunkerConfig:
     idleMs: int = 500
     # Human-like pacing
     humanDelay: Literal["off", "natural", "custom"] = "natural"
-    humanDelayMin: float = 0.8   # seconds
-    humanDelayMax: float = 2.5   # seconds
+    humanDelayMin: float = 0.8  # seconds
+    humanDelayMax: float = 2.5  # seconds
     # Break preference: list of priorities to try (highest first)
     breakPreference: Optional[List[int]] = None
     # Override hard cap (0 = use channel default)
@@ -86,7 +88,7 @@ def load_config_from_file(path: Optional[str] = None) -> ChunkerConfig:
 
 # ── Code fence tracking ──────────────────────────────────────
 
-_FENCE_OPEN = re.compile(r'^(`{3,}|~{3,})', re.MULTILINE)
+_FENCE_OPEN = re.compile(r"^(`{3,}|~{3,})", re.MULTILINE)
 
 
 def _count_open_fences(text: str) -> bool:
@@ -122,21 +124,21 @@ def _find_fence_safe_split(text: str, max_pos: int) -> Tuple[str, str]:
         _fence_marker = last_fence.group(1)  # noqa: F841
         # Check for language tag after fence
         fence_end = last_fence.end()
-        line_end = chunk.find('\n', fence_end)
+        line_end = chunk.find("\n", fence_end)
         if line_end == -1:
             line_end = len(chunk)
         lang_tag = chunk[fence_end:line_end].strip()
         # Close in chunk, reopen in rest
         chunk = chunk.rstrip() + "\n```"
-        rest = f"```{lang_tag}\n" + rest.lstrip('\n')
+        rest = f"```{lang_tag}\n" + rest.lstrip("\n")
 
     return chunk, rest
 
 
 # ── Smart break-point finder ────────────────────────────────
 
-def _find_best_break(text: str, max_pos: int,
-                     preference: Optional[List[int]] = None) -> int:
+
+def _find_best_break(text: str, max_pos: int, preference: Optional[List[int]] = None) -> int:
     """Find the best position to break text before max_pos.
 
     Returns the split position (exclusive). Falls back to max_pos (hard break).
@@ -149,17 +151,16 @@ def _find_best_break(text: str, max_pos: int,
 
     # Default priority order
     if preference is None:
-        preference = [BREAK_PARAGRAPH, BREAK_NEWLINE, BREAK_SENTENCE,
-                      BREAK_WHITESPACE, BREAK_HARD]
+        preference = [BREAK_PARAGRAPH, BREAK_NEWLINE, BREAK_SENTENCE, BREAK_WHITESPACE, BREAK_HARD]
 
     for bp in preference:
         pos = -1
         if bp == BREAK_PARAGRAPH:
-            pos = region.rfind('\n\n')
+            pos = region.rfind("\n\n")
             if pos >= 0:
                 pos += 2  # include the double newline
         elif bp == BREAK_NEWLINE:
-            pos = region.rfind('\n')
+            pos = region.rfind("\n")
             if pos >= 0:
                 pos += 1
         elif bp == BREAK_SENTENCE:
@@ -168,7 +169,7 @@ def _find_best_break(text: str, max_pos: int,
         elif bp == BREAK_WHITESPACE:
             # Find last whitespace
             for i in range(len(region) - 1, -1, -1):
-                if region[i] in ' \t':
+                if region[i] in " \t":
                     pos = i + 1
                     break
 
@@ -180,6 +181,7 @@ def _find_best_break(text: str, max_pos: int,
 
 
 # ── Main chunker class ──────────────────────────────────────
+
 
 class EmbeddedBlockChunker:
     """Accumulates streaming text and emits Markdown-safe chunks.
@@ -196,8 +198,7 @@ class EmbeddedBlockChunker:
     The on_chunk callback receives (text: str, is_final: bool).
     """
 
-    def __init__(self, config: Optional[ChunkerConfig] = None,
-                 on_chunk: Optional[Callable[[str, bool], None]] = None):
+    def __init__(self, config: Optional[ChunkerConfig] = None, on_chunk: Optional[Callable[[str, bool], None]] = None):
         self.config = config or ChunkerConfig()
         self.on_chunk = on_chunk
         self._buffer: str = ""
@@ -337,14 +338,14 @@ class EmbeddedBlockChunker:
         while remaining:
             if hard_cap > 0 and len(remaining) <= hard_cap:
                 # Check line limit
-                if max_lines and remaining.count('\n') >= max_lines:
-                    lines = remaining.split('\n')
-                    chunk_lines = '\n'.join(lines[:max_lines])
-                    remaining = '\n'.join(lines[max_lines:])
+                if max_lines and remaining.count("\n") >= max_lines:
+                    lines = remaining.split("\n")
+                    chunk_lines = "\n".join(lines[:max_lines])
+                    remaining = "\n".join(lines[max_lines:])
                     # Handle code fence integrity
                     if _count_open_fences(chunk_lines):
                         chunk_lines, extra = _find_fence_safe_split(chunk_lines, len(chunk_lines))
-                        remaining = extra + '\n' + remaining if remaining else extra
+                        remaining = extra + "\n" + remaining if remaining else extra
                     chunks.append(chunk_lines)
                     continue
                 chunks.append(remaining)
@@ -354,7 +355,7 @@ class EmbeddedBlockChunker:
 
             # Apply line limit
             if max_lines:
-                lines = remaining[:limit].split('\n')
+                lines = remaining[:limit].split("\n")
                 if len(lines) > max_lines:
                     limit = sum(len(l) + 1 for l in lines[:max_lines]) - 1  # noqa: E741
                     limit = min(limit, hard_cap) if hard_cap > 0 else limit
@@ -366,7 +367,7 @@ class EmbeddedBlockChunker:
                 chunk = remaining[:split_pos]
                 remaining = remaining[split_pos:]
 
-            remaining = remaining.lstrip('\n') if remaining else ""
+            remaining = remaining.lstrip("\n") if remaining else ""
             if chunk.strip():
                 chunks.append(chunk)
 

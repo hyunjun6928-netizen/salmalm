@@ -4,13 +4,13 @@ import sys as _sys
 import types as _types
 
 _real_mod = None
-_SUBMODULES = {'core', 'engine', 'llm', 'llm_loop', 'llm_task', 'session_manager', 'memory', 'prompt'}
+_SUBMODULES = {"core", "engine", "llm", "llm_loop", "llm_task", "session_manager", "memory", "prompt"}
 
 
 def _get_real():
     global _real_mod
     if _real_mod is None:
-        _real_mod = _importlib.import_module('salmalm.core.core')
+        _real_mod = _importlib.import_module("salmalm.core.core")
     return _real_mod
 
 
@@ -19,7 +19,7 @@ class _PkgProxy(_types.ModuleType):
         return getattr(_get_real(), name)
 
     def __setattr__(self, name, value):
-        if name.startswith('_') or name in _SUBMODULES:
+        if name.startswith("_") or name in _SUBMODULES:
             super().__setattr__(name, value)
         else:
             setattr(_get_real(), name, value)

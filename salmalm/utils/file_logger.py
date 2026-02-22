@@ -16,7 +16,7 @@ KST = timezone(timedelta(hours=9))
 class FileLogger:
     """JSON Lines 파일 로거."""
 
-    LOG_DIR = Path.home() / '.salmalm' / 'logs'
+    LOG_DIR = Path.home() / ".salmalm" / "logs"
 
     def __init__(self, log_dir: Optional[Path] = None):
         if log_dir is not None:
@@ -27,30 +27,30 @@ class FileLogger:
         """JSON 라인 로그 기록."""
         now = datetime.now(KST)
         entry = {
-            'ts': now.isoformat(),
-            'level': level.upper(),
-            'category': category,
-            'message': message,
+            "ts": now.isoformat(),
+            "level": level.upper(),
+            "category": category,
+            "message": message,
             **extra,
         }
         log_file = self.LOG_DIR / f"salmalm-{now.strftime('%Y-%m-%d')}.log"
-        with open(log_file, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     def tail(self, lines: int = 50, level: Optional[str] = None) -> List[dict]:
         """최근 로그 조회."""
         all_entries: List[dict] = []
-        log_files = sorted(self.LOG_DIR.glob('salmalm-*.log'), reverse=True)
+        log_files = sorted(self.LOG_DIR.glob("salmalm-*.log"), reverse=True)
         for lf in log_files:
             try:
-                with open(lf, 'r', encoding='utf-8') as f:
+                with open(lf, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
                         if not line:
                             continue
                         try:
                             entry = json.loads(line)
-                            if level and entry.get('level', '').upper() != level.upper():
+                            if level and entry.get("level", "").upper() != level.upper():
                                 continue
                             all_entries.append(entry)
                         except json.JSONDecodeError:
@@ -73,7 +73,7 @@ class FileLogger:
             if not log_file.exists():
                 continue
             try:
-                with open(log_file, 'r', encoding='utf-8') as f:
+                with open(log_file, "r", encoding="utf-8") as f:
                     for line in f:
                         if query_lower in line.lower():
                             try:
@@ -88,11 +88,11 @@ class FileLogger:
         """오래된 로그 삭제. Returns number of files removed."""
         now = datetime.now(KST)
         removed = 0
-        for lf in self.LOG_DIR.glob('salmalm-*.log'):
+        for lf in self.LOG_DIR.glob("salmalm-*.log"):
             try:
                 # Parse date from filename
-                date_str = lf.stem.replace('salmalm-', '')
-                file_date = datetime.strptime(date_str, '%Y-%m-%d').replace(tzinfo=KST)
+                date_str = lf.stem.replace("salmalm-", "")
+                file_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=KST)
                 if (now - file_date).days > retain_days:
                     lf.unlink()
                     removed += 1

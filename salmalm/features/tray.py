@@ -3,6 +3,7 @@
 Provides a system tray icon with right-click menu on Windows.
 On other platforms, falls back to normal server execution.
 """
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def is_windows() -> bool:
-    return sys.platform == 'win32'
+    return sys.platform == "win32"
 
 
 def run_tray(port: int = 18800):
@@ -25,6 +26,7 @@ def run_tray(port: int = 18800):
     if not is_windows():
         logger.info("System tray is Windows-only. Starting normal server...")
         from .__main__ import main
+
         main()
         return
 
@@ -78,13 +80,13 @@ def _run_windows_tray(port: int = 18800):
     # ── NOTIFYICONDATAW structure ──
     class NOTIFYICONDATAW(ctypes.Structure):
         _fields_ = [
-            ('cbSize', wt.DWORD),
-            ('hWnd', wt.HWND),
-            ('uID', wt.UINT),
-            ('uFlags', wt.UINT),
-            ('uCallbackMessage', wt.UINT),
-            ('hIcon', wt.HICON),
-            ('szTip', wt.WCHAR * 128),
+            ("cbSize", wt.DWORD),
+            ("hWnd", wt.HWND),
+            ("uID", wt.UINT),
+            ("uFlags", wt.UINT),
+            ("uCallbackMessage", wt.UINT),
+            ("hIcon", wt.HICON),
+            ("szTip", wt.WCHAR * 128),
         ]
 
     # ── WNDCLASSW ──
@@ -92,38 +94,39 @@ def _run_windows_tray(port: int = 18800):
 
     class WNDCLASSW(ctypes.Structure):
         _fields_ = [
-            ('style', wt.UINT),
-            ('lpfnWndProc', WNDPROC),
-            ('cbClsExtra', ctypes.c_int),
-            ('cbWndExtra', ctypes.c_int),
-            ('hInstance', wt.HINSTANCE),
-            ('hIcon', wt.HICON),
-            ('hCursor', wt.HANDLE),
-            ('hbrBackground', wt.HANDLE),
-            ('lpszMenuName', wt.LPCWSTR),
-            ('lpszClassName', wt.LPCWSTR),
+            ("style", wt.UINT),
+            ("lpfnWndProc", WNDPROC),
+            ("cbClsExtra", ctypes.c_int),
+            ("cbWndExtra", ctypes.c_int),
+            ("hInstance", wt.HINSTANCE),
+            ("hIcon", wt.HICON),
+            ("hCursor", wt.HANDLE),
+            ("hbrBackground", wt.HANDLE),
+            ("lpszMenuName", wt.LPCWSTR),
+            ("lpszClassName", wt.LPCWSTR),
         ]
 
     class POINT(ctypes.Structure):
-        _fields_ = [('x', wt.LONG), ('y', wt.LONG)]
+        _fields_ = [("x", wt.LONG), ("y", wt.LONG)]
 
     class MSG(ctypes.Structure):
         _fields_ = [
-            ('hWnd', wt.HWND),
-            ('message', wt.UINT),
-            ('wParam', wt.WPARAM),
-            ('lParam', wt.LPARAM),
-            ('time', wt.DWORD),
-            ('pt', POINT),
+            ("hWnd", wt.HWND),
+            ("message", wt.UINT),
+            ("wParam", wt.WPARAM),
+            ("lParam", wt.LPARAM),
+            ("time", wt.DWORD),
+            ("pt", POINT),
         ]
 
     # ── Server thread ──
     _server_ref = [None]  # noqa: F841
-    base_url = f'http://127.0.0.1:{port}'
+    base_url = f"http://127.0.0.1:{port}"
 
     def start_server():
         """Start SalmAlm server in background thread."""
         from .__main__ import main
+
         main()
 
     server_thread = threading.Thread(target=start_server, daemon=True)
@@ -131,6 +134,7 @@ def _run_windows_tray(port: int = 18800):
 
     # Give server time to start
     import time
+
     time.sleep(2)
 
     # ── Window procedure ──
@@ -139,26 +143,25 @@ def _run_windows_tray(port: int = 18800):
 
     def show_menu(hwnd):
         menu = user32.CreatePopupMenu()
-        user32.AppendMenuW(menu, MF_STRING, ID_OPEN_UI, '🌐 Open Web UI')
-        user32.AppendMenuW(menu, MF_STRING, ID_NEW_CHAT, '💬 New Chat')
+        user32.AppendMenuW(menu, MF_STRING, ID_OPEN_UI, "🌐 Open Web UI")
+        user32.AppendMenuW(menu, MF_STRING, ID_NEW_CHAT, "💬 New Chat")
         user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
-        user32.AppendMenuW(menu, MF_STRING, ID_SETTINGS, '⚙️ Settings')
+        user32.AppendMenuW(menu, MF_STRING, ID_SETTINGS, "⚙️ Settings")
         user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
-        user32.AppendMenuW(menu, MF_STRING, ID_QUIT, '❌ Quit')
+        user32.AppendMenuW(menu, MF_STRING, ID_QUIT, "❌ Quit")
 
         pt = POINT()
         user32.GetCursorPos(ctypes.byref(pt))
         user32.SetForegroundWindow(hwnd)
-        cmd = user32.TrackPopupMenu(menu, TPM_LEFTALIGN | TPM_RETURNCMD | TPM_NONOTIFY,
-                                    pt.x, pt.y, 0, hwnd, None)
+        cmd = user32.TrackPopupMenu(menu, TPM_LEFTALIGN | TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, hwnd, None)
         user32.DestroyMenu(menu)
 
         if cmd == ID_OPEN_UI:
             webbrowser.open(base_url)
         elif cmd == ID_NEW_CHAT:
-            webbrowser.open(f'{base_url}/#new')
+            webbrowser.open(f"{base_url}/#new")
         elif cmd == ID_SETTINGS:
-            webbrowser.open(f'{base_url}/#settings')
+            webbrowser.open(f"{base_url}/#settings")
         elif cmd == ID_QUIT:
             _cleanup_and_quit(hwnd)
 
@@ -186,7 +189,7 @@ def _run_windows_tray(port: int = 18800):
 
     # ── Create hidden window + tray icon ──
     hInstance = kernel32.GetModuleHandleW(None)
-    class_name = 'SalmAlmTray'
+    class_name = "SalmAlmTray"
 
     wc = WNDCLASSW()
     wc.lpfnWndProc = wnd_proc_cb
@@ -195,9 +198,7 @@ def _run_windows_tray(port: int = 18800):
 
     user32.RegisterClassW(ctypes.byref(wc))
 
-    hwnd = user32.CreateWindowExW(
-        0, class_name, 'SalmAlm Tray', WS_OVERLAPPED,
-        0, 0, 0, 0, None, None, hInstance, None)
+    hwnd = user32.CreateWindowExW(0, class_name, "SalmAlm Tray", WS_OVERLAPPED, 0, 0, 0, 0, None, None, hInstance, None)
     hwnd_ref[0] = hwnd
 
     # Load default icon
@@ -211,12 +212,12 @@ def _run_windows_tray(port: int = 18800):
     nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
     nid.uCallbackMessage = WM_TRAYICON
     nid.hIcon = hIcon
-    nid.szTip = f'😈 SalmAlm — AI Gateway (:{port})'
+    nid.szTip = f"😈 SalmAlm — AI Gateway (:{port})"
     nid_ref[0] = nid
 
     shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
 
-    logger.info(f'[TRAY] System tray icon active (port {port})')
+    logger.info(f"[TRAY] System tray icon active (port {port})")
 
     # ── Message loop ──
     msg = MSG()
@@ -228,4 +229,4 @@ def _run_windows_tray(port: int = 18800):
         pass
     finally:
         shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
-        logger.info('[TRAY] Tray icon removed. Goodbye!')
+        logger.info("[TRAY] Tray icon removed. Goodbye!")

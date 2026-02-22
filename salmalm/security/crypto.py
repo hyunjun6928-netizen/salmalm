@@ -27,6 +27,7 @@ def _keychain_get() -> Optional[str]:
     """Retrieve vault password from OS keychain. Returns None if unavailable."""
     try:
         import keyring
+
         pw = keyring.get_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
         return pw
     except Exception:
@@ -37,6 +38,7 @@ def _keychain_set(password: str) -> bool:
     """Store vault password in OS keychain. Returns True on success."""
     try:
         import keyring
+
         keyring.set_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT, password)
         log.info("[OK] Vault password saved to OS keychain")
         return True
@@ -49,6 +51,7 @@ def _keychain_delete() -> bool:
     """Remove vault password from OS keychain."""
     try:
         import keyring
+
         keyring.delete_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
         return True
     except Exception:
@@ -89,9 +92,7 @@ def _derive_key(password: str, salt: bytes, length: int = 32) -> bytes:
         )
         return kdf.derive(password.encode("utf-8"))
     else:
-        return hashlib.pbkdf2_hmac(
-            "sha256", password.encode("utf-8"), salt, PBKDF2_ITER, dklen=length
-        )
+        return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PBKDF2_ITER, dklen=length)
 
 
 class Vault:
@@ -115,9 +116,7 @@ class Vault:
     def create(self, password: str, save_to_keychain: bool = True) -> None:
         """Create a new vault with the given master password."""
         if not HAS_CRYPTO and not _ALLOW_FALLBACK:
-            raise RuntimeError(
-                "Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1"
-            )
+            raise RuntimeError("Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1")
         self._password = password
         self._salt = secrets.token_bytes(16)
         self._data = {}
@@ -202,9 +201,7 @@ class Vault:
             tag = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
             VAULT_FILE.write_bytes(b"\x02" + self._salt + tag + iv + ct)
         else:
-            raise RuntimeError(
-                "Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1"
-            )
+            raise RuntimeError("Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1")
 
     @staticmethod
     def _ctr_encrypt(key: bytes, data: bytes) -> bytes:
@@ -262,9 +259,7 @@ class Vault:
         if not self.is_unlocked:
             return False
         # Verify old password matches current (timing-safe comparison)
-        if not hmac.compare_digest(
-            (self._password or "").encode("utf-8"), old_password.encode("utf-8")
-        ):
+        if not hmac.compare_digest((self._password or "").encode("utf-8"), old_password.encode("utf-8")):
             return False
         # Re-encrypt with new password
         self._password = new_password

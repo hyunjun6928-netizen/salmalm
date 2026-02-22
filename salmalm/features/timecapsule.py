@@ -31,51 +31,49 @@ def _parse_capsule_date(text: str) -> datetime:
     now = datetime.now(tz=KST)
 
     # ISO date
-    m = re.match(r'^(\d{4}-\d{2}-\d{2})$', s)
+    m = re.match(r"^(\d{4}-\d{2}-\d{2})$", s)
     if m:
         return datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=KST)
 
     # Korean relative: N개월후, N년후, N일후, N주후
-    m = re.search(r'(\d+)\s*개월\s*후', s)
+    m = re.search(r"(\d+)\s*개월\s*후", s)
     if m:
         months = int(m.group(1))
-        target = now.replace(month=now.month + months % 12,
-                             year=now.year + (now.month + months - 1) // 12)
+        target = now.replace(month=now.month + months % 12, year=now.year + (now.month + months - 1) // 12)
         try:
             return target
         except ValueError:
             return target.replace(day=28)
 
-    m = re.search(r'(\d+)\s*년\s*후', s)
+    m = re.search(r"(\d+)\s*년\s*후", s)
     if m:
         return now.replace(year=now.year + int(m.group(1)))
 
-    m = re.search(r'(\d+)\s*일\s*후', s)
+    m = re.search(r"(\d+)\s*일\s*후", s)
     if m:
         return now + timedelta(days=int(m.group(1)))
 
-    m = re.search(r'(\d+)\s*주\s*후', s)
+    m = re.search(r"(\d+)\s*주\s*후", s)
     if m:
         return now + timedelta(weeks=int(m.group(1)))
 
     # English: in N months/days/weeks/years
-    m = re.search(r'in\s+(\d+)\s*(months?|days?|weeks?|years?)', s.lower())
+    m = re.search(r"in\s+(\d+)\s*(months?|days?|weeks?|years?)", s.lower())
     if m:
         val = int(m.group(1))
         unit = m.group(2)[0]
-        if unit == 'm':
+        if unit == "m":
             target_month = now.month + val
-            return now.replace(month=(target_month - 1) % 12 + 1,
-                               year=now.year + (target_month - 1) // 12)
-        elif unit == 'd':
+            return now.replace(month=(target_month - 1) % 12 + 1, year=now.year + (target_month - 1) // 12)
+        elif unit == "d":
             return now + timedelta(days=val)
-        elif unit == 'w':
+        elif unit == "w":
             return now + timedelta(weeks=val)
-        elif unit == 'y':
+        elif unit == "y":
             return now.replace(year=now.year + val)
 
     # 내년 (next year)
-    if '내년' in s:
+    if "내년" in s:
         return now.replace(year=now.year + 1)
 
     raise ValueError(f"날짜를 파싱할 수 없습니다: {text}")
@@ -106,13 +104,13 @@ class TimeCapsule:
             cur = conn.execute(
                 "INSERT INTO capsules (sender_note, delivery_date, created_at, delivered, delivery_channel) "
                 "VALUES (?, ?, ?, 0, ?)",
-                (message, delivery.strftime("%Y-%m-%d"), now.isoformat(), channel)
+                (message, delivery.strftime("%Y-%m-%d"), now.isoformat(), channel),
             )
             cid = cur.lastrowid
         return {
             "id": cid,
             "delivery_date": delivery.strftime("%Y-%m-%d"),
-            "message": f"📦 타임캡슐 #{cid} 생성! 배달 예정: {delivery.strftime('%Y-%m-%d')}"
+            "message": f"📦 타임캡슐 #{cid} 생성! 배달 예정: {delivery.strftime('%Y-%m-%d')}",
         }
 
     def list_pending(self) -> List[Tuple]:
@@ -137,22 +135,22 @@ class TimeCapsule:
         """Peek at a capsule (spoiler warning)."""
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT id, sender_note, delivery_date, created_at, delivered FROM capsules WHERE id = ?",
-                (capsule_id,)
+                "SELECT id, sender_note, delivery_date, created_at, delivered FROM capsules WHERE id = ?", (capsule_id,)
             ).fetchone()
         if not row:
             return None
         return {
-            "id": row[0], "message": row[1], "delivery_date": row[2],
-            "created_at": row[3], "delivered": bool(row[4])
+            "id": row[0],
+            "message": row[1],
+            "delivery_date": row[2],
+            "created_at": row[3],
+            "delivered": bool(row[4]),
         }
 
     def cancel(self, capsule_id: int) -> bool:
         """Cancel (delete) a pending capsule."""
         with self._conn() as conn:
-            cur = conn.execute(
-                "DELETE FROM capsules WHERE id = ? AND delivered = 0", (capsule_id,)
-            )
+            cur = conn.execute("DELETE FROM capsules WHERE id = ? AND delivered = 0", (capsule_id,))
         return cur.rowcount > 0
 
     def get_due_capsules(self, today: Optional[str] = None) -> List[Tuple]:
@@ -164,7 +162,7 @@ class TimeCapsule:
                 "SELECT id, sender_note, delivery_date, created_at, delivery_channel "
                 "FROM capsules WHERE delivered = 0 AND delivery_date <= ? "
                 "ORDER BY delivery_date",
-                (today,)
+                (today,),
             ).fetchall()
         return rows
 
@@ -179,14 +177,7 @@ class TimeCapsule:
         results = []
         for row in due:
             cid, note, ddate, created, channel = row
-            msg = (
-                f"📬 타임캡슐이 도착했습니다!\n"
-                f"작성일: {created[:10]}\n"
-                f"---\n"
-                f"{note}\n"
-                f"---\n"
-                f"과거의 나로부터."
-            )
+            msg = f"📬 타임캡슐이 도착했습니다!\n작성일: {created[:10]}\n---\n{note}\n---\n과거의 나로부터."
             if send_fn:
                 send_fn(msg, channel)
             self.mark_delivered(cid)
@@ -227,11 +218,7 @@ class TimeCapsule:
             cap = self.peek(cid)
             if not cap:
                 return f"캡슐 #{cid}를 찾을 수 없습니다."
-            return (
-                f"⚠️ 스포일러 주의!\n"
-                f"캡슐 #{cap['id']} (배달: {cap['delivery_date']})\n"
-                f"---\n{cap['message']}\n---"
-            )
+            return f"⚠️ 스포일러 주의!\n캡슐 #{cap['id']} (배달: {cap['delivery_date']})\n---\n{cap['message']}\n---"
 
         elif sub == "cancel":
             try:
@@ -261,20 +248,24 @@ class TimeCapsule:
 def _split_date_message(text: str) -> Tuple[str, str]:
     """Split combined date+message text."""
     # ISO date at start
-    m = re.match(r'^(\d{4}-\d{2}-\d{2})\s+(.+)', text, re.DOTALL)
+    m = re.match(r"^(\d{4}-\d{2}-\d{2})\s+(.+)", text, re.DOTALL)
     if m:
         return m.group(1), m.group(2)
 
     # Korean relative date patterns
-    for pattern in [r'^(\d+\s*개월\s*후)\s+', r'^(\d+\s*년\s*후)\s+',
-                    r'^(\d+\s*일\s*후)\s+', r'^(\d+\s*주\s*후)\s+',
-                    r'^(내년[^\s]*)\s+']:
+    for pattern in [
+        r"^(\d+\s*개월\s*후)\s+",
+        r"^(\d+\s*년\s*후)\s+",
+        r"^(\d+\s*일\s*후)\s+",
+        r"^(\d+\s*주\s*후)\s+",
+        r"^(내년[^\s]*)\s+",
+    ]:
         m = re.match(pattern, text)
         if m:
-            return m.group(1), text[m.end():]
+            return m.group(1), text[m.end() :]
 
     # English: "in N units message"
-    m = re.match(r'^(in\s+\d+\s+\w+)\s+(.+)', text, re.DOTALL | re.IGNORECASE)
+    m = re.match(r"^(in\s+\d+\s+\w+)\s+(.+)", text, re.DOTALL | re.IGNORECASE)
     if m:
         return m.group(1), m.group(2)
 

@@ -6,18 +6,45 @@ Strengthens the existing reminder system in tools_misc.py with:
 - Relative time: "3일 후", "다음주 수요일"
 - Recurring: daily, weekly, monthly, custom cron-like
 """
+
 import re
 from datetime import datetime, timedelta
 
 
 # Korean weekday names
-_KR_WEEKDAYS = {'월요일': 0, '화요일': 1, '수요일': 2, '목요일': 3,
-                '금요일': 4, '토요일': 5, '일요일': 6,
-                '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6}
+_KR_WEEKDAYS = {
+    "월요일": 0,
+    "화요일": 1,
+    "수요일": 2,
+    "목요일": 3,
+    "금요일": 4,
+    "토요일": 5,
+    "일요일": 6,
+    "월": 0,
+    "화": 1,
+    "수": 2,
+    "목": 3,
+    "금": 4,
+    "토": 5,
+    "일": 6,
+}
 
-_EN_WEEKDAYS = {'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
-                'friday': 4, 'saturday': 5, 'sunday': 6,
-                'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
+_EN_WEEKDAYS = {
+    "monday": 0,
+    "tuesday": 1,
+    "wednesday": 2,
+    "thursday": 3,
+    "friday": 4,
+    "saturday": 5,
+    "sunday": 6,
+    "mon": 0,
+    "tue": 1,
+    "wed": 2,
+    "thu": 3,
+    "fri": 4,
+    "sat": 5,
+    "sun": 6,
+}
 
 
 def parse_natural_time(text: str) -> datetime:
@@ -38,12 +65,16 @@ def parse_natural_time(text: str) -> datetime:
     s_lower = s.lower()
 
     # === Relative Korean: N분/시간/일/주 후 ===
-    m = re.search(r'(\d+)\s*(분|시간|일|주)\s*후', s)
+    m = re.search(r"(\d+)\s*(분|시간|일|주)\s*후", s)
     if m:
         val = int(m.group(1))
         unit = m.group(2)
-        deltas = {'분': timedelta(minutes=val), '시간': timedelta(hours=val),
-                  '일': timedelta(days=val), '주': timedelta(weeks=val)}
+        deltas = {
+            "분": timedelta(minutes=val),
+            "시간": timedelta(hours=val),
+            "일": timedelta(days=val),
+            "주": timedelta(weeks=val),
+        }
         base = now + deltas[unit]
         # Check if there's also a specific time
         hour, minute = _extract_time_kr(s)
@@ -52,12 +83,16 @@ def parse_natural_time(text: str) -> datetime:
         return base
 
     # === Relative English: in N minutes/hours/days/weeks ===
-    m = re.search(r'in\s+(\d+)\s*(min(?:ute)?s?|hours?|days?|weeks?)', s_lower)
+    m = re.search(r"in\s+(\d+)\s*(min(?:ute)?s?|hours?|days?|weeks?)", s_lower)
     if m:
         val = int(m.group(1))
         unit = m.group(2)[0]
-        deltas = {'m': timedelta(minutes=val), 'h': timedelta(hours=val),
-                  'd': timedelta(days=val), 'w': timedelta(weeks=val)}
+        deltas = {
+            "m": timedelta(minutes=val),
+            "h": timedelta(hours=val),
+            "d": timedelta(days=val),
+            "w": timedelta(weeks=val),
+        }
         base = now + deltas.get(unit, timedelta(minutes=val))
         hour, minute = _extract_time_en(s_lower)
         if hour is not None:
@@ -75,13 +110,13 @@ def parse_natural_time(text: str) -> datetime:
 
     # Apply period keywords if no specific time
     if hour is None:
-        if '아침' in s or 'morning' in s_lower:
+        if "아침" in s or "morning" in s_lower:
             hour, minute = 8, 0
-        elif '점심' in s or 'lunch' in s_lower or 'noon' in s_lower:
+        elif "점심" in s or "lunch" in s_lower or "noon" in s_lower:
             hour, minute = 12, 0
-        elif '저녁' in s or 'evening' in s_lower:
+        elif "저녁" in s or "evening" in s_lower:
             hour, minute = 18, 0
-        elif '밤' in s or 'night' in s_lower:
+        elif "밤" in s or "night" in s_lower:
             hour, minute = 21, 0
 
     if day_offset is not None or hour is not None:
@@ -98,27 +133,27 @@ def parse_natural_time(text: str) -> datetime:
     except ValueError:
         pass
 
-    raise ValueError(f'시간을 파싱할 수 없습니다: {text}')
+    raise ValueError(f"시간을 파싱할 수 없습니다: {text}")
 
 
 def _parse_day_offset(s: str, s_lower: str, now: datetime) -> int:
     """Parse day offset from text."""
-    if '오늘' in s or 'today' in s_lower:
+    if "오늘" in s or "today" in s_lower:
         return 0
-    if '내일' in s or 'tomorrow' in s_lower:
+    if "내일" in s or "tomorrow" in s_lower:
         return 1
-    if '모레' in s:
+    if "모레" in s:
         return 2
-    if 'day after tomorrow' in s_lower:
+    if "day after tomorrow" in s_lower:
         return 2
 
     # N일 후 (already handled above, but just in case)
-    m = re.search(r'(\d+)\s*일\s*후', s)
+    m = re.search(r"(\d+)\s*일\s*후", s)
     if m:
         return int(m.group(1))
 
     # 다음주 + weekday
-    if '다음주' in s or '다음 주' in s or 'next week' in s_lower:
+    if "다음주" in s or "다음 주" in s or "next week" in s_lower:
         for wd_name, wd_idx in _KR_WEEKDAYS.items():
             if wd_name in s:
                 return _days_until_weekday(now, wd_idx, next_week=True)
@@ -128,7 +163,7 @@ def _parse_day_offset(s: str, s_lower: str, now: datetime) -> int:
         return 7  # just "next week" without specific day
 
     # "next friday", "next monday"
-    m = re.search(r'next\s+(\w+)', s_lower)
+    m = re.search(r"next\s+(\w+)", s_lower)
     if m:
         wd_name = m.group(1)
         if wd_name in _EN_WEEKDAYS:
@@ -136,7 +171,7 @@ def _parse_day_offset(s: str, s_lower: str, now: datetime) -> int:
 
     # Just weekday name (이번주)
     for wd_name, wd_idx in _KR_WEEKDAYS.items():
-        if wd_name in s and '다음' not in s:
+        if wd_name in s and "다음" not in s:
             days = _days_until_weekday(now, wd_idx, next_week=False)
             if days > 0:
                 return days
@@ -160,18 +195,18 @@ def _days_until_weekday(now: datetime, target_wd: int, next_week: bool = False) 
 def _extract_time_kr(s: str):
     """Extract time from Korean text. Returns (hour, minute) or (None, None)."""
     # "오후 3시 30분", "오전 10시", "3시", "15시 30분"
-    m = re.search(r'(오전|오후)?\s*(\d{1,2})\s*시\s*(\d{1,2})?\s*분?', s)
+    m = re.search(r"(오전|오후)?\s*(\d{1,2})\s*시\s*(\d{1,2})?\s*분?", s)
     if m:
         period = m.group(1)
         hour = int(m.group(2))
         minute = int(m.group(3) or 0)
-        if period == '오후' and hour < 12:
+        if period == "오후" and hour < 12:
             hour += 12
-        elif period == '오전' and hour == 12:
+        elif period == "오전" and hour == 12:
             hour = 0
         elif not period and hour < 12:
             # Contextual: if 저녁/밤 mentioned, assume PM
-            if '저녁' in s or '밤' in s or '오후' in s:
+            if "저녁" in s or "밤" in s or "오후" in s:
                 hour += 12
         return hour, minute
     return None, None
@@ -180,14 +215,14 @@ def _extract_time_kr(s: str):
 def _extract_time_en(s: str):
     """Extract time from English text. Returns (hour, minute) or (None, None)."""
     # "at 3pm", "at 3:30pm", "3:00", "15:30"
-    m = re.search(r'(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', s)
+    m = re.search(r"(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", s)
     if m:
         hour = int(m.group(1))
         minute = int(m.group(2) or 0)
         period = m.group(3)
-        if period == 'pm' and hour < 12:
+        if period == "pm" and hour < 12:
             hour += 12
-        elif period == 'am' and hour == 12:
+        elif period == "am" and hour == 12:
             hour = 0
         return hour, minute
     return None, None
@@ -199,10 +234,10 @@ def parse_repeat_pattern(text: str) -> str:
     Returns: 'daily', 'weekly', 'monthly', or None.
     """
     s = text.strip().lower()
-    if '매일' in text or 'every day' in s or 'daily' in s:
-        return 'daily'
-    if '매주' in text or 'every week' in s or 'weekly' in s:
-        return 'weekly'
-    if '매달' in text or '매월' in text or 'every month' in s or 'monthly' in s:
-        return 'monthly'
+    if "매일" in text or "every day" in s or "daily" in s:
+        return "daily"
+    if "매주" in text or "every week" in s or "weekly" in s:
+        return "weekly"
+    if "매달" in text or "매월" in text or "every month" in s or "monthly" in s:
+        return "monthly"
     return None

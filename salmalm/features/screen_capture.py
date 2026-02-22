@@ -20,16 +20,16 @@ from typing import Dict, List, Optional
 
 log = logging.getLogger(__name__)
 
-_CONFIG_DIR = Path.home() / '.salmalm'
-_HISTORY_DIR = _CONFIG_DIR / 'screen_history'
-_SCREEN_CONFIG_PATH = _CONFIG_DIR / 'screen_config.json'
+_CONFIG_DIR = Path.home() / ".salmalm"
+_HISTORY_DIR = _CONFIG_DIR / "screen_history"
+_SCREEN_CONFIG_PATH = _CONFIG_DIR / "screen_config.json"
 
 DEFAULT_CONFIG = {
-    'enabled': True,
-    'captureIntervalMinutes': 5,
-    'maxHistory': 100,
-    'ocrEnabled': True,
-    'visionFallback': True,
+    "enabled": True,
+    "captureIntervalMinutes": 5,
+    "maxHistory": 100,
+    "ocrEnabled": True,
+    "visionFallback": True,
 }
 
 
@@ -43,21 +43,21 @@ class ScreenCapture:
 
     def capture_screen(self) -> Optional[bytes]:
         """Capture screen and return PNG bytes."""
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             tmp_path = tmp.name
 
         try:
-            if sys.platform == 'darwin':
+            if sys.platform == "darwin":
                 return self._capture_macos(tmp_path)
-            elif sys.platform == 'win32':
+            elif sys.platform == "win32":
                 return self._capture_windows(tmp_path)
-            elif sys.platform.startswith('linux'):
+            elif sys.platform.startswith("linux"):
                 return self._capture_linux(tmp_path)
             else:
-                log.warning(f'Unsupported platform for screen capture: {sys.platform}')
+                log.warning(f"Unsupported platform for screen capture: {sys.platform}")
                 return None
         except Exception as e:
-            log.error(f'Screen capture failed: {e}')
+            log.error(f"Screen capture failed: {e}")
             return None
         finally:
             try:
@@ -68,8 +68,9 @@ class ScreenCapture:
     @staticmethod
     def _capture_macos(tmp_path: str) -> Optional[bytes]:
         result = subprocess.run(
-            ['screencapture', '-x', tmp_path],
-            capture_output=True, timeout=10,
+            ["screencapture", "-x", tmp_path],
+            capture_output=True,
+            timeout=10,
         )
         if result.returncode == 0 and os.path.exists(tmp_path):
             return Path(tmp_path).read_bytes()
@@ -90,8 +91,9 @@ $graphics.Dispose()
 $bitmap.Dispose()
 '''
         result = subprocess.run(
-            ['powershell', '-Command', ps_script],
-            capture_output=True, timeout=15,
+            ["powershell", "-Command", ps_script],
+            capture_output=True,
+            timeout=15,
         )
         if result.returncode == 0 and os.path.exists(tmp_path):
             return Path(tmp_path).read_bytes()
@@ -101,37 +103,41 @@ $bitmap.Dispose()
     def _capture_linux(tmp_path: str) -> Optional[bytes]:
         # Try multiple tools
         tools = [
-            (['gnome-screenshot', '-f', tmp_path], 'gnome-screenshot'),
-            (['scrot', tmp_path], 'scrot'),
-            (['import', '-window', 'root', tmp_path], 'import'),
+            (["gnome-screenshot", "-f", tmp_path], "gnome-screenshot"),
+            (["scrot", tmp_path], "scrot"),
+            (["import", "-window", "root", tmp_path], "import"),
         ]
         for cmd, name in tools:
             if shutil.which(cmd[0]):
                 try:
                     result = subprocess.run(
-                        cmd, capture_output=True, timeout=10,
+                        cmd,
+                        capture_output=True,
+                        timeout=10,
                     )
                     if result.returncode == 0 and os.path.exists(tmp_path):
                         return Path(tmp_path).read_bytes()
                 except Exception:
                     continue
-        log.warning('No screen capture tool found on Linux (tried gnome-screenshot, scrot, import)')
+        log.warning("No screen capture tool found on Linux (tried gnome-screenshot, scrot, import)")
         return None
 
     @staticmethod
     def ocr_image(image_path: str) -> Optional[str]:
         """Run OCR on image using tesseract if available."""
-        if not shutil.which('tesseract'):
+        if not shutil.which("tesseract"):
             return None
         try:
             result = subprocess.run(
-                ['tesseract', image_path, 'stdout'],
-                capture_output=True, text=True, timeout=30,
+                ["tesseract", image_path, "stdout"],
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode == 0:
                 return result.stdout.strip()
         except Exception as e:
-            log.warning(f'OCR failed: {e}')
+            log.warning(f"OCR failed: {e}")
         return None
 
     @staticmethod
@@ -142,10 +148,10 @@ $bitmap.Dispose()
         """Capture screen and optionally analyze with LLM Vision."""
         png = self.capture_screen()
         if not png:
-            return '❌ Screen capture failed. No supported tool found.'
+            return "❌ Screen capture failed. No supported tool found."
 
         # Try OCR first
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
             tmp.write(png)
             tmp_path = tmp.name
 
@@ -158,17 +164,17 @@ $bitmap.Dispose()
                 pass
 
         if ocr_text:
-            return f'📸 **Screen capture** (OCR):\n```\n{ocr_text[:3000]}\n```'
+            return f"📸 **Screen capture** (OCR):\n```\n{ocr_text[:3000]}\n```"
 
         # Fallback to base64 for LLM Vision
         b64 = self.image_to_base64(png)
         if llm_func:
             try:
-                return llm_func(b64, 'image/png')
+                return llm_func(b64, "image/png")
             except Exception as e:
-                return f'📸 Screen captured ({len(png)} bytes). Vision analysis failed: {e}'
+                return f"📸 Screen captured ({len(png)} bytes). Vision analysis failed: {e}"
 
-        return f'📸 Screen captured ({len(png)} bytes). No OCR or Vision available.'
+        return f"📸 Screen captured ({len(png)} bytes). No OCR or Vision available."
 
 
 class ScreenHistory:
@@ -181,28 +187,30 @@ class ScreenHistory:
 
     def _load_config(self) -> dict:
         from salmalm.config_manager import ConfigManager
-        return ConfigManager.load('screen_config', defaults=DEFAULT_CONFIG)
+
+        return ConfigManager.load("screen_config", defaults=DEFAULT_CONFIG)
 
     def _save_config(self):
         from salmalm.config_manager import ConfigManager
-        _ensure_dirs()
-        ConfigManager.save('screen_config', self._config)
 
-    def save_capture(self, png_bytes: bytes, ocr_text: str = '') -> str:
+        _ensure_dirs()
+        ConfigManager.save("screen_config", self._config)
+
+    def save_capture(self, png_bytes: bytes, ocr_text: str = "") -> str:
         """Save a capture to history."""
         _ensure_dirs()
         ts = int(time.time())
-        filename = f'screen_{ts}.png'
+        filename = f"screen_{ts}.png"
         filepath = _HISTORY_DIR / filename
         filepath.write_bytes(png_bytes)
 
         # Save metadata
-        meta_path = _HISTORY_DIR / f'screen_{ts}.json'
+        meta_path = _HISTORY_DIR / f"screen_{ts}.json"
         meta = {
-            'timestamp': ts,
-            'filename': filename,
-            'size': len(png_bytes),
-            'ocr_text': ocr_text,
+            "timestamp": ts,
+            "filename": filename,
+            "size": len(png_bytes),
+            "ocr_text": ocr_text,
         }
         meta_path.write_text(json.dumps(meta))
 
@@ -212,19 +220,19 @@ class ScreenHistory:
 
     def _prune(self):
         """Remove oldest captures beyond maxHistory."""
-        max_hist = self._config.get('maxHistory', 100)
-        pngs = sorted(_HISTORY_DIR.glob('screen_*.png'))
+        max_hist = self._config.get("maxHistory", 100)
+        pngs = sorted(_HISTORY_DIR.glob("screen_*.png"))
         while len(pngs) > max_hist:
             old = pngs.pop(0)
             old.unlink(missing_ok=True)
-            meta = old.with_suffix('.json')
+            meta = old.with_suffix(".json")
             if meta.exists():
                 meta.unlink(missing_ok=True)
 
     def get_history(self, n: int = 5) -> List[Dict]:
         """Get most recent N captures."""
         _ensure_dirs()
-        metas = sorted(_HISTORY_DIR.glob('screen_*.json'), reverse=True)[:n]
+        metas = sorted(_HISTORY_DIR.glob("screen_*.json"), reverse=True)[:n]
         result = []
         for mp in metas:
             try:
@@ -238,10 +246,10 @@ class ScreenHistory:
         _ensure_dirs()
         query_lower = query.lower()
         results = []
-        for mp in sorted(_HISTORY_DIR.glob('screen_*.json'), reverse=True):
+        for mp in sorted(_HISTORY_DIR.glob("screen_*.json"), reverse=True):
             try:
                 meta = json.loads(mp.read_text())
-                if query_lower in meta.get('ocr_text', '').lower():
+                if query_lower in meta.get("ocr_text", "").lower():
                     results.append(meta)
                     if len(results) >= 20:
                         break
@@ -254,7 +262,7 @@ class ScreenHistory:
         if self._watching:
             return
         self._watching = True
-        interval = self._config.get('captureIntervalMinutes', 5) * 60
+        interval = self._config.get("captureIntervalMinutes", 5) * 60
         capturer = ScreenCapture()
 
         def _loop():
@@ -262,18 +270,18 @@ class ScreenHistory:
                 try:
                     png = capturer.capture_screen()
                     if png:
-                        ocr = ''
-                        if self._config.get('ocrEnabled'):
-                            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                        ocr = ""
+                        if self._config.get("ocrEnabled"):
+                            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
                                 tmp.write(png)
                                 tmp_path = tmp.name
                             try:
-                                ocr = capturer.ocr_image(tmp_path) or ''
+                                ocr = capturer.ocr_image(tmp_path) or ""
                             finally:
                                 os.unlink(tmp_path)
                         self.save_capture(png, ocr)
                 except Exception as e:
-                    log.error(f'Periodic capture error: {e}')
+                    log.error(f"Periodic capture error: {e}")
                 time.sleep(interval)
 
         self._watcher_thread = threading.Thread(target=_loop, daemon=True)
@@ -294,38 +302,38 @@ class ScreenManager:
         return self.capturer.capture_and_analyze(llm_func)
 
     def watch(self, toggle: str) -> str:
-        if toggle == 'on':
+        if toggle == "on":
             self.history_mgr.start_watching()
-            interval = self.history_mgr._config.get('captureIntervalMinutes', 5)
-            return f'👁️ Screen watching started (every {interval}min).'
-        elif toggle == 'off':
+            interval = self.history_mgr._config.get("captureIntervalMinutes", 5)
+            return f"👁️ Screen watching started (every {interval}min)."
+        elif toggle == "off":
             self.history_mgr.stop_watching()
-            return '👁️ Screen watching stopped.'
-        return '❓ Usage: /screen watch on|off'
+            return "👁️ Screen watching stopped."
+        return "❓ Usage: /screen watch on|off"
 
     def history(self, n: int = 5) -> str:
         entries = self.history_mgr.get_history(n)
         if not entries:
-            return '📸 No screen captures in history.'
-        lines = [f'📸 **Recent {len(entries)} captures:**']
+            return "📸 No screen captures in history."
+        lines = [f"📸 **Recent {len(entries)} captures:**"]
         for e in entries:
-            ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(e['timestamp']))
-            size_kb = e.get('size', 0) // 1024
-            ocr_preview = (e.get('ocr_text', '') or '')[:80]
-            lines.append(f'  • {ts} ({size_kb}KB) {ocr_preview}')
-        return '\n'.join(lines)
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(e["timestamp"]))
+            size_kb = e.get("size", 0) // 1024
+            ocr_preview = (e.get("ocr_text", "") or "")[:80]
+            lines.append(f"  • {ts} ({size_kb}KB) {ocr_preview}")
+        return "\n".join(lines)
 
     def search(self, query: str) -> str:
         if not query:
-            return '❓ Usage: /screen search <query>'
+            return "❓ Usage: /screen search <query>"
         results = self.history_mgr.search(query)
         if not results:
             return f'🔍 No captures matching "{query}".'
         lines = [f'🔍 **{len(results)} matches for "{query}":**']
         for e in results:
-            ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(e['timestamp']))
-            lines.append(f'  • {ts}: {(e.get("ocr_text", "") or "")[:100]}')
-        return '\n'.join(lines)
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(e["timestamp"]))
+            lines.append(f"  • {ts}: {(e.get('ocr_text', '') or '')[:100]}")
+        return "\n".join(lines)
 
 
 # Singleton

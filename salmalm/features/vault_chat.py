@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS vault_entries (
 
 def _pbkdf2_derive(password: str, salt: bytes, iterations: int = PBKDF2_ITERATIONS) -> bytes:
     """Derive 32-byte key from password using PBKDF2-HMAC-SHA256."""
-    return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, iterations, dklen=32)
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations, dklen=32)
 
 
 def _aes_gcm_encrypt(key: bytes, plaintext: bytes) -> bytes:
@@ -45,8 +45,8 @@ def _aes_gcm_encrypt(key: bytes, plaintext: bytes) -> bytes:
     nonce = secrets.token_bytes(12)
     # We implement AES-256-GCM via hmac-based stream cipher for stdlib-only
     # This uses a simplified authenticated encryption scheme
-    stream_key = hashlib.pbkdf2_hmac('sha256', key, nonce, 1, dklen=len(plaintext) + 16)
-    ct = bytes(a ^ b for a, b in zip(plaintext, stream_key[:len(plaintext)]))
+    stream_key = hashlib.pbkdf2_hmac("sha256", key, nonce, 1, dklen=len(plaintext) + 16)
+    ct = bytes(a ^ b for a, b in zip(plaintext, stream_key[: len(plaintext)]))
     tag = hmac.new(key, nonce + ct, hashlib.sha256).digest()[:16]
     return nonce + ct + tag
 
@@ -62,8 +62,8 @@ def _aes_gcm_decrypt(key: bytes, data: bytes) -> bytes:
     expected_tag = hmac.new(key, nonce + ct, hashlib.sha256).digest()[:16]
     if not hmac.compare_digest(tag, expected_tag):
         raise ValueError("Decryption failed: invalid password or corrupted data")
-    stream_key = hashlib.pbkdf2_hmac('sha256', key, nonce, 1, dklen=len(ct) + 16)
-    plaintext = bytes(a ^ b for a, b in zip(ct, stream_key[:len(ct)]))
+    stream_key = hashlib.pbkdf2_hmac("sha256", key, nonce, 1, dklen=len(ct) + 16)
+    plaintext = bytes(a ^ b for a, b in zip(ct, stream_key[: len(ct)]))
     return plaintext
 
 
@@ -96,7 +96,7 @@ class VaultChat:
         salt = secrets.token_bytes(32)
         pw_hash = _pbkdf2_derive(password, salt)
         verify_salt = secrets.token_bytes(16)
-        verify_hash = hashlib.pbkdf2_hmac('sha256', pw_hash, verify_salt, 1000)
+        verify_hash = hashlib.pbkdf2_hmac("sha256", pw_hash, verify_salt, 1000)
         meta = {
             "salt": salt.hex(),
             "verify_salt": verify_salt.hex(),
@@ -131,7 +131,7 @@ class VaultChat:
         key = _pbkdf2_derive(password, salt)
         verify_salt = bytes.fromhex(meta["verify_salt"])
         verify_hash = bytes.fromhex(meta["verify_hash"])
-        expected = hashlib.pbkdf2_hmac('sha256', key, verify_salt, 1000)
+        expected = hashlib.pbkdf2_hmac("sha256", key, verify_salt, 1000)
         if hmac.compare_digest(expected, verify_hash):
             return key
         return None
@@ -155,7 +155,7 @@ class VaultChat:
             f.write(new_encrypted)
         # Update meta
         verify_salt = secrets.token_bytes(16)
-        verify_hash = hashlib.pbkdf2_hmac('sha256', new_key, verify_salt, 1000)
+        verify_hash = hashlib.pbkdf2_hmac("sha256", new_key, verify_salt, 1000)
         meta = {
             "salt": new_salt.hex(),
             "verify_salt": verify_salt.hex(),
@@ -259,7 +259,7 @@ class VaultChat:
         now = datetime.now(tz=KST).isoformat()
         self._conn.execute(
             "INSERT INTO vault_entries (content, category, created_at, updated_at) VALUES (?, ?, ?, ?)",
-            (content, category, now, now)
+            (content, category, now, now),
         )
         self._conn.commit()
         self._flush_to_disk()
@@ -274,12 +274,11 @@ class VaultChat:
             rows = self._conn.execute(
                 "SELECT id, content, category, created_at FROM vault_entries "
                 "WHERE category = ? ORDER BY created_at DESC LIMIT ?",
-                (category, limit)
+                (category, limit),
             ).fetchall()
         else:
             rows = self._conn.execute(
-                "SELECT id, content, category, created_at FROM vault_entries "
-                "ORDER BY created_at DESC LIMIT ?", (limit,)
+                "SELECT id, content, category, created_at FROM vault_entries ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
         if not rows:
             return "📭 볼트가 비어있습니다."
@@ -298,7 +297,7 @@ class VaultChat:
         rows = self._conn.execute(
             "SELECT id, content, category, created_at FROM vault_entries "
             "WHERE content LIKE ? ORDER BY created_at DESC LIMIT 20",
-            (f"%{query}%",)
+            (f"%{query}%",),
         ).fetchall()
         if not rows:
             return f"🔍 '{query}'에 대한 결과가 없습니다."

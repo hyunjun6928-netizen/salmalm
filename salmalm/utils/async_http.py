@@ -11,16 +11,17 @@ import ssl
 import urllib.parse
 from typing import AsyncIterator, Dict, Optional
 
-__all__ = ['AsyncHTTPClient', 'AsyncHTTPResponse']
+__all__ = ["AsyncHTTPClient", "AsyncHTTPResponse"]
 
 
 class AsyncHTTPResponse:
     """Lightweight async HTTP response wrapper."""
 
-    __slots__ = ('status', 'headers', '_reader', '_writer', '_body')
+    __slots__ = ("status", "headers", "_reader", "_writer", "_body")
 
-    def __init__(self, status: int, headers: Dict[str, str],
-                 reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    def __init__(
+        self, status: int, headers: Dict[str, str], reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
         self.status = status
         self.headers = headers
         self._reader = reader
@@ -33,10 +34,10 @@ class AsyncHTTPResponse:
         """Read entire response body (handles chunked transfer-encoding)."""
         if self._body is not None:
             return self._body
-        if self.headers.get('transfer-encoding', '').lower() == 'chunked':
+        if self.headers.get("transfer-encoding", "").lower() == "chunked":
             self._body = await self._read_chunked()
         else:
-            length = self.headers.get('content-length')
+            length = self.headers.get("content-length")
             if length is not None:
                 self._body = await self._reader.readexactly(int(length))
             else:
@@ -48,25 +49,25 @@ class AsyncHTTPResponse:
         return json.loads(await self.read())
 
     async def text(self) -> str:
-        return (await self.read()).decode('utf-8', errors='replace')
+        return (await self.read()).decode("utf-8", errors="replace")
 
     # -- streaming ----------------------------------------------------------
 
     async def iter_lines(self) -> AsyncIterator[str]:
         """Yield lines as they arrive (for SSE / streaming)."""
-        buf = b''
+        buf = b""
         try:
             while True:
                 # Handle chunked TE transparently
                 chunk = await self._reader.read(4096)
                 if not chunk:
                     if buf:
-                        yield buf.decode('utf-8', errors='replace')
+                        yield buf.decode("utf-8", errors="replace")
                     break
                 buf += chunk
-                while b'\n' in buf:
-                    line, buf = buf.split(b'\n', 1)
-                    yield line.decode('utf-8', errors='replace')
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    yield line.decode("utf-8", errors="replace")
         finally:
             self._close()
 
@@ -121,41 +122,44 @@ class AsyncHTTPClient:
     def __init__(self, default_timeout: float = 30):
         self._default_timeout = default_timeout
 
-    async def request(self, method: str, url: str, *,
-                      headers: Optional[Dict[str, str]] = None,
-                      body: Optional[bytes] = None,
-                      timeout: Optional[float] = None) -> AsyncHTTPResponse:
+    async def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: Optional[Dict[str, str]] = None,
+        body: Optional[bytes] = None,
+        timeout: Optional[float] = None,
+    ) -> AsyncHTTPResponse:
         """Send an HTTP/1.1 request and return an :class:`AsyncHTTPResponse`."""
         timeout = timeout or self._default_timeout
         parsed = urllib.parse.urlparse(url)
         host = parsed.hostname
-        port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
 
         # Open connection
         kw = {}
-        if parsed.scheme == 'https':
-            kw['ssl'] = ssl.create_default_context()
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(host, port, **kw), timeout=timeout
-        )
+        if parsed.scheme == "https":
+            kw["ssl"] = ssl.create_default_context()
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port, **kw), timeout=timeout)
 
         # Build request
-        path = parsed.path or '/'
+        path = parsed.path or "/"
         if parsed.query:
-            path = f'{path}?{parsed.query}'
+            path = f"{path}?{parsed.query}"
 
-        lines = [f'{method} {path} HTTP/1.1', f'Host: {host}']
+        lines = [f"{method} {path} HTTP/1.1", f"Host: {host}"]
         hdrs = dict(headers) if headers else {}
-        if body and 'Content-Length' not in hdrs and 'content-length' not in hdrs:
-            hdrs['Content-Length'] = str(len(body))
-        if 'Connection' not in hdrs and 'connection' not in hdrs:
-            hdrs['Connection'] = 'close'
+        if body and "Content-Length" not in hdrs and "content-length" not in hdrs:
+            hdrs["Content-Length"] = str(len(body))
+        if "Connection" not in hdrs and "connection" not in hdrs:
+            hdrs["Connection"] = "close"
         for k, v in hdrs.items():
-            lines.append(f'{k}: {v}')
-        lines.append('')
-        lines.append('')
+            lines.append(f"{k}: {v}")
+        lines.append("")
+        lines.append("")
 
-        raw = '\r\n'.join(lines).encode('utf-8')
+        raw = "\r\n".join(lines).encode("utf-8")
         if body:
             raw += body
 
@@ -171,10 +175,10 @@ class AsyncHTTPClient:
         resp_headers: Dict[str, str] = {}
         while True:
             hline = await reader.readline()
-            if hline in (b'\r\n', b'\n', b''):
+            if hline in (b"\r\n", b"\n", b""):
                 break
-            decoded = hline.decode('utf-8', errors='replace')
-            key, _, value = decoded.partition(':')
+            decoded = hline.decode("utf-8", errors="replace")
+            key, _, value = decoded.partition(":")
             resp_headers[key.strip().lower()] = value.strip()
 
         return AsyncHTTPResponse(status_code, resp_headers, reader, writer)
@@ -182,15 +186,13 @@ class AsyncHTTPClient:
     # -- convenience wrappers -----------------------------------------------
 
     async def get(self, url: str, **kw) -> AsyncHTTPResponse:
-        return await self.request('GET', url, **kw)
+        return await self.request("GET", url, **kw)
 
     async def post(self, url: str, **kw) -> AsyncHTTPResponse:
-        return await self.request('POST', url, **kw)
+        return await self.request("POST", url, **kw)
 
-    async def post_json(self, url: str, data, *,
-                        headers: Optional[Dict[str, str]] = None,
-                        **kw) -> AsyncHTTPResponse:
-        body = json.dumps(data).encode('utf-8')
+    async def post_json(self, url: str, data, *, headers: Optional[Dict[str, str]] = None, **kw) -> AsyncHTTPResponse:
+        body = json.dumps(data).encode("utf-8")
         h = dict(headers) if headers else {}
-        h['Content-Type'] = 'application/json'
-        return await self.request('POST', url, headers=h, body=body, **kw)
+        h["Content-Type"] = "application/json"
+        return await self.request("POST", url, headers=h, body=body, **kw)

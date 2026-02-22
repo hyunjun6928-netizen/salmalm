@@ -21,12 +21,14 @@ _INBOX_PATH = _DATA_DIR / "a2a_inbox.json"
 
 PROTOCOL_VERSION = "salmalm-a2a-v1"
 
-VALID_ACTIONS = frozenset({
-    "schedule_meeting",
-    "share_document",
-    "ask_question",
-    "task_delegate",
-})
+VALID_ACTIONS = frozenset(
+    {
+        "schedule_meeting",
+        "share_document",
+        "ask_question",
+        "task_delegate",
+    }
+)
 
 
 class A2AProtocol:
@@ -94,10 +96,7 @@ class A2AProtocol:
         return False
 
     def list_peers(self) -> List[Dict[str, Any]]:
-        return [
-            {"id": pid, "name": p.get("name", ""), "url": p["url"]}
-            for pid, p in self.peers.items()
-        ]
+        return [{"id": pid, "name": p.get("name", ""), "url": p["url"]} for pid, p in self.peers.items()]
 
     # ── Sending ──────────────────────────────────────────────
 

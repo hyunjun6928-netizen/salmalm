@@ -1,4 +1,5 @@
 """SalmAlm Presence System — Track connected clients."""
+
 from __future__ import annotations
 
 import time
@@ -16,11 +17,18 @@ IDLE_THRESHOLD = 180
 
 
 class PresenceEntry:
-    __slots__ = ('instance_id', 'host', 'ip', 'mode', 'last_activity',
-                 'connected_at', 'user_agent', 'extra')
+    __slots__ = ("instance_id", "host", "ip", "mode", "last_activity", "connected_at", "user_agent", "extra")
 
-    def __init__(self, instance_id: str, *, host: str = '', ip: str = '',
-                 mode: str = 'web', user_agent: str = '', extra: Optional[Dict] = None):
+    def __init__(
+        self,
+        instance_id: str,
+        *,
+        host: str = "",
+        ip: str = "",
+        mode: str = "web",
+        user_agent: str = "",
+        extra: Optional[Dict] = None,
+    ):
         self.instance_id = instance_id
         self.host = host
         self.ip = ip
@@ -34,10 +42,10 @@ class PresenceEntry:
     def state(self) -> str:
         elapsed = time.time() - self.last_activity
         if elapsed < ACTIVE_THRESHOLD:
-            return 'active'
+            return "active"
         elif elapsed < IDLE_THRESHOLD:
-            return 'idle'
-        return 'stale'
+            return "idle"
+        return "stale"
 
     @property
     def is_expired(self) -> bool:
@@ -47,19 +55,19 @@ class PresenceEntry:
         """Update last activity and optional fields."""
         self.last_activity = time.time()
         for k, v in kwargs.items():
-            if hasattr(self, k) and k != 'instance_id':
+            if hasattr(self, k) and k != "instance_id":
                 setattr(self, k, v)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'instanceId': self.instance_id,
-            'host': self.host,
-            'ip': self.ip,
-            'mode': self.mode,
-            'state': self.state,
-            'lastActivity': self.last_activity,
-            'connectedAt': self.connected_at,
-            'userAgent': self.user_agent,
+            "instanceId": self.instance_id,
+            "host": self.host,
+            "ip": self.ip,
+            "mode": self.mode,
+            "state": self.state,
+            "lastActivity": self.last_activity,
+            "connectedAt": self.connected_at,
+            "userAgent": self.user_agent,
         }
 
 
@@ -84,7 +92,7 @@ class PresenceManager:
                 self._evict_oldest()
             entry = PresenceEntry(instance_id, **kwargs)
             self._entries[instance_id] = entry
-            log.info(f'Presence: {instance_id} registered (mode={entry.mode})')
+            log.info(f"Presence: {instance_id} registered (mode={entry.mode})")
             return entry
 
     def heartbeat(self, instance_id: str, **kwargs) -> Optional[PresenceEntry]:
@@ -124,7 +132,7 @@ class PresenceManager:
     def count_by_state(self) -> Dict[str, int]:
         with self._lock:
             self._evict_expired()
-            counts = {'active': 0, 'idle': 0, 'stale': 0}
+            counts = {"active": 0, "idle": 0, "stale": 0}
             for e in self._entries.values():
                 counts[e.state] = counts.get(e.state, 0) + 1
             return counts
@@ -132,8 +140,7 @@ class PresenceManager:
     def _evict_expired(self) -> int:
         """Remove expired entries. Returns count removed."""
         now = time.time()
-        expired = [k for k, v in self._entries.items()
-                   if (now - v.last_activity) > self._ttl]
+        expired = [k for k, v in self._entries.items() if (now - v.last_activity) > self._ttl]
         for k in expired:
             del self._entries[k]
         return len(expired)

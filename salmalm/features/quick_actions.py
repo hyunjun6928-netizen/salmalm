@@ -2,6 +2,7 @@
 
 stdlib-only. SQLite 저장, 매크로 체인 지원.
 """
+
 from __future__ import annotations
 
 import logging
@@ -70,14 +71,16 @@ class QuickActionManager:
             self.conn.execute(
                 "INSERT INTO quick_actions (name, commands, description, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?)",
-                (name, commands, description, now, now))
+                (name, commands, description, now, now),
+            )
             self.conn.commit()
             cmd_count = len(self._parse_chain(commands))
             return f"✅ 액션 '{name}' 등록 ({cmd_count}개 명령어)"
         except sqlite3.IntegrityError:
             self.conn.execute(
                 "UPDATE quick_actions SET commands=?, description=?, updated_at=? WHERE name=?",
-                (commands, description, now, name))
+                (commands, description, now, name),
+            )
             self.conn.commit()
             return f"✅ 액션 '{name}' 업데이트됨"
 
@@ -94,21 +97,23 @@ class QuickActionManager:
     def get(self, name: str) -> Optional[Dict]:
         """액션 조회."""
         row = self.conn.execute(
-            "SELECT name, commands, description, usage_count, created_at "
-            "FROM quick_actions WHERE name=?",
-            (name,)).fetchone()
+            "SELECT name, commands, description, usage_count, created_at FROM quick_actions WHERE name=?", (name,)
+        ).fetchone()
         if not row:
             return None
         return {
-            "name": row[0], "commands": row[1], "description": row[2],
-            "usage_count": row[3], "created_at": row[4],
+            "name": row[0],
+            "commands": row[1],
+            "description": row[2],
+            "usage_count": row[3],
+            "created_at": row[4],
         }
 
     def list_all(self) -> str:
         """목록."""
         rows = self.conn.execute(
-            "SELECT name, commands, description, usage_count "
-            "FROM quick_actions ORDER BY usage_count DESC").fetchall()
+            "SELECT name, commands, description, usage_count FROM quick_actions ORDER BY usage_count DESC"
+        ).fetchall()
 
         if not rows:
             return "📋 등록된 액션이 없습니다. `/qa add <name> <command>`로 추가하세요."
@@ -128,9 +133,7 @@ class QuickActionManager:
             return f"❌ '{name}' 액션을 찾을 수 없습니다."
 
         # Update usage count
-        self.conn.execute(
-            "UPDATE quick_actions SET usage_count = usage_count + 1 WHERE name=?",
-            (name,))
+        self.conn.execute("UPDATE quick_actions SET usage_count = usage_count + 1 WHERE name=?", (name,))
         self.conn.commit()
 
         commands = self._parse_chain(action["commands"])
@@ -144,6 +147,7 @@ class QuickActionManager:
             if dispatch:
                 try:
                     import asyncio
+
                     result = dispatch(cmd)
                     if asyncio.iscoroutine(result):
                         result = await result
@@ -179,7 +183,7 @@ class QuickActionManager:
             elif ch == quote_char and in_quote:
                 in_quote = False
                 continue
-            elif ch == '&' and not in_quote and current.endswith('&'):
+            elif ch == "&" and not in_quote and current.endswith("&"):
                 # Found &&
                 current = current[:-1]  # Remove trailing &
                 if current.strip():
@@ -199,9 +203,7 @@ class QuickActionManager:
             return f"❌ '{old_name}' 액션을 찾을 수 없습니다."
         now = datetime.now(KST).isoformat()
         try:
-            self.conn.execute(
-                "UPDATE quick_actions SET name=?, updated_at=? WHERE name=?",
-                (new_name, now, old_name))
+            self.conn.execute("UPDATE quick_actions SET name=?, updated_at=? WHERE name=?", (new_name, now, old_name))
             self.conn.commit()
             return f"✅ '{old_name}' → '{new_name}' 이름 변경됨."
         except sqlite3.IntegrityError:
@@ -221,6 +223,7 @@ def get_qa(db_path: Optional[Path] = None) -> QuickActionManager:
 
 # ── Command handler ──
 
+
 async def handle_qa_command(cmd: str, session=None, **kw) -> Optional[str]:
     """Handle /qa commands."""
     parts = cmd.strip().split(maxsplit=3)
@@ -232,7 +235,7 @@ async def handle_qa_command(cmd: str, session=None, **kw) -> Optional[str]:
 
     if sub == "add":
         if len(parts) < 4:
-            return "사용법: `/qa add <name> <command(s)>`\n예: `/qa add morning \"/briefing && /habit remind\"`"
+            return '사용법: `/qa add <name> <command(s)>`\n예: `/qa add morning "/briefing && /habit remind"`'
         name = parts[2]
         commands = parts[3]
         return qa.add(name, commands)
@@ -277,12 +280,14 @@ async def handle_qa_command(cmd: str, session=None, **kw) -> Optional[str]:
 
 # ── Registration ──
 
+
 def register_qa_commands(command_router):
     """Register /qa command."""
     from salmalm.features.commands import COMMAND_DEFS
-    COMMAND_DEFS['/qa'] = 'Quick actions (add|run|list|show|remove|rename)'
-    if hasattr(command_router, '_prefix_handlers'):
-        command_router._prefix_handlers.append(('/qa', handle_qa_command))
+
+    COMMAND_DEFS["/qa"] = "Quick actions (add|run|list|show|remove|rename)"
+    if hasattr(command_router, "_prefix_handlers"):
+        command_router._prefix_handlers.append(("/qa", handle_qa_command))
 
 
 def register_qa_tools():
@@ -296,19 +301,23 @@ def register_qa_tools():
         cmd = f"/qa {sub} {name} {commands}".strip()
         return await handle_qa_command(cmd)
 
-    register_dynamic("quick_actions", _qa_tool, {
-        "name": "quick_actions",
-        "description": "Quick actions - register and run command shortcuts/macros",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subcommand": {
-                    "type": "string",
-                    "enum": ["add", "run", "list", "show", "remove"],
+    register_dynamic(
+        "quick_actions",
+        _qa_tool,
+        {
+            "name": "quick_actions",
+            "description": "Quick actions - register and run command shortcuts/macros",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subcommand": {
+                        "type": "string",
+                        "enum": ["add", "run", "list", "show", "remove"],
+                    },
+                    "name": {"type": "string"},
+                    "commands": {"type": "string", "description": "Commands for add"},
                 },
-                "name": {"type": "string"},
-                "commands": {"type": "string", "description": "Commands for add"},
+                "required": ["subcommand"],
             },
-            "required": ["subcommand"]
-        }
-    })
+        },
+    )

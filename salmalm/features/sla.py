@@ -8,6 +8,7 @@ Components:
   - LatencyTracker: TTFT/total response time P50/P95/P99 with ring buffer
   - Watchdog: Background self-diagnosis every N seconds with auto-recovery
 """
+
 from __future__ import annotations
 
 import json
@@ -25,9 +26,9 @@ from salmalm.constants import VERSION, KST, AUDIT_DB
 from salmalm.security.crypto import log
 
 # ── Paths ────────────────────────────────────────────────────
-_SALMALM_DIR = Path.home() / '.salmalm'
-_RUNNING_FILE = _SALMALM_DIR / '.running'
-_SLA_CONFIG_FILE = _SALMALM_DIR / 'sla.json'
+_SALMALM_DIR = Path.home() / ".salmalm"
+_RUNNING_FILE = _SALMALM_DIR / ".running"
+_SLA_CONFIG_FILE = _SALMALM_DIR / "sla.json"
 
 # ============================================================
 # SLA Configuration (런타임 반영 설정)
@@ -66,14 +67,14 @@ class SLAConfig:
                 with self._lock:
                     if mtime == self._mtime:
                         return  # unchanged
-                data = json.loads(_SLA_CONFIG_FILE.read_text(encoding='utf-8'))
+                data = json.loads(_SLA_CONFIG_FILE.read_text(encoding="utf-8"))
                 with self._lock:
                     # Merge with defaults (keep new keys from default)
                     merged = dict(_DEFAULT_SLA_CONFIG)
                     merged.update(data)
-                    if isinstance(data.get('alerts'), dict):
-                        merged['alerts'] = dict(_DEFAULT_SLA_CONFIG['alerts'])
-                        merged['alerts'].update(data['alerts'])
+                    if isinstance(data.get("alerts"), dict):
+                        merged["alerts"] = dict(_DEFAULT_SLA_CONFIG["alerts"])
+                        merged["alerts"].update(data["alerts"])
                     self._config = merged
                     self._mtime = mtime
             else:
@@ -87,8 +88,7 @@ class SLAConfig:
         try:
             with self._lock:
                 data = dict(self._config)
-            _SLA_CONFIG_FILE.write_text(
-                json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')
+            _SLA_CONFIG_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
             self._mtime = _SLA_CONFIG_FILE.stat().st_mtime
         except Exception as e:
             log.warning(f"[SLA] Config save error: {e}")
@@ -136,6 +136,7 @@ sla_config = SLAConfig()
 # Uptime Monitor (업타임 모니터링)
 # ============================================================
 
+
 class UptimeMonitor:
     """Track server uptime, detect crashes, log downtime events.
 
@@ -156,13 +157,13 @@ class UptimeMonitor:
     def init_db(self):
         """Create uptime_log table if not exists."""
         conn = self._get_db()
-        conn.execute('''CREATE TABLE IF NOT EXISTS uptime_log (
+        conn.execute("""CREATE TABLE IF NOT EXISTS uptime_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             start_time TEXT NOT NULL,
             end_time TEXT,
             duration_sec REAL,
             reason TEXT DEFAULT 'unknown'
-        )''')
+        )""")
         conn.commit()
         conn.close()
 
@@ -175,12 +176,12 @@ class UptimeMonitor:
             # Previous non-graceful shutdown detected (비정상 종료 감지)
             log.warning("[SLA] Non-graceful shutdown detected! Recording downtime.")
             try:
-                prev_data = json.loads(_RUNNING_FILE.read_text(encoding='utf-8'))
-                prev_start = prev_data.get('start_time', '')
-                prev_pid = prev_data.get('pid', '?')
+                prev_data = json.loads(_RUNNING_FILE.read_text(encoding="utf-8"))
+                prev_start = prev_data.get("start_time", "")
+                prev_pid = prev_data.get("pid", "?")
             except Exception:
-                prev_start = ''
-                prev_pid = '?'
+                prev_start = ""
+                prev_pid = "?"
 
             now_str = datetime.now(KST).isoformat()
             # Estimate downtime: from prev start to now (approximate)
@@ -194,22 +195,23 @@ class UptimeMonitor:
 
             conn = self._get_db()
             conn.execute(
-                'INSERT INTO uptime_log (start_time, end_time, duration_sec, reason) VALUES (?, ?, ?, ?)',
-                (prev_start or now_str, now_str, duration, f'crash (prev_pid={prev_pid})')
+                "INSERT INTO uptime_log (start_time, end_time, duration_sec, reason) VALUES (?, ?, ?, ?)",
+                (prev_start or now_str, now_str, duration, f"crash (prev_pid={prev_pid})"),
             )
             conn.commit()
             conn.close()
 
             from salmalm.core import audit_log
-            audit_log('sla_downtime', f'Non-graceful shutdown detected. prev_pid={prev_pid}')
+
+            audit_log("sla_downtime", f"Non-graceful shutdown detected. prev_pid={prev_pid}")
 
         # Write lockfile (시작 시 lockfile 생성)
         lockdata = {
-            'pid': os.getpid(),
-            'start_time': self._start_dt.isoformat(),
-            'version': VERSION,
+            "pid": os.getpid(),
+            "start_time": self._start_dt.isoformat(),
+            "version": VERSION,
         }
-        _RUNNING_FILE.write_text(json.dumps(lockdata), encoding='utf-8')
+        _RUNNING_FILE.write_text(json.dumps(lockdata), encoding="utf-8")
         log.info(f"[SLA] Lockfile created: {_RUNNING_FILE}")
 
     def on_shutdown(self):
@@ -226,8 +228,8 @@ class UptimeMonitor:
         try:
             conn = self._get_db()
             conn.execute(
-                'INSERT INTO uptime_log (start_time, end_time, duration_sec, reason) VALUES (?, ?, ?, ?)',
-                (start, end, duration, reason)
+                "INSERT INTO uptime_log (start_time, end_time, duration_sec, reason) VALUES (?, ?, ?, ?)",
+                (start, end, duration, reason),
             )
             conn.commit()
             conn.close()
@@ -276,9 +278,9 @@ class UptimeMonitor:
             start_str = month_start.isoformat()
             end_str = month_end.isoformat()
             cur = conn.execute(
-                'SELECT COALESCE(SUM(duration_sec), 0) FROM uptime_log '
-                'WHERE start_time >= ? AND start_time < ? AND duration_sec IS NOT NULL',
-                (start_str, end_str)
+                "SELECT COALESCE(SUM(duration_sec), 0) FROM uptime_log "
+                "WHERE start_time >= ? AND start_time < ? AND duration_sec IS NOT NULL",
+                (start_str, end_str),
             )
             downtime = cur.fetchone()[0] or 0.0
             conn.close()
@@ -288,11 +290,11 @@ class UptimeMonitor:
         uptime_pct = max(0.0, 100.0 * (1.0 - downtime / total_secs))
         return round(uptime_pct, 4)
 
-    def get_daily_uptime_pct(self, date_str: str = '') -> float:
+    def get_daily_uptime_pct(self, date_str: str = "") -> float:
         """Calculate uptime percentage for a given day."""
         now = datetime.now(KST)
         if not date_str:
-            date_str = now.strftime('%Y-%m-%d')
+            date_str = now.strftime("%Y-%m-%d")
 
         day_start = datetime.fromisoformat(date_str).replace(tzinfo=KST)
         day_end = day_start + timedelta(days=1)
@@ -305,9 +307,9 @@ class UptimeMonitor:
         try:
             conn = self._get_db()
             cur = conn.execute(
-                'SELECT COALESCE(SUM(duration_sec), 0) FROM uptime_log '
-                'WHERE start_time >= ? AND start_time < ? AND duration_sec IS NOT NULL',
-                (day_start.isoformat(), day_end.isoformat())
+                "SELECT COALESCE(SUM(duration_sec), 0) FROM uptime_log "
+                "WHERE start_time >= ? AND start_time < ? AND duration_sec IS NOT NULL",
+                (day_start.isoformat(), day_end.isoformat()),
             )
             downtime = cur.fetchone()[0] or 0.0
             conn.close()
@@ -321,39 +323,36 @@ class UptimeMonitor:
         try:
             conn = self._get_db()
             cur = conn.execute(
-                'SELECT start_time, end_time, duration_sec, reason '
-                'FROM uptime_log ORDER BY id DESC LIMIT ?', (limit,)
+                "SELECT start_time, end_time, duration_sec, reason FROM uptime_log ORDER BY id DESC LIMIT ?", (limit,)
             )
             rows = cur.fetchall()
             conn.close()
-            return [
-                {'start': r[0], 'end': r[1], 'duration_sec': r[2], 'reason': r[3]}
-                for r in rows
-            ]
+            return [{"start": r[0], "end": r[1], "duration_sec": r[2], "reason": r[3]} for r in rows]
         except Exception:
             return []
 
     def get_stats(self) -> dict:
         """Full uptime stats for API/dashboard."""
         now = datetime.now(KST)
-        target = sla_config.get('uptime_target_pct', 99.9)
+        target = sla_config.get("uptime_target_pct", 99.9)
         monthly_pct = self.get_monthly_uptime_pct()
         return {
-            'uptime_seconds': round(self.get_uptime_seconds()),
-            'uptime_human': self.get_uptime_human(),
-            'start_time': self._start_dt.isoformat(),
-            'monthly_uptime_pct': monthly_pct,
-            'daily_uptime_pct': self.get_daily_uptime_pct(),
-            'target_pct': target,
-            'meets_target': monthly_pct >= target,
-            'recent_incidents': self.get_recent_incidents(5),
-            'month': now.strftime('%Y-%m'),
+            "uptime_seconds": round(self.get_uptime_seconds()),
+            "uptime_human": self.get_uptime_human(),
+            "start_time": self._start_dt.isoformat(),
+            "monthly_uptime_pct": monthly_pct,
+            "daily_uptime_pct": self.get_daily_uptime_pct(),
+            "target_pct": target,
+            "meets_target": monthly_pct >= target,
+            "recent_incidents": self.get_recent_incidents(5),
+            "month": now.strftime("%Y-%m"),
         }
 
 
 # ============================================================
 # Latency Tracker (응답 시간 추적)
 # ============================================================
+
 
 class LatencyTracker:
     """Track TTFT and total response time with ring buffer.
@@ -369,19 +368,18 @@ class LatencyTracker:
         self._consecutive_timeouts = 0
         self._timeout_threshold = 3  # Trigger failover after N consecutive timeouts
 
-    def record(self, ttft_ms: float, total_ms: float, model: str = '',
-               timed_out: bool = False, session_id: str = ''):
+    def record(self, ttft_ms: float, total_ms: float, model: str = "", timed_out: bool = False, session_id: str = ""):
         """Record a single request's latency.
 
         요청의 레이턴시 기록.
         """
         entry = {
-            'timestamp': datetime.now(KST).isoformat(),
-            'ttft_ms': round(ttft_ms, 1),
-            'total_ms': round(total_ms, 1),
-            'model': model,
-            'timed_out': timed_out,
-            'session_id': session_id,
+            "timestamp": datetime.now(KST).isoformat(),
+            "ttft_ms": round(ttft_ms, 1),
+            "total_ms": round(total_ms, 1),
+            "model": model,
+            "timed_out": timed_out,
+            "session_id": session_id,
         }
         with self._lock:
             self._records.append(entry)
@@ -391,15 +389,13 @@ class LatencyTracker:
                 self._consecutive_timeouts = 0
 
         # SLA warnings (SLA 경고)
-        ttft_target = sla_config.get('ttft_target_ms', 3000)
-        resp_target = sla_config.get('response_target_ms', 30000)
+        ttft_target = sla_config.get("ttft_target_ms", 3000)
+        resp_target = sla_config.get("response_target_ms", 30000)
 
         if ttft_ms > ttft_target:
-            log.warning(f"[SLA] TTFT {ttft_ms:.0f}ms exceeds target {ttft_target}ms "
-                        f"(model={model})")
+            log.warning(f"[SLA] TTFT {ttft_ms:.0f}ms exceeds target {ttft_target}ms (model={model})")
         if total_ms > resp_target:
-            log.warning(f"[SLA] Total response {total_ms:.0f}ms exceeds target {resp_target}ms "
-                        f"(model={model})")
+            log.warning(f"[SLA] Total response {total_ms:.0f}ms exceeds target {resp_target}ms (model={model})")
 
     def should_failover(self) -> bool:
         """Check if consecutive timeouts warrant a model failover."""
@@ -432,52 +428,53 @@ class LatencyTracker:
 
         if not records:
             return {
-                'count': 0,
-                'ttft': {'p50': 0, 'p95': 0, 'p99': 0},
-                'total': {'p50': 0, 'p95': 0, 'p99': 0},
-                'histogram': [],
-                'recent': [],
-                'consecutive_timeouts': 0,
-                'targets': {
-                    'ttft_ms': sla_config.get('ttft_target_ms', 3000),
-                    'response_ms': sla_config.get('response_target_ms', 30000),
+                "count": 0,
+                "ttft": {"p50": 0, "p95": 0, "p99": 0},
+                "total": {"p50": 0, "p95": 0, "p99": 0},
+                "histogram": [],
+                "recent": [],
+                "consecutive_timeouts": 0,
+                "targets": {
+                    "ttft_ms": sla_config.get("ttft_target_ms", 3000),
+                    "response_ms": sla_config.get("response_target_ms", 30000),
                 },
             }
 
-        ttft_vals = [r['ttft_ms'] for r in records if r['ttft_ms'] > 0]
-        total_vals = [r['total_ms'] for r in records]
+        ttft_vals = [r["ttft_ms"] for r in records if r["ttft_ms"] > 0]
+        total_vals = [r["total_ms"] for r in records]
 
         # Histogram buckets for total response time (ms)
         buckets = [500, 1000, 2000, 3000, 5000, 10000, 20000, 30000, 60000]
         histogram = []
         for b in buckets:
             count = sum(1 for v in total_vals if v <= b)
-            histogram.append({'le': b, 'count': count})
-        histogram.append({'le': '+Inf', 'count': len(total_vals)})
+            histogram.append({"le": b, "count": count})
+        histogram.append({"le": "+Inf", "count": len(total_vals)})
 
         # Recent 10 entries for trend display
         recent = records[-10:] if len(records) >= 10 else records
 
         return {
-            'count': len(records),
-            'ttft': {
-                'p50': round(self._percentile(ttft_vals, 50), 1),
-                'p95': round(self._percentile(ttft_vals, 95), 1),
-                'p99': round(self._percentile(ttft_vals, 99), 1),
+            "count": len(records),
+            "ttft": {
+                "p50": round(self._percentile(ttft_vals, 50), 1),
+                "p95": round(self._percentile(ttft_vals, 95), 1),
+                "p99": round(self._percentile(ttft_vals, 99), 1),
             },
-            'total': {
-                'p50': round(self._percentile(total_vals, 50), 1),
-                'p95': round(self._percentile(total_vals, 95), 1),
-                'p99': round(self._percentile(total_vals, 99), 1),
+            "total": {
+                "p50": round(self._percentile(total_vals, 50), 1),
+                "p95": round(self._percentile(total_vals, 95), 1),
+                "p99": round(self._percentile(total_vals, 99), 1),
             },
-            'histogram': histogram,
-            'recent': [{'ts': r['timestamp'], 'ttft': r['ttft_ms'],
-                        'total': r['total_ms'], 'model': r['model']}
-                       for r in recent],
-            'consecutive_timeouts': self._consecutive_timeouts,
-            'targets': {
-                'ttft_ms': sla_config.get('ttft_target_ms', 3000),
-                'response_ms': sla_config.get('response_target_ms', 30000),
+            "histogram": histogram,
+            "recent": [
+                {"ts": r["timestamp"], "ttft": r["ttft_ms"], "total": r["total_ms"], "model": r["model"]}
+                for r in recent
+            ],
+            "consecutive_timeouts": self._consecutive_timeouts,
+            "targets": {
+                "ttft_ms": sla_config.get("ttft_target_ms", 3000),
+                "response_ms": sla_config.get("response_target_ms", 30000),
             },
         }
 
@@ -485,6 +482,7 @@ class LatencyTracker:
 # ============================================================
 # Watchdog (자동 헬스체크 + 자가 복구)
 # ============================================================
+
 
 class Watchdog:
     """Background watchdog: periodic self-diagnosis + auto-recovery.
@@ -506,7 +504,7 @@ class Watchdog:
         if self._thread and self._thread.is_alive():
             return
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._run, daemon=True, name='sla-watchdog')
+        self._thread = threading.Thread(target=self._run, daemon=True, name="sla-watchdog")
         self._thread.start()
         log.info("[SLA] Watchdog started")
 
@@ -521,12 +519,12 @@ class Watchdog:
         # Wait a bit after startup before first check
         time.sleep(10)
         while not self._stop_event.is_set():
-            interval = sla_config.get('watchdog_interval_sec', 30)
+            interval = sla_config.get("watchdog_interval_sec", 30)
             try:
                 report = self._check()
                 with self._lock:
                     self._last_report = report
-                if report.get('status') != 'healthy':
+                if report.get("status") != "healthy":
                     self._handle_issues(report)
             except Exception as e:
                 log.error(f"[SLA] Watchdog error: {e}")
@@ -535,9 +533,9 @@ class Watchdog:
     def _check(self) -> dict:
         """Run all health checks. Returns detailed report."""
         report: Dict[str, Any] = {
-            'timestamp': datetime.now(KST).isoformat(),
-            'status': 'healthy',
-            'checks': {},
+            "timestamp": datetime.now(KST).isoformat(),
+            "status": "healthy",
+            "checks": {},
         }
 
         issues = []
@@ -545,100 +543,104 @@ class Watchdog:
         # 1. DB check
         try:
             conn = sqlite3.connect(str(AUDIT_DB), timeout=5)
-            conn.execute('SELECT 1')
+            conn.execute("SELECT 1")
             conn.close()
-            report['checks']['database'] = {'status': 'ok'}
+            report["checks"]["database"] = {"status": "ok"}
         except Exception as e:
-            report['checks']['database'] = {'status': 'error', 'error': str(e)[:200]}
-            issues.append(('database', str(e)))
+            report["checks"]["database"] = {"status": "error", "error": str(e)[:200]}
+            issues.append(("database", str(e)))
 
         # 2. Memory check
-        mem_limit = sla_config.get('memory_limit_mb', 500)
+        mem_limit = sla_config.get("memory_limit_mb", 500)
         try:
             try:
                 import resource as _res
+
                 usage = _res.getrusage(_res.RUSAGE_SELF)
                 mem_mb = usage.ru_maxrss / 1024  # Linux: KB -> MB
             except (ImportError, AttributeError):
                 mem_mb = 0
-            report['checks']['memory'] = {
-                'status': 'ok' if mem_mb < mem_limit else 'warning',
-                'usage_mb': round(mem_mb, 1),
-                'limit_mb': mem_limit,
+            report["checks"]["memory"] = {
+                "status": "ok" if mem_mb < mem_limit else "warning",
+                "usage_mb": round(mem_mb, 1),
+                "limit_mb": mem_limit,
             }
             if mem_mb >= mem_limit:
-                issues.append(('memory', f'{mem_mb:.0f}MB >= {mem_limit}MB'))
+                issues.append(("memory", f"{mem_mb:.0f}MB >= {mem_limit}MB"))
         except Exception as e:
-            report['checks']['memory'] = {'status': 'unknown', 'error': str(e)[:100]}
+            report["checks"]["memory"] = {"status": "unknown", "error": str(e)[:100]}
 
         # 3. Disk check
-        disk_limit = sla_config.get('disk_limit_pct', 90)
+        disk_limit = sla_config.get("disk_limit_pct", 90)
         try:
             from salmalm.constants import BASE_DIR
+
             stat = os.statvfs(str(BASE_DIR))
             disk_pct = round(100 * (1 - stat.f_bavail / stat.f_blocks), 1)
-            report['checks']['disk'] = {
-                'status': 'ok' if disk_pct < disk_limit else 'warning',
-                'usage_pct': disk_pct,
-                'limit_pct': disk_limit,
+            report["checks"]["disk"] = {
+                "status": "ok" if disk_pct < disk_limit else "warning",
+                "usage_pct": disk_pct,
+                "limit_pct": disk_limit,
             }
             if disk_pct >= disk_limit:
-                issues.append(('disk', f'{disk_pct}% >= {disk_limit}%'))
+                issues.append(("disk", f"{disk_pct}% >= {disk_limit}%"))
         except Exception as e:
-            report['checks']['disk'] = {'status': 'unknown', 'error': str(e)[:100]}
+            report["checks"]["disk"] = {"status": "unknown", "error": str(e)[:100]}
 
         # 4. HTTP server check (lightweight — just check thread is alive)
-        report['checks']['http'] = {'status': 'ok'}  # If we're running, HTTP is ok
+        report["checks"]["http"] = {"status": "ok"}  # If we're running, HTTP is ok
 
         # 5. WebSocket check
         try:
             from salmalm.web.ws import ws_server
-            ws_ok = ws_server.is_running if hasattr(ws_server, 'is_running') else True
-            report['checks']['websocket'] = {
-                'status': 'ok' if ws_ok else 'error',
-                'clients': getattr(ws_server, 'client_count', 0) if hasattr(ws_server, 'client_count') else 0,
+
+            ws_ok = ws_server.is_running if hasattr(ws_server, "is_running") else True
+            report["checks"]["websocket"] = {
+                "status": "ok" if ws_ok else "error",
+                "clients": getattr(ws_server, "client_count", 0) if hasattr(ws_server, "client_count") else 0,
             }
             if not ws_ok:
-                issues.append(('websocket', 'WS server not running'))
+                issues.append(("websocket", "WS server not running"))
         except Exception as e:
-            report['checks']['websocket'] = {'status': 'unknown', 'error': str(e)[:100]}
+            report["checks"]["websocket"] = {"status": "unknown", "error": str(e)[:100]}
 
         # Set overall status
-        if any(report['checks'][k].get('status') == 'error' for k in report['checks']):
-            report['status'] = 'unhealthy'
-        elif any(report['checks'][k].get('status') == 'warning' for k in report['checks']):
-            report['status'] = 'degraded'
+        if any(report["checks"][k].get("status") == "error" for k in report["checks"]):
+            report["status"] = "unhealthy"
+        elif any(report["checks"][k].get("status") == "warning" for k in report["checks"]):
+            report["status"] = "degraded"
 
         return report
 
     def _handle_issues(self, report: dict):
         """Handle detected issues: log, alert, attempt recovery."""
-        _status = report['status']  # noqa: F841
-        checks = report['checks']
+        _status = report["status"]  # noqa: F841
+        checks = report["checks"]
 
         for name, check in checks.items():
-            if check.get('status') in ('error', 'warning'):
-                detail = check.get('error', '') or json.dumps(check)
+            if check.get("status") in ("error", "warning"):
+                detail = check.get("error", "") or json.dumps(check)
                 log.warning(f"[SLA] Health issue: {name} = {check['status']}: {detail}")
 
                 # Audit log
                 try:
                     from salmalm.core import audit_log
-                    audit_log('sla_health_issue', f'{name}: {detail}')
+
+                    audit_log("sla_health_issue", f"{name}: {detail}")
                 except Exception:
                     pass
 
         # Auto-recovery attempts (자동 복구)
-        if not sla_config.get('auto_recovery', True):
+        if not sla_config.get("auto_recovery", True):
             return
 
         for name, check in checks.items():
-            if check.get('status') != 'error':
+            if check.get("status") != "error":
                 continue
             try:
-                if name == 'database':
+                if name == "database":
                     self._recover_database()
-                elif name == 'websocket':
+                elif name == "websocket":
                     self._recover_websocket()
             except Exception as e:
                 log.error(f"[SLA] Recovery failed for {name}: {e}")
@@ -648,7 +650,8 @@ class Watchdog:
         log.info("[SLA] Attempting DB recovery...")
         try:
             from salmalm.core import _thread_local
-            if hasattr(_thread_local, 'audit_conn'):
+
+            if hasattr(_thread_local, "audit_conn"):
                 try:
                     _thread_local.audit_conn.close()
                 except Exception:
@@ -656,7 +659,7 @@ class Watchdog:
                 del _thread_local.audit_conn
             # Test new connection
             conn = sqlite3.connect(str(AUDIT_DB), timeout=5)
-            conn.execute('SELECT 1')
+            conn.execute("SELECT 1")
             conn.close()
             log.info("[SLA] DB recovery successful")
         except Exception as e:
@@ -668,6 +671,7 @@ class Watchdog:
         try:
             import asyncio
             from salmalm.web.ws import ws_server
+
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 asyncio.ensure_future(ws_server.start())
@@ -683,9 +687,9 @@ class Watchdog:
     def get_detailed_health(self) -> dict:
         """Detailed health report for /health detail command."""
         report = self._check()
-        report['uptime'] = self._uptime.get_stats()
-        report['latency'] = self._latency.get_stats()
-        report['sla_config'] = sla_config.get_all()
+        report["uptime"] = self._uptime.get_stats()
+        report["latency"] = self._latency.get_stats()
+        report["sla_config"] = sla_config.get_all()
         return report
 
 

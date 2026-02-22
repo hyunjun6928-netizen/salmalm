@@ -2,6 +2,7 @@
 
 stdlib-only. SQLite 저장, 이모지 진행바, streak 계산.
 """
+
 from __future__ import annotations
 
 import logging
@@ -62,9 +63,7 @@ class HabitTracker:
             return "❌ 습관 이름을 입력하세요."
         try:
             now = datetime.now(KST).isoformat()
-            self.conn.execute(
-                "INSERT INTO habits (name, created_at) VALUES (?, ?)",
-                (name, now))
+            self.conn.execute("INSERT INTO habits (name, created_at) VALUES (?, ?)", (name, now))
             self.conn.commit()
             return f"✅ 습관 '{name}' 등록 완료!"
         except sqlite3.IntegrityError:
@@ -94,8 +93,8 @@ class HabitTracker:
         now = datetime.now(KST).isoformat()
         try:
             self.conn.execute(
-                "INSERT INTO habit_checks (habit_name, check_date, checked_at) VALUES (?, ?, ?)",
-                (name, today, now))
+                "INSERT INTO habit_checks (habit_name, check_date, checked_at) VALUES (?, ?, ?)", (name, today, now)
+            )
             self.conn.commit()
             streak = self._calc_streak(name, today)
             return f"✅ '{name}' 완료! 🔥 {streak}일 연속"
@@ -105,9 +104,7 @@ class HabitTracker:
     def uncheck_habit(self, name: str, date: Optional[str] = None) -> str:
         """완료 취소."""
         today = date or datetime.now(KST).strftime("%Y-%m-%d")
-        self.conn.execute(
-            "DELETE FROM habit_checks WHERE habit_name=? AND check_date=?",
-            (name, today))
+        self.conn.execute("DELETE FROM habit_checks WHERE habit_name=? AND check_date=?", (name, today))
         self.conn.commit()
         return f"↩️ '{name}' 완료 취소됨."
 
@@ -119,8 +116,8 @@ class HabitTracker:
         while True:
             ds = cur_date.strftime("%Y-%m-%d")
             row = self.conn.execute(
-                "SELECT 1 FROM habit_checks WHERE habit_name=? AND check_date=?",
-                (name, ds)).fetchone()
+                "SELECT 1 FROM habit_checks WHERE habit_name=? AND check_date=?", (name, ds)
+            ).fetchone()
             if row:
                 streak += 1
                 cur_date -= timedelta(days=1)
@@ -130,8 +127,7 @@ class HabitTracker:
 
     def get_habits(self) -> List[str]:
         """활성 습관 목록."""
-        rows = self.conn.execute(
-            "SELECT name FROM habits WHERE active=1 ORDER BY name").fetchall()
+        rows = self.conn.execute("SELECT name FROM habits WHERE active=1 ORDER BY name").fetchall()
         return [r[0] for r in rows]
 
     def stats(self, days: int = 7) -> str:
@@ -148,8 +144,8 @@ class HabitTracker:
             # Count completions in period
             start = (datetime.now(KST) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
             rows = self.conn.execute(
-                "SELECT COUNT(*) FROM habit_checks WHERE habit_name=? AND check_date BETWEEN ? AND ?",
-                (h, start, today)).fetchone()
+                "SELECT COUNT(*) FROM habit_checks WHERE habit_name=? AND check_date BETWEEN ? AND ?", (h, start, today)
+            ).fetchone()
             count = rows[0] if rows else 0
             rate = count / days
             bar = self._progress_bar(rate)
@@ -172,8 +168,8 @@ class HabitTracker:
         checked = []
         for h in habits:
             row = self.conn.execute(
-                "SELECT 1 FROM habit_checks WHERE habit_name=? AND check_date=?",
-                (h, today)).fetchone()
+                "SELECT 1 FROM habit_checks WHERE habit_name=? AND check_date=?", (h, today)
+            ).fetchone()
             if row:
                 checked.append(h)
             else:
@@ -207,8 +203,8 @@ class HabitTracker:
         pending = []
         for h in habits:
             row = self.conn.execute(
-                "SELECT 1 FROM habit_checks WHERE habit_name=? AND check_date=?",
-                (h, today)).fetchone()
+                "SELECT 1 FROM habit_checks WHERE habit_name=? AND check_date=?", (h, today)
+            ).fetchone()
             if row:
                 done.append(h)
             else:
@@ -228,6 +224,7 @@ def get_tracker(db_path: Optional[Path] = None) -> HabitTracker:
 
 
 # ── Command handler ──
+
 
 async def handle_habit_command(cmd: str, session=None, **kw) -> Optional[str]:
     """Handle /habit commands."""
@@ -285,12 +282,14 @@ async def handle_habit_command(cmd: str, session=None, **kw) -> Optional[str]:
 
 # ── Registration ──
 
+
 def register_habit_commands(command_router):
     """Register /habit command with the command router."""
     from salmalm.features.commands import COMMAND_DEFS
-    COMMAND_DEFS['/habit'] = 'Habit tracker (add|check|stats|remind|list|remove)'
-    if hasattr(command_router, '_prefix_handlers'):
-        command_router._prefix_handlers.append(('/habit', handle_habit_command))
+
+    COMMAND_DEFS["/habit"] = "Habit tracker (add|check|stats|remind|list|remove)"
+    if hasattr(command_router, "_prefix_handlers"):
+        command_router._prefix_handlers.append(("/habit", handle_habit_command))
 
 
 def register_habit_tools():
@@ -303,22 +302,23 @@ def register_habit_tools():
         cmd = f"/habit {sub} {name}".strip()
         return await handle_habit_command(cmd)
 
-    register_dynamic("habit_tracker", _habit_tool, {
-        "name": "habit_tracker",
-        "description": "Track daily habits (add, check, stats, remind, list, remove)",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subcommand": {
-                    "type": "string",
-                    "enum": ["add", "check", "uncheck", "stats", "monthly", "remind", "list", "remove"],
-                    "description": "Habit subcommand"
+    register_dynamic(
+        "habit_tracker",
+        _habit_tool,
+        {
+            "name": "habit_tracker",
+            "description": "Track daily habits (add, check, stats, remind, list, remove)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subcommand": {
+                        "type": "string",
+                        "enum": ["add", "check", "uncheck", "stats", "monthly", "remind", "list", "remove"],
+                        "description": "Habit subcommand",
+                    },
+                    "name": {"type": "string", "description": "Habit name (for add/check/remove)"},
                 },
-                "name": {
-                    "type": "string",
-                    "description": "Habit name (for add/check/remove)"
-                }
+                "required": ["subcommand"],
             },
-            "required": ["subcommand"]
-        }
-    })
+        },
+    )

@@ -3,6 +3,7 @@
 특정 주제/프로젝트에 대해서만 응답, off-topic 차단.
 stdlib-only.
 """
+
 from __future__ import annotations
 
 import logging
@@ -144,7 +145,7 @@ class FocusManager:
             return True
 
         # Commands are always on-topic
-        if message.strip().startswith('/'):
+        if message.strip().startswith("/"):
             return True
 
         # Short messages (< 3 words) might be continuations
@@ -174,10 +175,7 @@ class FocusManager:
         lines = ["📜 **집중 세션 히스토리**\n"]
         for s in self._history[-10:]:
             d = s.to_dict()
-            lines.append(
-                f"• **{d['topic']}** — {d['duration']} "
-                f"(메시지 {d['total']}개, 차단 {d['off_topic']}개)"
-            )
+            lines.append(f"• **{d['topic']}** — {d['duration']} (메시지 {d['total']}개, 차단 {d['off_topic']}개)")
         return "\n".join(lines)
 
 
@@ -193,6 +191,7 @@ def get_focus_manager() -> FocusManager:
 
 
 # ── Command handler ──
+
 
 async def handle_focus_command(cmd: str, session=None, **kw) -> Optional[str]:
     """Handle /focus commands."""
@@ -228,12 +227,14 @@ async def handle_focus_command(cmd: str, session=None, **kw) -> Optional[str]:
 
 # ── Registration ──
 
+
 def register_focus_commands(command_router):
     """Register /focus command."""
     from salmalm.features.commands import COMMAND_DEFS
-    COMMAND_DEFS['/focus'] = 'Focus mode (start|end|status|history)'
-    if hasattr(command_router, '_prefix_handlers'):
-        command_router._prefix_handlers.append(('/focus', handle_focus_command))
+
+    COMMAND_DEFS["/focus"] = "Focus mode (start|end|status|history)"
+    if hasattr(command_router, "_prefix_handlers"):
+        command_router._prefix_handlers.append(("/focus", handle_focus_command))
 
 
 def register_focus_tools():
@@ -246,18 +247,22 @@ def register_focus_tools():
         cmd = f"/focus {sub} {topic}".strip()
         return await handle_focus_command(cmd)
 
-    register_dynamic("focus_mode", _focus_tool, {
-        "name": "focus_mode",
-        "description": "Focus mode - restrict responses to a specific topic",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "subcommand": {
-                    "type": "string",
-                    "enum": ["start", "end", "status", "history"],
+    register_dynamic(
+        "focus_mode",
+        _focus_tool,
+        {
+            "name": "focus_mode",
+            "description": "Focus mode - restrict responses to a specific topic",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subcommand": {
+                        "type": "string",
+                        "enum": ["start", "end", "status", "history"],
+                    },
+                    "topic": {"type": "string", "description": "Topic for focus mode"},
                 },
-                "topic": {"type": "string", "description": "Topic for focus mode"},
+                "required": ["subcommand"],
             },
-            "required": ["subcommand"]
-        }
-    })
+        },
+    )

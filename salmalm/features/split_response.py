@@ -99,10 +99,7 @@ class SplitResponder:
         """Format split result for display."""
         a = result["response_a"]
         b = result["response_b"]
-        return (
-            f"📌 관점 A ({a['label']}):\n{a['content']}\n\n"
-            f"📌 관점 B ({b['label']}):\n{b['content']}"
-        )
+        return f"📌 관점 A ({a['label']}):\n{a['content']}\n\n📌 관점 B ({b['label']}):\n{b['content']}"
 
     def format_buttons(self) -> List[Dict[str, str]]:
         """Return inline button descriptors."""
@@ -124,8 +121,7 @@ class SplitResponder:
 
         if self._llm_fn:
             merge_prompt = (
-                "다음 두 관점을 종합하여 균형 잡힌 하나의 응답을 생성하시오.\n"
-                f"관점 A: {a_content}\n관점 B: {b_content}"
+                f"다음 두 관점을 종합하여 균형 잡힌 하나의 응답을 생성하시오.\n관점 A: {a_content}\n관점 B: {b_content}"
             )
             return await self._llm_fn(merge_prompt, question)
         return f"[종합] {a_content} + {b_content}"
@@ -139,8 +135,7 @@ class SplitResponder:
 
         if self._llm_fn:
             prompt = (
-                f"이전에 '{label}' 관점에서 다음과 같이 답변했다:\n{prev}\n\n"
-                f"같은 관점을 유지하여 후속 질문에 답하시오."
+                f"이전에 '{label}' 관점에서 다음과 같이 답변했다:\n{prev}\n\n같은 관점을 유지하여 후속 질문에 답하시오."
             )
             return await self._llm_fn(prompt, follow_up)
         return f"[{label} 관점 계속] {follow_up}"
@@ -166,9 +161,11 @@ class SplitResponder:
         if not sub and self._last_question:
             # Re-split last question
             mode = self._last_mode or "conservative_bold"
-            result = asyncio.get_event_loop().run_until_complete(
-                self.generate(self._last_question, mode)
-            ) if self._last_question else {}
+            result = (
+                asyncio.get_event_loop().run_until_complete(self.generate(self._last_question, mode))
+                if self._last_question
+                else {}
+            )
             if result:
                 return self.format_result(result)
             return "이전 질문이 없습니다."
@@ -180,10 +177,9 @@ class SplitResponder:
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     import concurrent.futures
+
                     with concurrent.futures.ThreadPoolExecutor() as pool:
-                        result = pool.submit(
-                            asyncio.run, self.generate(rest, sub)
-                        ).result()
+                        result = pool.submit(asyncio.run, self.generate(rest, sub)).result()
                 else:
                     result = loop.run_until_complete(self.generate(rest, sub))
             except RuntimeError:
@@ -200,9 +196,4 @@ class SplitResponder:
                 result = loop.run_until_complete(self.generate(question))
             return self.format_result(result)
 
-        return (
-            "사용법:\n"
-            "  /split <모드> <질문> — 분할 응답\n"
-            "  /split — 마지막 질문 재분할\n"
-            "  /split modes — 모드 목록"
-        )
+        return "사용법:\n  /split <모드> <질문> — 분할 응답\n  /split — 마지막 질문 재분할\n  /split modes — 모드 목록"

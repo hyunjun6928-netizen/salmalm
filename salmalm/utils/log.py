@@ -3,6 +3,7 @@
 Provides a single ``setup_logging()`` entry-point that configures
 format, level, and optional file output for the whole application.
 """
+
 from __future__ import annotations
 
 import logging
@@ -67,15 +68,12 @@ def setup_logging(
     if json_format:
         try:
             from salmalm.utils.logging_ext import JSONFormatter
+
             formatter = JSONFormatter()
         except Exception:
-            formatter = logging.Formatter(
-                fmt or _DEFAULT_FMT, datefmt=datefmt or _DEFAULT_DATEFMT
-            )
+            formatter = logging.Formatter(fmt or _DEFAULT_FMT, datefmt=datefmt or _DEFAULT_DATEFMT)
     else:
-        formatter = logging.Formatter(
-            fmt or _DEFAULT_FMT, datefmt=datefmt or _DEFAULT_DATEFMT
-        )
+        formatter = logging.Formatter(fmt or _DEFAULT_FMT, datefmt=datefmt or _DEFAULT_DATEFMT)
 
     # Console handler
     console = logging.StreamHandler()

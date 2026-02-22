@@ -17,6 +17,7 @@ from salmalm.security.crypto import log
 @dataclass
 class SubAgentTask:
     """A sub-agent task definition."""
+
     task_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     description: str = ""
     model: Optional[str] = None
@@ -66,17 +67,25 @@ class SubAgentManager:
         self._tasks: Dict[str, SubAgentTask] = {}
         self._lock = threading.Lock()
 
-    def spawn(self, description: str, model: Optional[str] = None,
-              max_turns: int = 10, timeout_s: int = 300,
-              parent_session: str = "web",
-              on_complete: Optional[Callable] = None) -> SubAgentTask:
+    def spawn(
+        self,
+        description: str,
+        model: Optional[str] = None,
+        max_turns: int = 10,
+        timeout_s: int = 300,
+        parent_session: str = "web",
+        on_complete: Optional[Callable] = None,
+    ) -> SubAgentTask:
         """Spawn a new sub-agent task."""
         with self._lock:
             # Check concurrent limit
             running = sum(1 for t in self._tasks.values() if t.status == "running")
             if running >= self._MAX_CONCURRENT:
-                task = SubAgentTask(description=description, status="failed",
-                                    error=f"Max concurrent sub-agents ({self._MAX_CONCURRENT}) reached")
+                task = SubAgentTask(
+                    description=description,
+                    status="failed",
+                    error=f"Max concurrent sub-agents ({self._MAX_CONCURRENT}) reached",
+                )
                 return task
 
             # Cleanup old tasks
@@ -128,6 +137,7 @@ class SubAgentManager:
             model = task.model
             if not model:
                 from salmalm.core.core import router
+
                 model = router._pick_available(3)  # Pick a capable model
 
             total_tokens = 0
@@ -167,11 +177,13 @@ class SubAgentManager:
                             except json.JSONDecodeError:
                                 tool_args = {}
                         tool_result = execute_tool(tool_name, tool_args)
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tc.get("id", ""),
-                            "content": str(tool_result)[:5000],
-                        })
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tc.get("id", ""),
+                                "content": str(tool_result)[:5000],
+                            }
+                        )
                 else:
                     # No tool calls = final answer
                     task.status = "completed"
@@ -233,8 +245,7 @@ class SubAgentManager:
         """Remove old completed tasks beyond history limit."""
         if len(self._tasks) <= self._MAX_HISTORY:
             return
-        completed = [(tid, t) for tid, t in self._tasks.items()
-                     if t.status in ("completed", "failed", "killed")]
+        completed = [(tid, t) for tid, t in self._tasks.items() if t.status in ("completed", "failed", "killed")]
         completed.sort(key=lambda x: x[1].completed_at)
         to_remove = len(self._tasks) - self._MAX_HISTORY
         for tid, _ in completed[:to_remove]:
@@ -254,6 +265,7 @@ class SubAgentManager:
         session_id = f"subagent_{task_id}"
         try:
             from salmalm.core.core import get_session
+
             session = get_session(session_id)
             session.messages.append({"role": "user", "content": f"[Steering from parent] {message}"})
 
@@ -262,9 +274,11 @@ class SubAgentManager:
 
             # Completed/failed — re-run with the steering message
             from salmalm.core.llm import call_llm
+
             model = task.model
             if not model:
                 from salmalm.core.core import router
+
                 model = router._pick_available(2)
 
             result = call_llm(session.messages, model=model, tools=_get_tool_defs(), max_tokens=4096)
@@ -284,9 +298,11 @@ class SubAgentManager:
         results = []
         with self._lock:
             for task in self._tasks.values():
-                if (task.parent_session == parent_session
-                        and task.status == "completed"
-                        and not getattr(task, '_collected', False)):
+                if (
+                    task.parent_session == parent_session
+                    and task.status == "completed"
+                    and not getattr(task, "_collected", False)
+                ):
                     results.append(task.to_dict())
                     task._collected = True  # type: ignore[attr-defined]
         return results
@@ -295,6 +311,7 @@ class SubAgentManager:
 def _get_tool_defs() -> list:
     """Get tool definitions for sub-agents (subset of safe tools)."""
     from salmalm.tools.tool_registry import get_all_tools
+
     # Sub-agents get all tools except dangerous ones
     _BLOCKED_FOR_SUBAGENTS = {"exec", "exec_session", "browser_action"}
     all_tools = get_all_tools()

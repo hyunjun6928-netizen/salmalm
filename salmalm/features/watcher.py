@@ -4,6 +4,7 @@ Monitors specified directories for file changes (created/modified/deleted)
 using mtime polling. Triggers debounced RAG re-indexing on changes.
 stdlib-only.
 """
+
 import os
 import threading
 import time
@@ -12,46 +13,50 @@ from typing import Callable, Dict, List, Optional, Set
 
 from salmalm import log
 
-_WATCHER_CONFIG = Path.home() / '.salmalm' / 'watcher.json'
+_WATCHER_CONFIG = Path.home() / ".salmalm" / "watcher.json"
 
-DEFAULT_EXTENSIONS = {'.md', '.txt', '.py', '.json', '.yaml', '.yml'}
-DEFAULT_EXCLUDE = {'node_modules', '.git', '__pycache__', '.venv', 'venv'}
+DEFAULT_EXTENSIONS = {".md", ".txt", ".py", ".json", ".yaml", ".yml"}
+DEFAULT_EXCLUDE = {"node_modules", ".git", "__pycache__", ".venv", "venv"}
 
 
 from salmalm.config_manager import ConfigManager
 
 _WATCHER_DEFAULTS = {
-    'enabled': True,
-    'paths': [str(Path.home() / '.salmalm')],
-    'extensions': list(DEFAULT_EXTENSIONS),
-    'interval': 5,
-    'debounceMs': 2000,
-    'excludePatterns': list(DEFAULT_EXCLUDE),
+    "enabled": True,
+    "paths": [str(Path.home() / ".salmalm")],
+    "extensions": list(DEFAULT_EXTENSIONS),
+    "interval": 5,
+    "debounceMs": 2000,
+    "excludePatterns": list(DEFAULT_EXCLUDE),
 }
 
 
 def _load_config() -> dict:
-    return ConfigManager.load('watcher', defaults=_WATCHER_DEFAULTS)
+    return ConfigManager.load("watcher", defaults=_WATCHER_DEFAULTS)
 
 
 class FileWatcher:
     """Polling-based file watcher that detects created/modified/deleted files."""
 
-    def __init__(self, paths: Optional[List[str]] = None, interval: int = 5,
-                 extensions: Optional[Set[str]] = None,
-                 exclude_patterns: Optional[Set[str]] = None,
-                 on_change: Optional[Callable] = None):
+    def __init__(
+        self,
+        paths: Optional[List[str]] = None,
+        interval: int = 5,
+        extensions: Optional[Set[str]] = None,
+        exclude_patterns: Optional[Set[str]] = None,
+        on_change: Optional[Callable] = None,
+    ):
         config = _load_config()
-        self._paths = [Path(os.path.expanduser(p)) for p in (paths or config.get('paths', []))]
-        self._interval = interval or config.get('interval', 5)
-        self._extensions = extensions or set(config.get('extensions', DEFAULT_EXTENSIONS))
-        self._exclude = exclude_patterns or set(config.get('excludePatterns', DEFAULT_EXCLUDE))
+        self._paths = [Path(os.path.expanduser(p)) for p in (paths or config.get("paths", []))]
+        self._interval = interval or config.get("interval", 5)
+        self._extensions = extensions or set(config.get("extensions", DEFAULT_EXTENSIONS))
+        self._exclude = exclude_patterns or set(config.get("excludePatterns", DEFAULT_EXCLUDE))
         self._on_change = on_change
         self._mtimes: Dict[str, float] = {}
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._debounce_timer: Optional[threading.Timer] = None
-        self._debounce_ms = config.get('debounceMs', 2000)
+        self._debounce_ms = config.get("debounceMs", 2000)
         self._pending_changes: List[dict] = []
         self._lock = threading.Lock()
 
@@ -62,9 +67,9 @@ class FileWatcher:
         self._running = True
         # Initial scan to populate mtimes
         self._initial_scan()
-        self._thread = threading.Thread(target=self._run, daemon=True, name='FileWatcher')
+        self._thread = threading.Thread(target=self._run, daemon=True, name="FileWatcher")
         self._thread.start()
-        log.info('FileWatcher started')
+        log.info("FileWatcher started")
 
     def stop(self):
         """Stop the watcher."""
@@ -73,7 +78,7 @@ class FileWatcher:
             self._debounce_timer.cancel()
         if self._thread:
             self._thread.join(timeout=self._interval + 2)
-        log.info('FileWatcher stopped')
+        log.info("FileWatcher stopped")
 
     @property
     def running(self) -> bool:
@@ -84,7 +89,7 @@ class FileWatcher:
             try:
                 self._scan()
             except Exception as e:
-                log.info(f'FileWatcher scan error: {e}')
+                log.info(f"FileWatcher scan error: {e}")
             time.sleep(self._interval)
 
     def _initial_scan(self):
@@ -116,16 +121,16 @@ class FileWatcher:
                     continue
 
                 if key not in self._mtimes:
-                    changes.append({'path': key, 'event': 'created'})
+                    changes.append({"path": key, "event": "created"})
                     self._mtimes[key] = mtime
                 elif mtime != self._mtimes[key]:
-                    changes.append({'path': key, 'event': 'modified'})
+                    changes.append({"path": key, "event": "modified"})
                     self._mtimes[key] = mtime
 
         # Check for deleted files
         deleted = set(self._mtimes.keys()) - current_files
         for key in deleted:
-            changes.append({'path': key, 'event': 'deleted'})
+            changes.append({"path": key, "event": "deleted"})
             del self._mtimes[key]
 
         if changes:
@@ -152,9 +157,7 @@ class FileWatcher:
             self._pending_changes.extend(changes)
             if self._debounce_timer:
                 self._debounce_timer.cancel()
-            self._debounce_timer = threading.Timer(
-                self._debounce_ms / 1000.0, self._flush_changes
-            )
+            self._debounce_timer = threading.Timer(self._debounce_ms / 1000.0, self._flush_changes)
             self._debounce_timer.start()
 
     def _flush_changes(self):
@@ -173,9 +176,9 @@ class FileWatcher:
         for change in changes:
             try:
                 if self._on_change:
-                    self._on_change(change['path'], change['event'])
+                    self._on_change(change["path"], change["event"])
             except Exception as e:
-                log.info(f'FileWatcher callback error: {e}')
+                log.info(f"FileWatcher callback error: {e}")
 
     def get_watched_files(self) -> Dict[str, float]:
         """Return current tracked files and their mtimes."""
@@ -183,6 +186,7 @@ class FileWatcher:
 
 
 # ── RAG Integration ──────────────────────────────────────────
+
 
 class RAGFileWatcher(FileWatcher):
     """FileWatcher that triggers RAG re-indexing on file changes."""
@@ -195,17 +199,17 @@ class RAGFileWatcher(FileWatcher):
         if not self._rag:
             return
         try:
-            if event == 'deleted':
+            if event == "deleted":
                 # Remove from index
-                log.info(f'RAGFileWatcher: removing {path} from index')
+                log.info(f"RAGFileWatcher: removing {path} from index")
                 # RAG engine should support remove_file
-                if hasattr(self._rag, 'remove_file'):
+                if hasattr(self._rag, "remove_file"):
                     self._rag.remove_file(path)
-            elif event in ('created', 'modified'):
-                log.info(f'RAGFileWatcher: re-indexing {path}')
+            elif event in ("created", "modified"):
+                log.info(f"RAGFileWatcher: re-indexing {path}")
                 fpath = Path(path)
-                if fpath.exists() and hasattr(self._rag, 'index_file'):
+                if fpath.exists() and hasattr(self._rag, "index_file"):
                     label = fpath.name
                     self._rag.index_file(label, fpath)
         except Exception as e:
-            log.info(f'RAGFileWatcher index error: {e}')
+            log.info(f"RAGFileWatcher index error: {e}")

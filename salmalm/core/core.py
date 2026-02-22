@@ -16,9 +16,20 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from salmalm.constants import (
-    AUDIT_DB, BASE_DIR, CACHE_TTL, COMPACTION_THRESHOLD, COMPLEX_INDICATORS,
-    DATA_DIR, KST, MEMORY_DIR, MEMORY_FILE, MODEL_COSTS, MODEL_TIERS,
-    SIMPLE_QUERY_MAX_CHARS, TOOL_HINT_KEYWORDS, WORKSPACE_DIR,
+    AUDIT_DB,
+    BASE_DIR,
+    CACHE_TTL,
+    COMPACTION_THRESHOLD,
+    COMPLEX_INDICATORS,
+    DATA_DIR,
+    KST,
+    MEMORY_DIR,
+    MEMORY_FILE,
+    MODEL_COSTS,
+    MODEL_TIERS,
+    SIMPLE_QUERY_MAX_CHARS,
+    TOOL_HINT_KEYWORDS,
+    WORKSPACE_DIR,
 )
 from salmalm.security.crypto import vault, log
 
@@ -61,15 +72,11 @@ def _get_db() -> sqlite3.Connection:
             updated_at TEXT NOT NULL
         )""")
         try:
-            conn.execute(
-                "ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL"
-            )
+            conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
         except Exception:
             pass
         try:
-            conn.execute(
-                "ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL"
-            )
+            conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
         except Exception:
             pass
         conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (
@@ -102,15 +109,11 @@ def _init_audit_db():
         updated_at TEXT NOT NULL
     )""")
     try:
-        conn.execute(
-            "ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL"
-        )
+        conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
     except Exception:
         pass
     try:
-        conn.execute(
-            "ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL"
-        )
+        conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
     except Exception:
         pass
     conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (
@@ -133,18 +136,14 @@ def _ensure_audit_v2_table():
         session_id TEXT DEFAULT '',
         detail TEXT DEFAULT '{}'
     )""")
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_audit_v2_ts ON audit_log_v2(timestamp)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_ts ON audit_log_v2(timestamp)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)")
     conn.commit()
 
 
 # ── Audit log batching ──
 _audit_buffer: list = []  # buffered audit entries
-_AUDIT_BATCH_SIZE = 20    # flush after this many entries
+_AUDIT_BATCH_SIZE = 20  # flush after this many entries
 _AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush
 _audit_flush_timer: Optional[threading.Timer] = None  # noqa: F405
 
@@ -162,9 +161,7 @@ def _flush_audit_buffer() -> None:
 
     conn = _get_db()
     # Get current chain head
-    row = conn.execute(
-        "SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = conn.execute("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
     prev = row[0] if row else "0" * 64
 
     for ts, event, detail, session_id, json_detail in entries:
@@ -212,11 +209,7 @@ def audit_log(
     """
     _ensure_audit_v2_table()
     ts = datetime.now(KST).isoformat()  # noqa: F405
-    json_detail = (
-        json.dumps(detail_dict, ensure_ascii=False)
-        if detail_dict
-        else json.dumps({"text": detail[:500]})
-    )
+    json_detail = json.dumps(detail_dict, ensure_ascii=False) if detail_dict else json.dumps({"text": detail[:500]})
 
     with _audit_lock:
         _audit_buffer.append((ts, event, detail, session_id, json_detail))
@@ -239,9 +232,7 @@ def audit_checkpoint() -> Optional[str]:
     """
     try:
         conn = _get_db()
-        row = conn.execute(
-            "SELECT hash, id FROM audit_log ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        row = conn.execute("SELECT hash, id FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
         if not row:
             return None
         head_hash, head_id = row[0], row[1]
@@ -262,21 +253,15 @@ def audit_log_cleanup(days: int = 30) -> None:
     try:
         conn = _get_db()
         _ensure_audit_v2_table()
-        deleted = conn.execute(
-            "DELETE FROM audit_log_v2 WHERE timestamp < ?", (cutoff,)
-        ).rowcount
+        deleted = conn.execute("DELETE FROM audit_log_v2 WHERE timestamp < ?", (cutoff,)).rowcount
         conn.commit()
         if deleted:
-            log.info(
-                f"[AUDIT] Cleaned up {deleted} audit entries older than {days} days"
-            )
+            log.info(f"[AUDIT] Cleaned up {deleted} audit entries older than {days} days")
     except Exception as e:
         log.warning(f"Audit cleanup error: {e}")
 
 
-def query_audit_log(
-    limit: int = 50, event_type: Optional[str] = None, session_id: Optional[str] = None
-) -> list:
+def query_audit_log(limit: int = 50, event_type: Optional[str] = None, session_id: Optional[str] = None) -> list:
     """Query structured audit log entries.
 
     Returns list of dicts with id, timestamp, event_type, session_id, detail.
@@ -341,9 +326,7 @@ class ResponseCache:
 
     def _key(self, model: str, messages: list, session_id: str = "") -> str:
         # Include last 5 messages for better session isolation even without explicit session_id
-        content = json.dumps(
-            {"s": session_id, "m": model, "msgs": messages[-5:]}, sort_keys=True
-        )
+        content = json.dumps({"s": session_id, "m": model, "msgs": messages[-5:]}, sort_keys=True)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
     def get(self, model: str, messages: list, session_id: str = "") -> Optional[str]:
@@ -358,9 +341,7 @@ class ResponseCache:
             del self._cache[k]
         return None
 
-    def put(
-        self, model: str, messages: list, response: str, session_id: str = ""
-    ) -> None:
+    def put(self, model: str, messages: list, response: str, session_id: str = "") -> None:
         """Store a response in cache with TTL."""
         k = self._key(model, messages, session_id)
         self._cache[k] = {"response": response, "ts": time.time()}
@@ -447,9 +428,7 @@ def get_current_user_id() -> Optional[int]:
     return getattr(_thread_local, "current_user_id", None)
 
 
-def track_usage(
-    model: str, input_tokens: int, output_tokens: int, user_id: Optional[int] = None
-) -> None:
+def track_usage(model: str, input_tokens: int, output_tokens: int, user_id: Optional[int] = None) -> None:
     """Record token usage and cost for a model call."""
     # Auto-detect user_id from thread-local if not provided
     if user_id is None:
@@ -457,9 +436,7 @@ def track_usage(
     with _usage_lock:
         short = model.split("/")[-1] if "/" in model else model
         cost_info = MODEL_COSTS.get(short, {"input": 1.0, "output": 5.0})  # noqa: F405
-        cost = (
-            input_tokens * cost_info["input"] + output_tokens * cost_info["output"]
-        ) / 1_000_000
+        cost = (input_tokens * cost_info["input"] + output_tokens * cost_info["output"]) / 1_000_000
         _usage["total_input"] += input_tokens  # type: ignore[operator]
         _usage["total_output"] += output_tokens  # type: ignore[operator]
         _usage["total_cost"] += cost  # type: ignore[operator]
@@ -479,9 +456,7 @@ def track_usage(
             conn = _get_db()
             # Ensure user_id column exists
             try:
-                conn.execute(
-                    "ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL"
-                )
+                conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL")
             except Exception:
                 pass
             conn.execute(
@@ -547,9 +522,7 @@ class ModelRouter:
         except Exception as e:
             log.error(f"Failed to persist model pref: {e}")
 
-    def route(
-        self, user_message: str, has_tools: bool = False, iteration: int = 0
-    ) -> str:
+    def route(self, user_message: str, has_tools: bool = False, iteration: int = 0) -> str:
         """Route a message to the best model based on intent classification."""
         if self.force_model:
             return self.force_model
@@ -564,11 +537,7 @@ class ModelRouter:
         # Tier 3: complex tasks
         complex_score = sum(1 for kw in COMPLEX_INDICATORS if kw in msg)  # noqa: F405
         tool_hint_score = sum(1 for kw in TOOL_HINT_KEYWORDS if kw in msg)  # noqa: F405
-        if (
-            complex_score >= 2
-            or msg_len > 1000
-            or (complex_score >= 1 and tool_hint_score >= 1)
-        ):
+        if complex_score >= 2 or msg_len > 1000 or (complex_score >= 1 and tool_hint_score >= 1):
             return self._pick_available(3)
 
         # Tier 2: tool usage likely or medium complexity
@@ -656,11 +625,7 @@ def _msg_content_str(msg: dict) -> str:
     if isinstance(c, str):
         return c
     if isinstance(c, list):
-        return " ".join(
-            b.get("text", "")
-            for b in c
-            if isinstance(b, dict) and b.get("type") == "text"
-        )
+        return " ".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text")
     return str(c)
 
 
@@ -713,9 +678,7 @@ def compact_messages(
         recent = [m for m in messages if m["role"] != "system"][-20:]
         messages = system_msgs + recent
         total_chars = sum(len(_msg_content_str(m)) for m in messages)
-        log.warning(
-            f"[CUT] Hard char limit: truncated to {len(messages)} msgs ({total_chars} chars)"
-        )
+        log.warning(f"[CUT] Hard char limit: truncated to {len(messages)} msgs ({total_chars} chars)")
 
     if total_chars < COMPACTION_THRESHOLD:  # noqa: F405
         return messages
@@ -871,7 +834,7 @@ def compact_messages(
     # Persist compaction summary for cross-session continuity
     if session:
         try:
-            _persist_compaction_summary(getattr(session, 'id', ''), summary_content)
+            _persist_compaction_summary(getattr(session, "id", ""), summary_content)
         except Exception as e:
             log.warning(f"[PKG] Summary persistence error: {e}")
 
@@ -1022,9 +985,7 @@ class TFIDFSearch:
             self._idf = {t: math.log(n_docs / (1 + df)) for t, df in doc_freq.items()}
         self._built = True
         self._last_index_time = now  # type: ignore[assignment]
-        log.info(
-            f"[SEARCH] TF-IDF index built: {len(self._docs)} chunks from {len(search_files)} files"
-        )
+        log.info(f"[SEARCH] TF-IDF index built: {len(self._docs)} chunks from {len(search_files)} files")
 
     def search(self, query: str, max_results: int = 5) -> list:
         """Search with TF-IDF + cosine similarity. Returns [(score, label, lineno, snippet)]."""
@@ -1050,10 +1011,7 @@ class TFIDFSearch:
         for label, lineno, chunk, doc_tf in self._docs:
             doc_vec = {t: tf * self._idf.get(t, 0) for t, tf in doc_tf.items()}
             # Cosine similarity
-            dot = sum(
-                query_vec.get(t, 0) * doc_vec.get(t, 0)
-                for t in set(query_vec) | set(doc_vec)
-            )
+            dot = sum(query_vec.get(t, 0) * doc_vec.get(t, 0) for t in set(query_vec) | set(doc_vec))
             doc_norm = math.sqrt(sum(v**2 for v in doc_vec.values()))
             if doc_norm == 0:
                 continue
@@ -1102,9 +1060,7 @@ class LLMCronManager:
     def save_jobs(self) -> None:
         """Persist cron jobs to file."""
         try:
-            self._JOBS_FILE.write_text(
-                json.dumps(self.jobs, ensure_ascii=False, indent=2)
-            )
+            self._JOBS_FILE.write_text(json.dumps(self.jobs, ensure_ascii=False, indent=2))
         except Exception as e:
             log.error(f"Failed to save cron jobs: {e}")
 
@@ -1237,30 +1193,22 @@ class LLMCronManager:
 
                 # Track cost before/after to enforce per-cron-job cap
                 cost_before = _usage["total_cost"]
-                response = await process_message(
-                    f"cron-{job['id']}", job["prompt"], model_override=job.get("model")
-                )
+                response = await process_message(f"cron-{job['id']}", job["prompt"], model_override=job.get("model"))
                 cost_after = _usage["total_cost"]
                 cron_cost = cost_after - cost_before
                 MAX_CRON_JOB_COST = 2.0  # $2 max per cron execution
                 if cron_cost > MAX_CRON_JOB_COST:
-                    log.warning(
-                        f"[CRON] Job {job['name']} cost ${cron_cost:.2f} — exceeds ${MAX_CRON_JOB_COST} cap"
-                    )
+                    log.warning(f"[CRON] Job {job['name']} cost ${cron_cost:.2f} — exceeds ${MAX_CRON_JOB_COST} cap")
                 job["last_run"] = datetime.now(KST).isoformat()  # noqa: F405
                 job["run_count"] = job.get("run_count", 0) + 1
                 self.save_jobs()
-                log.info(
-                    f"[CRON] Cron completed: {job['name']} ({len(response)} chars)"
-                )
+                log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
 
                 # Notification routing
                 notify_cfg = job.get("notify")
                 notified = False
                 summary = response[:800] + ("..." if len(response) > 800 else "")
-                notify_text = (
-                    f"⏰ SalmAlm scheduled task completed: {job['name']}\n\n{summary}"
-                )
+                notify_text = f"⏰ SalmAlm scheduled task completed: {job['name']}\n\n{summary}"
 
                 if isinstance(notify_cfg, dict):
                     ch = notify_cfg.get("channel", "")
@@ -1283,9 +1231,7 @@ class LLMCronManager:
                                 except Exception:
                                     pass
                     except Exception as e:
-                        log.warning(
-                            f"[CRON] Notification routing failed for {job['name']}: {e}"
-                        )
+                        log.warning(f"[CRON] Notification routing failed for {job['name']}: {e}")
                 elif notify_cfg:
                     if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
                         try:
@@ -1374,9 +1320,7 @@ class Session:
             conn = _get_db()
             # Ensure user_id column exists
             try:
-                conn.execute(
-                    "ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL"
-                )
+                conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
             except Exception:
                 pass
             conn.execute(
@@ -1404,9 +1348,7 @@ class Session:
             system_msgs = [m for m in self.messages if m["role"] == "system"][:1]
             recent = [m for m in self.messages if m["role"] != "system"][-50:]
             self.messages = system_msgs + recent
-            log.warning(
-                f"[SESSION] Auto-trimmed session {self.id}: >1000 msgs → {len(self.messages)}"
-            )
+            log.warning(f"[SESSION] Auto-trimmed session {self.id}: >1000 msgs → {len(self.messages)}")
 
     def add_assistant(self, content: str) -> None:
         """Add an assistant response to the session."""
@@ -1464,9 +1406,7 @@ def _cleanup_sessions():
         return
     _session_cleanup_ts = now
     with _session_lock:
-        stale = [
-            sid for sid, s in _sessions.items() if now - s.last_active > _SESSION_TTL
-        ]
+        stale = [sid for sid, s in _sessions.items() if now - s.last_active > _SESSION_TTL]
         for sid in stale:
             try:
                 _sessions[sid]._persist()
@@ -1501,14 +1441,10 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                         if not isinstance(restored, list):
                             raise ValueError("Session data is not a list")
                         _sessions[session_id].messages = restored
-                        log.info(
-                            f"[NOTE] Session restored: {session_id} ({len(restored)} msgs)"
-                        )
+                        log.info(f"[NOTE] Session restored: {session_id} ({len(restored)} msgs)")
                     except (json.JSONDecodeError, ValueError, TypeError) as je:
                         # Corrupted session JSON — start fresh
-                        log.warning(
-                            f"[SESSION] Corrupt session JSON for {session_id}: {je}"
-                        )
+                        log.warning(f"[SESSION] Corrupt session JSON for {session_id}: {je}")
                         _sessions[session_id].messages = []
                     # Refresh system prompt
                     from salmalm.core.prompt import build_system_prompt
@@ -1524,18 +1460,21 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
             # Cross-session continuity: inject last compaction summary
             prev_summary = _restore_compaction_summary(session_id)
             if prev_summary:
-                _sessions[session_id].messages.append({
-                    "role": "system",
-                    "content": f"[Previous session context]\n{prev_summary}",
-                })
+                _sessions[session_id].messages.append(
+                    {
+                        "role": "system",
+                        "content": f"[Previous session context]\n{prev_summary}",
+                    }
+                )
                 log.info(f"[NOTE] Restored compaction summary for {session_id} ({len(prev_summary)} chars)")
 
             # Apply onboarding model as session default
             try:
                 from salmalm.security.crypto import vault
+
                 if vault.is_unlocked:
-                    dm = vault.get('default_model')
-                    if dm and dm != 'auto':
+                    dm = vault.get("default_model")
+                    if dm and dm != "auto":
                         _sessions[session_id]._default_model = dm
                         _sessions[session_id].model_override = dm
             except Exception:
@@ -1560,9 +1499,7 @@ def rollback_session(session_id: str, count: int) -> dict:
     Returns {'ok': True, 'removed': <int>} or {'ok': False, 'error': ...}.
     """
     session = get_session(session_id)
-    non_system = [
-        (i, m) for i, m in enumerate(session.messages) if m.get("role") != "system"
-    ]
+    non_system = [(i, m) for i, m in enumerate(session.messages) if m.get("role") != "system"]
     pairs_removed = 0
     indices_to_remove = []
     j = len(non_system) - 1
@@ -1636,15 +1573,11 @@ def branch_session(session_id: str, message_index: int) -> dict:
 
     conn = _get_db()
     try:
-        conn.execute(
-            "ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL"
-        )
+        conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
     except Exception:
         pass
     try:
-        conn.execute(
-            "ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL"
-        )
+        conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
     except Exception:
         pass
     conn.execute(
@@ -1675,11 +1608,7 @@ def save_session_to_disk(session_id: str) -> None:
         saveable_msgs = []
         for m in session.messages[-50:]:
             if isinstance(m.get("content"), list):
-                texts = [
-                    b
-                    for b in m["content"]
-                    if isinstance(b, dict) and b.get("type") == "text"
-                ]
+                texts = [b for b in m["content"] if isinstance(b, dict) and b.get("type") == "text"]
                 if texts:
                     saveable_msgs.append({**m, "content": texts})
             elif isinstance(m.get("content"), str):
@@ -1692,9 +1621,7 @@ def save_session_to_disk(session_id: str) -> None:
             "metadata": session.metadata,
         }
         path = _SESSIONS_DIR / f"{session_id}.json"
-        path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception as e:
         log.warning(f"[DISK] Failed to save session {session_id}: {e}")
 
@@ -1713,9 +1640,7 @@ def restore_session(session_id: str) -> Optional[Session]:
         session.metadata = data.get("metadata", {})
         with _session_lock:
             _sessions[session_id] = session
-        log.info(
-            f"[DISK] Restored session from disk: {session_id} ({len(session.messages)} msgs)"
-        )
+        log.info(f"[DISK] Restored session from disk: {session_id} ({len(session.messages)} msgs)")
         return session
     except Exception as e:
         log.warning(f"[DISK] Failed to restore session {session_id}: {e}")
@@ -1742,9 +1667,7 @@ class CronScheduler:
         self.jobs = []
         self._running = False
 
-    def add_job(
-        self, name: str, interval_seconds: int, callback: object, **kwargs: object
-    ) -> None:
+    def add_job(self, name: str, interval_seconds: int, callback: object, **kwargs: object) -> None:
         """Add a new cron job with the given schedule and callback."""
         self.jobs.append(
             {
@@ -1822,9 +1745,7 @@ class HeartbeatManager:
         """Persist heartbeat state to JSON file."""
         try:
             MEMORY_DIR.mkdir(exist_ok=True)  # noqa: F405
-            cls._STATE_FILE.write_text(
-                json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8"
-            )
+            cls._STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
         except Exception as e:
             log.error(f"[HEARTBEAT] Failed to save state: {e}")
 
@@ -1833,9 +1754,7 @@ class HeartbeatManager:
         """Read HEARTBEAT.md for the heartbeat checklist."""
         if cls._HEARTBEAT_FILE.exists():
             try:
-                content = cls._HEARTBEAT_FILE.read_text(
-                    encoding="utf-8", errors="replace"
-                )
+                content = cls._HEARTBEAT_FILE.read_text(encoding="utf-8", errors="replace")
                 if content.strip():
                     return content
             except Exception:
@@ -1913,17 +1832,14 @@ class HeartbeatManager:
             # Run in isolated session (OpenClaw pattern: no cross-contamination)
             result = await process_message(
                 f"heartbeat-{int(time.time())}",
-                f"[Heartbeat check]\n{prompt}{state_ctx}\n\n"
-                f"If nothing needs attention, reply HEARTBEAT_OK.",
+                f"[Heartbeat check]\n{prompt}{state_ctx}\n\nIf nothing needs attention, reply HEARTBEAT_OK.",
                 model_override=None,  # Use auto-routing
             )
 
             # Update state
             state["totalBeats"] = state.get("totalBeats", 0) + 1
             state["lastBeatTime"] = time.time()
-            state["lastBeatResult"] = (
-                "ok" if (result and "HEARTBEAT_OK" in result) else "action"
-            )
+            state["lastBeatResult"] = "ok" if (result and "HEARTBEAT_OK" in result) else "action"
             # Keep last 20 history entries
             history = state.get("history", [])
             history.append(
@@ -1953,9 +1869,7 @@ class HeartbeatManager:
         if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
             try:
                 summary = result[:800] + ("..." if len(result) > 800 else "")
-                _tg_bot.send_message(
-                    _tg_bot.owner_id, f"💓 Heartbeat alert:\n{summary}"
-                )
+                _tg_bot.send_message(_tg_bot.owner_id, f"💓 Heartbeat alert:\n{summary}")
             except Exception as e:
                 log.error(f"[HEARTBEAT] Announce error: {e}")
 
@@ -1964,9 +1878,7 @@ class HeartbeatManager:
         if web_session:
             if not hasattr(web_session, "_notifications"):
                 web_session._notifications = []
-            web_session._notifications.append(
-                {"time": time.time(), "text": f"💓 Heartbeat: {result[:200]}"}
-            )
+            web_session._notifications.append({"time": time.time(), "text": f"💓 Heartbeat: {result[:200]}"})
 
 
 heartbeat = HeartbeatManager()
@@ -1975,9 +1887,7 @@ heartbeat = HeartbeatManager()
 # ============================================================
 # CONTEXT COMPACTION — Auto-compress old messages when token count exceeds threshold
 # ============================================================
-AUTO_COMPACT_TOKEN_THRESHOLD = (
-    80_000  # ~80K tokens (chars/4 approximation = 320K chars)
-)
+AUTO_COMPACT_TOKEN_THRESHOLD = 80_000  # ~80K tokens (chars/4 approximation = 320K chars)
 COMPACT_PRESERVE_RECENT = 10  # Keep last N messages intact
 
 
@@ -1997,7 +1907,9 @@ def compact_session(session_id: str, force: bool = False) -> str:
     est_tokens = _estimate_tokens(session.messages)
 
     if not force and est_tokens < AUTO_COMPACT_TOKEN_THRESHOLD:
-        return f"Context size ~{est_tokens:,} tokens — no compaction needed (threshold: {AUTO_COMPACT_TOKEN_THRESHOLD:,})."
+        return (
+            f"Context size ~{est_tokens:,} tokens — no compaction needed (threshold: {AUTO_COMPACT_TOKEN_THRESHOLD:,})."
+        )
 
     # Separate system messages and conversation
     system_msgs = [m for m in session.messages if m["role"] == "system"][:1]
@@ -2080,8 +1992,7 @@ def compact_session(session_id: str, force: bool = False) -> str:
     new_tokens = _estimate_tokens(session.messages)
 
     log.info(
-        f"[COMPACT] Session {session_id}: {old_tokens:,} → {new_tokens:,} tokens, "
-        f"{len(old_msgs)} messages summarized"
+        f"[COMPACT] Session {session_id}: {old_tokens:,} → {new_tokens:,} tokens, {len(old_msgs)} messages summarized"
     )
     return f"✅ Compacted: ~{old_tokens:,} → ~{new_tokens:,} tokens ({len(old_msgs)} messages summarized)."
 
@@ -2091,9 +2002,7 @@ def auto_compact_if_needed(session_id: str) -> None:
     session = get_session(session_id)
     est_tokens = _estimate_tokens(session.messages)
     if est_tokens >= AUTO_COMPACT_TOKEN_THRESHOLD:
-        log.info(
-            f"[COMPACT] Auto-compacting session {session_id} (~{est_tokens:,} tokens)"
-        )
+        log.info(f"[COMPACT] Auto-compacting session {session_id} (~{est_tokens:,} tokens)")
         compact_session(session_id, force=True)
 
 
@@ -2201,10 +2110,7 @@ def delete_message(session_id: str, message_index: int) -> dict:
         return {"ok": False, "error": "Can only delete user messages"}
     indices_to_remove = [message_index]
     # Also remove the paired assistant message (next one if it's assistant)
-    if (
-        message_index + 1 < len(session.messages)
-        and session.messages[message_index + 1].get("role") == "assistant"
-    ):
+    if message_index + 1 < len(session.messages) and session.messages[message_index + 1].get("role") == "assistant":
         indices_to_remove.append(message_index + 1)
     # Backup
     removed_msgs = [session.messages[i] for i in indices_to_remove]
@@ -2264,11 +2170,7 @@ def search_messages(query: str, limit: int = 20) -> list:
                     idx = content.lower().index(query.lower())
                     start = max(0, idx - 40)
                     end = min(len(content), idx + len(query) + 40)
-                    snippet = (
-                        ("..." if start > 0 else "")
-                        + content[start:end]
-                        + ("..." if end < len(content) else "")
-                    )
+                    snippet = ("..." if start > 0 else "") + content[start:end] + ("..." if end < len(content) else "")
                     results.append(
                         {
                             "session_id": sid,

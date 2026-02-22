@@ -1,4 +1,5 @@
 """SalmAlm Discord Bot — Pure stdlib Discord Gateway + HTTP API."""
+
 from __future__ import annotations
 
 import asyncio
@@ -12,7 +13,7 @@ from typing import Optional, Dict, Any, Callable
 
 from salmalm import log
 
-API_BASE = 'https://discord.com/api/v10'
+API_BASE = "https://discord.com/api/v10"
 
 
 class DiscordBot:
@@ -42,37 +43,38 @@ class DiscordBot:
     # ── REST API ──
 
     def _api(self, method: str, path: str, body: Optional[dict] = None) -> dict:
-        url = f'{API_BASE}{path}'
+        url = f"{API_BASE}{path}"
         data = json.dumps(body).encode() if body else None
         req = urllib.request.Request(url, data=data, method=method)
-        req.add_header('Authorization', f'Bot {self.token}')
-        req.add_header('Content-Type', 'application/json')
-        req.add_header('User-Agent', 'SalmAlm (github.com/hyunjun6928-netizen/salmalm, 0.8)')
+        req.add_header("Authorization", f"Bot {self.token}")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("User-Agent", "SalmAlm (github.com/hyunjun6928-netizen/salmalm, 0.8)")
         try:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 return json.loads(resp.read().decode())  # type: ignore[no-any-return]
         except urllib.error.HTTPError as e:
-            err = e.read().decode('utf-8', errors='replace')
-            log.error(f'Discord API {method} {path}: {e.code} {err[:200]}')
+            err = e.read().decode("utf-8", errors="replace")
+            log.error(f"Discord API {method} {path}: {e.code} {err[:200]}")
             return {}
 
     def send_message(self, channel_id: str, content: str, reply_to: Optional[str] = None) -> dict:
         """Send a message to a channel."""
-        body: Dict[str, Any] = {'content': content[:2000]}
+        body: Dict[str, Any] = {"content": content[:2000]}
         if reply_to:
-            body['message_reference'] = {'message_id': reply_to}
-        return self._api('POST', f'/channels/{channel_id}/messages', body)
+            body["message_reference"] = {"message_id": reply_to}
+        return self._api("POST", f"/channels/{channel_id}/messages", body)
 
     def send_typing(self, channel_id: str):
         """Send typing indicator."""
-        self._api('POST', f'/channels/{channel_id}/typing')
+        self._api("POST", f"/channels/{channel_id}/typing")
 
-    def start_typing_loop(self, channel_id: str) -> 'asyncio.Task':
+    def start_typing_loop(self, channel_id: str) -> "asyncio.Task":
         """Start a continuous typing indicator loop (refreshes every 8s).
 
         Discord typing expires after ~10s, so we refresh every 8s.
         Returns a cancellable asyncio Task.
         """
+
         async def _loop():
             try:
                 while True:
@@ -80,12 +82,13 @@ class DiscordBot:
                     await asyncio.sleep(8)
             except asyncio.CancelledError:
                 pass
+
         return asyncio.create_task(_loop())
 
     def add_reaction(self, channel_id: str, message_id: str, emoji: str):
         """Add an emoji reaction to a Discord message."""
         encoded = urllib.parse.quote(emoji)
-        self._api('PUT', f'/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me')
+        self._api("PUT", f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me")
 
     # ── Gateway WebSocket ──
 
@@ -94,13 +97,13 @@ class DiscordBot:
         import socket
 
         # Get gateway URL
-        gw = self._api('GET', '/gateway/bot')
-        gateway_url = gw.get('url', 'wss://gateway.discord.gg')
-        gateway_url += '/?v=10&encoding=json'
+        gw = self._api("GET", "/gateway/bot")
+        gateway_url = gw.get("url", "wss://gateway.discord.gg")
+        gateway_url += "/?v=10&encoding=json"
 
         # Parse URL
-        host = gateway_url.split('//')[1].split('/')[0].split('?')[0]
-        path = '/' + '/'.join(gateway_url.split('//')[1].split('/')[1:])
+        host = gateway_url.split("//")[1].split("/")[0].split("?")[0]
+        path = "/" + "/".join(gateway_url.split("//")[1].split("/")[1:])
 
         # SSL connect
         ctx = ssl.create_default_context()
@@ -108,27 +111,27 @@ class DiscordBot:
         self._ws_raw = ctx.wrap_socket(sock, server_hostname=host)
 
         # WebSocket handshake
-        key = __import__('base64').b64encode(os.urandom(16)).decode()
+        key = __import__("base64").b64encode(os.urandom(16)).decode()
         handshake = (
-            f'GET {path} HTTP/1.1\r\n'
-            f'Host: {host}\r\n'
-            f'Upgrade: websocket\r\n'
-            f'Connection: Upgrade\r\n'
-            f'Sec-WebSocket-Key: {key}\r\n'
-            f'Sec-WebSocket-Version: 13\r\n'
-            f'\r\n'
+            f"GET {path} HTTP/1.1\r\n"
+            f"Host: {host}\r\n"
+            f"Upgrade: websocket\r\n"
+            f"Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\n"
+            f"Sec-WebSocket-Version: 13\r\n"
+            f"\r\n"
         )
         self._ws_raw.sendall(handshake.encode())
 
         # Read handshake response
-        resp = b''
-        while b'\r\n\r\n' not in resp:
+        resp = b""
+        while b"\r\n\r\n" not in resp:
             resp += self._ws_raw.recv(4096)
 
-        if b'101' not in resp.split(b'\r\n')[0]:
-            raise ConnectionError(f'WebSocket handshake failed: {resp[:100]}')  # type: ignore[str-bytes-safe]
+        if b"101" not in resp.split(b"\r\n")[0]:
+            raise ConnectionError(f"WebSocket handshake failed: {resp[:100]}")  # type: ignore[str-bytes-safe]
 
-        log.info('[DISC] Discord Gateway connected')
+        log.info("[DISC] Discord Gateway connected")
 
     def _ws_send(self, data: dict):
         """Send a WebSocket frame (masked, as client)."""
@@ -140,10 +143,10 @@ class DiscordBot:
             frame.append(0x80 | length)  # masked
         elif length < 65536:
             frame.append(0x80 | 126)
-            frame.extend(struct.pack('>H', length))
+            frame.extend(struct.pack(">H", length))
         else:
             frame.append(0x80 | 127)
-            frame.extend(struct.pack('>Q', length))
+            frame.extend(struct.pack(">Q", length))
         # Mask
         mask = os.urandom(4)
         frame.extend(mask)
@@ -161,14 +164,14 @@ class DiscordBot:
             length = header[1] & 0x7F
 
             if length == 126:
-                length = struct.unpack('>H', self._ws_raw.recv(2))[0]
+                length = struct.unpack(">H", self._ws_raw.recv(2))[0]
             elif length == 127:
-                length = struct.unpack('>Q', self._ws_raw.recv(8))[0]
+                length = struct.unpack(">Q", self._ws_raw.recv(8))[0]
 
             if masked:
                 mask = self._ws_raw.recv(4)
 
-            data = b''
+            data = b""
             while len(data) < length:
                 chunk = self._ws_raw.recv(min(length - len(data), 65536))
                 if not chunk:
@@ -192,7 +195,7 @@ class DiscordBot:
                 return json.loads(data.decode())  # type: ignore[no-any-return]
             return None
         except Exception as e:
-            log.error(f'Discord WS recv error: {e}')
+            log.error(f"Discord WS recv error: {e}")
             return None
 
     async def _heartbeat_loop(self):
@@ -200,35 +203,33 @@ class DiscordBot:
         while self._running:
             await asyncio.sleep(self._heartbeat_interval / 1000)
             if self._running:
-                self._ws_send({'op': 1, 'd': self._seq})
+                self._ws_send({"op": 1, "d": self._seq})
 
     async def _identify(self):
         """Send IDENTIFY payload."""
-        self._ws_send({
-            'op': 2,
-            'd': {
-                'token': self.token,
-                'intents': 33281,  # GUILDS + GUILD_MESSAGES + DM_MESSAGES + MESSAGE_CONTENT
-                'properties': {
-                    'os': 'linux',
-                    'browser': 'salmalm',
-                    'device': 'salmalm'
-                }
+        self._ws_send(
+            {
+                "op": 2,
+                "d": {
+                    "token": self.token,
+                    "intents": 33281,  # GUILDS + GUILD_MESSAGES + DM_MESSAGES + MESSAGE_CONTENT
+                    "properties": {"os": "linux", "browser": "salmalm", "device": "salmalm"},
+                },
             }
-        })
+        )
 
     async def _handle_event(self, data: dict):
         """Handle a gateway event."""
-        op = data.get('op')
-        t = data.get('t')
-        d = data.get('d', {})
-        s = data.get('s')
+        op = data.get("op")
+        t = data.get("t")
+        d = data.get("d", {})
+        s = data.get("s")
 
         if s:
             self._seq = s
 
         if op == 10:  # Hello
-            self._heartbeat_interval = d.get('heartbeat_interval', 41250)
+            self._heartbeat_interval = d.get("heartbeat_interval", 41250)
             asyncio.create_task(self._heartbeat_loop())
             await self._identify()
 
@@ -236,35 +237,37 @@ class DiscordBot:
             pass
 
         elif op == 0:  # Dispatch
-            if t == 'READY':
-                self._session_id = d.get('session_id')
-                self._bot_user = d.get('user', {})
-                log.info(f"[DISC] Discord ready: {self._bot_user.get('username')}#{self._bot_user.get('discriminator')}")
+            if t == "READY":
+                self._session_id = d.get("session_id")
+                self._bot_user = d.get("user", {})
+                log.info(
+                    f"[DISC] Discord ready: {self._bot_user.get('username')}#{self._bot_user.get('discriminator')}"
+                )
 
-            elif t == 'MESSAGE_CREATE':
+            elif t == "MESSAGE_CREATE":
                 # Ignore own messages
-                author = d.get('author', {})
-                if author.get('id') == self._bot_user.get('id'):  # type: ignore[union-attr]
+                author = d.get("author", {})
+                if author.get("id") == self._bot_user.get("id"):  # type: ignore[union-attr]
                     return
-                if author.get('bot'):
+                if author.get("bot"):
                     return
 
-                content = d.get('content', '').strip()
-                channel_id = d.get('channel_id')
-                message_id = d.get('id')
+                content = d.get("content", "").strip()
+                channel_id = d.get("channel_id")
+                message_id = d.get("id")
 
                 # Check if bot is mentioned or DM
-                is_dm = d.get('guild_id') is None
-                mentions = [m.get('id') for m in d.get('mentions', [])]
-                is_mentioned = self._bot_user and self._bot_user.get('id') in mentions
+                is_dm = d.get("guild_id") is None
+                mentions = [m.get("id") for m in d.get("mentions", [])]
+                is_mentioned = self._bot_user and self._bot_user.get("id") in mentions
 
                 if not is_dm and not is_mentioned:
                     return  # Only respond to DMs and mentions
 
                 # Strip bot mention from content
                 if self._bot_user:
-                    content = content.replace(f'<@{self._bot_user["id"]}>', '').strip()
-                    content = content.replace(f'<@!{self._bot_user["id"]}>', '').strip()
+                    content = content.replace(f"<@{self._bot_user['id']}>", "").strip()
+                    content = content.replace(f"<@!{self._bot_user['id']}>", "").strip()
 
                 if not content:
                     return
@@ -281,8 +284,8 @@ class DiscordBot:
                                 response = response[2000:]
                                 self.send_message(channel_id, chunk, reply_to=message_id)
                     except Exception as e:
-                        log.error(f'Discord message handler error: {e}')
-                        self.send_message(channel_id, f'❌ Error: {str(e)[:200]}', reply_to=message_id)
+                        log.error(f"Discord message handler error: {e}")
+                        self.send_message(channel_id, f"❌ Error: {str(e)[:200]}", reply_to=message_id)
                     finally:
                         typing_task.cancel()
                         try:
@@ -293,7 +296,7 @@ class DiscordBot:
     async def poll(self):
         """Main gateway loop."""
         if not self.token:
-            log.warning('Discord token not configured')
+            log.warning("Discord token not configured")
             return
 
         self._running = True
@@ -311,10 +314,10 @@ class DiscordBot:
                     await self._handle_event(data)
 
             except Exception as e:
-                log.error(f'Discord gateway error: {e}')
+                log.error(f"Discord gateway error: {e}")
 
             if self._running:
-                log.info(f'[DISC] Discord reconnecting in {retry_delay}s...')
+                log.info(f"[DISC] Discord reconnecting in {retry_delay}s...")
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 60)
 

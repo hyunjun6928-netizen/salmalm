@@ -104,13 +104,21 @@ class TokenManager:
         except (OSError, NotImplementedError):
             pass
         import sys
+
         if sys.platform == "win32":
             try:
                 import subprocess
+
                 subprocess.run(
-                    ["icacls", str(path), "/inheritance:r",
-                     "/grant:r", f"{os.environ.get('USERNAME', 'SYSTEM')}:(R,W)"],
-                    capture_output=True, timeout=5,
+                    [
+                        "icacls",
+                        str(path),
+                        "/inheritance:r",
+                        "/grant:r",
+                        f"{os.environ.get('USERNAME', 'SYSTEM')}:(R,W)",
+                    ],
+                    capture_output=True,
+                    timeout=5,
                 )
             except Exception:
                 pass
@@ -160,13 +168,7 @@ class TokenManager:
             "exp": now + expires_in,
             "iat": now,
         }
-        data = (
-            base64.urlsafe_b64encode(
-                json.dumps(payload, separators=(",", ":")).encode()
-            )
-            .decode()
-            .rstrip("=")
-        )
+        data = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
         secret = self._keys[self._current_kid]
         sig = hmac.new(secret, data.encode(), hashlib.sha256).hexdigest()
         return f"{data}.{sig}"
@@ -245,9 +247,7 @@ class TokenManager:
         """Check if a jti has been revoked."""
         try:
             conn = sqlite3.connect(str(AUTH_DB))
-            row = conn.execute(
-                "SELECT 1 FROM revoked_tokens WHERE jti=?", (jti,)
-            ).fetchone()
+            row = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti=?", (jti,)).fetchone()
             conn.close()
             return row is not None
         except Exception:
@@ -257,9 +257,7 @@ class TokenManager:
         """Remove revocation entries for tokens that have expired anyway."""
         try:
             conn = sqlite3.connect(str(AUTH_DB))
-            cursor = conn.execute(
-                "DELETE FROM revoked_tokens WHERE expires_at < ?", (time.time(),)
-            )
+            cursor = conn.execute("DELETE FROM revoked_tokens WHERE expires_at < ?", (time.time(),))
             conn.commit()
             deleted = cursor.rowcount
             conn.close()
@@ -302,9 +300,7 @@ class RateLimiter:
 
             # Auto-cleanup stale buckets every 10 minutes
             if now - self._last_cleanup > 600:
-                stale = [
-                    k for k, v in self._buckets.items() if now - v["last_refill"] > 3600
-                ]
+                stale = [k for k, v in self._buckets.items() if now - v["last_refill"] > 3600]
                 for k in stale:
                     del self._buckets[k]
                 self._last_cleanup = now
@@ -339,9 +335,7 @@ class RateLimiter:
         """Remove stale buckets (>1h inactive)."""
         with self._lock:
             now = time.time()
-            stale = [
-                k for k, v in self._buckets.items() if now - v["last_refill"] > 3600
-            ]
+            stale = [k for k, v in self._buckets.items() if now - v["last_refill"] > 3600]
             for k in stale:
                 del self._buckets[k]
 
@@ -416,9 +410,7 @@ class AuthManager:
                 f"[WARN]  Save this password! It won't be shown again.\n"
                 f"{'=' * 50}"
             )
-            log.info(
-                "[USER] Default admin user created (password shown in console only)"
-            )
+            log.info("[USER] Default admin user created (password shown in console only)")
         conn.close()
         self._initialized = True
 
@@ -582,9 +574,7 @@ class AuthManager:
         """List all users (admin only)."""
         self._ensure_db()
         conn = sqlite3.connect(str(AUTH_DB))
-        rows = conn.execute(
-            "SELECT id, username, role, created_at, last_login, enabled FROM users"
-        ).fetchall()
+        rows = conn.execute("SELECT id, username, role, created_at, last_login, enabled FROM users").fetchall()
         conn.close()
         return [
             {
@@ -602,9 +592,7 @@ class AuthManager:
         """Delete a user account by username."""
         self._ensure_db()
         conn = sqlite3.connect(str(AUTH_DB))
-        cursor = conn.execute(
-            "DELETE FROM users WHERE username=? AND role != ?", (username, "admin")
-        )
+        cursor = conn.execute("DELETE FROM users WHERE username=? AND role != ?", (username, "admin"))
         conn.commit()
         deleted = cursor.rowcount > 0
         conn.close()

@@ -24,17 +24,10 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         {
             "type": "message",
             "target": "telegram:CHAT_ID",
-            "content": "긴급: {user_name}이(가) {days}일간 응답이 없습니다."
+            "content": "긴급: {user_name}이(가) {days}일간 응답이 없습니다.",
         },
-        {
-            "type": "backup",
-            "destination": "~/.salmalm/backup/deadman/"
-        },
-        {
-            "type": "email",
-            "to": "emergency@example.com",
-            "subject": "Dead Man's Switch Activated"
-        }
+        {"type": "backup", "destination": "~/.salmalm/backup/deadman/"},
+        {"type": "email", "to": "emergency@example.com", "subject": "Dead Man's Switch Activated"},
     ],
     "warningHours": 24,
     "confirmationRequired": True,
@@ -54,22 +47,24 @@ class DeadManSwitch:
 
     def _load_config(self) -> Dict[str, Any]:
         from salmalm.config_manager import ConfigManager
+
         if self.config_path != DEADMAN_CONFIG:
             # Custom path (e.g. tests) — use direct file I/O
             if self.config_path.exists():
                 with open(self.config_path, "r", encoding="utf-8") as f:
                     return json.load(f)
             return dict(DEFAULT_CONFIG)
-        return ConfigManager.load('deadman', defaults=DEFAULT_CONFIG)
+        return ConfigManager.load("deadman", defaults=DEFAULT_CONFIG)
 
     def _save_config(self) -> None:
         from salmalm.config_manager import ConfigManager
+
         if self.config_path != DEADMAN_CONFIG:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(self.config, f, ensure_ascii=False, indent=2)
             return
-        ConfigManager.save('deadman', self.config)
+        ConfigManager.save("deadman", self.config)
 
     def _load_state(self) -> Dict[str, Any]:
         if self.state_path.exists():
@@ -136,9 +131,13 @@ class DeadManSwitch:
 
     # -- setup ----------------------------------------------------------------
 
-    def setup(self, inactivity_days: int = 3, warning_hours: int = 24,
-              actions: Optional[List[Dict]] = None,
-              confirmation_required: bool = True) -> str:
+    def setup(
+        self,
+        inactivity_days: int = 3,
+        warning_hours: int = 24,
+        actions: Optional[List[Dict]] = None,
+        confirmation_required: bool = True,
+    ) -> str:
         self.config["enabled"] = True
         self.config["inactivityDays"] = inactivity_days
         self.config["warningHours"] = warning_hours
@@ -209,8 +208,9 @@ class DeadManSwitch:
             results.append(result)
         return {"action": "activate", "results": results}
 
-    def _execute_action(self, action: Dict, user_name: str = "사용자",
-                        days: int = 3, dry_run: bool = False) -> Dict[str, Any]:
+    def _execute_action(
+        self, action: Dict, user_name: str = "사용자", days: int = 3, dry_run: bool = False
+    ) -> Dict[str, Any]:
         atype = action.get("type", "unknown")
         if atype == "message":
             content = action.get("content", "").format(user_name=user_name, days=days)
@@ -229,8 +229,13 @@ class DeadManSwitch:
             subject = action.get("subject", "Dead Man's Switch Activated")
             if dry_run:
                 return {"type": "email", "to": to, "subject": subject, "dry_run": True}
-            return {"type": "email", "to": to, "subject": subject, "sent": False,
-                    "reason": "email sending not configured"}
+            return {
+                "type": "email",
+                "to": to,
+                "subject": subject,
+                "sent": False,
+                "reason": "email sending not configured",
+            }
         elif atype == "cleanup":
             paths = action.get("paths", [])
             if dry_run:

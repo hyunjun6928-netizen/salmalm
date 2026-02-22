@@ -19,11 +19,12 @@ from salmalm.security.crypto import log
 
 # ── Error Classification ──
 
+
 class ErrorKind:
-    TRANSIENT = "transient"      # Retry-able: rate limit, timeout, 5xx
-    PERMANENT = "permanent"      # Not retry-able: auth, invalid request, 4xx
-    OVERLOADED = "overloaded"    # Provider overloaded: back off longer
-    NETWORK = "network"          # Network issue: DNS, connection refused
+    TRANSIENT = "transient"  # Retry-able: rate limit, timeout, 5xx
+    PERMANENT = "permanent"  # Not retry-able: auth, invalid request, 4xx
+    OVERLOADED = "overloaded"  # Provider overloaded: back off longer
+    NETWORK = "network"  # Network issue: DNS, connection refused
 
 
 def classify_error(error: Exception, status_code: int = 0, body: str = "") -> str:
@@ -52,8 +53,10 @@ def classify_error(error: Exception, status_code: int = 0, body: str = "") -> st
         return ErrorKind.PERMANENT
 
     # Network errors
-    if any(w in error_str for w in ["timeout", "connection", "dns", "socket", "network",
-                                     "etimedout", "econnrefused", "enotfound"]):  # noqa: E127
+    if any(
+        w in error_str
+        for w in ["timeout", "connection", "dns", "socket", "network", "etimedout", "econnrefused", "enotfound"]
+    ):  # noqa: E127
         return ErrorKind.NETWORK
 
     # Default: treat as transient (safer to retry)
@@ -62,19 +65,20 @@ def classify_error(error: Exception, status_code: int = 0, body: str = "") -> st
 
 # ── Exponential Backoff with Jitter ──
 
-def backoff_delay(attempt: int, base: float = 1.0, max_delay: float = 60.0,
-                  jitter: bool = True) -> float:
+
+def backoff_delay(attempt: int, base: float = 1.0, max_delay: float = 60.0, jitter: bool = True) -> float:
     """Calculate exponential backoff delay with optional jitter.
 
     attempt 0 → base, attempt 1 → base*2, attempt 2 → base*4, etc.
     """
-    delay = min(base * (2 ** attempt), max_delay)
+    delay = min(base * (2**attempt), max_delay)
     if jitter:
         delay = delay * (0.5 + random.random() * 0.5)  # 50-100% of calculated delay
     return delay
 
 
 # ── Circuit Breaker ──
+
 
 @dataclass
 class CircuitState:
@@ -137,8 +141,7 @@ class CircuitBreakerRegistry:
     def status(self) -> Dict[str, dict]:
         with self._lock:
             return {
-                p: {"state": c.state, "failures": c.failures,
-                    "last_failure": c.last_failure}
+                p: {"state": c.state, "failures": c.failures, "last_failure": c.last_failure}
                 for p, c in self._circuits.items()
             }
 
@@ -148,6 +151,7 @@ circuit_breakers = CircuitBreakerRegistry()
 
 
 # ── Retry with Recovery ──
+
 
 async def retry_with_recovery(
     fn: Callable,
@@ -168,9 +172,13 @@ async def retry_with_recovery(
     """
     if not circuit_breakers.is_available(provider):
         return (
-            {"content": f"⚠️ {provider} is temporarily unavailable (circuit breaker open)",
-             "tool_calls": [], "usage": {"input": 0, "output": 0}, "_failed": True},
-            f"⚠️ {provider} circuit breaker open"
+            {
+                "content": f"⚠️ {provider} is temporarily unavailable (circuit breaker open)",
+                "tool_calls": [],
+                "usage": {"input": 0, "output": 0},
+                "_failed": True,
+            },
+            f"⚠️ {provider} circuit breaker open",
         )
 
     last_error = None
@@ -196,7 +204,7 @@ async def retry_with_recovery(
                 circuit_breakers.record_failure(provider)
                 return (
                     {"content": f"❌ {e}", "tool_calls": [], "usage": {"input": 0, "output": 0}, "_failed": True},
-                    None
+                    None,
                 )
 
             # Record failure
@@ -211,8 +219,9 @@ async def retry_with_recovery(
                 delay = backoff_delay(attempt, base=1.0, max_delay=60.0)
 
             if attempt < max_retries:
-                log.warning(f"[RETRY] {provider} attempt {attempt + 1}/{max_retries}: {e} "
-                           f"(kind={kind}, delay={delay:.1f}s)")  # noqa: E128
+                log.warning(
+                    f"[RETRY] {provider} attempt {attempt + 1}/{max_retries}: {e} (kind={kind}, delay={delay:.1f}s)"
+                )  # noqa: E128
                 if on_retry:
                     try:
                         on_retry(attempt, delay, e)
@@ -224,19 +233,25 @@ async def retry_with_recovery(
 
     # All retries failed
     return (
-        {"content": f"❌ All retries failed: {last_error}", "tool_calls": [],
-         "usage": {"input": 0, "output": 0}, "_failed": True},
-        f"⚠️ {provider} failed after {max_retries} retries"
+        {
+            "content": f"❌ All retries failed: {last_error}",
+            "tool_calls": [],
+            "usage": {"input": 0, "output": 0},
+            "_failed": True,
+        },
+        f"⚠️ {provider} failed after {max_retries} retries",
     )
 
 
 async def _async_sleep(seconds: float):
     """Async sleep wrapper."""
     import asyncio
+
     await asyncio.sleep(seconds)
 
 
 # ── Partial Response Recovery ──
+
 
 class StreamBuffer:
     """Buffer for streaming responses — saves partial content on failure.
@@ -286,6 +301,7 @@ class StreamBuffer:
 
 
 # ── User-Friendly Error Messages ──
+
 
 def friendly_error(error: str, provider: str = "") -> str:
     """Convert technical errors to user-friendly messages."""

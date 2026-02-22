@@ -14,6 +14,7 @@ Features:
 
 Protocol: HTTP API on each SalmAlm instance's existing server port.
 """
+
 import hashlib
 import json
 import os
@@ -27,22 +28,21 @@ from typing import Dict, List, Optional
 from salmalm.security.crypto import log
 from salmalm.constants import DATA_DIR, VERSION
 
-_MESH_FILE = DATA_DIR / 'mesh_peers.json'
-_MESH_SECRET = os.environ.get('SALMALM_MESH_SECRET', '')
+_MESH_FILE = DATA_DIR / "mesh_peers.json"
+_MESH_SECRET = os.environ.get("SALMALM_MESH_SECRET", "")
 
 
 class MeshPeer:
     """Represents a remote SalmAlm instance."""
 
-    def __init__(self, peer_id: str, url: str, name: str = '',
-                 secret: str = ''):
+    def __init__(self, peer_id: str, url: str, name: str = "", secret: str = ""):
         self.peer_id = peer_id
-        self.url = url.rstrip('/')
+        self.url = url.rstrip("/")
         self.name = name or peer_id
         self.secret = secret or _MESH_SECRET
         self.last_seen = 0.0
-        self.status = 'unknown'  # unknown, online, offline, error
-        self.version = ''
+        self.status = "unknown"  # unknown, online, offline, error
+        self.version = ""
         self.capabilities: list = []
 
     def _auth_header(self) -> dict:
@@ -51,85 +51,92 @@ class MeshPeer:
             return {}
         ts = str(int(time.time()))
         sig = hashlib.sha256(f"{self.secret}:{ts}".encode()).hexdigest()[:32]
-        return {'X-Mesh-Auth': f'{ts}:{sig}'}
+        return {"X-Mesh-Auth": f"{ts}:{sig}"}
 
     def ping(self) -> bool:
         """Check if peer is alive."""
         try:
             req = urllib.request.Request(
-                f'{self.url}/api/mesh/ping',
-                headers={**self._auth_header(), 'User-Agent': f'SalmAlm-Mesh/{VERSION}'},
-                method='GET',
+                f"{self.url}/api/mesh/ping",
+                headers={**self._auth_header(), "User-Agent": f"SalmAlm-Mesh/{VERSION}"},
+                method="GET",
             )
             resp = urllib.request.urlopen(req, timeout=5)
             data = json.loads(resp.read().decode())
-            self.status = 'online'
+            self.status = "online"
             self.last_seen = time.time()
-            self.version = data.get('version', '')
-            self.capabilities = data.get('capabilities', [])
+            self.version = data.get("version", "")
+            self.capabilities = data.get("capabilities", [])
             return True
         except Exception:
-            self.status = 'offline'
+            self.status = "offline"
             return False
 
     def send_task(self, task: str, model: Optional[str] = None) -> dict:
         """Delegate a task to this peer."""
         try:
-            payload = json.dumps({
-                'task': task, 'model': model,
-                'from': socket.gethostname(),
-            }).encode()
+            payload = json.dumps(
+                {
+                    "task": task,
+                    "model": model,
+                    "from": socket.gethostname(),
+                }
+            ).encode()
             req = urllib.request.Request(
-                f'{self.url}/api/mesh/task',
+                f"{self.url}/api/mesh/task",
                 data=payload,
                 headers={
                     **self._auth_header(),
-                    'Content-Type': 'application/json',
-                    'User-Agent': f'SalmAlm-Mesh/{VERSION}',
+                    "Content-Type": "application/json",
+                    "User-Agent": f"SalmAlm-Mesh/{VERSION}",
                 },
-                method='POST',
+                method="POST",
             )
             resp = urllib.request.urlopen(req, timeout=60)
             return json.loads(resp.read().decode())
         except Exception as e:
-            return {'error': str(e)}
+            return {"error": str(e)}
 
     def send_clipboard(self, text: str) -> dict:
         """Share clipboard content with peer."""
         try:
-            payload = json.dumps({'text': text}).encode()
+            payload = json.dumps({"text": text}).encode()
             req = urllib.request.Request(
-                f'{self.url}/api/mesh/clipboard',
+                f"{self.url}/api/mesh/clipboard",
                 data=payload,
                 headers={
                     **self._auth_header(),
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
-                method='POST',
+                method="POST",
             )
             resp = urllib.request.urlopen(req, timeout=10)
             return json.loads(resp.read().decode())
         except Exception as e:
-            return {'error': str(e)}
+            return {"error": str(e)}
 
     def get_status(self) -> dict:
         """Get detailed status from peer."""
         try:
             req = urllib.request.Request(
-                f'{self.url}/api/mesh/status',
+                f"{self.url}/api/mesh/status",
                 headers={**self._auth_header()},
-                method='GET',
+                method="GET",
             )
             resp = urllib.request.urlopen(req, timeout=10)
             return json.loads(resp.read().decode())
         except Exception as e:
-            return {'error': str(e), 'status': 'offline'}
+            return {"error": str(e), "status": "offline"}
 
     def to_dict(self) -> dict:
         return {
-            'peer_id': self.peer_id, 'url': self.url, 'name': self.name,
-            'status': self.status, 'version': self.version,
-            'last_seen': self.last_seen, 'capabilities': self.capabilities,
+            "peer_id": self.peer_id,
+            "url": self.url,
+            "name": self.name,
+            "status": self.status,
+            "version": self.version,
+            "last_seen": self.last_seen,
+            "capabilities": self.capabilities,
         }
 
 
@@ -142,7 +149,7 @@ class MeshManager:
     def __init__(self):
         self._peers: Dict[str, MeshPeer] = {}
         self._lock = threading.Lock()
-        self._clipboard: str = ''
+        self._clipboard: str = ""
         self._clipboard_ts: float = 0
         self._load()
 
@@ -150,10 +157,9 @@ class MeshManager:
         """Load peers from config file."""
         try:
             if _MESH_FILE.exists():
-                data = json.loads(_MESH_FILE.read_text(encoding='utf-8'))
-                for p in data.get('peers', []):
-                    peer = MeshPeer(p['peer_id'], p['url'], p.get('name', ''),
-                                    p.get('secret', ''))
+                data = json.loads(_MESH_FILE.read_text(encoding="utf-8"))
+                for p in data.get("peers", []):
+                    peer = MeshPeer(p["peer_id"], p["url"], p.get("name", ""), p.get("secret", ""))
                     self._peers[peer.peer_id] = peer
         except Exception as e:
             log.warning(f"[MESH] Load error: {e}")
@@ -162,32 +168,33 @@ class MeshManager:
         """Save peers to config file."""
         try:
             DATA_DIR.mkdir(parents=True, exist_ok=True)
-            data = {'peers': [
-                {'peer_id': p.peer_id, 'url': p.url, 'name': p.name,
-                 'secret': p.secret}
-                for p in self._peers.values()
-            ]}
-            _MESH_FILE.write_text(json.dumps(data, indent=2), encoding='utf-8')
+            data = {
+                "peers": [
+                    {"peer_id": p.peer_id, "url": p.url, "name": p.name, "secret": p.secret}
+                    for p in self._peers.values()
+                ]
+            }
+            _MESH_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
         except Exception as e:
             log.warning(f"[MESH] Save error: {e}")
 
-    def add_peer(self, url: str, name: str = '', secret: str = '') -> str:
+    def add_peer(self, url: str, name: str = "", secret: str = "") -> str:
         """Add a peer by URL. Returns status message."""
-        url = url.rstrip('/')
+        url = url.rstrip("/")
         peer_id = hashlib.md5(url.encode()).hexdigest()[:8]
 
         with self._lock:
             if len(self._peers) >= self._MAX_PEERS:
-                return '❌ Max peers reached (20)'
+                return "❌ Max peers reached (20)"
 
             peer = MeshPeer(peer_id, url, name or url, secret)
             online = peer.ping()
             self._peers[peer_id] = peer
             self._save()
 
-            status = '🟢 online' if online else '🔴 offline'
-            ver = f' (v{peer.version})' if peer.version else ''
-            return f'📡 Peer added: {peer.name} [{peer_id}] — {status}{ver}'
+            status = "🟢 online" if online else "🔴 offline"
+            ver = f" (v{peer.version})" if peer.version else ""
+            return f"📡 Peer added: {peer.name} [{peer_id}] — {status}{ver}"
 
     def remove_peer(self, peer_id: str) -> str:
         """Remove a peer."""
@@ -196,8 +203,8 @@ class MeshManager:
                 name = self._peers[peer_id].name
                 del self._peers[peer_id]
                 self._save()
-                return f'📡 Peer removed: {name}'
-            return f'❌ Peer not found: {peer_id}'
+                return f"📡 Peer removed: {name}"
+            return f"❌ Peer not found: {peer_id}"
 
     def list_peers(self) -> List[dict]:
         """List all peers with their status."""
@@ -208,26 +215,26 @@ class MeshManager:
         results = {}
         for peer in self._peers.values():
             results[peer.peer_id] = {
-                'name': peer.name, 'online': peer.ping(),
-                'version': peer.version,
+                "name": peer.name,
+                "online": peer.ping(),
+                "version": peer.version,
             }
         return results
 
-    def delegate_task(self, peer_id: str, task: str,
-                      model: Optional[str] = None) -> dict:
+    def delegate_task(self, peer_id: str, task: str, model: Optional[str] = None) -> dict:
         """Send a task to a specific peer for execution."""
         peer = self._peers.get(peer_id)
         if not peer:
-            return {'error': f'Peer {peer_id} not found'}
+            return {"error": f"Peer {peer_id} not found"}
         return peer.send_task(task, model=model)
 
     def broadcast_task(self, task: str, model: Optional[str] = None) -> List[dict]:
         """Send task to all online peers (parallel execution)."""
         results = []
         for peer in self._peers.values():
-            if peer.status == 'online':
+            if peer.status == "online":
                 result = peer.send_task(task, model=model)
-                results.append({'peer': peer.name, **result})
+                results.append({"peer": peer.name, **result})
         return results
 
     def share_clipboard(self, text: str) -> dict:
@@ -236,13 +243,13 @@ class MeshManager:
         self._clipboard_ts = time.time()
         results = {}
         for peer in self._peers.values():
-            if peer.status == 'online':
+            if peer.status == "online":
                 results[peer.name] = peer.send_clipboard(text)
         return results
 
     def get_clipboard(self) -> dict:
         """Get the latest shared clipboard content."""
-        return {'text': self._clipboard, 'timestamp': self._clipboard_ts}
+        return {"text": self._clipboard, "timestamp": self._clipboard_ts}
 
     def set_clipboard(self, text: str):
         """Set clipboard (called when receiving from a peer)."""
@@ -254,46 +261,48 @@ class MeshManager:
     def handle_ping(self) -> dict:
         """Handle /api/mesh/ping — return this instance's info."""
         from salmalm.tools import TOOL_DEFINITIONS
+
         return {
-            'version': VERSION,
-            'hostname': socket.gethostname(),
-            'capabilities': ['task', 'clipboard', 'status'],
-            'tools': len(TOOL_DEFINITIONS),
-            'timestamp': time.time(),
+            "version": VERSION,
+            "hostname": socket.gethostname(),
+            "capabilities": ["task", "clipboard", "status"],
+            "tools": len(TOOL_DEFINITIONS),
+            "timestamp": time.time(),
         }
 
     def handle_task(self, data: dict) -> dict:
         """Handle /api/mesh/task — execute a delegated task."""
-        task = data.get('task', '')
-        model = data.get('model')
-        from_host = data.get('from', 'unknown')
+        task = data.get("task", "")
+        model = data.get("model")
+        from_host = data.get("from", "unknown")
         if not task:
-            return {'error': 'No task provided'}
+            return {"error": "No task provided"}
         log.info(f"[MESH] Task from {from_host}: {task[:80]}")
         try:
             import asyncio
             from salmalm.core.engine import process_message
-            result = asyncio.run(process_message(
-                f'mesh-{from_host}', task, model_override=model))
-            return {'result': result[:5000], 'status': 'completed'}
+
+            result = asyncio.run(process_message(f"mesh-{from_host}", task, model_override=model))
+            return {"result": result[:5000], "status": "completed"}
         except Exception as e:
-            return {'error': str(e), 'status': 'failed'}
+            return {"error": str(e), "status": "failed"}
 
     def handle_clipboard(self, data: dict) -> dict:
         """Handle /api/mesh/clipboard — receive shared clipboard."""
-        text = data.get('text', '')
+        text = data.get("text", "")
         self.set_clipboard(text)
-        return {'ok': True, 'length': len(text)}
+        return {"ok": True, "length": len(text)}
 
     def handle_status(self) -> dict:
         """Handle /api/mesh/status — return detailed status."""
         from salmalm.core.core import _sessions, _metrics
+
         return {
-            'version': VERSION,
-            'hostname': socket.gethostname(),
-            'sessions': len(_sessions),
-            'uptime_s': time.time() - _metrics.get('start_time', time.time()),
-            'peers': len(self._peers),
+            "version": VERSION,
+            "hostname": socket.gethostname(),
+            "sessions": len(_sessions),
+            "uptime_s": time.time() - _metrics.get("start_time", time.time()),
+            "peers": len(self._peers),
         }
 
     def discover_lan(self, timeout: float = 3.0) -> List[str]:
@@ -309,8 +318,8 @@ class MeshManager:
             sock.settimeout(timeout)
 
             # Send discovery packet
-            msg = json.dumps({'type': 'salmalm_discover', 'version': VERSION}).encode()
-            sock.sendto(msg, ('<broadcast>', self._DISCOVERY_PORT))
+            msg = json.dumps({"type": "salmalm_discover", "version": VERSION}).encode()
+            sock.sendto(msg, ("<broadcast>", self._DISCOVERY_PORT))
 
             # Listen for responses
             end_time = time.time() + timeout
@@ -318,7 +327,7 @@ class MeshManager:
                 try:
                     data, addr = sock.recvfrom(1024)
                     resp = json.loads(data.decode())
-                    if resp.get('type') == 'salmalm_announce':
+                    if resp.get("type") == "salmalm_announce":
                         url = f"http://{addr[0]}:{resp.get('port', 18800)}"
                         if url not in discovered:
                             discovered.append(url)

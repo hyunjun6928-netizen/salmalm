@@ -3,6 +3,7 @@
 Monitors ~/.salmalm/plugins/ for file changes and reloads only the affected plugin.
 stdlib-only (polling, no watchdog dependency).
 """
+
 from __future__ import annotations
 
 import threading
@@ -30,7 +31,7 @@ class PluginWatcher:
             return
         self._running = True
         self._initial_scan()
-        self._thread = threading.Thread(target=self._run, daemon=True, name='PluginWatcher')
+        self._thread = threading.Thread(target=self._run, daemon=True, name="PluginWatcher")
         self._thread.start()
         log.info("[PLUGIN] Hot-reload watcher started")
 
@@ -67,11 +68,11 @@ class PluginWatcher:
         result = []
         if not PLUGINS_DIR.exists():
             return result
-        exts = {'.py', '.json'}
+        exts = {".py", ".json"}
         for plugin_dir in PLUGINS_DIR.iterdir():
-            if not plugin_dir.is_dir() or plugin_dir.name.startswith(('.', '_')):
+            if not plugin_dir.is_dir() or plugin_dir.name.startswith((".", "_")):
                 continue
-            for entry in plugin_dir.rglob('*'):
+            for entry in plugin_dir.rglob("*"):
                 if entry.is_file() and entry.suffix in exts:
                     result.append(entry)
         return result

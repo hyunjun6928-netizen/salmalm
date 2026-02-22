@@ -18,8 +18,8 @@ from typing import Dict, List, Optional
 
 from salmalm.security.crypto import log
 
-PLUGINS_DIR = Path.home() / '.salmalm' / 'plugins'
-PLUGINS_STATE_FILE = Path.home() / '.salmalm' / 'plugins.json'
+PLUGINS_DIR = Path.home() / ".salmalm" / "plugins"
+PLUGINS_STATE_FILE = Path.home() / ".salmalm" / "plugins.json"
 
 
 class PluginInfo:
@@ -29,8 +29,8 @@ class PluginInfo:
         self.name = name
         self.path = path
         self.metadata = metadata
-        self.version = metadata.get('version', '0.0.0')
-        self.description = metadata.get('description', '')
+        self.version = metadata.get("version", "0.0.0")
+        self.description = metadata.get("description", "")
         self.enabled = True
         self.module = None
         self.tools: List[dict] = []  # tool definitions
@@ -39,14 +39,14 @@ class PluginInfo:
 
     def to_dict(self) -> dict:
         return {
-            'name': self.name,
-            'version': self.version,
-            'description': self.description,
-            'enabled': self.enabled,
-            'path': str(self.path),
-            'tools': [t.get('name', '?') for t in self.tools],
-            'hooks': list(self.hook_callbacks.keys()),
-            'error': self.error,
+            "name": self.name,
+            "version": self.version,
+            "description": self.description,
+            "enabled": self.enabled,
+            "path": str(self.path),
+            "tools": [t.get("name", "?") for t in self.tools],
+            "hooks": list(self.hook_callbacks.keys()),
+            "error": self.error,
         }
 
 
@@ -63,7 +63,7 @@ class PluginManager:
         """Load enabled/disabled state from plugins.json."""
         try:
             if PLUGINS_STATE_FILE.exists():
-                self._state = json.loads(PLUGINS_STATE_FILE.read_text(encoding='utf-8'))
+                self._state = json.loads(PLUGINS_STATE_FILE.read_text(encoding="utf-8"))
         except Exception:
             self._state = {}
 
@@ -72,7 +72,7 @@ class PluginManager:
         try:
             PLUGINS_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
             state = {name: p.enabled for name, p in self._plugins.items()}
-            PLUGINS_STATE_FILE.write_text(json.dumps(state, indent=2), encoding='utf-8')
+            PLUGINS_STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
         except Exception as e:
             log.error(f"[PLUGIN] Failed to save state: {e}")
 
@@ -88,22 +88,22 @@ class PluginManager:
             for plugin_dir in sorted(PLUGINS_DIR.iterdir()):
                 if not plugin_dir.is_dir():
                     continue
-                if plugin_dir.name.startswith('_') or plugin_dir.name.startswith('.'):
+                if plugin_dir.name.startswith("_") or plugin_dir.name.startswith("."):
                     continue
 
-                plugin_json = plugin_dir / 'plugin.json'
-                init_py = plugin_dir / '__init__.py'
+                plugin_json = plugin_dir / "plugin.json"
+                init_py = plugin_dir / "__init__.py"
 
                 if not plugin_json.exists():
                     continue
 
                 try:
-                    metadata = json.loads(plugin_json.read_text(encoding='utf-8'))
+                    metadata = json.loads(plugin_json.read_text(encoding="utf-8"))
                 except Exception as e:
                     log.error(f"[PLUGIN] Bad plugin.json in {plugin_dir.name}: {e}")
                     continue
 
-                name = metadata.get('name', plugin_dir.name)
+                name = metadata.get("name", plugin_dir.name)
                 info = PluginInfo(name, plugin_dir, metadata)
 
                 # Check enabled state
@@ -121,27 +121,28 @@ class PluginManager:
                 if init_py.exists():
                     try:
                         spec = importlib.util.spec_from_file_location(
-                            f'salmalm_plugin_{name}', str(init_py),
-                            submodule_search_locations=[str(plugin_dir)]
+                            f"salmalm_plugin_{name}", str(init_py), submodule_search_locations=[str(plugin_dir)]
                         )
                         mod = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(mod)
                         info.module = mod
 
                         # Extract tool definitions
-                        tools = getattr(mod, 'TOOLS', [])
+                        tools = getattr(mod, "TOOLS", [])
                         if isinstance(tools, list):
                             info.tools = tools
 
                         # Extract hook callbacks
-                        hooks_config = metadata.get('hooks', {})
+                        hooks_config = metadata.get("hooks", {})
                         for event, func_name in hooks_config.items():
                             cb = getattr(mod, func_name, None)
                             if callable(cb):
                                 info.hook_callbacks[event] = cb
 
-                        log.info(f"[PLUGIN] Loaded: {name} v{info.version} "
-                                 f"({len(info.tools)} tools, {len(info.hook_callbacks)} hooks)")
+                        log.info(
+                            f"[PLUGIN] Loaded: {name} v{info.version} "
+                            f"({len(info.tools)} tools, {len(info.hook_callbacks)} hooks)"
+                        )
 
                     except Exception as e:
                         info.error = str(e)[:200]
@@ -160,6 +161,7 @@ class PluginManager:
         """Register all plugin hooks with the HookManager."""
         try:
             from salmalm.features.hooks import hook_manager
+
             for plugin in self._plugins.values():
                 if not plugin.enabled:
                     continue
@@ -172,6 +174,7 @@ class PluginManager:
         """Unregister all plugin hooks."""
         try:
             from salmalm.features.hooks import hook_manager
+
             all_cbs = []
             for plugin in self._plugins.values():
                 all_cbs.extend(plugin.hook_callbacks.values())
@@ -196,9 +199,9 @@ class PluginManager:
         for plugin in self._plugins.values():
             if not plugin.enabled or plugin.error or not plugin.module:
                 continue
-            tool_names = [t.get('name') for t in plugin.tools]
+            tool_names = [t.get("name") for t in plugin.tools]
             if tool_name in tool_names:
-                execute_fn = getattr(plugin.module, 'execute', None)
+                execute_fn = getattr(plugin.module, "execute", None)
                 if execute_fn:
                     return execute_fn(tool_name, args)
         return None
@@ -211,27 +214,27 @@ class PluginManager:
         """Enable a plugin."""
         plugin = self._plugins.get(name)
         if not plugin:
-            return f'❌ Plugin not found: {name}'
+            return f"❌ Plugin not found: {name}"
         plugin.enabled = True
         self._save_state()
         self.scan_and_load()  # reload to activate
-        return f'✅ Plugin enabled: {name}'
+        return f"✅ Plugin enabled: {name}"
 
     def disable(self, name: str) -> str:
         """Disable a plugin."""
         plugin = self._plugins.get(name)
         if not plugin:
-            return f'❌ Plugin not found: {name}'
+            return f"❌ Plugin not found: {name}"
         plugin.enabled = False
         self._save_state()
         self.scan_and_load()  # reload to deactivate
-        return f'✅ Plugin disabled: {name}'
+        return f"✅ Plugin disabled: {name}"
 
     def reload_all(self) -> str:
         """Reload all plugins."""
         count = self.scan_and_load()
         total_tools = sum(len(p.tools) for p in self._plugins.values() if p.enabled)
-        return f'🔄 Reloaded {count} plugins ({total_tools} tools)'
+        return f"🔄 Reloaded {count} plugins ({total_tools} tools)"
 
 
 # Singleton

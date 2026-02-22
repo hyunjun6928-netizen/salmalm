@@ -7,6 +7,7 @@ Pattern: snapshot → reason → act → snapshot (OpenClaw's core browser loop)
 This is a lightweight adaptation of OpenClaw's browser control system,
 tailored for SalmAlm's pip-install-one-liner philosophy.
 """
+
 import json
 import os
 import subprocess
@@ -26,7 +27,8 @@ def _check_playwright() -> bool:
     """Check if playwright is installed."""
     try:
         import importlib
-        importlib.import_module('playwright')
+
+        importlib.import_module("playwright")
         return True
     except ImportError:
         return False
@@ -40,7 +42,7 @@ def _ensure_browser_dirs():
 
 # ── Playwright subprocess scripts ──
 
-_SNAPSHOT_SCRIPT = '''
+_SNAPSHOT_SCRIPT = """
 import json, sys
 from playwright.sync_api import sync_playwright
 
@@ -67,9 +69,9 @@ with sync_playwright() as p:
         print(json.dumps({"error": str(e)}))
     finally:
         browser.close()
-'''
+"""
 
-_ACT_SCRIPT = '''
+_ACT_SCRIPT = """
 import json, sys
 from playwright.sync_api import sync_playwright
 
@@ -119,7 +121,7 @@ with sync_playwright() as p:
         print(json.dumps({"error": str(e)}))
     finally:
         browser.close()
-'''
+"""
 
 
 def _run_playwright_script(script: str, args: list, timeout: int = 60) -> dict:
@@ -127,15 +129,18 @@ def _run_playwright_script(script: str, args: list, timeout: int = 60) -> dict:
     if not _check_playwright():
         return {"error": "Playwright not installed. Run: pip install salmalm[browser] && playwright install chromium"}
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(script)
         script_path = f.name
 
     try:
         cmd = [sys.executable, script_path] + [str(a) for a in args]
         result = subprocess.run(
-            cmd, capture_output=True, text=True,
-            timeout=timeout, cwd=str(WORKSPACE_DIR),
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(WORKSPACE_DIR),
         )
         if result.returncode == 0 and result.stdout.strip():
             try:
@@ -154,7 +159,7 @@ def _run_playwright_script(script: str, args: list, timeout: int = 60) -> dict:
             pass
 
 
-@register('browser')
+@register("browser")
 def handle_browser(args: dict) -> str:
     """Browser automation — OpenClaw snapshot/act pattern.
 
@@ -165,71 +170,72 @@ def handle_browser(args: dict) -> str:
     - status: Check if Playwright is available
     """
     _ensure_browser_dirs()
-    action = args.get('action', 'status')
+    action = args.get("action", "status")
 
-    if action == 'status':
+    if action == "status":
         available = _check_playwright()
         if available:
-            return '🌐 Browser automation: ✅ Ready (Playwright installed) / 브라우저 자동화 준비 완료'
-        return ('🌐 Browser automation: ❌ Not available / 사용 불가\n'
-                'Install / 설치: `pip install salmalm[browser]` → `playwright install chromium`')
+            return "🌐 Browser automation: ✅ Ready (Playwright installed) / 브라우저 자동화 준비 완료"
+        return (
+            "🌐 Browser automation: ❌ Not available / 사용 불가\n"
+            "Install / 설치: `pip install salmalm[browser]` → `playwright install chromium`"
+        )
 
-    if action == 'snapshot':
-        url = args.get('url', 'about:blank')
-        if not url.startswith(('http://', 'https://', 'about:')):
-            url = 'https://' + url
-        timeout = args.get('timeout', 30000)
+    if action == "snapshot":
+        url = args.get("url", "about:blank")
+        if not url.startswith(("http://", "https://", "about:")):
+            url = "https://" + url
+        timeout = args.get("timeout", 30000)
         result = _run_playwright_script(_SNAPSHOT_SCRIPT, [url, str(timeout)])
-        if 'error' in result:
-            return f'❌ Browser error: {result["error"]}'
-        lines = [f'🌐 **{result.get("title", "?")}**',
-                 f'URL: {result.get("url", url)}']
-        text = result.get('text', '')
+        if "error" in result:
+            return f"❌ Browser error: {result['error']}"
+        lines = [f"🌐 **{result.get('title', '?')}**", f"URL: {result.get('url', url)}"]
+        text = result.get("text", "")
         if text:
-            lines.append(f'\n{text[:3000]}')
-        snapshot = result.get('snapshot')
+            lines.append(f"\n{text[:3000]}")
+        snapshot = result.get("snapshot")
         if snapshot:
-            lines.append(f'\n📋 Accessibility tree: {json.dumps(snapshot, ensure_ascii=False)[:2000]}')
-        return '\n'.join(lines)
+            lines.append(f"\n📋 Accessibility tree: {json.dumps(snapshot, ensure_ascii=False)[:2000]}")
+        return "\n".join(lines)
 
-    if action == 'act':
+    if action == "act":
         act_args = {
-            'url': args.get('url', 'about:blank'),
-            'kind': args.get('kind', 'click'),
-            'selector': args.get('selector', ''),
-            'text': args.get('text', ''),
-            'screenshot_path': str(_SCREENSHOT_DIR / f'act_{int(time.time())}.png'),
-            'timeout': args.get('timeout', 30000),
+            "url": args.get("url", "about:blank"),
+            "kind": args.get("kind", "click"),
+            "selector": args.get("selector", ""),
+            "text": args.get("text", ""),
+            "screenshot_path": str(_SCREENSHOT_DIR / f"act_{int(time.time())}.png"),
+            "timeout": args.get("timeout", 30000),
         }
-        if not act_args['url'].startswith(('http://', 'https://', 'about:')):
-            act_args['url'] = 'https://' + act_args['url']
+        if not act_args["url"].startswith(("http://", "https://", "about:")):
+            act_args["url"] = "https://" + act_args["url"]
         result = _run_playwright_script(_ACT_SCRIPT, [json.dumps(act_args)])
-        if 'error' in result:
-            return f'❌ Browser error: {result["error"]}'
-        lines = [f'🌐 {result.get("action", "done")}',
-                 f'URL: {result.get("url", act_args["url"])}']
-        if result.get('screenshot'):
-            lines.append(f'📸 Screenshot: {result["screenshot"]}')
-        if result.get('eval_result'):
-            lines.append(f'📊 Result: {result["eval_result"][:2000]}')
-        text = result.get('text', '')
+        if "error" in result:
+            return f"❌ Browser error: {result['error']}"
+        lines = [f"🌐 {result.get('action', 'done')}", f"URL: {result.get('url', act_args['url'])}"]
+        if result.get("screenshot"):
+            lines.append(f"📸 Screenshot: {result['screenshot']}")
+        if result.get("eval_result"):
+            lines.append(f"📊 Result: {result['eval_result'][:2000]}")
+        text = result.get("text", "")
         if text:
-            lines.append(f'\n{text[:2000]}')
-        return '\n'.join(lines)
+            lines.append(f"\n{text[:2000]}")
+        return "\n".join(lines)
 
-    if action == 'screenshot':
-        url = args.get('url', 'about:blank')
-        if not url.startswith(('http://', 'https://', 'about:')):
-            url = 'https://' + url
-        screenshot_path = str(_SCREENSHOT_DIR / f'screenshot_{int(time.time())}.png')
+    if action == "screenshot":
+        url = args.get("url", "about:blank")
+        if not url.startswith(("http://", "https://", "about:")):
+            url = "https://" + url
+        screenshot_path = str(_SCREENSHOT_DIR / f"screenshot_{int(time.time())}.png")
         act_args = {
-            'url': url, 'kind': 'screenshot',
-            'screenshot_path': screenshot_path,
-            'timeout': args.get('timeout', 30000),
+            "url": url,
+            "kind": "screenshot",
+            "screenshot_path": screenshot_path,
+            "timeout": args.get("timeout", 30000),
         }
         result = _run_playwright_script(_ACT_SCRIPT, [json.dumps(act_args)])
-        if 'error' in result:
-            return f'❌ Browser error: {result["error"]}'
-        return f'📸 Screenshot saved: {result.get("screenshot", screenshot_path)}'
+        if "error" in result:
+            return f"❌ Browser error: {result['error']}"
+        return f"📸 Screenshot saved: {result.get('screenshot', screenshot_path)}"
 
-    return f'❌ Unknown browser action / 알 수 없는 액션: {action}. Use: status, snapshot, act, screenshot'
+    return f"❌ Unknown browser action / 알 수 없는 액션: {action}. Use: status, snapshot, act, screenshot"

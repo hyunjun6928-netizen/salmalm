@@ -43,7 +43,7 @@ def _should_retry(error: Exception) -> tuple:
             return False, None
         if code == 429:
             # Respect Retry-After header
-            retry_after = error.headers.get('Retry-After') if hasattr(error, 'headers') else None
+            retry_after = error.headers.get("Retry-After") if hasattr(error, "headers") else None
             if retry_after:
                 try:
                     wait = float(retry_after)
@@ -65,11 +65,11 @@ def _should_retry(error: Exception) -> tuple:
 
     if isinstance(error, ValueError):
         msg = str(error).lower()
-        if 'rate limit' in msg or '429' in msg:
+        if "rate limit" in msg or "429" in msg:
             return True, DEFAULT_BASE_DELAY
-        if 'overloaded' in msg or '529' in msg:
+        if "overloaded" in msg or "529" in msg:
             return True, OVERLOADED_WAIT
-        if 'timeout' in msg:
+        if "timeout" in msg:
             return True, None
         return False, None
 
@@ -82,10 +82,13 @@ def _add_jitter(delay: float) -> float:
     return delay + random.uniform(-jitter, jitter)
 
 
-def retry_with_backoff(fn: Optional[Callable] = None, *,
-                       max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-                       base_delay: float = DEFAULT_BASE_DELAY,
-                       max_delay: float = DEFAULT_MAX_DELAY):
+def retry_with_backoff(
+    fn: Optional[Callable] = None,
+    *,
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    base_delay: float = DEFAULT_BASE_DELAY,
+    max_delay: float = DEFAULT_MAX_DELAY,
+):
     """Decorator: retry function with exponential backoff + jitter.
 
     Usage:
@@ -97,6 +100,7 @@ def retry_with_backoff(fn: Optional[Callable] = None, *,
         def my_api_call():
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -118,8 +122,10 @@ def retry_with_backoff(fn: Optional[Callable] = None, *,
                         delay = base_delay * (2 ** (attempt - 1))
                         wait = _add_jitter(min(delay, max_delay))
 
-                    log.info(f"[RETRY] {func.__name__} attempt {attempt}/{max_attempts} "
-                             f"failed ({type(e).__name__}), retrying in {wait:.1f}s")
+                    log.info(
+                        f"[RETRY] {func.__name__} attempt {attempt}/{max_attempts} "
+                        f"failed ({type(e).__name__}), retrying in {wait:.1f}s"
+                    )
                     time.sleep(wait)
 
             raise last_error  # Should not reach here
@@ -131,17 +137,21 @@ def retry_with_backoff(fn: Optional[Callable] = None, *,
     return decorator
 
 
-async def async_retry_with_backoff(coro_fn: Callable, *args,
-                                   max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-                                   base_delay: float = DEFAULT_BASE_DELAY,
-                                   max_delay: float = DEFAULT_MAX_DELAY,
-                                   **kwargs) -> Any:
+async def async_retry_with_backoff(
+    coro_fn: Callable,
+    *args,
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    base_delay: float = DEFAULT_BASE_DELAY,
+    max_delay: float = DEFAULT_MAX_DELAY,
+    **kwargs,
+) -> Any:
     """Async version: retry an async callable with exponential backoff.
 
     Usage:
         result = await async_retry_with_backoff(my_async_fn, arg1, arg2)
     """
     import asyncio
+
     last_error = None
     for attempt in range(1, max_attempts + 1):
         try:
@@ -160,17 +170,18 @@ async def async_retry_with_backoff(coro_fn: Callable, *args,
                 delay = base_delay * (2 ** (attempt - 1))
                 wait = _add_jitter(min(delay, max_delay))
 
-            log.info(f"[RETRY] {coro_fn.__name__} attempt {attempt}/{max_attempts} "
-                     f"failed ({type(e).__name__}), retrying in {wait:.1f}s")
+            log.info(
+                f"[RETRY] {coro_fn.__name__} attempt {attempt}/{max_attempts} "
+                f"failed ({type(e).__name__}), retrying in {wait:.1f}s"
+            )
             await asyncio.sleep(wait)
 
     raise last_error
 
 
-def retry_call(fn: Callable, *args,
-               max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-               base_delay: float = DEFAULT_BASE_DELAY,
-               **kwargs) -> Any:
+def retry_call(
+    fn: Callable, *args, max_attempts: int = DEFAULT_MAX_ATTEMPTS, base_delay: float = DEFAULT_BASE_DELAY, **kwargs
+) -> Any:
     """Functional retry: call fn with retry logic (not a decorator).
 
     Usage:
@@ -193,8 +204,7 @@ def retry_call(fn: Callable, *args,
                 delay = base_delay * (2 ** (attempt - 1))
                 wait = _add_jitter(min(delay, DEFAULT_MAX_DELAY))
 
-            log.info(f"[RETRY] attempt {attempt}/{max_attempts}: {type(e).__name__}, "
-                     f"wait {wait:.1f}s")
+            log.info(f"[RETRY] attempt {attempt}/{max_attempts}: {type(e).__name__}, wait {wait:.1f}s")
             time.sleep(wait)
 
     raise last_error

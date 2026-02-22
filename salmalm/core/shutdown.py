@@ -3,12 +3,13 @@
 stdlib-only. Provides enhanced shutdown beyond the basic begin_shutdown/wait_for_active_requests
 in engine.py.
 """
+
 from __future__ import annotations
 
 import logging
 import threading
 
-log = logging.getLogger('salmalm')
+log = logging.getLogger("salmalm")
 
 
 class ShutdownManager:
@@ -43,6 +44,7 @@ class ShutdownManager:
         log.info("[SHUTDOWN] Phase 1: Reject new requests")
         try:
             from salmalm.core.engine import begin_shutdown, wait_for_active_requests
+
             begin_shutdown()
         except Exception as e:
             log.warning(f"[SHUTDOWN] Engine begin_shutdown error: {e}")
@@ -51,6 +53,7 @@ class ShutdownManager:
         log.info("[SHUTDOWN] Phase 2: Drain active LLM requests")
         try:
             from salmalm.core.engine import wait_for_active_requests  # noqa: F811
+
             drained = wait_for_active_requests(timeout=min(timeout, 15.0))
             if not drained:
                 log.warning("[SHUTDOWN] Some LLM requests did not complete in time")
@@ -61,7 +64,8 @@ class ShutdownManager:
         log.info("[SHUTDOWN] Phase 3: Cancel/wait for active tool executions")
         try:
             from salmalm.core.engine import _engine
-            if hasattr(_engine, '_tool_executor'):
+
+            if hasattr(_engine, "_tool_executor"):
                 _engine._tool_executor.shutdown(wait=True, cancel_futures=True)
                 log.info("[SHUTDOWN] Tool executor shut down")
         except Exception as e:
@@ -71,6 +75,7 @@ class ShutdownManager:
         log.info("[SHUTDOWN] Phase 4: Flush session states to disk")
         try:
             from salmalm.core.core import _sessions, _session_lock
+
             with _session_lock:
                 count = 0
                 for sid, session in _sessions.items():
@@ -87,6 +92,7 @@ class ShutdownManager:
         log.info("[SHUTDOWN] Phase 5: Notify WebSocket clients")
         try:
             from salmalm.web.ws import ws_server
+
             await ws_server.shutdown()
         except Exception as e:
             log.warning(f"[SHUTDOWN] WebSocket shutdown error: {e}")
@@ -95,6 +101,7 @@ class ShutdownManager:
         log.info("[SHUTDOWN] Phase 6: Close DB connections")
         try:
             from salmalm.core.core import close_all_db_connections
+
             close_all_db_connections()
         except Exception as e:
             log.warning(f"[SHUTDOWN] DB close error: {e}")

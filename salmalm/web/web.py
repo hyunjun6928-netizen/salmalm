@@ -57,9 +57,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         # No Origin header (same-origin requests, curl, etc) → no CORS headers needed
-        self.send_header(
-            "Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key"
-        )
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
 
     def _maybe_gzip(self, body: bytes) -> bytes:
         """Compress body if client accepts gzip and body is large enough."""
@@ -88,7 +86,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     # Per-request CSP nonce (generated fresh each time)
-    _csp_nonce: str = ''
+    _csp_nonce: str = ""
 
     def _security_headers(self):
         """Add security headers to all responses.
@@ -98,14 +96,13 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         TODO(v0.18): Migrate all inline scripts to external files, remove unsafe-inline.
         """
         import secrets as _secrets
+
         self._csp_nonce = _secrets.token_urlsafe(16)
 
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header(
-            "Permissions-Policy", "camera=(), microphone=(self), geolocation=()"
-        )
+        self.send_header("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
         # CSP: nonce mode (strict) vs inline mode (compat)
         if os.environ.get("SALMALM_CSP_NONCE"):
             script_src = f"'self' 'nonce-{self._csp_nonce}'"
@@ -185,9 +182,19 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         return None
 
     # Trusted proxy subnets — only accept X-Forwarded-For from these
-    _TRUSTED_PROXY_NETS = ('127.', '::1', '10.', '172.16.', '172.17.',
-                           '172.18.', '172.19.', '172.2', '172.30.',
-                           '172.31.', '192.168.')
+    _TRUSTED_PROXY_NETS = (
+        "127.",
+        "::1",
+        "10.",
+        "172.16.",
+        "172.17.",
+        "172.18.",
+        "172.19.",
+        "172.2",
+        "172.30.",
+        "172.31.",
+        "192.168.",
+    )
 
     def _get_client_ip(self) -> str:
         """Get client IP. Only trusts X-Forwarded-For if:
@@ -198,8 +205,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         remote_addr = self.client_address[0] if self.client_address else "?"
         if os.environ.get("SALMALM_TRUST_PROXY"):
             # Only trust XFF if the direct connection is from a trusted proxy
-            is_trusted = any(remote_addr.startswith(net)
-                             for net in self._TRUSTED_PROXY_NETS)
+            is_trusted = any(remote_addr.startswith(net) for net in self._TRUSTED_PROXY_NETS)
             if is_trusted:
                 xff = self.headers.get("X-Forwarded-For")
                 if xff:
@@ -212,8 +218,12 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         user = extract_auth(dict(self.headers))
         # Loopback admin bypass: only when server is bound to 127.0.0.1 (not 0.0.0.0)
         _bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
-        if (not user and ip in ("127.0.0.1", "::1", "localhost")
-                and vault.is_unlocked and _bind in ("127.0.0.1", "::1", "localhost")):
+        if (
+            not user
+            and ip in ("127.0.0.1", "::1", "localhost")
+            and vault.is_unlocked
+            and _bind in ("127.0.0.1", "::1", "localhost")
+        ):
             user = {"username": "local", "role": "admin"}
         role = user.get("role", "anonymous") if user else "anonymous"
         key = user.get("username", ip) if user else ip
@@ -225,11 +235,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Retry-After", str(int(e.retry_after)))
             self._cors()
             self.end_headers()
-            self.wfile.write(
-                json.dumps(
-                    {"error": "Rate limit exceeded", "retry_after": e.retry_after}
-                ).encode()
-            )
+            self.wfile.write(json.dumps({"error": "Rate limit exceeded", "retry_after": e.retry_after}).encode())
             return False
 
     def do_PUT(self):
@@ -273,15 +279,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
             conn = _get_db()
             try:
-                conn.execute(
-                    'ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""'
-                )
+                conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
                 conn.commit()
             except Exception:
                 pass
-            conn.execute(
-                "UPDATE session_store SET title=? WHERE session_id=?", (title, sid)
-            )
+            conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
             conn.commit()
             self._json({"ok": True})
             return
@@ -352,11 +354,12 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             return True
         # 1b. Try .vault_auto file (WSL/no-keychain fallback)
         try:
-            _pw_hint_file = VAULT_FILE.parent / '.vault_auto'  # noqa: F405
+            _pw_hint_file = VAULT_FILE.parent / ".vault_auto"  # noqa: F405
             if _pw_hint_file.exists():
-                _hint = _pw_hint_file.read_text(encoding='utf-8').strip()
+                _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
                 if _hint:
                     import base64
+
                     _auto_pw = base64.b64decode(_hint).decode()
                 else:
                     _auto_pw = ""
@@ -367,6 +370,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         pw = os.environ.get("SALMALM_VAULT_PW", "")
         if pw:
             import warnings
+
             warnings.warn(
                 "SALMALM_VAULT_PW env var is deprecated and will be removed in v0.20. "
                 "Use OS keychain instead: vault password is auto-saved on first unlock.",
@@ -377,7 +381,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             # Check if this is a no-crypto marker file
             try:
                 marker = VAULT_FILE.read_bytes()  # noqa: F405
-                if b'no_crypto' in marker:
+                if b"no_crypto" in marker:
                     vault._data = {}
                     vault._password = ""
                     vault._salt = b"\x00" * 16
@@ -471,9 +475,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         # Session info
         sess = get_session("web")
         sess_msgs = len(sess.messages) if sess else 0
-        sess_ctx = sum(
-            len(str(m.get("content", ""))) for m in (sess.messages if sess else [])
-        )
+        sess_ctx = sum(len(str(m.get("content", ""))) for m in (sess.messages if sess else []))
         # Provider keys
         from salmalm.core.llm_router import PROVIDERS, is_provider_available
 
@@ -608,26 +610,19 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 # Fetch real models from local endpoint instead of hardcoded list
                 try:
                     from salmalm.features.model_detect import model_detector
+
                     detected = model_detector.detect_all(force=True)
                     local_models = [
-                        {"name": m["name"], "full": m["id"]}
-                        for m in detected
-                        if m.get("provider") == "ollama"
+                        {"name": m["name"], "full": m["id"]} for m in detected if m.get("provider") == "ollama"
                     ]
                 except Exception:
-                    local_models = [
-                        {"name": m, "full": f"ollama/{m}"}
-                        for m in cfg["models"]
-                    ]
+                    local_models = [{"name": m, "full": f"ollama/{m}"} for m in cfg["models"]]
                 providers.append(
                     {
                         "name": name,
                         "available": is_provider_available(name) or bool(local_models),
                         "env_key": "",
-                        "models": local_models or [
-                            {"name": m, "full": f"ollama/{m}"}
-                            for m in cfg["models"]
-                        ],
+                        "models": local_models or [{"name": m, "full": f"ollama/{m}"} for m in cfg["models"]],
                     }
                 )
             else:
@@ -636,10 +631,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                         "name": name,
                         "available": is_provider_available(name),
                         "env_key": cfg.get("env_key", ""),
-                        "models": [
-                            {"name": m, "full": f"{name}/{m}"}
-                            for m in cfg["models"]
-                        ],
+                        "models": [{"name": m, "full": f"{name}/{m}"} for m in cfg["models"]],
                     }
                 )
         # Check session-level override (more accurate than global router state)
@@ -647,12 +639,13 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         try:
             _sid = self.headers.get("X-Session-Id") or "web"
             from salmalm.core import get_session as _gs_prov
+
             _s = _gs_prov(_sid)
-            _override = getattr(_s, 'model_override', None)
-            if _override is not None and _override != 'auto':
+            _override = getattr(_s, "model_override", None)
+            if _override is not None and _override != "auto":
                 _cur = _override
-            elif _override == 'auto':
-                _cur = 'auto'
+            elif _override == "auto":
+                _cur = "auto"
         except Exception:
             pass
         self._json(
@@ -686,21 +679,24 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         if not self._require_auth("user"):
             return
         from salmalm.core.engine import get_routing_config
+
         config = get_routing_config()
         # Validate: strip models whose provider has no key
         _provider_key_map = {
-            'anthropic': 'anthropic_api_key', 'openai': 'openai_api_key',
-            'xai': 'xai_api_key', 'google': 'google_api_key',
-            'openrouter': 'openrouter_api_key',
+            "anthropic": "anthropic_api_key",
+            "openai": "openai_api_key",
+            "xai": "xai_api_key",
+            "google": "google_api_key",
+            "openrouter": "openrouter_api_key",
         }
-        for tier in ('simple', 'moderate', 'complex'):
-            model = config.get(tier, '')
-            if not model or model == 'auto':
+        for tier in ("simple", "moderate", "complex"):
+            model = config.get(tier, "")
+            if not model or model == "auto":
                 continue
-            provider = model.split('/')[0] if '/' in model else ''
+            provider = model.split("/")[0] if "/" in model else ""
             key_name = _provider_key_map.get(provider)
             if key_name and not vault.get(key_name):
-                config[tier] = ''  # Reset to auto default
+                config[tier] = ""  # Reset to auto default
         self._json({"config": config, "available_models": MODELS})
 
     def _get_failover(self):
@@ -739,9 +735,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         # Soul file
         soul = DATA_DIR / "soul.md"
         if soul.exists():
-            files.append(
-                {"name": "soul.md", "size": soul.stat().st_size, "path": "soul.md"}
-            )
+            files.append({"name": "soul.md", "size": soul.stat().st_size, "path": "soul.md"})
         self._json({"files": files})
 
     def _get_cron(self):
@@ -1188,9 +1182,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                             tools.append(
                                 {
                                     "name": n,
-                                    "description": t.get("function", {}).get(
-                                        "description", ""
-                                    ),
+                                    "description": t.get("function", {}).get("description", ""),
                                 }
                             )
             except Exception:
@@ -1341,14 +1333,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     )
                     title = ""
                     for m in msgs:
-                        if m.get("role") == "user" and isinstance(
-                            m.get("content"), str
-                        ):
+                        if m.get("role") == "user" and isinstance(m.get("content"), str):
                             title = m["content"][:60]
                             break
-                    msg_count = len(
-                        [m for m in msgs if m.get("role") in ("user", "assistant")]
-                    )
+                    msg_count = len([m for m in msgs if m.get("role") in ("user", "assistant")])
                 except Exception:
                     title = sid
                     msg_count = 0
@@ -1415,10 +1403,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             for s in _sessions.values()
         ]
         cron_jobs = _llm_cron.list_jobs() if _llm_cron else []
-        plugins = [
-            {"name": n, "tools": len(p["tools"])}
-            for n, p in PluginLoader._plugins.items()
-        ]
+        plugins = [{"name": n, "tools": len(p["tools"])} for n, p in PluginLoader._plugins.items()]
         subagents = SubAgent.list_agents()
         usage = get_usage_report()
         # Cost by hour (from audit)
@@ -1453,10 +1438,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         from salmalm.core import PluginLoader
 
         legacy_tools = PluginLoader.get_all_tools()
-        legacy = [
-            {"name": n, "tools": len(p["tools"]), "path": p["path"]}
-            for n, p in PluginLoader._plugins.items()
-        ]
+        legacy = [{"name": n, "tools": len(p["tools"]), "path": p["path"]} for n, p in PluginLoader._plugins.items()]
         from salmalm.features.plugin_manager import plugin_manager
 
         new_plugins = plugin_manager.list_plugins()
@@ -1553,17 +1535,13 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         try:
             import urllib.request
 
-            resp = urllib.request.urlopen(
-                "https://pypi.org/pypi/salmalm/json", timeout=10
-            )
+            resp = urllib.request.urlopen("https://pypi.org/pypi/salmalm/json", timeout=10)
             data = json.loads(resp.read().decode())
             latest = data.get("info", {}).get("version", VERSION)  # noqa: F405
             is_exe = getattr(sys, "frozen", False)
             result = {"current": VERSION, "latest": latest, "exe": is_exe}  # noqa: F405
             if is_exe:
-                result["download_url"] = (
-                    "https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
-                )
+                result["download_url"] = "https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
             self._json(result)
         except Exception as e:
             self._json({"current": VERSION, "latest": None, "error": str(e)[:100]})  # noqa: F405
@@ -1573,9 +1551,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         try:
             import urllib.request
 
-            resp = urllib.request.urlopen(
-                "https://pypi.org/pypi/salmalm/json", timeout=10
-            )
+            resp = urllib.request.urlopen("https://pypi.org/pypi/salmalm/json", timeout=10)
             data = json.loads(resp.read().decode())
             latest = data.get("info", {}).get("version", VERSION)  # noqa: F405
             is_exe = getattr(sys, "frozen", False)
@@ -1586,9 +1562,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 "update_available": latest != VERSION,
             }  # noqa: F405
             if is_exe:
-                result["download_url"] = (
-                    "https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
-                )
+                result["download_url"] = "https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
             self._json(result)
         except Exception as e:
             self._json({"current": VERSION, "latest": None, "error": str(e)[:100]})  # noqa: F405
@@ -1742,6 +1716,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         content = js_path.read_bytes()
         # ETag for caching
         import hashlib
+
         etag = f'"{hashlib.md5(content).hexdigest()}"'
         if self.headers.get("If-None-Match") == etag:
             self.send_response(304)
@@ -1841,9 +1816,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     content = msg.get("content", "")
                     if isinstance(content, list):
                         content = " ".join(
-                            b.get("text", "")
-                            for b in content
-                            if isinstance(b, dict) and b.get("type") == "text"
+                            b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"
                         )
                     icon = "## 👤 User" if role == "user" else "## 😈 Assistant"
                     lines.append(icon)
@@ -1855,9 +1828,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 fname = f"salmalm_{sid}_{updated_at[:10]}.md"
                 self.send_response(200)
                 self.send_header("Content-Type", "text/markdown; charset=utf-8")
-                self.send_header(
-                    "Content-Disposition", f'attachment; filename="{fname}"'
-                )
+                self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
                 self.send_header("Content-Length", str(len(body)))
                 self._cors()
                 self.end_headers()
@@ -1868,15 +1839,11 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     "updated_at": updated_at,
                     "messages": msgs,
                 }
-                body = json.dumps(export_data, ensure_ascii=False, indent=2).encode(
-                    "utf-8"
-                )
+                body = json.dumps(export_data, ensure_ascii=False, indent=2).encode("utf-8")
                 fname = f"salmalm_{sid}_{updated_at[:10]}.json"
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
-                self.send_header(
-                    "Content-Disposition", f'attachment; filename="{fname}"'
-                )
+                self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
                 self.send_header("Content-Length", str(len(body)))
                 self._cors()
                 self.end_headers()
@@ -1895,9 +1862,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             if not query:
                 self._json({"error": "Missing q parameter"}, 400)
             else:
-                results = rag_engine.search(
-                    query, max_results=int(params.get("n", ["5"])[0])
-                )
+                results = rag_engine.search(query, max_results=int(params.get("n", ["5"])[0]))
                 self._json({"query": query, "results": results})
         elif self.path.startswith("/api/audit"):
             if not self._require_auth("user"):
@@ -1911,9 +1876,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             sid = params.get("session_id", [None])[0]
             from salmalm.core import query_audit_log
 
-            entries = query_audit_log(
-                limit=limit, event_type=event_type, session_id=sid
-            )
+            entries = query_audit_log(limit=limit, event_type=event_type, session_id=sid)
             self._json({"entries": entries, "count": len(entries)})
 
         elif self.path.startswith("/api/sessions/") and "/summary" in self.path:
@@ -1952,11 +1915,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             log_path = DATA_DIR / "salmalm.log"
             entries = []
             if log_path.exists():
-                all_lines = (
-                    log_path.read_text(encoding="utf-8", errors="replace")
-                    .strip()
-                    .split("\n")
-                )
+                all_lines = log_path.read_text(encoding="utf-8", errors="replace").strip().split("\n")
                 for ln in all_lines[-lines:]:
                     if level and f"[{level}]" not in ln:
                         continue
@@ -1979,9 +1938,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 return
             try:
                 content = full.read_text(encoding="utf-8")[:50000]
-                self._json(
-                    {"file": fpath, "content": content, "size": full.stat().st_size}
-                )
+                self._json({"file": fpath, "content": content, "size": full.stat().st_size})
             except Exception as e:
                 self._json({"error": str(e)}, 500)
 
@@ -1998,9 +1955,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 )
                 return
             if not code:
-                self._html(
-                    '<html><body><h2>No code received</h2><p><a href="/">Back</a></p></body></html>'
-                )
+                self._html('<html><body><h2>No code received</h2><p><a href="/">Back</a></p></body></html>')
                 return
             client_id = vault.get("google_client_id") or ""
             client_secret = vault.get("google_client_secret") or ""
@@ -2079,12 +2034,11 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     zf.writestr("soul.md", soul_path.read_text(encoding="utf-8"))
                 # Memory files
                 from salmalm.constants import MEMORY_DIR as _mem_dir
+
                 if _mem_dir.exists():
                     for f in _mem_dir.glob("*"):
                         if f.is_file():
-                            zf.writestr(
-                                f"memory/{f.name}", f.read_text(encoding="utf-8")
-                            )
+                            zf.writestr(f"memory/{f.name}", f.read_text(encoding="utf-8"))
                 # Also include memory.md from DATA_DIR
                 mem_md = DATA_DIR / "memory.md"
                 if mem_md.exists():
@@ -2095,17 +2049,13 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     zf.writestr("config.json", config_path.read_text(encoding="utf-8"))
                 routing_path = Path.home() / ".salmalm" / "routing.json"
                 if routing_path.exists():
-                    zf.writestr(
-                        "routing.json", routing_path.read_text(encoding="utf-8")
-                    )
+                    zf.writestr("routing.json", routing_path.read_text(encoding="utf-8"))
                 # Sessions
                 if inc_sessions:
                     from salmalm.core import _get_db
 
                     conn = _get_db()
-                    rows = conn.execute(
-                        "SELECT session_id, messages, title FROM session_store"
-                    ).fetchall()
+                    rows = conn.execute("SELECT session_id, messages, title FROM session_store").fetchall()
                     sessions = []
                     for r in rows:
                         sessions.append(
@@ -2166,9 +2116,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self.send_response(200)
             self._cors()
             self.send_header("Content-Type", "application/zip")
-            self.send_header(
-                "Content-Disposition", f'attachment; filename="salmalm-export-{ts}.zip"'
-            )
+            self.send_header("Content-Disposition", f'attachment; filename="salmalm-export-{ts}.zip"')
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
@@ -2250,6 +2198,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             pass  # Client disconnected — nothing to send
         except Exception as e:
             import traceback
+
             err_detail = traceback.format_exc()
             log.error(f"POST {self.path} error: {e}\n{err_detail}")
             print(f"[ERROR] POST {self.path}: {e}", flush=True)
@@ -2259,9 +2208,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 pass  # Client already gone
         finally:
             duration = (time.time() - _start) * 1000
-            request_logger.log_request(
-                "POST", self.path, ip=self._get_client_ip(), duration_ms=duration
-            )
+            request_logger.log_request("POST", self.path, ip=self._get_client_ip(), duration_ms=duration)
 
     # Max POST body size: 10MB
     _MAX_POST_SIZE = 10 * 1024 * 1024
@@ -2276,9 +2223,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         if reg_mode == "admin_only":
             if not requester or requester.get("role") != "admin":
                 self._json(
-                    {
-                        "error": "Admin access required for registration / 관리자만 등록 가능"
-                    },
+                    {"error": "Admin access required for registration / 관리자만 등록 가능"},
                     403,
                 )
                 return
@@ -2447,13 +2392,14 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             vault.unlock(_vault_pw, save_to_keychain=True)
             # Save password hint file for auto-unlock on restart (WSL lacks keychain)
             try:
-                _pw_hint_file = VAULT_FILE.parent / '.vault_auto'  # noqa: F405
+                _pw_hint_file = VAULT_FILE.parent / ".vault_auto"  # noqa: F405
                 if not use_pw:
-                    _pw_hint_file.write_text('', encoding='utf-8')
+                    _pw_hint_file.write_text("", encoding="utf-8")
                 else:
                     # Store obfuscated pw for auto-unlock (local machine only)
                     import base64
-                    _pw_hint_file.write_text(base64.b64encode(_vault_pw.encode()).decode(), encoding='utf-8')
+
+                    _pw_hint_file.write_text(base64.b64encode(_vault_pw.encode()).decode(), encoding="utf-8")
                 _pw_hint_file.chmod(0o600)
             except Exception:
                 pass
@@ -2487,12 +2433,12 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
             # Try pipx first (common install method), fallback to pip
             import shutil
-            _use_pipx = shutil.which('pipx') is not None
+
+            _use_pipx = shutil.which("pipx") is not None
             if _use_pipx:
-                _update_cmd = ['pipx', 'install', 'salmalm', '--force']
+                _update_cmd = ["pipx", "install", "salmalm", "--force"]
             else:
-                _update_cmd = [sys.executable, '-m', 'pip', 'install',
-                               '--upgrade', '--no-cache-dir', 'salmalm']
+                _update_cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "salmalm"]
             result = subprocess.run(
                 _update_cmd,
                 capture_output=True,
@@ -2513,9 +2459,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 )
                 new_ver = ver_result.stdout.strip() or "?"
                 audit_log("update", f"upgraded to v{new_ver}")
-                self._json(
-                    {"ok": True, "version": new_ver, "output": result.stdout[-200:]}
-                )
+                self._json({"ok": True, "version": new_ver, "output": result.stdout[-200:]})
             else:
                 self._json({"ok": False, "error": result.stderr[-200:]})
         except Exception as e:
@@ -2538,6 +2482,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
         def _do_restart():
             import time
+
             time.sleep(0.5)  # Let HTTP response flush
             os.execv(_sys.executable, [_sys.executable] + _sys.argv)
 
@@ -2561,11 +2506,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    asyncio.ensure_future(
-                        ws_server.broadcast(
-                            {"type": "update_status", "status": "installing"}
-                        )
-                    )
+                    asyncio.ensure_future(ws_server.broadcast({"type": "update_status", "status": "installing"}))
             except Exception:
                 pass
             result = subprocess.run(
@@ -2595,9 +2536,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 )
                 new_ver = ver_result.stdout.strip() or "?"
                 audit_log("update", f"upgraded to v{new_ver}")
-                self._json(
-                    {"ok": True, "version": new_ver, "output": result.stdout[-200:]}
-                )
+                self._json({"ok": True, "version": new_ver, "output": result.stdout[-200:]})
             else:
                 self._json({"ok": False, "error": result.stderr[-200:]})
         except Exception as e:
@@ -2701,9 +2640,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 lambda k: __import__("urllib.request", fromlist=["urlopen"]).urlopen(
                     __import__("urllib.request", fromlist=["Request"]).Request(
                         f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={k}",  # noqa: F405
-                        data=json.dumps(
-                            {"contents": [{"parts": [{"text": "ping"}]}]}
-                        ).encode(),
+                        data=json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode(),
                         headers={"Content-Type": "application/json"},
                     ),
                     timeout=15,
@@ -2713,21 +2650,13 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         if provider not in tests:
             self._json({"ok": False, "result": f"❌ Unknown provider: {provider}"})
             return
-        key = (
-            vault.get(f"{provider}_api_key")
-            if provider != "google"
-            else vault.get("google_api_key")
-        )
+        key = vault.get(f"{provider}_api_key") if provider != "google" else vault.get("google_api_key")
         if not key:
-            self._json(
-                {"ok": False, "result": f"❌ {provider} API key not found in vault"}
-            )
+            self._json({"ok": False, "result": f"❌ {provider} API key not found in vault"})
             return
         try:
             tests[provider]()
-            self._json(
-                {"ok": True, "result": f"✅ {provider} API connection successful!"}
-            )
+            self._json({"ok": True, "result": f"✅ {provider} API connection successful!"})
         except Exception as e:
             self._json(
                 {
@@ -2766,11 +2695,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             from salmalm.tools.tool_handlers import execute_tool
 
             result = execute_tool("stt", {"audio_base64": audio_b64, "language": lang})  # type: ignore[assignment]
-            text = (
-                result.replace("🎤 Transcription:\n", "")
-                if isinstance(result, str)
-                else ""
-            )
+            text = result.replace("🎤 Transcription:\n", "") if isinstance(result, str) else ""
             self._json({"ok": True, "text": text})
         except Exception as e:
             self._json({"ok": False, "error": str(e)}, 500)
@@ -2790,14 +2715,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 export_data["soul"] = soul_path.read_text(encoding="utf-8")
             config_path = DATA_DIR / "config.json"
             if config_path.exists():
-                export_data["config"] = _json.loads(
-                    config_path.read_text(encoding="utf-8")
-                )
+                export_data["config"] = _json.loads(config_path.read_text(encoding="utf-8"))
             routing_path = Path.home() / ".salmalm" / "routing.json"
             if routing_path.exists():
-                export_data["routing"] = _json.loads(
-                    routing_path.read_text(encoding="utf-8")
-                )
+                export_data["routing"] = _json.loads(routing_path.read_text(encoding="utf-8"))
             memory_dir = BASE_DIR / "memory"
             if memory_dir.exists():
                 export_data["memory"] = {}
@@ -2823,11 +2744,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         content_length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(content_length)
         # Find ZIP in multipart
-        boundary = (
-            content_type.split("boundary=")[1].encode()
-            if "boundary=" in content_type
-            else b""
-        )
+        boundary = content_type.split("boundary=")[1].encode() if "boundary=" in content_type else b""
         parts = raw.split(b"--" + boundary)
         zip_data = None
         for part in parts:
@@ -2843,11 +2760,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             return
         try:
             zf = zipfile.ZipFile(io.BytesIO(zip_data))
-            manifest = (
-                _json.loads(zf.read("manifest.json"))
-                if "manifest.json" in zf.namelist()
-                else {}
-            )
+            manifest = _json.loads(zf.read("manifest.json")) if "manifest.json" in zf.namelist() else {}
             preview = {
                 "files": zf.namelist(),
                 "manifest": manifest,
@@ -2959,8 +2872,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"ok": False, "error": "messages array required"}, 400)
             return
         import uuid
+
         sid = f"imported_{uuid.uuid4().hex[:8]}"
         from salmalm.core import _get_db
+
         conn = _get_db()
         conn.execute(
             "INSERT OR REPLACE INTO session_store (session_id, messages, title, updated_at) VALUES (?, ?, ?, datetime('now'))",
@@ -2985,9 +2900,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         conn = _get_db()
         conn.execute("DELETE FROM session_store WHERE session_id=?", (sid,))
         conn.commit()
-        audit_log(
-            "session_delete", sid, session_id=sid, detail_dict={"session_id": sid}
-        )
+        audit_log("session_delete", sid, session_id=sid, detail_dict={"session_id": sid})
         self._json({"ok": True})
 
     def _post_api_soul(self):
@@ -3024,6 +2937,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         if not self._require_auth("user"):
             return
         from salmalm.core.model_selection import auto_optimize_and_save
+
         available_keys = []
         for key_name in ("anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key"):
             if vault.get(key_name):
@@ -3034,19 +2948,20 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         config = auto_optimize_and_save(available_keys)
         # Build human-readable summary
         from salmalm.core.model_selection import _MODEL_COSTS
+
         summary = {}
         for tier, model in config.items():
             cost = _MODEL_COSTS.get(model, (0, 0))
-            provider = model.split('/')[0] if '/' in model else '?'
-            name = model.split('/')[-1] if '/' in model else model
+            provider = model.split("/")[0] if "/" in model else "?"
+            name = model.split("/")[-1] if "/" in model else model
             summary[tier] = {
-                'model': model, 'provider': provider, 'name': name,
-                'cost_input': cost[0], 'cost_output': cost[1],
+                "model": model,
+                "provider": provider,
+                "name": name,
+                "cost_input": cost[0],
+                "cost_output": cost[1],
             }
-        self._json({
-            "ok": True, "config": config,
-            "summary": summary, "keys_used": available_keys
-        })
+        self._json({"ok": True, "config": config, "summary": summary, "keys_used": available_keys})
 
     def _post_api_failover(self):
         body = self._body
@@ -3076,9 +2991,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             conn.commit()
         except Exception:
             pass  # column already exists
-        conn.execute(
-            "UPDATE session_store SET title=? WHERE session_id=?", (title, sid)
-        )
+        conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
         conn.commit()
         self._json({"ok": True})
 
@@ -3124,9 +3037,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         sid = body.get("session_id", "")
         idx = body.get("message_index")
         if not sid or idx is None:
-            self._json(
-                {"ok": False, "error": "Missing session_id or message_index"}, 400
-            )
+            self._json({"ok": False, "error": "Missing session_id or message_index"}, 400)
             return
         from salmalm.core import delete_message
 
@@ -3140,9 +3051,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         sid = body.get("session_id", "")
         message_index = body.get("message_index")
         if not sid or message_index is None:
-            self._json(
-                {"ok": False, "error": "Missing session_id or message_index"}, 400
-            )
+            self._json({"ok": False, "error": "Missing session_id or message_index"}, 400)
             return
         from salmalm.core import branch_session
 
@@ -3157,27 +3066,19 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
         action = body.get("action", "")
         if action == "create":
-            result = agent_manager.create(
-                body.get("id", ""), body.get("display_name", "")
-            )
+            result = agent_manager.create(body.get("id", ""), body.get("display_name", ""))
             self._json({"ok": "✅" in result, "message": result})
         elif action == "delete":
             result = agent_manager.delete(body.get("id", ""))
             self._json({"ok": True, "message": result})
         elif action == "bind":
-            result = agent_manager.bind(
-                body.get("chat_key", ""), body.get("agent_id", "")
-            )
+            result = agent_manager.bind(body.get("chat_key", ""), body.get("agent_id", ""))
             self._json({"ok": True, "message": result})
         elif action == "switch":
-            result = agent_manager.switch(
-                body.get("chat_key", ""), body.get("agent_id", "")
-            )
+            result = agent_manager.switch(body.get("chat_key", ""), body.get("agent_id", ""))
             self._json({"ok": True, "message": result})
         else:
-            self._json(
-                {"error": "Unknown action. Use: create, delete, bind, switch"}, 400
-            )
+            self._json({"error": "Unknown action. Use: create, delete, bind, switch"}, 400)
 
     def _post_api_hooks(self):
         body = self._body
@@ -3187,14 +3088,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
         action = body.get("action", "")
         if action == "add":
-            result = hook_manager.add_hook(
-                body.get("event", ""), body.get("command", "")
-            )
+            result = hook_manager.add_hook(body.get("event", ""), body.get("command", ""))
             self._json({"ok": True, "message": result})
         elif action == "remove":
-            result = hook_manager.remove_hook(
-                body.get("event", ""), body.get("index", 0)
-            )
+            result = hook_manager.remove_hook(body.get("event", ""), body.get("index", 0))
             self._json({"ok": True, "message": result})
         elif action == "test":
             result = hook_manager.test_hook(body.get("event", ""))
@@ -3227,6 +3124,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
     def _post_api_chat(self):
         """Handle /api/chat and /api/chat/stream — main conversation endpoint."""
         from salmalm.core.engine import process_message
+
         body = self._body
         self._auto_unlock_localhost()
         if not vault.is_unlocked:
@@ -3288,32 +3186,44 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 loop = asyncio.new_event_loop()
                 # Pass session-level model override to engine
                 from salmalm.core import get_session as _gs_pre
+
                 _sess_pre = _gs_pre(session_id)
-                _model_ov = getattr(_sess_pre, 'model_override', None)
-                if _model_ov == 'auto':
+                _model_ov = getattr(_sess_pre, "model_override", None)
+                if _model_ov == "auto":
                     _model_ov = None
                 response = loop.run_until_complete(
-                    process_message(session_id, message,
-                                    model_override=_model_ov,
-                                    image_data=(image_b64, image_mime) if image_b64 else None,
-                                    on_tool=on_tool_sse, on_token=on_token_sse, lang=ui_lang))
+                    process_message(
+                        session_id,
+                        message,
+                        model_override=_model_ov,
+                        image_data=(image_b64, image_mime) if image_b64 else None,
+                        on_tool=on_tool_sse,
+                        on_token=on_token_sse,
+                        lang=ui_lang,
+                    )
+                )
                 loop.close()
             except Exception as e:
                 log.error(f"SSE process_message error: {e}")
                 response = f"❌ Internal error: {type(e).__name__}"
             from salmalm.core import get_session as _gs2
+
             _sess2 = _gs2(session_id)
             try:
                 from salmalm.tools.tools_ui import pop_pending_commands
+
                 for cmd in pop_pending_commands():
                     send_sse("ui_cmd", cmd)
             except Exception:
                 pass
-            send_sse("done", {
-                "response": response,
-                "model": getattr(_sess2, "last_model", router.force_model or "auto"),
-                "complexity": getattr(_sess2, "last_complexity", "auto"),
-            })
+            send_sse(
+                "done",
+                {
+                    "response": response,
+                    "model": getattr(_sess2, "last_model", router.force_model or "auto"),
+                    "complexity": getattr(_sess2, "last_complexity", "auto"),
+                },
+            )
             try:
                 self.wfile.write(b"event: close\ndata: {}\n\n")
                 self.wfile.flush()
@@ -3324,26 +3234,34 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 loop = asyncio.new_event_loop()
                 # Pass session-level model override to engine
                 from salmalm.core import get_session as _gs_pre2
+
                 _sess_pre2 = _gs_pre2(session_id)
-                _model_ov2 = getattr(_sess_pre2, 'model_override', None)
-                if _model_ov2 == 'auto':
+                _model_ov2 = getattr(_sess_pre2, "model_override", None)
+                if _model_ov2 == "auto":
                     _model_ov2 = None
                 response = loop.run_until_complete(
-                    process_message(session_id, message,
-                                    model_override=_model_ov2,
-                                    image_data=(image_b64, image_mime) if image_b64 else None,
-                                    lang=ui_lang))
+                    process_message(
+                        session_id,
+                        message,
+                        model_override=_model_ov2,
+                        image_data=(image_b64, image_mime) if image_b64 else None,
+                        lang=ui_lang,
+                    )
+                )
                 loop.close()
             except Exception as e:
                 log.error(f"Chat process_message error: {e}")
                 response = f"❌ Internal error: {type(e).__name__}"
             from salmalm.core import get_session as _gs
+
             _sess = _gs(session_id)
-            self._json({
-                "response": response,
-                "model": getattr(_sess, "last_model", router.force_model or "auto"),
-                "complexity": getattr(_sess, "last_complexity", "auto"),
-            })
+            self._json(
+                {
+                    "response": response,
+                    "model": getattr(_sess, "last_model", router.force_model or "auto"),
+                    "complexity": getattr(_sess, "last_complexity", "auto"),
+                }
+            )
 
     def _post_api_model_switch(self):
         """Handle /api/llm-router/switch and /api/model/switch."""
@@ -3351,6 +3269,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         if not self._require_auth("user"):
             return
         from salmalm.core.llm_router import llm_router
+
         model = body.get("model", "")
         if not model:
             self._json({"error": "model required"}, 400)
@@ -3360,8 +3279,9 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         sid = self.headers.get("X-Session-Id") or body.get("session") or "web"
         try:
             from salmalm.core import get_session as _gs_switch
+
             _s = _gs_switch(sid)
-            _s.model_override = None if model == 'auto' else model
+            _s.model_override = None if model == "auto" else model
         except Exception:
             pass
         # Return the effective model (session override takes precedence)
@@ -3379,6 +3299,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"error": "provider and api_key required"}, 400)
             return
         from salmalm.core.llm_router import PROVIDERS
+
         prov_cfg = PROVIDERS.get(provider)
         if not prov_cfg:
             self._json({"ok": False, "message": f"Unknown provider: {provider}"})
@@ -3390,13 +3311,25 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         try:
             import urllib.request
             import urllib.error
+
             if provider == "anthropic":
                 url = f"{prov_cfg['base_url']}/messages"
-                req = urllib.request.Request(url,
-                    data=json.dumps({"model": TEST_MODELS["anthropic"], "max_tokens": 1,  # noqa: E128
-                                     "messages": [{"role": "user", "content": "hi"}]}).encode(),
-                    headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
-                             "content-type": "application/json"}, method="POST")
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(
+                        {
+                            "model": TEST_MODELS["anthropic"],
+                            "max_tokens": 1,  # noqa: E128
+                            "messages": [{"role": "user", "content": "hi"}],
+                        }
+                    ).encode(),
+                    headers={
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    method="POST",
+                )
             elif provider == "ollama":
                 url = f"{prov_cfg['base_url']}/api/tags"
                 req = urllib.request.Request(url)
@@ -3420,6 +3353,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         """Handle /api/thoughts/search."""
         body = self._body
         from salmalm.features.thoughts import thought_stream
+
         q = body.get("q", body.get("query", ""))
         if not q:
             self._json({"error": "query required"}, 400)
@@ -3453,9 +3387,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
         try:
             loop = asyncio.new_event_loop()
-            response = loop.run_until_complete(
-                conversation_fork.regenerate(session_id, int(message_index))
-            )
+            response = loop.run_until_complete(conversation_fork.regenerate(session_id, int(message_index)))
             loop.close()
             if response:
                 self._json({"ok": True, "response": response})
@@ -3480,9 +3412,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
         try:
             loop = asyncio.new_event_loop()
-            results = loop.run_until_complete(
-                compare_models(session_id, message, models or None)
-            )
+            results = loop.run_until_complete(compare_models(session_id, message, models or None))
             loop.close()
             self._json({"ok": True, "results": results})
         except Exception as e:
@@ -3502,19 +3432,13 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             return
         from salmalm.features.edge_cases import conversation_fork
 
-        content = conversation_fork.switch_alternative(
-            session_id, int(message_index), int(alt_id)
-        )
+        content = conversation_fork.switch_alternative(session_id, int(message_index), int(alt_id))
         if content:
             # Update session messages
             from salmalm.core import get_session
 
             session = get_session(session_id)
-            ua = [
-                (i, m)
-                for i, m in enumerate(session.messages)
-                if m.get("role") in ("user", "assistant")
-            ]
+            ua = [(i, m) for i, m in enumerate(session.messages) if m.get("role") in ("user", "assistant")]
             if int(message_index) < len(ua):
                 real_idx = ua[int(message_index)][0]
                 session.messages[real_idx] = {
@@ -3576,11 +3500,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             if not gid:
                 self._json({"error": "Missing id"}, 400)
                 return
-            kwargs = {
-                k: v
-                for k, v in body.items()
-                if k in ("name", "color", "sort_order", "collapsed")
-            }
+            kwargs = {k: v for k, v in body.items() if k in ("name", "color", "sort_order", "collapsed")}
             ok = session_groups.update_group(int(gid), **kwargs)
             self._json({"ok": ok})
         elif action == "delete":
@@ -3682,9 +3602,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             import email.policy
 
             header_bytes = f"Content-Type: {content_type}\r\n\r\n".encode()
-            msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(
-                header_bytes + raw
-            )
+            msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(header_bytes + raw)
             for part in msg.walk():
                 fname_raw = part.get_filename()
                 if not fname_raw:
@@ -3697,9 +3615,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 # Validate file type (Open WebUI style)
                 from salmalm.features.edge_cases import validate_upload
 
-                ok, err = validate_upload(
-                    fname, len(part.get_payload(decode=True) or b"")
-                )
+                ok, err = validate_upload(fname, len(part.get_payload(decode=True) or b""))
                 if not ok:
                     self._json({"error": err}, 400)
                     return
@@ -3717,8 +3633,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 save_path.write_bytes(file_data)  # type: ignore[arg-type]
                 size_kb = len(file_data) / 1024
                 is_image = any(
-                    fname.lower().endswith(ext)
-                    for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
+                    fname.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
                 )
                 is_text = any(
                     fname.lower().endswith(ext)
@@ -3802,6 +3717,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             # Fresh install: auto-create vault with empty password
             try:
                 from salmalm.security.crypto import VAULT_FILE
+
                 if not VAULT_FILE.exists():
                     vault.create("", save_to_keychain=False)
                 else:
@@ -3902,9 +3818,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 gk = body["google_api_key"]
                 req = urllib.request.Request(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={gk}",  # noqa: F405
-                    data=json.dumps(
-                        {"contents": [{"parts": [{"text": "ping"}]}]}
-                    ).encode(),
+                    data=json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode(),
                     headers={"Content-Type": "application/json"},
                 )
                 urllib.request.urlopen(req, timeout=15)
@@ -3916,6 +3830,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         routing_config = {}
         try:
             from salmalm.core.model_selection import auto_optimize_and_save
+
             available_keys = []
             for key_name in ("anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key"):
                 if vault.get(key_name):
@@ -3926,10 +3841,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         except Exception as e:
             log.warning(f"[ONBOARDING] Auto-routing failed (ignored): {e}")
         test_result = " | ".join(test_results) if test_results else "Keys saved."
-        self._json({
-            "ok": True, "saved": saved,
-            "test_result": test_result, "routing": routing_config
-        })
+        self._json({"ok": True, "saved": saved, "test_result": test_result, "routing": routing_config})
         return
 
     def _post_api_onboarding_preferences(self):
@@ -4063,9 +3975,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             return
         # Verify secret token
         secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if telegram_bot._webhook_secret and not telegram_bot.verify_webhook_request(
-            secret
-        ):
+        if telegram_bot._webhook_secret and not telegram_bot.verify_webhook_request(secret):
             log.warning("[BLOCK] Telegram webhook: invalid secret token")
             self._json({"error": "Forbidden"}, 403)
             return
@@ -4119,65 +4029,69 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         """GET /api/engine/settings — return current engine optimization toggles."""
         import os
         from salmalm.constants import COMPACTION_THRESHOLD
-        self._json({
-            'dynamic_tools': os.environ.get('SALMALM_ALL_TOOLS', '0') != '1',
-            'planning': os.environ.get('SALMALM_PLANNING', '0') == '1',
-            'reflection': os.environ.get('SALMALM_REFLECT', '0') == '1',
-            'compaction_threshold': COMPACTION_THRESHOLD,
-            'cost_cap': os.environ.get('SALMALM_COST_CAP', ''),
-            'max_tool_iterations': int(os.environ.get('SALMALM_MAX_TOOL_ITER', '15')),
-            'cache_ttl': int(os.environ.get('SALMALM_CACHE_TTL', '3600')),
-            'batch_api': os.environ.get('SALMALM_BATCH_API', '0') == '1',
-            'file_presummary': os.environ.get('SALMALM_FILE_PRESUMMARY', '0') == '1',
-            'early_stop': os.environ.get('SALMALM_EARLY_STOP', '0') == '1',
-        })
+
+        self._json(
+            {
+                "dynamic_tools": os.environ.get("SALMALM_ALL_TOOLS", "0") != "1",
+                "planning": os.environ.get("SALMALM_PLANNING", "0") == "1",
+                "reflection": os.environ.get("SALMALM_REFLECT", "0") == "1",
+                "compaction_threshold": COMPACTION_THRESHOLD,
+                "cost_cap": os.environ.get("SALMALM_COST_CAP", ""),
+                "max_tool_iterations": int(os.environ.get("SALMALM_MAX_TOOL_ITER", "15")),
+                "cache_ttl": int(os.environ.get("SALMALM_CACHE_TTL", "3600")),
+                "batch_api": os.environ.get("SALMALM_BATCH_API", "0") == "1",
+                "file_presummary": os.environ.get("SALMALM_FILE_PRESUMMARY", "0") == "1",
+                "early_stop": os.environ.get("SALMALM_EARLY_STOP", "0") == "1",
+            }
+        )
 
     def _post_api_engine_settings(self):
         """POST /api/engine/settings — toggle engine optimization settings."""
         import os
         import salmalm.constants as _const
+
         body = self._body
-        if 'dynamic_tools' in body:
-            os.environ['SALMALM_ALL_TOOLS'] = '0' if body['dynamic_tools'] else '1'
-        if 'planning' in body:
-            os.environ['SALMALM_PLANNING'] = '1' if body['planning'] else '0'
-        if 'reflection' in body:
-            os.environ['SALMALM_REFLECT'] = '1' if body['reflection'] else '0'
-        if 'compaction_threshold' in body:
+        if "dynamic_tools" in body:
+            os.environ["SALMALM_ALL_TOOLS"] = "0" if body["dynamic_tools"] else "1"
+        if "planning" in body:
+            os.environ["SALMALM_PLANNING"] = "1" if body["planning"] else "0"
+        if "reflection" in body:
+            os.environ["SALMALM_REFLECT"] = "1" if body["reflection"] else "0"
+        if "compaction_threshold" in body:
             try:
-                val = int(body['compaction_threshold'])
+                val = int(body["compaction_threshold"])
                 if 10000 <= val <= 200000:
                     _const.COMPACTION_THRESHOLD = val
             except (ValueError, TypeError):
                 pass
-        if 'max_tool_iterations' in body:
+        if "max_tool_iterations" in body:
             try:
-                val = int(body['max_tool_iterations'])
+                val = int(body["max_tool_iterations"])
                 if 3 <= val <= 999:
-                    os.environ['SALMALM_MAX_TOOL_ITER'] = str(val)
+                    os.environ["SALMALM_MAX_TOOL_ITER"] = str(val)
             except (ValueError, TypeError):
                 pass
-        if 'cache_ttl' in body:
+        if "cache_ttl" in body:
             try:
-                val = int(body['cache_ttl'])
+                val = int(body["cache_ttl"])
                 if 0 <= val <= 86400:
-                    os.environ['SALMALM_CACHE_TTL'] = str(val)
+                    os.environ["SALMALM_CACHE_TTL"] = str(val)
                     _const.CACHE_TTL = val
             except (ValueError, TypeError):
                 pass
-        if 'batch_api' in body:
-            os.environ['SALMALM_BATCH_API'] = '1' if body['batch_api'] else '0'
-        if 'file_presummary' in body:
-            os.environ['SALMALM_FILE_PRESUMMARY'] = '1' if body['file_presummary'] else '0'
-        if 'early_stop' in body:
-            os.environ['SALMALM_EARLY_STOP'] = '1' if body['early_stop'] else '0'
-        if 'cost_cap' in body:
-            cap = str(body['cost_cap']).strip()
+        if "batch_api" in body:
+            os.environ["SALMALM_BATCH_API"] = "1" if body["batch_api"] else "0"
+        if "file_presummary" in body:
+            os.environ["SALMALM_FILE_PRESUMMARY"] = "1" if body["file_presummary"] else "0"
+        if "early_stop" in body:
+            os.environ["SALMALM_EARLY_STOP"] = "1" if body["early_stop"] else "0"
+        if "cost_cap" in body:
+            cap = str(body["cost_cap"]).strip()
             if cap:
-                os.environ['SALMALM_COST_CAP'] = cap
-            elif 'SALMALM_COST_CAP' in os.environ:
-                del os.environ['SALMALM_COST_CAP']
-        self._json({'ok': True})
+                os.environ["SALMALM_COST_CAP"] = cap
+            elif "SALMALM_COST_CAP" in os.environ:
+                del os.environ["SALMALM_COST_CAP"]
+        self._json({"ok": True})
 
     def _post_api_thoughts(self):
         body = self._body
@@ -4264,9 +4178,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         # Request size limit
         if length > self._MAX_POST_SIZE:
             self._json(
-                {
-                    "error": f"Request too large ({length} bytes). Max: {self._MAX_POST_SIZE} bytes."
-                },
+                {"error": f"Request too large ({length} bytes). Max: {self._MAX_POST_SIZE} bytes."},
                 413,
             )
             return
@@ -4277,12 +4189,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         else:
             # Content-Type validation for JSON endpoints
             ct = self.headers.get("Content-Type", "")
-            if (
-                length > 0
-                and self.path.startswith("/api/")
-                and "json" not in ct
-                and "form" not in ct
-            ):
+            if length > 0 and self.path.startswith("/api/") and "json" not in ct and "form" not in ct:
                 self._json({"error": "Expected Content-Type: application/json"}, 400)
                 return
             try:

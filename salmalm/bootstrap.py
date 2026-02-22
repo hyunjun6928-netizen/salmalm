@@ -1,4 +1,5 @@
 """Server bootstrap — start all SalmAlm services."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,12 +10,22 @@ import sys
 import threading
 
 from salmalm.constants import (  # noqa: F401
-    VERSION, APP_NAME, VAULT_FILE, MEMORY_DIR, BASE_DIR, DATA_DIR
+    VERSION,
+    APP_NAME,
+    VAULT_FILE,
+    MEMORY_DIR,
+    BASE_DIR,
+    DATA_DIR,
 )
 from salmalm.security.crypto import vault, log, HAS_CRYPTO
 from salmalm.core import (  # noqa: F401
-    _init_audit_db, _restore_usage, audit_log,
-    _sessions, cron, LLMCronManager, PluginLoader
+    _init_audit_db,
+    _restore_usage,
+    audit_log,
+    _sessions,
+    cron,
+    LLMCronManager,
+    PluginLoader,
 )
 from salmalm.telegram import telegram_bot
 from salmalm.web import WebHandler
@@ -30,18 +41,23 @@ def _check_for_updates() -> str:
     """Check PyPI for newer version. Returns update message or empty string."""
     try:
         from salmalm.utils.http import request_json as _rj
+
         data = _rj(
-            'https://pypi.org/pypi/salmalm/json',
-            headers={'User-Agent': f'SalmAlm/{VERSION}', 'Accept': 'application/json'},
-            timeout=5)
-        latest = data.get('info', {}).get('version', '')
+            "https://pypi.org/pypi/salmalm/json",
+            headers={"User-Agent": f"SalmAlm/{VERSION}", "Accept": "application/json"},
+            timeout=5,
+        )
+        latest = data.get("info", {}).get("version", "")
 
         def _ver_tuple(v):
-            return tuple(int(x) for x in v.split('.'))
+            return tuple(int(x) for x in v.split("."))
+
         if latest and _ver_tuple(latest) > _ver_tuple(VERSION):
-            if getattr(sys, 'frozen', False):
-                return (f"⬆️  New version {latest} available!\n"
-                        f"   Download: https://github.com/hyunjun6928-netizen/salmalm/releases/latest")
+            if getattr(sys, "frozen", False):
+                return (
+                    f"⬆️  New version {latest} available!\n"
+                    f"   Download: https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
+                )
             return f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
     except Exception:
         pass  # silently skip if no network
@@ -53,16 +69,18 @@ async def run_server():
     # ── Phase 1: Database & Core State ──
     _init_audit_db()
     _restore_usage()
-    audit_log('startup', f'{APP_NAME} v{VERSION}')
+    audit_log("startup", f"{APP_NAME} v{VERSION}")
     MEMORY_DIR.mkdir(exist_ok=True)
 
     # ── Audit checkpoint cron (every 6 hours) ──
     from salmalm.features.audit_cron import start_audit_cron
+
     start_audit_cron(interval_hours=6)
 
     # ── Phase 2: SLA Monitoring ──
     try:
         from .sla import uptime_monitor, watchdog
+
         uptime_monitor.on_startup()
         watchdog.start()
         log.info("[SLA] Uptime monitor + watchdog initialized")
@@ -72,54 +90,83 @@ async def run_server():
     # ── Phase 3: Extensions (hooks → plugins → agents) ──
     try:
         from .hooks import hook_manager
-        hook_manager.fire('on_startup', {'message': f'{APP_NAME} v{VERSION} starting'})
+
+        hook_manager.fire("on_startup", {"message": f"{APP_NAME} v{VERSION} starting"})
     except Exception:
         pass
-    try:
-        from .plugin_manager import plugin_manager
-        plugin_manager.scan_and_load()
-    except Exception as e:
-        log.warning(f"Plugin scan error: {e}")
+    # Plugins: OFF by default (arbitrary code execution risk)
+    # Enable with SALMALM_PLUGINS=1
+    if os.environ.get("SALMALM_PLUGINS", "0") == "1":
+        try:
+            from .plugin_manager import plugin_manager
+
+            plugin_manager.scan_and_load()
+            log.warning("[PLUGINS] ⚠️ Plugins enabled — arbitrary code execution is possible")
+        except Exception as e:
+            log.warning(f"Plugin scan error: {e}")
+    else:
+        log.info("[PLUGINS] Disabled (set SALMALM_PLUGINS=1 to enable)")
     try:
         from .agents import agent_manager
+
         agent_manager.scan()
     except Exception as e:
         log.warning(f"Agent scan error: {e}")
 
     # ── Phase 4: HTTP Server ──
-    port = int(os.environ.get('SALMALM_PORT', 18800))
+    port = int(os.environ.get("SALMALM_PORT", 18800))
     # Always default to 127.0.0.1 (loopback only).
     # WSL users: set SALMALM_BIND=0.0.0.0 to allow Windows browser access.
-    bind_addr = os.environ.get('SALMALM_BIND', '127.0.0.1')
-    if bind_addr == '0.0.0.0':
-        log.warning("[WARN] Binding to 0.0.0.0 — server is accessible from LAN. "
-                    "Set SALMALM_BIND=127.0.0.1 to restrict to localhost.")
+    bind_addr = os.environ.get("SALMALM_BIND", "127.0.0.1")
+    if bind_addr == "0.0.0.0":
+        log.warning(
+            "[WARN] Binding to 0.0.0.0 — server is accessible from LAN. "
+            "Set SALMALM_BIND=127.0.0.1 to restrict to localhost."
+        )
         # External exposure safety checks
         from salmalm.web.middleware import check_external_exposure_safety
+
         exposure_warnings = check_external_exposure_safety(bind_addr, WebHandler)
         for w in exposure_warnings:
             log.warning(w)
     server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
 
     # Auto-generate self-signed cert for HTTPS (enables microphone, camera, etc.)
-    https_port = int(os.environ.get('SALMALM_HTTPS_PORT', 0))
-    if https_port or os.environ.get('SALMALM_HTTPS', '').lower() in ('1', 'true', 'yes'):
+    https_port = int(os.environ.get("SALMALM_HTTPS_PORT", 0))
+    if https_port or os.environ.get("SALMALM_HTTPS", "").lower() in ("1", "true", "yes"):
         https_port = https_port or 18443
         try:
             import ssl
-            cert_dir = DATA_DIR / '.certs'
+
+            cert_dir = DATA_DIR / ".certs"
             cert_dir.mkdir(exist_ok=True)
-            cert_file = cert_dir / 'salmalm.pem'
-            key_file = cert_dir / 'salmalm-key.pem'
+            cert_file = cert_dir / "salmalm.pem"
+            key_file = cert_dir / "salmalm-key.pem"
             if not cert_file.exists():
                 # Generate self-signed cert using stdlib
                 import subprocess
-                subprocess.run([
-                    'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
-                    '-keyout', str(key_file), '-out', str(cert_file),
-                    '-days', '3650', '-nodes', '-batch',
-                    '-subj', '/CN=localhost'
-                ], capture_output=True, timeout=30)
+
+                subprocess.run(
+                    [
+                        "openssl",
+                        "req",
+                        "-x509",
+                        "-newkey",
+                        "rsa:2048",
+                        "-keyout",
+                        str(key_file),
+                        "-out",
+                        str(cert_file),
+                        "-days",
+                        "3650",
+                        "-nodes",
+                        "-batch",
+                        "-subj",
+                        "/CN=localhost",
+                    ],
+                    capture_output=True,
+                    timeout=30,
+                )
                 log.info("[HTTPS] Self-signed certificate generated")
             if cert_file.exists() and key_file.exists():
                 ssl_server = http.server.ThreadingHTTPServer((bind_addr, https_port), WebHandler)
@@ -140,8 +187,9 @@ async def run_server():
     print(f"\n  😈 SalmAlm v{VERSION} running at {url}\n  Press Ctrl+C to stop.\n", flush=True)
 
     # Auto-open browser if requested (--open flag or SALMALM_OPEN_BROWSER=1)
-    if os.environ.get('SALMALM_OPEN_BROWSER', '') == '1':
+    if os.environ.get("SALMALM_OPEN_BROWSER", "") == "1":
         import webbrowser
+
         webbrowser.open(url)
 
     # ── Phase 5: Vault Auto-unlock ──
@@ -159,11 +207,12 @@ async def run_server():
         # 2. Try .vault_auto file (WSL/no-keychain fallback)
         if not vault.is_unlocked:
             try:
-                _pw_hint_file = VAULT_FILE.parent / '.vault_auto'
+                _pw_hint_file = VAULT_FILE.parent / ".vault_auto"
                 if _pw_hint_file.exists():
-                    _hint = _pw_hint_file.read_text(encoding='utf-8').strip()
+                    _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
                     if _hint:
                         import base64 as _b64
+
                         _auto_pw = _b64.b64decode(_hint).decode()
                     else:
                         _auto_pw = ""
@@ -172,7 +221,7 @@ async def run_server():
             except Exception as _e:
                 log.warning(f"[UNLOCK] .vault_auto read failed: {_e}")
         # 3. Try env var (deprecated)
-        vault_pw = os.environ.get('SALMALM_VAULT_PW')
+        vault_pw = os.environ.get("SALMALM_VAULT_PW")
         if not vault.is_unlocked and vault_pw:
             if vault.unlock(vault_pw, save_to_keychain=True):
                 log.info("[UNLOCK] Vault auto-unlocked from env")
@@ -184,7 +233,7 @@ async def run_server():
     _core.set_telegram_bot(telegram_bot)
 
     # ── Phase 6: WebSocket Server ──
-    ws_port = int(os.environ.get('SALMALM_WS_PORT', 18801))
+    ws_port = int(os.environ.get("SALMALM_WS_PORT", 18801))
     try:
         ws_server.port = ws_port
         await ws_server.start()
@@ -193,50 +242,61 @@ async def run_server():
 
     @ws_server.on_message
     async def handle_ws_message(client, data):
-        msg_type = data.get('type', 'message')
-        if msg_type == 'ping':
-            await client.send_json({'type': 'pong'})
+        msg_type = data.get("type", "message")
+        if msg_type == "ping":
+            await client.send_json({"type": "pong"})
             return
-        if msg_type == 'message':
-            text = data.get('text', '').strip()
-            session_id = data.get('session') or client.session_id or 'web'
-            image_b64 = data.get('image')
-            image_mime = data.get('image_mime', 'image/png')
+        if msg_type == "message":
+            text = data.get("text", "").strip()
+            session_id = data.get("session") or client.session_id or "web"
+            image_b64 = data.get("image")
+            image_mime = data.get("image_mime", "image/png")
             if not text and not image_b64:
-                await client.send_json({'type': 'error', 'error': 'Empty message'})
+                await client.send_json({"type": "error", "error": "Empty message"})
                 return
             stream = StreamingResponse(client)
             # Send typing indicator immediately
-            await client.send_json({'type': 'typing', 'status': 'typing'})
+            await client.send_json({"type": "typing", "status": "typing"})
 
             async def on_tool(name, args):
                 await stream.send_tool_call(name, args)
 
             async def on_status(status_type, detail):
                 """Forward engine status to WS client as typing events."""
-                await client.send_json({'type': 'typing', 'status': status_type, 'detail': detail})
+                await client.send_json({"type": "typing", "status": status_type, "detail": detail})
+
             try:
                 from salmalm.core.engine import process_message
+
                 image_data = (image_b64, image_mime) if image_b64 else None
                 # Pass session-level model override
                 from salmalm.core import get_session as _gs_ws
+
                 _sess_ws = _gs_ws(session_id)
-                _model_ov_ws = getattr(_sess_ws, 'model_override', None)
-                if _model_ov_ws == 'auto':
+                _model_ov_ws = getattr(_sess_ws, "model_override", None)
+                if _model_ov_ws == "auto":
                     _model_ov_ws = None
-                response = await process_message(session_id, text or '', image_data=image_data,
-                                                 model_override=_model_ov_ws,
-                                                 on_tool=on_tool, on_status=on_status)
+                response = await process_message(
+                    session_id,
+                    text or "",
+                    image_data=image_data,
+                    model_override=_model_ov_ws,
+                    on_tool=on_tool,
+                    on_status=on_status,
+                )
                 await stream.send_done(response)
             except Exception as e:
                 await stream.send_error(str(e)[:200])
 
     @ws_server.on_connect
     async def handle_ws_connect(client):
-        await client.send_json({
-            'type': 'welcome', 'version': VERSION,
-            'session': client.session_id,
-        })
+        await client.send_json(
+            {
+                "type": "welcome",
+                "version": VERSION,
+                "session": client.session_id,
+            }
+        )
 
     # ── Phase 7: RAG Engine ──
     try:
@@ -251,6 +311,7 @@ async def run_server():
 
         async def mcp_tool_executor(name, args):
             return execute_tool(name, args)
+
         mcp_manager.server.set_tools(TOOL_DEFINITIONS, mcp_tool_executor)
     except Exception as e:
         log.warning(f"MCP init error: {e}")
@@ -262,7 +323,8 @@ async def run_server():
 
     # Schedule audit log cleanup (once daily)
     from salmalm.core import audit_log_cleanup
-    cron.add_job('audit_cleanup', 86400, audit_log_cleanup, days=30)
+
+    cron.add_job("audit_cleanup", 86400, audit_log_cleanup, days=30)
 
     # ── Phase 10: Self-test, Nodes, Plugins, Cron start ──
     selftest = health_monitor.startup_selftest()
@@ -274,18 +336,21 @@ async def run_server():
     if not vault.is_unlocked:
         log.warning("[TELEGRAM] Skipped — vault is locked. Unlock vault to enable Telegram.")
     if vault.is_unlocked:
-        tg_token = vault.get('telegram_token')
-        tg_owner = vault.get('telegram_owner_id')
-        log.info(f"[TELEGRAM] token={'YES' if tg_token else 'NO'}, owner={'YES' if tg_owner else 'NO'}, vault_unlocked={vault.is_unlocked}")
+        tg_token = vault.get("telegram_token")
+        tg_owner = vault.get("telegram_owner_id")
+        log.info(
+            f"[TELEGRAM] token={'YES' if tg_token else 'NO'}, owner={'YES' if tg_owner else 'NO'}, vault_unlocked={vault.is_unlocked}"
+        )
         if tg_token and tg_owner:
             telegram_bot.configure(tg_token, tg_owner)
             log.info("[TELEGRAM] Bot configured, starting polling...")
             import os as _os2
-            _wh_url = _os2.environ.get('SALMALM_TELEGRAM_WEBHOOK_URL') or vault.get('telegram_webhook_url') or ''
+
+            _wh_url = _os2.environ.get("SALMALM_TELEGRAM_WEBHOOK_URL") or vault.get("telegram_webhook_url") or ""
             if _wh_url:
-                telegram_bot.set_webhook(_wh_url.rstrip('/') + '/webhook/telegram'
-                                         if not _wh_url.endswith('/webhook/telegram')
-                                         else _wh_url)
+                telegram_bot.set_webhook(
+                    _wh_url.rstrip("/") + "/webhook/telegram" if not _wh_url.endswith("/webhook/telegram") else _wh_url
+                )
             else:
                 asyncio.create_task(telegram_bot.poll())
 
@@ -293,21 +358,24 @@ async def run_server():
     if not vault.is_unlocked:
         log.warning("[DISCORD] Skipped — vault is locked. Unlock vault to enable Discord.")
     if vault.is_unlocked:
-        dc_token = vault.get('discord_token')
-        dc_guild = vault.get('discord_guild_id')
+        dc_token = vault.get("discord_token")
+        dc_guild = vault.get("discord_guild_id")
         log.info(f"[DISCORD] token={'YES' if dc_token else 'NO'}, guild={'YES' if dc_guild else 'NO'}")
         if dc_token:
             try:
                 from salmalm.channels.discord_bot import discord_bot
+
                 discord_bot.configure(dc_token, dc_guild)
 
                 # Register message handler → core engine
                 async def _discord_message_handler(content, raw_data):
                     import time as _t
-                    _channel_id = raw_data.get('channel_id', '')
-                    _session_id = f'discord_{_channel_id}'
+
+                    _channel_id = raw_data.get("channel_id", "")
+                    _session_id = f"discord_{_channel_id}"
                     _start = _t.time()
                     from salmalm.core.engine import process_message
+
                     response = await process_message(_session_id, content)
                     _elapsed = _t.time() - _start
                     return f"{response}\n\n⏱️ {_elapsed:.1f}s" if response else None
@@ -337,7 +405,8 @@ async def run_server():
     # Auto-open browser on first start
     try:
         import webbrowser
-        webbrowser.open(f'http://127.0.0.1:{port}')
+
+        webbrowser.open(f"http://127.0.0.1:{port}")
     except Exception:
         pass
 
@@ -367,6 +436,7 @@ async def run_server():
     # === Shutdown Sequence ===
     log.info("[SHUTDOWN] Phase 1: Stop accepting new requests")
     from salmalm.core.engine import begin_shutdown, wait_for_active_requests
+
     begin_shutdown()
 
     log.info("[SHUTDOWN] Phase 2: Wait for active LLM requests (max 30s)")
@@ -380,6 +450,7 @@ async def run_server():
 
     log.info("[SHUTDOWN] Phase 5: Close DB connections")
     from salmalm.core import close_all_db_connections
+
     close_all_db_connections()
 
     log.info("[SHUTDOWN] Phase 6: Stop HTTP server")
@@ -388,13 +459,15 @@ async def run_server():
     # Fire on_shutdown hook
     try:
         from .hooks import hook_manager
-        hook_manager.fire('on_shutdown', {'message': 'Server shutting down'})
+
+        hook_manager.fire("on_shutdown", {"message": "Server shutting down"})
     except Exception:
         pass
 
     # SLA: Graceful shutdown
     try:
         from .sla import uptime_monitor, watchdog
+
         watchdog.stop()
         uptime_monitor.on_shutdown()
         log.info("[SHUTDOWN] SLA cleanup complete")
@@ -403,11 +476,12 @@ async def run_server():
 
     try:
         from salmalm.features.audit_cron import stop_audit_cron
+
         stop_audit_cron()
     except Exception:
         pass
     try:
-        audit_log('shutdown', f'{APP_NAME} v{VERSION} graceful shutdown')
+        audit_log("shutdown", f"{APP_NAME} v{VERSION} graceful shutdown")
     except Exception:
         pass  # DB may already be closed
     log.info("[SHUTDOWN] Complete. Goodbye! 😈")

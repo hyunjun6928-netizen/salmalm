@@ -56,11 +56,11 @@ class MessageDeduplicator:
 # ── Channel-aware debounce times (ms) ──
 
 CHANNEL_DEBOUNCE_MS: Dict[str, int] = {
-    'telegram': 2000,
-    'discord': 1500,
-    'slack': 1500,
-    'whatsapp': 5000,
-    'web': 1000,
+    "telegram": 2000,
+    "discord": 1500,
+    "slack": 1500,
+    "whatsapp": 5000,
+    "web": 1000,
 }
 
 DEFAULT_DEBOUNCE_MS = 1000
@@ -79,7 +79,7 @@ def should_skip_debounce(message: str, has_media: bool = False) -> bool:
     if has_media:
         return True
     stripped = message.strip()
-    if stripped.startswith('/'):
+    if stripped.startswith("/"):
         return True
     return False
 

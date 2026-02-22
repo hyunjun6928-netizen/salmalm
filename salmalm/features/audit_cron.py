@@ -20,6 +20,7 @@ def _run_checkpoint(interval_seconds: float) -> None:
     """Execute audit_checkpoint and reschedule."""
     try:
         from salmalm.core import audit_checkpoint
+
         audit_checkpoint()
         log.info("Audit checkpoint completed")
     except Exception as exc:

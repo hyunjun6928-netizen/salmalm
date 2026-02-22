@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """SalmAlm MCP (Model Context Protocol) — Server + Client.
 
 Implements MCP 2025-03-26 spec (simplified):
@@ -65,6 +66,7 @@ def _rpc_response(id: int, result: Optional[Any] = None, error: Optional[dict] =
 #  MCP SERVER — expose SalmAlm tools to external clients
 # ══════════════════════════════════════════════════════════════
 
+
 class MCPServer:
     """MCP Server that exposes SalmAlm tools via JSON-RPC 2.0."""
 
@@ -106,11 +108,14 @@ class MCPServer:
         # ── Lifecycle ──
         if method == "initialize":
             self._initialized = True
-            return _rpc_response(msg_id, {  # type: ignore[arg-type]
-                "protocolVersion": "2025-03-26",
-                "capabilities": self.CAPABILITIES,
-                "serverInfo": self.SERVER_INFO,
-            })
+            return _rpc_response(
+                msg_id,
+                {  # type: ignore[arg-type]
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": self.CAPABILITIES,
+                    "serverInfo": self.SERVER_INFO,
+                },
+            )
 
         if method == "notifications/initialized":
             return None  # No response for notifications
@@ -129,19 +134,30 @@ class MCPServer:
             name = params.get("name", "")
             args = params.get("arguments", {})
             if not self._tool_executor:
-                return _rpc_response(msg_id, error={  # type: ignore[arg-type]
-                    "code": -32603, "message": "No tool executor configured"})
+                return _rpc_response(
+                    msg_id,
+                    error={  # type: ignore[arg-type]
+                        "code": -32603,
+                        "message": "No tool executor configured",
+                    },
+                )
             try:
                 result = await self._tool_executor(name, args)
-                return _rpc_response(msg_id, {  # type: ignore[arg-type]
-                    "content": [{"type": "text", "text": str(result)}],
-                    "isError": False,
-                })
+                return _rpc_response(
+                    msg_id,
+                    {  # type: ignore[arg-type]
+                        "content": [{"type": "text", "text": str(result)}],
+                        "isError": False,
+                    },
+                )
             except Exception as e:
-                return _rpc_response(msg_id, {  # type: ignore[arg-type]
-                    "content": [{"type": "text", "text": f"Error: {e}"}],
-                    "isError": True,
-                })
+                return _rpc_response(
+                    msg_id,
+                    {  # type: ignore[arg-type]
+                        "content": [{"type": "text", "text": f"Error: {e}"}],
+                        "isError": True,
+                    },
+                )
 
         # ── Resources ──
         if method == "resources/list":
@@ -150,19 +166,23 @@ class MCPServer:
             mem_dir = BASE_DIR / "memory"
             if mem_dir.exists():
                 for f in sorted(mem_dir.glob("*.md"))[-10:]:
-                    resources.append({
-                        "uri": f"file://memory/{f.name}",
-                        "name": f.name,
-                        "mimeType": "text/markdown",
-                    })
+                    resources.append(
+                        {
+                            "uri": f"file://memory/{f.name}",
+                            "name": f.name,
+                            "mimeType": "text/markdown",
+                        }
+                    )
             # MEMORY.md
             mem_file = BASE_DIR / "MEMORY.md"
             if mem_file.exists():
-                resources.append({
-                    "uri": "file://MEMORY.md",
-                    "name": "MEMORY.md",
-                    "mimeType": "text/markdown",
-                })
+                resources.append(
+                    {
+                        "uri": "file://MEMORY.md",
+                        "name": "MEMORY.md",
+                        "mimeType": "text/markdown",
+                    }
+                )
             return _rpc_response(msg_id, {"resources": resources})  # type: ignore[arg-type]
 
         if method == "resources/read":
@@ -174,75 +194,108 @@ class MCPServer:
                 try:
                     full_path.relative_to(BASE_DIR.resolve())
                 except ValueError:
-                    return _rpc_response(msg_id, error={  # type: ignore[arg-type]
-                        "code": -32602, "message": "Path traversal denied"})
+                    return _rpc_response(
+                        msg_id,
+                        error={  # type: ignore[arg-type]
+                            "code": -32602,
+                            "message": "Path traversal denied",
+                        },
+                    )
                 if full_path.exists() and full_path.is_file():
                     try:
-                        content = full_path.read_text(encoding='utf-8', errors='replace')[:50000]
-                        return _rpc_response(msg_id, {  # type: ignore[arg-type]
-                            "contents": [{
-                                "uri": uri,
-                                "mimeType": "text/markdown",
-                                "text": content,
-                            }]
-                        })
+                        content = full_path.read_text(encoding="utf-8", errors="replace")[:50000]
+                        return _rpc_response(
+                            msg_id,
+                            {  # type: ignore[arg-type]
+                                "contents": [
+                                    {
+                                        "uri": uri,
+                                        "mimeType": "text/markdown",
+                                        "text": content,
+                                    }
+                                ]
+                            },
+                        )
                     except Exception as e:
-                        return _rpc_response(msg_id, error={  # type: ignore[arg-type]
-                            "code": -32603, "message": str(e)})
-            return _rpc_response(msg_id, error={  # type: ignore[arg-type]
-                "code": -32602, "message": f"Unknown resource: {uri}"})
+                        return _rpc_response(
+                            msg_id,
+                            error={  # type: ignore[arg-type]
+                                "code": -32603,
+                                "message": str(e),
+                            },
+                        )
+            return _rpc_response(
+                msg_id,
+                error={  # type: ignore[arg-type]
+                    "code": -32602,
+                    "message": f"Unknown resource: {uri}",
+                },
+            )
 
         # ── Prompts ──
         if method == "prompts/list":
-            return _rpc_response(msg_id, {"prompts": [  # type: ignore[arg-type]
+            return _rpc_response(
+                msg_id,
                 {
-                    "name": "analyze",
-                    "description": "Analysis request prompt",
-                    "arguments": [
-                        {"name": "topic", "description": "Topic to analyze", "required": True}
-                    ],
+                    "prompts": [  # type: ignore[arg-type]
+                        {
+                            "name": "analyze",
+                            "description": "Analysis request prompt",
+                            "arguments": [{"name": "topic", "description": "Topic to analyze", "required": True}],
+                        },
+                        {
+                            "name": "code_review",
+                            "description": "Code review prompt",
+                            "arguments": [
+                                {"name": "file_path", "description": "File path to review", "required": True}
+                            ],
+                        },
+                    ]
                 },
-                {
-                    "name": "code_review",
-                    "description": "Code review prompt",
-                    "arguments": [
-                        {"name": "file_path", "description": "File path to review", "required": True}
-                    ],
-                },
-            ]})
+            )
 
         if method == "prompts/get":
             name = params.get("name", "")
             args = params.get("arguments", {})
             if name == "analyze":
                 topic = args.get("topic", "unknown")
-                return _rpc_response(msg_id, {  # type: ignore[arg-type]
-                    "description": f"'{topic}' Analysis",
-                    "messages": [
-                        {"role": "user", "content": {
-                            "type": "text",
-                            "text": f"Deep analysis of topic: {topic}"
-                        }}
-                    ],
-                })
+                return _rpc_response(
+                    msg_id,
+                    {  # type: ignore[arg-type]
+                        "description": f"'{topic}' Analysis",
+                        "messages": [
+                            {"role": "user", "content": {"type": "text", "text": f"Deep analysis of topic: {topic}"}}
+                        ],
+                    },
+                )
             if name == "code_review":
                 fp = args.get("file_path", "")
-                return _rpc_response(msg_id, {  # type: ignore[arg-type]
-                    "description": f"'{fp}' Code review",
-                    "messages": [
-                        {"role": "user", "content": {
-                            "type": "text",
-                            "text": f"Review this file for security/performance/readability: {fp}"
-                        }}
-                    ],
-                })
-            return _rpc_response(msg_id, error={  # type: ignore[arg-type]
-                "code": -32602, "message": f"Unknown prompt: {name}"})
+                return _rpc_response(
+                    msg_id,
+                    {  # type: ignore[arg-type]
+                        "description": f"'{fp}' Code review",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": {
+                                    "type": "text",
+                                    "text": f"Review this file for security/performance/readability: {fp}",
+                                },
+                            }
+                        ],
+                    },
+                )
+            return _rpc_response(
+                msg_id,
+                error={  # type: ignore[arg-type]
+                    "code": -32602,
+                    "message": f"Unknown prompt: {name}",
+                },
+            )
 
         # ── Unknown method ──
         if msg_id is not None:
-            return _rpc_response(msg_id, error={
-                "code": -32601, "message": f"Method not found: {method}"})
+            return _rpc_response(msg_id, error={"code": -32601, "message": f"Method not found: {method}"})
         return None
 
     async def run_stdio(self):
@@ -254,9 +307,7 @@ class MCPServer:
         protocol = asyncio.StreamReaderProtocol(reader)
         await loop.connect_read_pipe(lambda: protocol, sys.stdin.buffer)
 
-        w_transport, w_protocol = await loop.connect_write_pipe(
-            asyncio.streams.FlowControlMixin, sys.stdout.buffer
-        )
+        w_transport, w_protocol = await loop.connect_write_pipe(asyncio.streams.FlowControlMixin, sys.stdout.buffer)
         writer = asyncio.StreamWriter(w_transport, w_protocol, reader, loop)
 
         try:
@@ -274,8 +325,8 @@ class MCPServer:
 
                 response = await self.handle_message(msg)
                 if response:
-                    out = json.dumps(response, ensure_ascii=False) + '\n'
-                    writer.write(out.encode('utf-8'))
+                    out = json.dumps(response, ensure_ascii=False) + "\n"
+                    writer.write(out.encode("utf-8"))
                     await writer.drain()
         except (EOFError, ConnectionError, BrokenPipeError):
             pass
@@ -286,11 +337,11 @@ class MCPServer:
 #  MCP CLIENT — connect to external MCP servers
 # ══════════════════════════════════════════════════════════════
 
+
 class MCPClientConnection:
     """A connection to a single external MCP server (stdio transport)."""
 
-    def __init__(self, name: str, command: List[str], env: Optional[Dict[str, str]] = None,
-                 cwd: Optional[str] = None):
+    def __init__(self, name: str, command: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None):
         self.name = name
         self.command = command
         self.env = env or {}
@@ -318,16 +369,18 @@ class MCPClientConnection:
             )
 
             # Start reader thread
-            self._reader_thread = threading.Thread(
-                target=self._read_loop, daemon=True)
+            self._reader_thread = threading.Thread(target=self._read_loop, daemon=True)
             self._reader_thread.start()
 
             # Initialize
-            resp = self._send_request("initialize", {
-                "protocolVersion": "2025-03-26",
-                "capabilities": {},
-                "clientInfo": {"name": "salmalm", "version": VERSION},
-            })
+            resp = self._send_request(
+                "initialize",
+                {
+                    "protocolVersion": "2025-03-26",
+                    "capabilities": {},
+                    "clientInfo": {"name": "salmalm", "version": VERSION},
+                },
+            )
             if not resp or "error" in resp:
                 log.error(f"MCP init failed ({self.name}): {resp}")
                 self.disconnect()
@@ -347,8 +400,9 @@ class MCPClientConnection:
                 self._resources = res_resp["result"].get("resources", [])
 
             self._connected = True
-            log.info(f"[CONN] MCP client connected: {self.name} "
-                     f"({len(self._tools)} tools, {len(self._resources)} resources)")
+            log.info(
+                f"[CONN] MCP client connected: {self.name} ({len(self._tools)} tools, {len(self._resources)} resources)"
+            )
             return True
 
         except Exception as e:
@@ -390,15 +444,14 @@ class MCPClientConnection:
             log.debug(f"Suppressed: {e}")
         self._connected = False
 
-    def _send_request(self, method: str, params: Optional[dict] = None,
-                      timeout: float = 30) -> Optional[dict]:
+    def _send_request(self, method: str, params: Optional[dict] = None, timeout: float = 30) -> Optional[dict]:
         """Send JSON-RPC request and wait for response."""
         if not self._process or self._process.poll() is not None:
             return None
         rid = _next_id()
         msg = _rpc_request(method, params, rid)
         try:
-            data = (json.dumps(msg, ensure_ascii=False) + '\n').encode('utf-8')
+            data = (json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8")
             self._process.stdin.write(data)  # type: ignore[union-attr]
             self._process.stdin.flush()  # type: ignore[union-attr]
         except Exception as e:
@@ -420,7 +473,7 @@ class MCPClientConnection:
             return
         msg = _rpc_request(method, params)
         try:
-            data = (json.dumps(msg, ensure_ascii=False) + '\n').encode('utf-8')
+            data = (json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8")
             self._process.stdin.write(data)  # type: ignore[union-attr]
             self._process.stdin.flush()  # type: ignore[union-attr]
         except Exception as e:
@@ -431,20 +484,23 @@ class MCPClientConnection:
         """List all available tools from connected MCP servers."""
         return self._tools
 
-    def call_tool(self, name: str, arguments: Optional[dict] = None,
-                  timeout: float = 60) -> Optional[str]:
+    def call_tool(self, name: str, arguments: Optional[dict] = None, timeout: float = 60) -> Optional[str]:
         """Call a tool on the remote MCP server."""
         if not self._connected:
             return None
-        resp = self._send_request("tools/call", {
-            "name": name,
-            "arguments": arguments or {},
-        }, timeout=timeout)
+        resp = self._send_request(
+            "tools/call",
+            {
+                "name": name,
+                "arguments": arguments or {},
+            },
+            timeout=timeout,
+        )
         if resp and "result" in resp:
             result = resp["result"]
             contents = result.get("content", [])
             texts = [c.get("text", "") for c in contents if c.get("type") == "text"]
-            return '\n'.join(texts) if texts else str(result)
+            return "\n".join(texts) if texts else str(result)
         if resp and "error" in resp:
             return f"MCP Error: {resp['error'].get('message', 'unknown')}"
         return None
@@ -457,7 +513,7 @@ class MCPClientConnection:
         if resp and "result" in resp:
             contents = resp["result"].get("contents", [])
             texts = [c.get("text", "") for c in contents]
-            return '\n'.join(texts) if texts else None
+            return "\n".join(texts) if texts else None
         return None
 
 
@@ -474,9 +530,14 @@ class MCPManager:
         """Get connection info for a specific MCP server."""
         return self._server
 
-    def add_server(self, name: str, command: List[str],
-                   env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None,
-                   auto_connect: bool = True) -> bool:
+    def add_server(
+        self,
+        name: str,
+        command: List[str],
+        env: Optional[Dict[str, str]] = None,
+        cwd: Optional[str] = None,
+        auto_connect: bool = True,
+    ) -> bool:
         """Add and optionally connect to an external MCP server."""
         if name in self._clients:
             self._clients[name].disconnect()
@@ -496,12 +557,15 @@ class MCPManager:
 
     def list_servers(self) -> List[dict]:
         """List all configured MCP servers and their status."""
-        return [{
-            "name": name,
-            "connected": client._connected,
-            "tools": len(client.tools),
-            "command": client.command,
-        } for name, client in self._clients.items()]
+        return [
+            {
+                "name": name,
+                "connected": client._connected,
+                "tools": len(client.tools),
+                "command": client.command,
+            }
+            for name, client in self._clients.items()
+        ]
 
     def get_all_tools(self) -> List[dict]:
         """Get all tools from all connected MCP servers (for LLM tool lists)."""
@@ -511,13 +575,15 @@ class MCPManager:
                 continue
             for tool in client.tools:
                 # Prefix tool names with server name to avoid collisions
-                tools.append({
-                    "name": f"mcp_{name}_{tool['name']}",
-                    "description": f"[MCP:{name}] {tool.get('description', '')}",
-                    "input_schema": tool.get("inputSchema", {"type": "object", "properties": {}}),
-                    "_mcp_server": name,
-                    "_mcp_tool": tool["name"],
-                })
+                tools.append(
+                    {
+                        "name": f"mcp_{name}_{tool['name']}",
+                        "description": f"[MCP:{name}] {tool.get('description', '')}",
+                        "input_schema": tool.get("inputSchema", {"type": "object", "properties": {}}),
+                        "_mcp_server": name,
+                        "_mcp_tool": tool["name"],
+                    }
+                )
         return tools
 
     def call_tool(self, prefixed_name: str, arguments: Optional[dict] = None) -> Optional[str]:
@@ -529,7 +595,7 @@ class MCPManager:
         for name, client in self._clients.items():
             prefix = f"{name}_"
             if rest.startswith(prefix):
-                tool_name = rest[len(prefix):]
+                tool_name = rest[len(prefix) :]
                 return client.call_tool(tool_name, arguments)
         return f"Unknown MCP tool: {prefixed_name}"
 
@@ -542,10 +608,7 @@ class MCPManager:
                 "env": client.env,
                 "cwd": client.cwd,
             }
-        self._config_path.write_text(
-            json.dumps(config, indent=2, ensure_ascii=False),
-            encoding='utf-8'
-        )
+        self._config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
         log.info(f"[CONN] MCP config saved ({len(config)} servers)")
 
     def load_config(self):
@@ -553,14 +616,10 @@ class MCPManager:
         if not self._config_path.exists():
             return
         try:
-            config = json.loads(self._config_path.read_text(encoding='utf-8'))
+            config = json.loads(self._config_path.read_text(encoding="utf-8"))
             for name, cfg in config.items():
                 self.add_server(
-                    name,
-                    command=cfg.get("command", []),
-                    env=cfg.get("env"),
-                    cwd=cfg.get("cwd"),
-                    auto_connect=True
+                    name, command=cfg.get("command", []), env=cfg.get("env"), cwd=cfg.get("cwd"), auto_connect=True
                 )
         except Exception as e:
             log.error(f"MCP config load error: {e}")
@@ -579,16 +638,18 @@ mcp_manager = MCPManager()
 
 # ── CLI entry point for stdio server mode ──────────────────────
 
+
 async def _run_server_stdio():
     """Entry point for `python -m salmalm.mcp --server --stdio`."""
     import logging
+
     # Redirect all logging to stderr so stdout is clean JSON-RPC
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
-    logging.basicConfig(stream=sys.stderr, level=logging.INFO,
-                        format='%(asctime)s [%(levelname)s] %(message)s')
+    logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
     from salmalm.tools import TOOL_DEFINITIONS, execute_tool
+
     server = MCPServer()
 
     async def executor(name, args):
@@ -603,8 +664,8 @@ if __name__ == "__main__":
     if "--server" in sys.argv:
         # Ensure ALL logging goes to stderr before any imports trigger log output
         import logging
+
         for h in logging.root.handlers[:]:
             logging.root.removeHandler(h)
-        logging.basicConfig(stream=sys.stderr, level=logging.INFO,
-                            format='%(asctime)s [%(levelname)s] %(message)s')
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
         asyncio.run(_run_server_stdio())

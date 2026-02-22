@@ -2,6 +2,7 @@
 
 Attempts PIL first; falls back to sending original if unavailable.
 """
+
 from __future__ import annotations
 
 import base64
@@ -37,21 +38,21 @@ def resize_image_b64(b64_data: str, mime: str, max_dim: int = MAX_DIMENSION) -> 
 
         # Re-encode
         buf = io.BytesIO()
-        out_format = 'JPEG'
-        out_mime = 'image/jpeg'
-        if mime == 'image/png':
-            out_format = 'PNG'
-            out_mime = 'image/png'
-        elif mime == 'image/webp':
-            out_format = 'WEBP'
-            out_mime = 'image/webp'
+        out_format = "JPEG"
+        out_mime = "image/jpeg"
+        if mime == "image/png":
+            out_format = "PNG"
+            out_mime = "image/png"
+        elif mime == "image/webp":
+            out_format = "WEBP"
+            out_mime = "image/webp"
 
         # Convert RGBA to RGB for JPEG
-        if out_format == 'JPEG' and img.mode in ('RGBA', 'LA', 'P'):
-            img = img.convert('RGB')
+        if out_format == "JPEG" and img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGB")
 
         img.save(buf, format=out_format, quality=85)
-        resized_b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+        resized_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
         return resized_b64, out_mime
     except Exception:
         # Any error → return original

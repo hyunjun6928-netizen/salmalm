@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """SalmAlm Node Control — lightweight remote agent management.
 
 Manages remote machines via SSH (subprocess) or HTTP agent protocol.
@@ -43,8 +44,7 @@ NODES_CONFIG = BASE_DIR / "nodes.json"
 class SSHNode:
     """Remote node accessible via SSH."""
 
-    def __init__(self, name: str, host: str, user: str = "root",
-                 port: int = 22, key: Optional[str] = None):
+    def __init__(self, name: str, host: str, user: str = "root", port: int = 22, key: Optional[str] = None):
         self.name = name
         self.host = host
         self.user = user
@@ -56,9 +56,7 @@ class SSHNode:
     def _ssh_cmd(self, command: str, timeout: int = 30) -> tuple:
         """Execute SSH command, return (stdout, stderr, returncode)."""
         # StrictHostKeyChecking=accept-new: trust on first use, reject changes (TOFU)
-        args = ["ssh", "-o", "StrictHostKeyChecking=accept-new",
-                "-o", "ConnectTimeout=10",
-                "-p", str(self.port)]
+        args = ["ssh", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10", "-p", str(self.port)]
         if self.key:
             key_path = os.path.expanduser(self.key)
             args.extend(["-i", key_path])
@@ -66,9 +64,7 @@ class SSHNode:
         args.append(command)
 
         try:
-            result = subprocess.run(
-                args, capture_output=True, text=True, timeout=timeout
-            )
+            result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
             return result.stdout, result.stderr, result.returncode
         except subprocess.TimeoutExpired:
             return "", "Timeout", -1
@@ -97,14 +93,13 @@ class SSHNode:
         stdout, stderr, code = self._ssh_cmd(cmd, timeout=15)
 
         if code != 0:
-            return {"node": self.name, "status": "unreachable",
-                    "error": stderr[:200]}
+            return {"node": self.name, "status": "unreachable", "error": stderr[:200]}
 
         self._last_status = {  # type: ignore[assignment]
             "node": self.name,
             "status": "online",
             "raw": stdout[:3000],
-            "checked_at": time.strftime('%Y-%m-%d %H:%M:%S'),
+            "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
         self._last_check = now  # type: ignore[assignment]
 
@@ -121,8 +116,10 @@ class SSHNode:
                     parts = line.split()
                     if len(parts) >= 5:
                         self._last_status["disk"] = {  # type: ignore[index]
-                            "total": parts[1], "used": parts[2],
-                            "avail": parts[3], "pct": parts[4],
+                            "total": parts[1],
+                            "used": parts[2],
+                            "avail": parts[3],
+                            "pct": parts[4],
                         }
                 if "load average" in line:
                     load = line.split("load average:")[-1].strip()
@@ -134,31 +131,27 @@ class SSHNode:
 
     def upload(self, local_path: str, remote_path: str) -> dict:
         """Upload file via SCP."""
-        args = ["scp", "-o", "StrictHostKeyChecking=accept-new",
-                "-P", str(self.port)]
+        args = ["scp", "-o", "StrictHostKeyChecking=accept-new", "-P", str(self.port)]
         if self.key:
             args.extend(["-i", os.path.expanduser(self.key)])
         args.extend([local_path, f"{self.user}@{self.host}:{remote_path}"])
 
         try:
             result = subprocess.run(args, capture_output=True, text=True, timeout=120)
-            return {"success": result.returncode == 0,
-                    "error": result.stderr[:200] if result.returncode != 0 else ""}
+            return {"success": result.returncode == 0, "error": result.stderr[:200] if result.returncode != 0 else ""}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
     def download(self, remote_path: str, local_path: str) -> dict:
         """Download file via SCP."""
-        args = ["scp", "-o", "StrictHostKeyChecking=accept-new",
-                "-P", str(self.port)]
+        args = ["scp", "-o", "StrictHostKeyChecking=accept-new", "-P", str(self.port)]
         if self.key:
             args.extend(["-i", os.path.expanduser(self.key)])
         args.extend([f"{self.user}@{self.host}:{remote_path}", local_path])
 
         try:
             result = subprocess.run(args, capture_output=True, text=True, timeout=120)
-            return {"success": result.returncode == 0,
-                    "error": result.stderr[:200] if result.returncode != 0 else ""}
+            return {"success": result.returncode == 0, "error": result.stderr[:200] if result.returncode != 0 else ""}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -173,11 +166,10 @@ class HTTPNode:
 
     def __init__(self, name: str, url: str, token: str = ""):
         self.name = name
-        self.url = url.rstrip('/')
+        self.url = url.rstrip("/")
         self.token = token
 
-    def _request(self, path: str, method: str = "GET",
-                 data: Optional[dict] = None, timeout: int = 30) -> dict:
+    def _request(self, path: str, method: str = "GET", data: Optional[dict] = None, timeout: int = 30) -> dict:
         """Make HTTP request to node agent."""
         full_url = f"{self.url}{path}"
         headers = {"Content-Type": "application/json"}
@@ -195,9 +187,7 @@ class HTTPNode:
 
     def run(self, command: str, timeout: int = 30) -> dict:
         """Execute a command on a remote node."""
-        result = self._request("/exec", "POST",
-                               {"command": command, "timeout": timeout},
-                               timeout=timeout + 5)
+        result = self._request("/exec", "POST", {"command": command, "timeout": timeout}, timeout=timeout + 5)
         result["node"] = self.name
         return result
 
@@ -210,16 +200,22 @@ class HTTPNode:
     def upload(self, local_path: str, remote_path: str) -> dict:
         """Upload via HTTP (base64 in JSON — for small files)."""
         try:
-            with open(local_path, 'rb') as f:
+            with open(local_path, "rb") as f:
                 data = f.read()
             if len(data) > 50 * 1024 * 1024:
                 return {"success": False, "error": "File too large (>50MB)"}
             import base64
-            result = self._request("/upload", "POST", {
-                "path": remote_path,
-                "data": base64.b64encode(data).decode(),
-                "size": len(data),
-            }, timeout=60)
+
+            result = self._request(
+                "/upload",
+                "POST",
+                {
+                    "path": remote_path,
+                    "data": base64.b64encode(data).decode(),
+                    "size": len(data),
+                },
+                timeout=60,
+            )
             return result
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -241,19 +237,21 @@ class NodeManager:
         if not NODES_CONFIG.exists():
             return
         try:
-            config = json.loads(NODES_CONFIG.read_text(encoding='utf-8'))
+            config = json.loads(NODES_CONFIG.read_text(encoding="utf-8"))
             for name, cfg in config.items():
                 node_type = cfg.get("type", "ssh")
                 if node_type == "ssh":
                     self._nodes[name] = SSHNode(
-                        name, cfg["host"],
+                        name,
+                        cfg["host"],
                         user=cfg.get("user", "root"),
                         port=cfg.get("port", 22),
                         key=cfg.get("key"),
                     )
                 elif node_type == "http":
                     self._nodes[name] = HTTPNode(
-                        name, cfg["url"],
+                        name,
+                        cfg["url"],
                         token=cfg.get("token", ""),
                     )
             if self._nodes:
@@ -267,21 +265,21 @@ class NodeManager:
         for name, node in self._nodes.items():
             if isinstance(node, SSHNode):
                 config[name] = {
-                    "type": "ssh", "host": node.host,
-                    "user": node.user, "port": node.port,
+                    "type": "ssh",
+                    "host": node.host,
+                    "user": node.user,
+                    "port": node.port,
                     "key": node.key,
                 }
             elif isinstance(node, HTTPNode):
                 config[name] = {
-                    "type": "http", "url": node.url,
+                    "type": "http",
+                    "url": node.url,
                     "token": node.token,
                 }
-        NODES_CONFIG.write_text(
-            json.dumps(config, indent=2, ensure_ascii=False),
-            encoding='utf-8')
+        NODES_CONFIG.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    def add_ssh_node(self, name: str, host: str, user: str = "root",
-                     port: int = 22, key: Optional[str] = None) -> bool:
+    def add_ssh_node(self, name: str, host: str, user: str = "root", port: int = 22, key: Optional[str] = None) -> bool:
         """Add an SSH node."""
         node = SSHNode(name, host, user, port, key)
         self._nodes[name] = node
@@ -341,15 +339,15 @@ class NodeManager:
                 results.append({"node": name, "status": "error", "error": str(e)})
         return results
 
-    def wake_on_lan(self, mac_address: str, broadcast: str = "255.255.255.255",
-                    port: int = 9) -> dict:
+    def wake_on_lan(self, mac_address: str, broadcast: str = "255.255.255.255", port: int = 9) -> dict:
         """Send Wake-on-LAN magic packet."""
         import socket
+
         try:
             mac = mac_address.replace(":", "").replace("-", "")
             if len(mac) != 12:
                 return {"error": "Invalid MAC address"}
-            magic = b'\xff' * 6 + bytes.fromhex(mac) * 16
+            magic = b"\xff" * 6 + bytes.fromhex(mac) * 16
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             sock.sendto(magic, (broadcast, port))
@@ -366,156 +364,171 @@ class NodeManager:
 # Node runs in --node mode: lightweight SalmAlm that only executes tools.
 # Gateway keeps a registry and routes tool calls based on node capabilities.
 
+
 class GatewayRegistry:
     """Gateway side: manages registered nodes that can execute tools remotely."""
 
     def __init__(self):
         self._nodes: Dict[str, dict] = {}  # node_id → {url, token, capabilities, last_heartbeat, status}
-        self._gateway_token: str = ''  # Set via config to require auth for registration
+        self._gateway_token: str = ""  # Set via config to require auth for registration
 
     def set_gateway_token(self, token: str):
         """Set the gateway authentication token. Nodes must provide this to register."""
         self._gateway_token = token
 
-    def register(self, node_id: str, url: str, token: str = '',
-                 capabilities: Optional[list] = None, name: str = '',
-                 auth_token: str = '') -> dict:
+    def register(
+        self,
+        node_id: str,
+        url: str,
+        token: str = "",
+        capabilities: Optional[list] = None,
+        name: str = "",
+        auth_token: str = "",
+    ) -> dict:
         """Register a node with the gateway. Requires auth_token if gateway_token is set."""
         # Verify registration auth
         if self._gateway_token:
             import hmac as _hmac
+
             if not auth_token or not _hmac.compare_digest(auth_token, self._gateway_token):
                 log.warning(f"[NET] Node registration rejected (bad auth): {node_id} ({url})")
-                return {'error': 'Authentication required for node registration'}
+                return {"error": "Authentication required for node registration"}
         self._nodes[node_id] = {
-            'id': node_id,
-            'name': name or node_id,
-            'url': url.rstrip('/'),
-            'token': token,
-            'capabilities': capabilities or ['exec', 'read_file', 'write_file', 'edit_file', 'web_search', 'web_fetch'],
-            'last_heartbeat': time.time(),
-            'status': 'online',
-            'tool_calls': 0,
-            'errors': 0,
+            "id": node_id,
+            "name": name or node_id,
+            "url": url.rstrip("/"),
+            "token": token,
+            "capabilities": capabilities or ["exec", "read_file", "write_file", "edit_file", "web_search", "web_fetch"],
+            "last_heartbeat": time.time(),
+            "status": "online",
+            "tool_calls": 0,
+            "errors": 0,
         }
         log.info(f"[NET] Node registered: {node_id} ({url})")
-        return {'ok': True, 'node_id': node_id}
+        return {"ok": True, "node_id": node_id}
 
     def heartbeat(self, node_id: str) -> dict:
         """Update node heartbeat timestamp."""
         node = self._nodes.get(node_id)
         if not node:
-            return {'error': 'Node not registered'}
-        node['last_heartbeat'] = time.time()
-        node['status'] = 'online'
-        return {'ok': True}
+            return {"error": "Node not registered"}
+        node["last_heartbeat"] = time.time()
+        node["status"] = "online"
+        return {"ok": True}
 
     def unregister(self, node_id: str) -> dict:
         """Remove a node."""
         if node_id in self._nodes:
             del self._nodes[node_id]
             log.info(f"[NET] Node unregistered: {node_id}")
-            return {'ok': True}
-        return {'error': 'Node not found'}
+            return {"ok": True}
+        return {"error": "Node not found"}
 
     def list_nodes(self) -> list:
         """List all registered nodes with status."""
         now = time.time()
         result = []
         for nid, node in self._nodes.items():
-            age = now - node['last_heartbeat']
+            age = now - node["last_heartbeat"]
             if age > 120:
-                node['status'] = 'offline'
+                node["status"] = "offline"
             elif age > 60:
-                node['status'] = 'stale'
-            result.append({
-                'id': nid,
-                'name': node['name'],
-                'url': node['url'],
-                'status': node['status'],
-                'capabilities': node['capabilities'],
-                'tool_calls': node['tool_calls'],
-                'errors': node['errors'],
-                'last_seen': int(age),
-            })
+                node["status"] = "stale"
+            result.append(
+                {
+                    "id": nid,
+                    "name": node["name"],
+                    "url": node["url"],
+                    "status": node["status"],
+                    "capabilities": node["capabilities"],
+                    "tool_calls": node["tool_calls"],
+                    "errors": node["errors"],
+                    "last_seen": int(age),
+                }
+            )
         return result
 
     def find_node(self, tool_name: str) -> Optional[dict]:
         """Find an online node that supports the given tool."""
         now = time.time()
         for nid, node in self._nodes.items():
-            if (node['status'] == 'online'
-                    and (now - node['last_heartbeat']) < 120
-                    and tool_name in node['capabilities']):
+            if (
+                node["status"] == "online"
+                and (now - node["last_heartbeat"]) < 120
+                and tool_name in node["capabilities"]
+            ):
                 return node
         return None
 
-    def dispatch(self, node_id: str, tool_name: str, tool_args: dict,
-                 timeout: int = 60) -> dict:
+    def dispatch(self, node_id: str, tool_name: str, tool_args: dict, timeout: int = 60) -> dict:
         """Dispatch a tool call to a specific node."""
         node = self._nodes.get(node_id)
         if not node:
-            return {'error': f'Node {node_id} not found'}
+            return {"error": f"Node {node_id} not found"}
 
         url = f"{node['url']}/api/node/execute"
-        headers = {'Content-Type': 'application/json'}
-        if node['token']:
-            headers['Authorization'] = f'Bearer {node["token"]}'
+        headers = {"Content-Type": "application/json"}
+        if node["token"]:
+            headers["Authorization"] = f"Bearer {node['token']}"
 
-        payload = json.dumps({
-            'tool': tool_name,
-            'args': tool_args,
-        }).encode()
+        payload = json.dumps(
+            {
+                "tool": tool_name,
+                "args": tool_args,
+            }
+        ).encode()
 
-        req = urllib.request.Request(url, data=payload, headers=headers, method='POST')
+        req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 result = json.loads(resp.read())
-                node['tool_calls'] += 1
+                node["tool_calls"] += 1
                 return result  # type: ignore[no-any-return]
         except Exception as e:
-            node['errors'] += 1
-            return {'error': f'Node dispatch failed: {str(e)[:200]}'}
+            node["errors"] += 1
+            return {"error": f"Node dispatch failed: {str(e)[:200]}"}
 
-    def dispatch_auto(self, tool_name: str, tool_args: dict,
-                      timeout: int = 60) -> Optional[dict]:
+    def dispatch_auto(self, tool_name: str, tool_args: dict, timeout: int = 60) -> Optional[dict]:
         """Auto-find a node for this tool and dispatch. Returns None if no node available."""
         node = self.find_node(tool_name)
         if not node:
             return None
-        return self.dispatch(node['id'], tool_name, tool_args, timeout)
+        return self.dispatch(node["id"], tool_name, tool_args, timeout)
 
 
 class NodeAgent:
     """Node side: lightweight agent that receives and executes tool calls from gateway."""
 
-    def __init__(self, gateway_url: str, node_id: str, token: str = '',
-                 capabilities: Optional[list] = None, name: str = ''):
-        self.gateway_url = gateway_url.rstrip('/')
+    def __init__(
+        self, gateway_url: str, node_id: str, token: str = "", capabilities: Optional[list] = None, name: str = ""
+    ):
+        self.gateway_url = gateway_url.rstrip("/")
         self.node_id = node_id
         self.token = token
-        self.capabilities = capabilities or ['exec', 'read_file', 'write_file', 'edit_file', 'web_search', 'web_fetch']
+        self.capabilities = capabilities or ["exec", "read_file", "write_file", "edit_file", "web_search", "web_fetch"]
         self.name = name or node_id
         self._heartbeat_thread = None
         self._running = False
 
     def register(self) -> dict:
         """Register this node with the gateway."""
-        payload = json.dumps({
-            'node_id': self.node_id,
-            'url': f'http://{self._get_local_ip()}:18810',
-            'token': self.token,
-            'capabilities': self.capabilities,
-            'name': self.name,
-        }).encode()
+        payload = json.dumps(
+            {
+                "node_id": self.node_id,
+                "url": f"http://{self._get_local_ip()}:18810",
+                "token": self.token,
+                "capabilities": self.capabilities,
+                "name": self.name,
+            }
+        ).encode()
 
-        headers = {'Content-Type': 'application/json'}
+        headers = {"Content-Type": "application/json"}
         if self.token:
-            headers['Authorization'] = f'Bearer {self.token}'
+            headers["Authorization"] = f"Bearer {self.token}"
 
         req = urllib.request.Request(
-            f'{self.gateway_url}/api/gateway/register',
-            data=payload, headers=headers, method='POST')
+            f"{self.gateway_url}/api/gateway/register", data=payload, headers=headers, method="POST"
+        )
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 result = json.loads(resp.read())
@@ -523,19 +536,20 @@ class NodeAgent:
                 return result  # type: ignore[no-any-return]
         except Exception as e:
             log.error(f"[NET] Gateway registration failed: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
     def _get_local_ip(self) -> str:
         """Get local IP for advertising to gateway."""
         import socket
+
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(('8.8.8.8', 80))
+            s.connect(("8.8.8.8", 80))
             ip = s.getsockname()[0]
             s.close()
             return ip  # type: ignore[no-any-return]
         except Exception:
-            return '127.0.0.1'
+            return "127.0.0.1"
 
     def start_heartbeat(self, interval: int = 30):
         """Start background heartbeat to gateway."""
@@ -545,13 +559,13 @@ class NodeAgent:
         def _beat():
             while self._running:
                 try:
-                    payload = json.dumps({'node_id': self.node_id}).encode()
-                    headers = {'Content-Type': 'application/json'}
+                    payload = json.dumps({"node_id": self.node_id}).encode()
+                    headers = {"Content-Type": "application/json"}
                     if self.token:
-                        headers['Authorization'] = f'Bearer {self.token}'
+                        headers["Authorization"] = f"Bearer {self.token}"
                     req = urllib.request.Request(
-                        f'{self.gateway_url}/api/gateway/heartbeat',
-                        data=payload, headers=headers, method='POST')
+                        f"{self.gateway_url}/api/gateway/heartbeat", data=payload, headers=headers, method="POST"
+                    )
                     urllib.request.urlopen(req, timeout=10)
                 except Exception:
                     pass

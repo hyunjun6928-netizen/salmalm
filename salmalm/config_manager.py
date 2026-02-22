@@ -3,6 +3,7 @@
 중앙집중 설정 관리자 — 단일 진실 소스(Single Source of Truth).
 우선순위: CLI args > 환경변수 > config file > constants.py defaults
 """
+
 import json
 import os
 from pathlib import Path
@@ -27,15 +28,15 @@ class ConfigManager:
       4. Caller-supplied *defaults* (typically from ``constants.py``)
     """
 
-    BASE_DIR = Path.home() / '.salmalm'
+    BASE_DIR = Path.home() / ".salmalm"
 
     @classmethod
     def load(cls, name: str, defaults: dict = None) -> dict:
         """설정 파일 로드. name='mood' → ~/.salmalm/mood.json"""
-        path = cls.BASE_DIR / f'{name}.json'
+        path = cls.BASE_DIR / f"{name}.json"
         if path.exists():
             try:
-                with open(path, encoding='utf-8') as f:
+                with open(path, encoding="utf-8") as f:
                     config = json.load(f)
                 if defaults:
                     merged = {**defaults, **config}
@@ -49,8 +50,8 @@ class ConfigManager:
     def save(cls, name: str, config: dict) -> None:
         """설정 파일 저장."""
         cls.BASE_DIR.mkdir(parents=True, exist_ok=True)
-        path = cls.BASE_DIR / f'{name}.json'
-        with open(path, 'w', encoding='utf-8') as f:
+        path = cls.BASE_DIR / f"{name}.json"
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
 
     @classmethod
@@ -60,12 +61,12 @@ class ConfigManager:
         1. CLI args  2. Env var ``SALMALM_<NAME>_<KEY>``  3. Config file  4. *default*
         """
         # 1. CLI overrides
-        cli_key = f'{name}.{key}'
+        cli_key = f"{name}.{key}"
         if cli_key in _cli_overrides:
             return _cli_overrides[cli_key]
 
         # 2. Environment variable
-        env_key = f'SALMALM_{name.upper()}_{key.upper()}'
+        env_key = f"SALMALM_{name.upper()}_{key.upper()}"
         env_val = os.environ.get(env_key)
         if env_val is not None:
             # Attempt JSON parse for non-string types
@@ -96,11 +97,11 @@ class ConfigManager:
 
     @classmethod
     def exists(cls, name: str) -> bool:
-        return (cls.BASE_DIR / f'{name}.json').exists()
+        return (cls.BASE_DIR / f"{name}.json").exists()
 
     @classmethod
     def delete(cls, name: str) -> bool:
-        path = cls.BASE_DIR / f'{name}.json'
+        path = cls.BASE_DIR / f"{name}.json"
         if path.exists():
             path.unlink()
             return True
@@ -111,18 +112,18 @@ class ConfigManager:
         """모든 설정 파일 목록."""
         if not cls.BASE_DIR.exists():
             return []
-        return [f.stem for f in cls.BASE_DIR.glob('*.json')]
+        return [f.stem for f in cls.BASE_DIR.glob("*.json")]
 
     @classmethod
     def migrate(cls, name: str) -> bool:
         """설정 파일 마이그레이션 실행."""
         config = cls.load(name)
-        current_version = config.get('_version', 0)
+        current_version = config.get("_version", 0)
         migrated = False
         for migration in CONFIG_MIGRATIONS:
-            if migration['version'] > current_version:
-                config = migration['migrate'](config)
-                config['_version'] = migration['version']
+            if migration["version"] > current_version:
+                config = migration["migrate"](config)
+                config["_version"] = migration["version"]
                 migrated = True
         if migrated:
             cls.save(name, config)
@@ -131,35 +132,36 @@ class ConfigManager:
 
 # ── Config Migrations ──
 
+
 def _migrate_v1(config: dict) -> dict:
     """routing.json → channels.json 통합."""
     # If routing keys exist at top level, nest them under byChannel
-    if 'simple' in config or 'moderate' in config or 'complex' in config:
+    if "simple" in config or "moderate" in config or "complex" in config:
         routing = {}
-        for k in ('simple', 'moderate', 'complex'):
+        for k in ("simple", "moderate", "complex"):
             if k in config:
                 routing[k] = config.pop(k)
-        config.setdefault('routing', routing)
+        config.setdefault("routing", routing)
     return config
 
 
 def _migrate_v2(config: dict) -> dict:
     """heartbeat.json active_hours 추가."""
     # Ensure active_hours defaults exist
-    config.setdefault('active_hours', {'start': '08:00', 'end': '24:00'})
-    config.setdefault('timezone', 'Asia/Seoul')
+    config.setdefault("active_hours", {"start": "08:00", "end": "24:00"})
+    config.setdefault("timezone", "Asia/Seoul")
     return config
 
 
 CONFIG_MIGRATIONS = [
     {
-        'version': 1,
-        'description': 'routing.json → channels.json 통합',
-        'migrate': _migrate_v1,
+        "version": 1,
+        "description": "routing.json → channels.json 통합",
+        "migrate": _migrate_v1,
     },
     {
-        'version': 2,
-        'description': 'heartbeat.json active_hours 추가',
-        'migrate': _migrate_v2,
+        "version": 2,
+        "description": "heartbeat.json active_hours 추가",
+        "migrate": _migrate_v2,
     },
 ]

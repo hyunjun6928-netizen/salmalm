@@ -6,6 +6,7 @@ Features:
 - Streaming token accumulator for abort recovery
 - Thread-safe with fine-grained locking
 """
+
 from __future__ import annotations
 
 import threading

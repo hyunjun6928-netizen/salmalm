@@ -18,7 +18,7 @@ from __future__ import annotations
 import threading
 from typing import Any, Callable, Dict, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Container:
@@ -75,59 +75,66 @@ class Container:
     @property
     def vault(self) -> Any:
         """Get the Vault service instance."""
-        return self.get('vault')
+        return self.get("vault")
 
     @property
     def router(self) -> Any:
         """Get the ModelRouter service instance."""
-        return self.get('router')
+        return self.get("router")
 
     @property
     def auth_manager(self) -> Any:
         """Get the AuthManager service instance."""
-        return self.get('auth_manager')
+        return self.get("auth_manager")
 
     @property
     def rate_limiter(self) -> Any:
         """Get the RateLimiter service instance."""
-        return self.get('rate_limiter')
+        return self.get("rate_limiter")
 
     @property
     def rag_engine(self) -> Any:
         """Get the RAGEngine service instance."""
-        return self.get('rag_engine')
+        return self.get("rag_engine")
 
     @property
     def mcp_manager(self) -> Any:
         """Get the MCPManager service instance."""
-        return self.get('mcp_manager')
+        return self.get("mcp_manager")
 
     @property
     def node_manager(self) -> Any:
         """Get the NodeManager service instance."""
-        return self.get('node_manager')
+        return self.get("node_manager")
 
     @property
     def health_monitor(self) -> Any:
         """Get the HealthMonitor service instance."""
-        return self.get('health_monitor')
+        return self.get("health_monitor")
 
     @property
     def telegram_bot(self) -> Any:
         """Get the TelegramBot service instance."""
-        return self.get('telegram_bot')
+        return self.get("telegram_bot")
 
     @property
     def ws_server(self) -> Any:
         """Get the WebSocketServer service instance."""
-        return self.get('ws_server')
+        return self.get("ws_server")
 
     def validate(self) -> Dict[str, bool]:
         """Check all expected services are registered."""
         expected = [
-            'vault', 'router', 'auth_manager', 'rate_limiter',
-            'rag_engine', 'mcp_manager', 'node_manager',
-            'health_monitor', 'telegram_bot', 'ws_server',
+            "vault",
+            "router",
+            "auth_manager",
+            "rate_limiter",
+            "rag_engine",
+            "mcp_manager",
+            "node_manager",
+            "health_monitor",
+            "telegram_bot",
+            "ws_server",
         ]
         return {name: self.has(name) for name in expected}
 

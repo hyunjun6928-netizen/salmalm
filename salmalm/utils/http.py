@@ -1,4 +1,5 @@
 """HTTP request common functions — urllib.request 래퍼."""
+
 from __future__ import annotations
 
 import json

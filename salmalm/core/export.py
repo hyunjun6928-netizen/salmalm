@@ -3,6 +3,7 @@
 Provides the /export command implementation.
 stdlib-only.
 """
+
 from __future__ import annotations
 
 import html as _html
@@ -12,10 +13,10 @@ from datetime import datetime
 from salmalm.constants import VERSION, KST, BASE_DIR
 from salmalm.security.crypto import log
 
-EXPORT_DIR = BASE_DIR / 'exports'
+EXPORT_DIR = BASE_DIR / "exports"
 
 
-def export_session(session, fmt: str = 'md') -> dict:
+def export_session(session, fmt: str = "md") -> dict:
     """Export a session to the specified format.
 
     Args:
@@ -26,106 +27,108 @@ def export_session(session, fmt: str = 'md') -> dict:
         {'ok': True, 'path': str, 'filename': str, 'size': int}
         or {'ok': False, 'error': str}
     """
-    if fmt not in ('md', 'json', 'html'):
-        return {'ok': False, 'error': f'Unsupported format: {fmt}. Use md, json, or html.'}
+    if fmt not in ("md", "json", "html"):
+        return {"ok": False, "error": f"Unsupported format: {fmt}. Use md, json, or html."}
 
     EXPORT_DIR.mkdir(parents=True, exist_ok=True)
     now = datetime.now(KST)
-    timestamp = now.strftime('%Y%m%d_%H%M%S')
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
     sid_short = session.id[:20]
 
-    if fmt == 'md':
+    if fmt == "md":
         content = _export_markdown(session, now)
-        filename = f'export_{sid_short}_{timestamp}.md'
-    elif fmt == 'json':
+        filename = f"export_{sid_short}_{timestamp}.md"
+    elif fmt == "json":
         content = _export_json(session, now)
-        filename = f'export_{sid_short}_{timestamp}.json'
-    elif fmt == 'html':
+        filename = f"export_{sid_short}_{timestamp}.json"
+    elif fmt == "html":
         content = _export_html(session, now)
-        filename = f'export_{sid_short}_{timestamp}.html'
+        filename = f"export_{sid_short}_{timestamp}.html"
     else:
-        return {'ok': False, 'error': 'Unknown format'}
+        return {"ok": False, "error": "Unknown format"}
 
     filepath = EXPORT_DIR / filename
     try:
-        filepath.write_text(content, encoding='utf-8')
+        filepath.write_text(content, encoding="utf-8")
         size = filepath.stat().st_size
         log.info(f"[EXPORT] Session {session.id} exported as {fmt}: {filepath} ({size} bytes)")
-        return {'ok': True, 'path': str(filepath), 'filename': filename, 'size': size}
+        return {"ok": True, "path": str(filepath), "filename": filename, "size": size}
     except Exception as e:
-        return {'ok': False, 'error': str(e)[:200]}
+        return {"ok": False, "error": str(e)[:200]}
 
 
 def _msg_text(msg: dict) -> str:
     """Extract text from a message."""
-    content = msg.get('content', '')
+    content = msg.get("content", "")
     if isinstance(content, str):
         return content
     if isinstance(content, list):
         parts = []
         for block in content:
             if isinstance(block, dict):
-                if block.get('type') == 'text':
-                    parts.append(block.get('text', ''))
-                elif block.get('type') == 'tool_result':
+                if block.get("type") == "text":
+                    parts.append(block.get("text", ""))
+                elif block.get("type") == "tool_result":
                     parts.append(f"[Tool result: {block.get('content', '')[:100]}]")
-                elif block.get('type') == 'tool_use':
+                elif block.get("type") == "tool_use":
                     parts.append(f"[Tool call: {block.get('name', '?')}]")
-        return '\n'.join(parts)
+        return "\n".join(parts)
     return str(content)
 
 
 def _export_markdown(session, now: datetime) -> str:
     """Export session as Markdown."""
     lines = [
-        '# SalmAlm Conversation Export',
-        '',
-        f'- **Session ID**: {session.id}',
-        f'- **Date**: {now.isoformat()}',
-        f'- **Version**: SalmAlm v{VERSION}',
-        f'- **Messages**: {len(session.messages)}',
-        '',
-        '---',
-        '',
+        "# SalmAlm Conversation Export",
+        "",
+        f"- **Session ID**: {session.id}",
+        f"- **Date**: {now.isoformat()}",
+        f"- **Version**: SalmAlm v{VERSION}",
+        f"- **Messages**: {len(session.messages)}",
+        "",
+        "---",
+        "",
     ]
     for msg in session.messages:
-        role = msg.get('role', '')
-        if role == 'system':
+        role = msg.get("role", "")
+        if role == "system":
             continue
         text = _msg_text(msg)
-        if role == 'user':
-            lines.append('## 👤 User')
-        elif role == 'assistant':
-            lines.append('## 🤖 Assistant')
-        elif role == 'tool':
-            lines.append(f'## 🔧 Tool ({msg.get("name", "?")})')
+        if role == "user":
+            lines.append("## 👤 User")
+        elif role == "assistant":
+            lines.append("## 🤖 Assistant")
+        elif role == "tool":
+            lines.append(f"## 🔧 Tool ({msg.get('name', '?')})")
         else:
-            lines.append(f'## {role}')
-        lines.append('')
+            lines.append(f"## {role}")
+        lines.append("")
         lines.append(text)
-        lines.append('')
-        lines.append('---')
-        lines.append('')
-    return '\n'.join(lines)
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+    return "\n".join(lines)
 
 
 def _export_json(session, now: datetime) -> str:
     """Export session as JSON."""
     messages = []
     for msg in session.messages:
-        role = msg.get('role', '')
-        if role == 'system':
+        role = msg.get("role", "")
+        if role == "system":
             continue
-        messages.append({
-            'role': role,
-            'content': _msg_text(msg),
-        })
+        messages.append(
+            {
+                "role": role,
+                "content": _msg_text(msg),
+            }
+        )
     data = {
-        'session_id': session.id,
-        'exported_at': now.isoformat(),
-        'version': VERSION,
-        'message_count': len(messages),
-        'messages': messages,
+        "session_id": session.id,
+        "exported_at": now.isoformat(),
+        "version": VERSION,
+        "message_count": len(messages),
+        "messages": messages,
     }
     return json.dumps(data, ensure_ascii=False, indent=2)
 
@@ -134,25 +137,24 @@ def _export_html(session, now: datetime) -> str:
     """Export session as standalone HTML."""
     msgs_html = []
     for msg in session.messages:
-        role = msg.get('role', '')
-        if role == 'system':
+        role = msg.get("role", "")
+        if role == "system":
             continue
-        text = _html.escape(_msg_text(msg)).replace('\n', '<br>')
-        if role == 'user':
-            cls = 'user'
-            icon = '👤'
-        elif role == 'assistant':
-            cls = 'assistant'
-            icon = '🤖'
+        text = _html.escape(_msg_text(msg)).replace("\n", "<br>")
+        if role == "user":
+            cls = "user"
+            icon = "👤"
+        elif role == "assistant":
+            cls = "assistant"
+            icon = "🤖"
         else:
-            cls = 'tool'
-            icon = '🔧'
+            cls = "tool"
+            icon = "🔧"
         msgs_html.append(
-            f'<div class="msg {cls}"><span class="icon">{icon}</span>'
-            f'<div class="content">{text}</div></div>'
+            f'<div class="msg {cls}"><span class="icon">{icon}</span><div class="content">{text}</div></div>'
         )
 
-    return f'''<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -178,6 +180,6 @@ h1 {{ color: #818cf8; }}
   Version: SalmAlm v{VERSION}<br>
   Messages: {len(session.messages)}
 </div>
-{''.join(msgs_html)}
+{"".join(msgs_html)}
 </body>
-</html>'''
+</html>"""
