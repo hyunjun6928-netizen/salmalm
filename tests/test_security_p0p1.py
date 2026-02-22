@@ -200,3 +200,52 @@ def test_tool_critical_unauthenticated_blocked():
     tier = get_tool_tier("exec_command")
     if tier == "critical":
         assert is_tool_allowed_external("exec_command", False, "0.0.0.0") is False
+
+
+# ============================================================
+# P0: Memory secret scrubbing
+# ============================================================
+
+def test_memory_contains_secret_openai_key():
+    from salmalm.core.memory import MemoryManager
+    assert MemoryManager._contains_secret("my key is sk-abc123456789012345678901234567890123456789")
+
+
+def test_memory_contains_secret_aws():
+    from salmalm.core.memory import MemoryManager
+    assert MemoryManager._contains_secret("AWS key AKIAIOSFODNN7EXAMPLE")
+
+
+def test_memory_contains_secret_jwt():
+    from salmalm.core.memory import MemoryManager
+    assert MemoryManager._contains_secret("token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.Sfl")
+
+
+def test_memory_no_false_positive():
+    from salmalm.core.memory import MemoryManager
+    assert not MemoryManager._contains_secret("decided to use Haiku for simple messages")
+
+
+def test_memory_scrub_redacts():
+    from salmalm.core.memory import MemoryManager
+    scrubbed = MemoryManager._scrub_secrets("key is sk-abc123456789012345678901234567890123456789")
+    assert "sk-abc" not in scrubbed
+    assert "[REDACTED]" in scrubbed
+
+
+def test_memory_write_scrubs(tmp_path):
+    from salmalm.core.memory import MemoryManager
+    import salmalm.core.memory as mem_mod
+    orig_dir = mem_mod.MEMORY_DIR
+    orig_file = mem_mod.MEMORY_FILE
+    mem_mod.MEMORY_DIR = tmp_path / "memory"
+    mem_mod.MEMORY_FILE = tmp_path / "MEMORY.md"
+    try:
+        mm = MemoryManager()
+        mm.write("test.md", "secret: sk-abc12345678901234567890123456789012345678x end")
+        content = (tmp_path / "memory" / "test.md").read_text()
+        assert "sk-abc" not in content
+        assert "[REDACTED]" in content
+    finally:
+        mem_mod.MEMORY_DIR = orig_dir
+        mem_mod.MEMORY_FILE = orig_file

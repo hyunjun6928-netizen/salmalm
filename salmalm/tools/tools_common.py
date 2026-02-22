@@ -52,6 +52,11 @@ def _is_safe_command(cmd: str):
         if first_word in EXEC_BLOCKED_INTERPRETERS:
             return False, f"Interpreter blocked (use python_eval tool): {first_word}"
         if first_word in EXEC_ELEVATED:
+            # On external bind, elevated commands are blocked by default
+            _bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+            if _bind not in ("127.0.0.1", "::1", "localhost"):
+                if not os.environ.get("SALMALM_ALLOW_ELEVATED"):
+                    return False, f"Elevated command '{first_word}' blocked on external bind (set SALMALM_ALLOW_ELEVATED=1 to override)"
             log.warning(f"[WARN] Elevated exec: {first_word} (can run arbitrary code)")
         elif first_word not in EXEC_ALLOWLIST:
             return False, f"Command not in allowlist: {first_word}"

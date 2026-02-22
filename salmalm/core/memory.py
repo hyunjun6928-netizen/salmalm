@@ -38,12 +38,36 @@ class MemoryManager:
         re.compile(r"\b(중요|important|critical|핵심)\b", re.I),
         re.compile(r"\b(배운|learned|lesson|교훈)\b", re.I),
         re.compile(r"\b(preference|선호|좋아|싫어)\b", re.I),
-        re.compile(r"\b(password|비밀번호|credential|API.?key)\b", re.I),
         re.compile(r"\b(project|프로젝트|goal|목표|plan|계획)\b", re.I),
         re.compile(r"\b(remember|기억|잊지|forget)\b", re.I),
         re.compile(r"^\s*\*\*", re.M),  # Bold text often = important
         re.compile(r"^\s*#{1,3}\s", re.M),  # Headers = section markers
     ]
+
+    # Secret patterns — lines matching these are NEVER stored in memory.
+    # Detected secrets are redacted + warning logged instead of curated.
+    _SECRET_PATTERNS = [
+        re.compile(r"\b(sk-[a-zA-Z0-9]{20,})\b"),  # OpenAI keys
+        re.compile(r"\b(AIza[a-zA-Z0-9_-]{30,})\b"),  # Google API keys
+        re.compile(r"\b(xoxb-[a-zA-Z0-9-]+)\b"),  # Slack tokens
+        re.compile(r"\b(ghp_[a-zA-Z0-9]{36,})\b"),  # GitHub PATs
+        re.compile(r"\b(AKIA[A-Z0-9]{16})\b"),  # AWS access keys
+        re.compile(r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\."),  # JWT tokens
+        re.compile(r"\b(password|비밀번호|credential|API.?key)\s*[:=]\s*\S+", re.I),  # key=value secrets
+    ]
+
+    @classmethod
+    def _contains_secret(cls, text: str) -> bool:
+        """Check if text contains potential secrets."""
+        return any(pat.search(text) for pat in cls._SECRET_PATTERNS)
+
+    @classmethod
+    def _scrub_secrets(cls, text: str) -> str:
+        """Redact secrets from text, keeping context."""
+        result = text
+        for pat in cls._SECRET_PATTERNS:
+            result = pat.sub("[REDACTED]", result)
+        return result
 
     def __init__(self):
         self._search = None  # Lazy — set after TFIDFSearch is ready
@@ -65,18 +89,22 @@ class MemoryManager:
                 return MEMORY_FILE.read_text(encoding="utf-8", errors="replace")
             return "(MEMORY.md does not exist yet)"
         fpath = MEMORY_DIR / filename
-        if fpath.exists() and str(fpath.resolve()).startswith(str(MEMORY_DIR.resolve())):
+        if fpath.exists() and fpath.resolve().is_relative_to(MEMORY_DIR.resolve()):
             return fpath.read_text(encoding="utf-8", errors="replace")
         return f"(File not found: {filename})"
 
     def write(self, filename: str, content: str, append: bool = False) -> str:
-        """Write to a memory file."""
+        """Write to a memory file. Secrets are automatically scrubbed."""
         MEMORY_DIR.mkdir(exist_ok=True)
+        # Scrub secrets before writing to any memory file
+        if self._contains_secret(content):
+            log.warning(f"[MEMORY] Secret detected in write to {filename} — redacting")
+            content = self._scrub_secrets(content)
         if filename == "MEMORY.md":
             fpath = MEMORY_FILE
         else:
             fpath = MEMORY_DIR / filename
-            if not str(fpath.resolve()).startswith(str(MEMORY_DIR.resolve())):
+            if not fpath.resolve().is_relative_to(MEMORY_DIR.resolve()):
                 return "❌ Invalid memory path"
         if append and fpath.exists():
             existing = fpath.read_text(encoding="utf-8", errors="replace")
@@ -229,10 +257,14 @@ class MemoryManager:
                 fingerprint = stripped[:50]
                 if fingerprint in existing_memory:
                     continue
+                # Block secret-containing lines from curation
+                if self._contains_secret(stripped):
+                    log.warning(f"[MEMORY] Secret detected in daily log — skipping curation: {stripped[:30]}...")
+                    continue
                 # Check importance patterns
                 importance = sum(1 for pat in self._IMPORTANT_PATTERNS if pat.search(stripped))
                 if importance >= 2:  # At least 2 pattern matches
-                    curated.append((date_str, stripped))
+                    curated.append((date_str, self._scrub_secrets(stripped)))
 
         if not curated:
             return "No new entries to curate."

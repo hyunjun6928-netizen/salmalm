@@ -1936,7 +1936,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 self._json({"error": "Invalid path"}, 400)
                 return
             full = (BASE_DIR / fpath).resolve()
-            if not str(full).startswith(str(BASE_DIR.resolve())):
+            if not full.is_relative_to(BASE_DIR.resolve()):
                 self._json({"error": "Path outside allowed directory"}, 403)
                 return
             if not full.exists() or not full.is_file():
@@ -2157,7 +2157,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 return
             upload_dir = (WORKSPACE_DIR / "uploads").resolve()  # noqa: F405
             fpath = (upload_dir / fname).resolve()
-            if not str(fpath).startswith(str(upload_dir)) or not fpath.exists():
+            if not fpath.is_relative_to(upload_dir) or not fpath.exists():
                 self.send_error(404)
                 return
             mime_map = {
