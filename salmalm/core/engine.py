@@ -654,77 +654,62 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     async def _execute_loop(
         self, session, user_message, model_override, on_tool, classification, tier, on_token=None, on_status=None
     ):
+        from salmalm.core.loop_helpers import (
+            check_abort,
+            select_model,
+            trim_history,
+            prune_session_context,
+            record_usage,
+            validate_tool_calls,
+            check_circuit_breaker,
+            check_loop_detection,
+            handle_empty_response,
+            finalize_response,
+        )
+
         use_thinking = getattr(session, "thinking_enabled", False)
         iteration = 0
         consecutive_errors = 0
-        _recent_tool_calls = []  # Loop detection: track recent (name, args_hash) tuples
+        _recent_tool_calls = []
         _session_id = getattr(session, "id", "")
         import os as _os
 
         _max_iter = int(_os.environ.get("SALMALM_MAX_TOOL_ITER", str(self.MAX_TOOL_ITERATIONS)))
         while iteration < _max_iter:
-            # Abort check (생성 중지 체크) — LibreChat style
-            from salmalm.features.edge_cases import abort_controller
-
-            if abort_controller.is_aborted(_session_id):
-                partial = abort_controller.get_partial(_session_id) or ""
-                abort_controller.clear(_session_id)
-                response = (partial + "\n\n⏹ [생성 중단됨 / Generation aborted]").strip()
-                session.add_assistant(response)
+            # Abort check
+            abort_msg = check_abort(_session_id)
+            if abort_msg:
+                session.add_assistant(abort_msg)
                 log.info(f"[ABORT] Generation aborted: session={_session_id}")
-                return response
-            model = model_override or router.route(user_message, has_tools=True, iteration=iteration)
+                return abort_msg
 
-            # Force tier upgrade for complex tasks
-            if not model_override and tier == 3 and iteration == 0:
-                model = router._pick_available(3)
-            elif not model_override and tier == 2 and iteration == 0:
-                model = router._pick_available(2)
-
+            # Model & provider selection
+            model = select_model(model_override, user_message, tier, iteration, router)
             provider = model.split("/")[0] if "/" in model else "anthropic"
 
-            # Always provide tools — let the LLM decide what to use
-            # Intent/keyword filtering was too restrictive (chat/memory/creative got no tools)
+            # Tools
             tools = self._get_tools_for_provider(
                 provider, intent=classification["intent"], user_message=user_message or ""
             )
 
-            # Use thinking for first call on complex tasks
+            # Thinking mode
             think_this_call = (
                 use_thinking and iteration == 0 and provider == "anthropic" and ("opus" in model or "sonnet" in model)
             )
 
-            # Aggressive history trim for simple intents — keep only recent messages
-            _INTENT_HISTORY_LIMIT = {"chat": 10, "memory": 10, "creative": 20}
-            _hist_limit = _INTENT_HISTORY_LIMIT.get(classification["intent"])
-            if _hist_limit and len(session.messages) > _hist_limit:
-                # Keep system messages + last N messages
-                _sys = [m for m in session.messages if m.get("role") == "system"]
-                _recent = [m for m in session.messages if m.get("role") != "system"][-_hist_limit:]
-                session.messages = _sys + _recent
+            # History & context management
+            trim_history(session, classification)
+            pruned_messages = prune_session_context(session, model)
 
-            # Session pruning — only when cache TTL expired (preserves Anthropic prompt cache)
-            if _should_prune_for_cache():
-                _ctx_win = estimate_context_window(model)
-                pruned_messages, prune_stats = prune_context(session.messages, context_window_tokens=_ctx_win)
-                if prune_stats["soft_trimmed"] or prune_stats["hard_cleared"]:
-                    log.info(f"[PRUNE] soft={prune_stats['soft_trimmed']} hard={prune_stats['hard_cleared']}")
-            else:
-                pruned_messages = session.messages
-                prune_stats = {"soft_trimmed": 0, "hard_cleared": 0, "unchanged": 0}
-
-            # Status callback: typing/thinking
+            # Status callback
             if on_status:
                 if think_this_call:
                     _safe_callback(on_status, STATUS_THINKING, "🧠 Thinking...")
                 else:
                     _safe_callback(on_status, STATUS_TYPING, "typing")
 
-            # Dynamic max_tokens based on intent
+            # LLM call
             _dynamic_max_tokens = _get_dynamic_max_tokens(classification["intent"], user_message or "")
-
-            # LLM call with failover
-            _failover_warn = None
             result, _failover_warn = await self._call_with_failover(
                 pruned_messages,
                 model=model,
@@ -734,12 +719,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 on_token=on_token,
                 on_status=on_status,
             )
-            # Clean internal flag
             result.pop("_failed", None)
-            # Record API call time for cache TTL tracking
             _record_api_call_time()
 
-            # ── Token overflow: staged recovery ──
+            # Token overflow recovery
             if result.get("error") == "token_overflow":
                 result, overflow_msg = await self._handle_token_overflow(
                     session, model, tools, _dynamic_max_tokens, think_this_call, on_status
@@ -747,100 +730,41 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 if overflow_msg:
                     return overflow_msg
 
-            # Record usage for /usage command
-            usage = result.get("usage", {})
-            record_response_usage(_session_id, result.get("model", model), usage)
-
-            # Audit API call
-            api_detail = {
-                "model": result.get("model", model),
-                "input_tokens": usage.get("input", 0),
-                "output_tokens": usage.get("output", 0),
-                "iteration": iteration,
-            }
-            if usage.get("input", 0) or usage.get("output", 0):
-                audit_log(
-                    "api_call",
-                    f"{model} in={usage.get('input', 0)} out={usage.get('output', 0)}",
-                    detail_dict=api_detail,
-                )
-                # Detailed usage tracking (LibreChat style)
-                try:
-                    from salmalm.features.edge_cases import usage_tracker
-
-                    _inp, _out = usage.get("input", 0), usage.get("output", 0)
-                    _cost = estimate_cost(model, usage)
-                    usage_tracker.record(_session_id, model, _inp, _out, _cost, classification.get("intent", ""))
-                except Exception as _exc:
-                    log.debug(f"Suppressed: {_exc}")
+            # Usage tracking
+            record_usage(_session_id, model, result, classification, iteration)
 
             if result.get("thinking"):
                 log.info(f"[AI] Thinking: {len(result['thinking'])} chars")
 
+            # ── Tool execution branch ──
             if result.get("tool_calls"):
-                # Status: tool running
                 if on_status:
                     tool_names = ", ".join(tc["name"] for tc in result["tool_calls"][:3])
                     _safe_callback(on_status, STATUS_TOOL_RUNNING, f"🔧 Running {tool_names}...")
 
-                # Validate tool calls
-                valid_tools = []
-                tool_outputs = {}
-                for tc in result["tool_calls"]:
-                    # Invalid arguments (not a dict) — try JSON parse
-                    if not isinstance(tc.get("arguments"), dict):
-                        try:
-                            tc["arguments"] = json.loads(tc["arguments"]) if isinstance(tc["arguments"], str) else {}
-                        except (json.JSONDecodeError, TypeError):
-                            tool_outputs[tc["id"]] = f"❌ Invalid tool arguments for {tc['name']} / 잘못된 도구 인자"
-                            continue
-                    valid_tools.append(tc)
+                valid_tools, tool_outputs = validate_tool_calls(result["tool_calls"])
 
                 if valid_tools:
                     exec_outputs = await asyncio.to_thread(self._execute_tools_parallel, valid_tools, on_tool)
                     tool_outputs.update(exec_outputs)
 
-                # Circuit breaker: 연속 에러 감지 (❌ prefix only)
-                errors = sum(1 for v in tool_outputs.values() if str(v).startswith("❌"))
-                if errors > 0:
-                    consecutive_errors += errors
-                    if consecutive_errors >= self.MAX_CONSECUTIVE_ERRORS:
-                        log.warning(f"[BREAK] {consecutive_errors} consecutive tool errors — stopping loop")
-                        err_summary = "\n".join(f"• {v}" for v in tool_outputs.values() if str(v).startswith("❌"))
-                        response = f"⚠️ Tool errors detected, stopping:\n{err_summary}"
-                        session.add_assistant(response)
-                        return response
-                else:
-                    consecutive_errors = 0
+                # Circuit breaker
+                consecutive_errors, break_msg = check_circuit_breaker(
+                    tool_outputs, consecutive_errors, self.MAX_CONSECUTIVE_ERRORS
+                )
+                if break_msg:
+                    session.add_assistant(break_msg)
+                    return break_msg
 
-                # Loop detection: 같은 도구+인자 반복 호출 감지
-                import hashlib as _hl
-
-                for tc in result.get("tool_calls", []):
-                    _sig = (
-                        tc.get("name", ""),
-                        _hl.md5(json.dumps(tc.get("arguments", {}), sort_keys=True).encode()).hexdigest()[:8],
-                    )
-                    _recent_tool_calls.append(_sig)
-                # 최근 6회 중 같은 시그니처가 3회 이상이면 루프
-                if len(_recent_tool_calls) >= 6:
-                    from collections import Counter as _Counter
-
-                    _freq = _Counter(_recent_tool_calls[-6:])
-                    _top = _freq.most_common(1)[0]
-                    if _top[1] >= 3:
-                        log.warning(
-                            f"[BREAK] Loop detected: {_top[0][0]} called {_top[1]}x with same args in last 6 iterations"
-                        )
-                        response = (
-                            f"⚠️ Infinite loop detected — tool `{_top[0][0]}` repeating with same arguments. Stopping."
-                        )
-                        session.add_assistant(response)
-                        return response
+                # Loop detection
+                loop_msg = check_loop_detection(result.get("tool_calls", []), _recent_tool_calls)
+                if loop_msg:
+                    session.add_assistant(loop_msg)
+                    return loop_msg
 
                 self._append_tool_results(session, provider, result, result["tool_calls"], tool_outputs)
 
-                # Mid-loop compaction: 메시지 40개 넘으면 즉시 압축
+                # Mid-loop compaction
                 if len(session.messages) > 40:
                     session.messages = compact_messages(session.messages, session=session, on_status=on_status)
                     log.info(f"[CUT] Mid-loop compaction: -> {len(session.messages)} msgs")
@@ -848,35 +772,17 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 iteration += 1
                 continue
 
-            # Final response
+            # ── Final response branch ──
             response = result.get("content", "")
 
-            # ── LLM edge cases ──
-
-            # Empty response: retry up to 2 times with backoff
+            # Empty response retry
             if not response or not response.strip():
-                for _retry in range(2):
-                    log.warning(f"[LLM] Empty response, retry #{_retry + 1}")
-                    await asyncio.sleep(0.5 * (_retry + 1))  # 0.5s, 1.0s backoff
-                    retry_result, _ = await self._call_with_failover(
-                        pruned_messages, model=model, tools=tools, max_tokens=4096, thinking=False
-                    )
-                    response = retry_result.get("content", "")
-                    if response and response.strip():
-                        break
-                if not response or not response.strip():
-                    response = "⚠️ 응답을 생성할 수 없습니다. / Could not generate a response."
+                response = await handle_empty_response(self._call_with_failover, pruned_messages, model, tools)
 
-            # Truncated response (max_tokens reached)
-            stop_reason = result.get("stop_reason", "")
-            if stop_reason == "max_tokens" or result.get("usage", {}).get("output", 0) >= 4090:
-                response += "\n\n⚠️ [응답이 잘렸습니다 / Response was truncated]"
+            # Edge cases (truncation, content filter)
+            response = finalize_response(result, response)
 
-            # Content filter / safety block
-            if stop_reason in ("content_filter", "safety"):
-                response = "⚠️ 안전 필터에 의해 응답이 차단되었습니다. / Response blocked by content filter."
-
-            # PHASE 3: REFLECT — self-evaluation for complex tasks
+            # Reflection pass
             if self._should_reflect(classification, response, iteration):
                 log.info(f"[SEARCH] Reflection pass on {classification['intent']} response")
                 reflect_msgs = [
@@ -888,18 +794,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 reflect_result = await _call_llm_async(reflect_msgs, model=router._pick_available(2), max_tokens=4000)
                 improved = reflect_result.get("content", "")
                 if improved and len(improved) > len(response) * 0.5 and len(improved) > 50:
-                    # Only use reflection if it's substantive and not a degradation
-                    # Skip if reflection is just "the answer is fine" or similar
-                    skip_phrases = [
-                        "satisfactory",
-                        "sufficient",
-                        "correct",
-                    ]
+                    skip_phrases = ["satisfactory", "sufficient", "correct"]
                     if not any(p in improved[:100].lower() for p in skip_phrases):
                         response = improved
                     log.info(f"[SEARCH] Reflection improved: {len(response)} chars")
 
-            # Prepend failover warning if applicable
             if _failover_warn:
                 response = f"{_failover_warn}\n\n{response}"
 
@@ -908,12 +807,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 f"[CHAT] Response ({result.get('model', '?')}): {len(response)} chars, "
                 f"iteration {iteration + 1}, intent={classification['intent']}"
             )
-
-            # Clean up planning message if added (use marker, not content comparison)
             session.messages = [m for m in session.messages if not m.get("_plan_injected")]
             return response
 
-        # Loop exhausted — MAX_TOOL_ITERATIONS reached
+        # Loop exhausted
         log.warning(f"[BREAK] Max iterations ({_max_iter}) reached")
         response = result.get("content", "Reached maximum tool iterations. Please try a simpler request.")  # noqa: F821
         if not response:

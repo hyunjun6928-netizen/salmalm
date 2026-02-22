@@ -8,8 +8,8 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
-[![Tests](https://img.shields.io/badge/tests-1%2C817%20passed-brightgreen)]()
-[![Tools](https://img.shields.io/badge/tools-66-blueviolet)]()
+[![Tests](https://img.shields.io/badge/tests-1%2C806%20passed-brightgreen)]()
+[![Tools](https://img.shields.io/badge/tools-67-blueviolet)]()
 
 **[한국어 README](README_KR.md)**
 
@@ -19,7 +19,7 @@
 
 ## What is SalmAlm?
 
-SalmAlm is a **personal AI gateway** — one Python package that gives you a full-featured AI assistant with a web UI, Telegram/Discord bots, 66 tools, and 10 features you won't find anywhere else.
+SalmAlm is a **personal AI gateway** — one Python package that gives you a full-featured AI assistant with a web UI, Telegram/Discord bots, 67 tools, and 10 features you won't find anywhere else.
 
 No Docker. No Node.js. No config files. Just:
 
@@ -103,7 +103,7 @@ SALMALM_BIND=0.0.0.0 salmalm    # expose to LAN (see Security section)
 - **Infinite loop detection** — 3+ same (tool, args_hash) in last 6 iterations = auto-break
 - **Irreversible action gate** — email send, calendar delete require explicit confirmation
 
-### 66 Built-in Tools
+### 67 Built-in Tools
 Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Python eval, image generation (DALL-E/Aurora), TTS/STT, browser automation (Playwright), RAG search, QR codes, system monitor, OS-native sandbox, mesh networking, canvas preview, and more.
 
 ### Web UI
@@ -146,7 +146,7 @@ SalmAlm is designed to minimize API costs without sacrificing quality:
 
 | Feature | Effect |
 |---|---|
-| Dynamic tool loading | 66 tools → 0 (chat) or 7-12 (actions) per request |
+| Dynamic tool loading | 67 tools → 0 (chat) or 7-12 (actions) per request |
 | Smart model routing | Simple→Haiku ($1), Moderate→Sonnet ($3), Complex→Opus ($15) |
 | Tool schema compression | 7,749 → 693 tokens (91% reduction) |
 | System prompt compression | 762 → 310 tokens |
@@ -171,7 +171,7 @@ SalmAlm follows a **dangerous features default OFF** policy:
 | Plugin system | Disabled | `SALMALM_PLUGINS=1` |
 | CLI OAuth reuse | Disabled | `SALMALM_CLI_OAUTH=1` |
 | Elevated exec on external bind | Blocked | `SALMALM_ALLOW_ELEVATED=1` |
-| Strict CSP (nonce mode) | Enabled | `SALMALM_CSP_COMPAT=1` for legacy |
+| Strict CSP (nonce mode) | Disabled | `SALMALM_CSP_STRICT=1` to enable |
 
 ### Tool Risk Tiers
 
@@ -198,7 +198,7 @@ Tools are classified by risk and **critical tools are blocked on external bind w
 - **CSRF defense** — Origin validation + `X-Requested-With` custom header
 - **Centralized auth gate** — all `/api/` routes require auth unless in `_PUBLIC_PATHS`
 - **Node dispatch** — HMAC-SHA256 signed payloads with timestamp + nonce
-- **142+ security regression tests** in CI
+- **150+ security regression tests** in CI
 
 See [`SECURITY.md`](SECURITY.md) for full threat model and details.
 
@@ -274,7 +274,7 @@ Mesh Peers ──►           ├── Message Queue (offline + retry)
                          └── Vault (PBKDF2 + AES-256-GCM / HMAC-CTR)
 ```
 
-- **233 modules**, **49K+ lines**, **82 test files**, **1,817 tests**
+- **234 modules**, **49K+ lines**, **82 test files**, **1,806 tests**
 - Pure Python 3.10+ stdlib — no frameworks, no heavy dependencies
 - Data stored under `~/SalmAlm` (configurable via `SALMALM_HOME`)
 
