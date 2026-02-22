@@ -2373,6 +2373,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 return
         try:
             vault.create(pw if use_pw else "")
+            # Auto-unlock vault after creation so API keys can be saved immediately
+            vault.unlock(pw if use_pw else "", save_to_keychain=True)
             audit_log("setup", f"vault created {'with' if use_pw else 'without'} password")
         except RuntimeError:
             # cryptography not installed and fallback not enabled —
