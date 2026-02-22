@@ -38,7 +38,13 @@ def handle_web_fetch(args: dict) -> str:
     if blocked:
         return f"{reason}"
     req = urllib.request.Request(final_url, headers={"User-Agent": "Mozilla/5.0 (SalmAlm/0.1)"})
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    # DNS pinning: connect to the IP we already validated (anti-rebinding)
+    try:
+        from salmalm.tools.tools_common import _resolve_and_pin
+        opener = _resolve_and_pin(final_url)
+    except ValueError as e:
+        return f"SSRF blocked: {e}"
+    with opener.open(req, timeout=15) as resp:
         # Limit download to 2MB to prevent memory explosion
         raw = resp.read(2 * 1024 * 1024).decode("utf-8", errors="replace")
     from html.parser import HTMLParser
@@ -144,7 +150,13 @@ def handle_http_request(args: dict) -> str:
     try:
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         _MAX_RESP_BYTES = 2 * 1024 * 1024  # 2 MB guard
-        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+        # DNS pinning (anti-rebinding)
+        try:
+            from salmalm.tools.tools_common import _resolve_and_pin
+            _opener = _resolve_and_pin(url)
+        except ValueError as _ve:
+            return f"SSRF blocked: {_ve}"
+        with _opener.open(req, timeout=timeout_sec) as resp:
             status = resp.status
             resp_headers = dict(resp.headers)
             raw = resp.read(_MAX_RESP_BYTES + 1)

@@ -225,3 +225,71 @@ def _is_private_url_follow_redirects(url: str, max_redirects: int = 5):
             break
 
     return False, "", current_url
+
+
+def _make_pinned_opener(resolved_ip: str, hostname: str):
+    """Create a urllib opener that pins DNS to a pre-resolved IP.
+
+    Prevents DNS rebinding: the actual TCP connection uses the IP we already
+    validated, not a fresh DNS lookup that could return a different (internal) IP.
+    """
+    import http.client
+    import urllib.request
+    import ssl
+
+    class _PinnedHTTPConnection(http.client.HTTPConnection):
+        def connect(self):
+            self.host = resolved_ip
+            super().connect()
+            self.host = hostname  # Restore for Host header
+
+    class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+        def connect(self):
+            self.host = resolved_ip
+            super().connect()
+            self.host = hostname
+
+    class _PinnedHTTPHandler(urllib.request.HTTPHandler):
+        def http_open(self, req):
+            return self.do_open(_PinnedHTTPConnection, req)
+
+    class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):
+        def https_open(self, req):
+            return self.do_open(_PinnedHTTPSConnection, req)
+
+    return urllib.request.build_opener(_PinnedHTTPHandler, _PinnedHTTPSHandler)
+
+
+def _resolve_and_pin(url: str):
+    """Resolve URL hostname, validate IP, return (opener, final_url) or raise.
+
+    Combines SSRF check + DNS pinning in one step.
+    """
+    import socket
+    import ipaddress
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").strip("[]")
+    if not hostname:
+        raise ValueError("No hostname in URL")
+
+    # Resolve
+    addrs = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+    if not addrs:
+        raise ValueError(f"DNS resolution failed: {hostname}")
+
+    # Pick first valid non-private IP
+    chosen_ip = None
+    for family, _, _, _, sockaddr in addrs:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            continue
+        chosen_ip = sockaddr[0]
+        break
+
+    if not chosen_ip:
+        raise ValueError(f"All resolved IPs are internal: {hostname}")
+
+    opener = _make_pinned_opener(chosen_ip, hostname)
+    return opener

@@ -121,7 +121,14 @@ def execute_tool(name: str, args: dict) -> str:
                 continue  # exec tool handles its own safety
             args[key] = re.sub(r"\$\{?\w+\}?", "", val)
 
-    audit_log("tool_exec", f"{name}: {json.dumps(args, ensure_ascii=False)[:200]}")
+    _audit_args = json.dumps(args, ensure_ascii=False)[:300]
+    _session_id = args.pop("_session_id", "")  # Injected by engine
+    audit_log(
+        "tool_exec",
+        f"{name}: {_audit_args}",
+        session_id=_session_id,
+        detail_dict={"tool": name, "args_preview": _audit_args},
+    )
 
     # Tool tier check — critical tools blocked when externally exposed without auth
     try:
