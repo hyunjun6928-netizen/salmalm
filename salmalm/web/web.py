@@ -1932,7 +1932,16 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             if not fpath or ".." in fpath:
                 self._json({"error": "Invalid path"}, 400)
                 return
-            full = BASE_DIR / fpath
+            # P0-1: Block absolute paths and resolve to prevent path traversal
+            from pathlib import PurePosixPath
+
+            if PurePosixPath(fpath).is_absolute() or "\\" in fpath:
+                self._json({"error": "Invalid path"}, 400)
+                return
+            full = (BASE_DIR / fpath).resolve()
+            if not str(full).startswith(str(BASE_DIR.resolve())):
+                self._json({"error": "Path outside allowed directory"}, 403)
+                return
             if not full.exists() or not full.is_file():
                 self._json({"error": "File not found"}, 404)
                 return

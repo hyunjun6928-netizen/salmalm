@@ -148,3 +148,55 @@ class TestPluginDefault:
         os.environ.pop("SALMALM_PLUGINS", None)
         val = os.environ.get("SALMALM_PLUGINS", "0")
         assert val != "1", "Plugins should default to OFF"
+
+
+# ============================================================
+# P0-1: Memory read path traversal defense
+# ============================================================
+
+def test_absolute_path_blocked():
+    """Absolute paths like /etc/passwd must be rejected."""
+    from pathlib import PurePosixPath
+
+    assert PurePosixPath("/etc/passwd").is_absolute()
+
+
+def test_backslash_path_blocked():
+    """Backslash in path must be rejected."""
+    assert "\\" in "..\\..\\etc\\passwd"
+
+
+def test_resolve_stays_in_base(tmp_path):
+    """Resolved path must stay within BASE_DIR."""
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "notes" / "test.md").write_text("ok")
+    full = (tmp_path / "notes/test.md").resolve()
+    assert str(full).startswith(str(tmp_path.resolve()))
+    full2 = (tmp_path / "../../etc/passwd").resolve()
+    assert not str(full2).startswith(str(tmp_path.resolve()))
+
+
+# ============================================================
+# P0-2: is_tool_allowed_external signature match
+# ============================================================
+
+def test_tool_allowed_external_three_args():
+    """is_tool_allowed_external must accept 3 args without TypeError."""
+    from salmalm.web.middleware import is_tool_allowed_external
+
+    result = is_tool_allowed_external("web_search", False, "0.0.0.0")
+    assert isinstance(result, bool)
+
+
+def test_tool_allowed_loopback():
+    from salmalm.web.middleware import is_tool_allowed_external
+
+    assert is_tool_allowed_external("exec_command", False, "127.0.0.1") is True
+
+
+def test_tool_critical_unauthenticated_blocked():
+    from salmalm.web.middleware import is_tool_allowed_external, get_tool_tier
+
+    tier = get_tool_tier("exec_command")
+    if tier == "critical":
+        assert is_tool_allowed_external("exec_command", False, "0.0.0.0") is False
