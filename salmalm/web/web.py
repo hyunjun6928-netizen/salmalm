@@ -3978,7 +3978,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         if 'max_tool_iterations' in body:
             try:
                 val = int(body['max_tool_iterations'])
-                if 3 <= val <= 50:
+                if 3 <= val <= 999:
                     os.environ['SALMALM_MAX_TOOL_ITER'] = str(val)
             except (ValueError, TypeError):
                 pass
