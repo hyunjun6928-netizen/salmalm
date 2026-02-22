@@ -686,8 +686,22 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         if not self._require_auth("user"):
             return
         from salmalm.core.engine import get_routing_config
-
-        self._json({"config": get_routing_config(), "available_models": MODELS})
+        config = get_routing_config()
+        # Validate: strip models whose provider has no key
+        _provider_key_map = {
+            'anthropic': 'anthropic_api_key', 'openai': 'openai_api_key',
+            'xai': 'xai_api_key', 'google': 'google_api_key',
+            'openrouter': 'openrouter_api_key',
+        }
+        for tier in ('simple', 'moderate', 'complex'):
+            model = config.get(tier, '')
+            if not model or model == 'auto':
+                continue
+            provider = model.split('/')[0] if '/' in model else ''
+            key_name = _provider_key_map.get(provider)
+            if key_name and not vault.get(key_name):
+                config[tier] = ''  # Reset to auto default
+        self._json({"config": config, "available_models": MODELS})
 
     def _get_failover(self):
         if not self._require_auth("user"):

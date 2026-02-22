@@ -170,6 +170,23 @@ def select_model(message: str, session) -> Tuple[str, str]:
     # If user chose a model during onboarding, use it for complex tier
     if _default_fallback and not rc.get('complex'):
         _tier_defaults['complex'] = _default_fallback
+    # Validate: strip models whose provider has no API key
+    _prov_keys = {
+        'anthropic': 'anthropic_api_key', 'openai': 'openai_api_key',
+        'xai': 'xai_api_key', 'google': 'google_api_key',
+        'openrouter': 'openrouter_api_key',
+    }
+    try:
+        from salmalm.security.crypto import vault
+        for k in ('simple', 'moderate', 'complex'):
+            model = rc.get(k, '')
+            if model:
+                prov = model.split('/')[0] if '/' in model else ''
+                key_name = _prov_keys.get(prov)
+                if key_name and not vault.get(key_name):
+                    rc[k] = ''  # Force fallback to default
+    except Exception:
+        pass
     for k in ('simple', 'moderate', 'complex'):
         if not rc[k]:
             rc[k] = _tier_defaults.get(k, _MODELS.get('sonnet', ''))
