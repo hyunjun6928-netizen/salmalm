@@ -35,10 +35,10 @@ import time
 import urllib.request
 from typing import Dict, List, Optional
 
-from salmalm.constants import BASE_DIR
+from salmalm.constants import DATA_DIR
 from salmalm.security.crypto import log
 
-NODES_CONFIG = BASE_DIR / "nodes.json"
+NODES_CONFIG = DATA_DIR / "nodes.json"
 
 
 class SSHNode:

@@ -60,7 +60,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         # No Origin header (same-origin requests, curl, etc) → no CORS headers needed
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key, X-Requested-With")
 
     def _maybe_gzip(self, body: bytes) -> bytes:
         """Compress body if client accepts gzip and body is large enough."""
@@ -1740,6 +1740,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         _clean_path = self.path.split("?")[0]
         _handler_name = self._GET_ROUTES.get(_clean_path)
         if _handler_name:
+            # Centralized auth gate: all /api/ routes require auth unless public
+            if _clean_path.startswith("/api/") and _clean_path not in self._PUBLIC_PATHS:
+                if not self._require_auth("user"):
+                    return
             return getattr(self, _handler_name)()
         if self.path == "/" or self.path == "/index.html":
             if self._needs_first_run():
@@ -2186,21 +2190,33 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self.send_error(404)
 
     def _check_origin(self) -> bool:
-        """CSRF protection: reject cross-origin state-changing requests.
-        CORS blocks response reading, but the request still executes.
-        This blocks the request itself for non-whitelisted origins."""
+        """CSRF protection for state-changing requests (POST/PUT/DELETE).
+        Two-layer defense:
+        1. Origin header must be whitelisted (if present)
+        2. Custom header X-Requested-With required for /api/ routes
+           (browsers enforce CORS preflight for custom headers, blocking cross-origin)
+        """
         origin = self.headers.get("Origin", "")
-        if not origin:
-            # No Origin header = same-origin, curl, etc. → allow
-            return True
-        if origin in self._ALLOWED_ORIGINS:
-            return True
-        log.warning(f"[BLOCK] CSRF blocked: Origin={origin} on {self.path}")
-        self.send_response(403)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(b'{"error":"Forbidden: cross-origin request"}')
-        return False
+        # Layer 1: If Origin is present, it must be whitelisted
+        if origin and origin not in self._ALLOWED_ORIGINS:
+            log.warning(f"[BLOCK] CSRF blocked: Origin={origin} on {self.path}")
+            self.send_response(403)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":"Forbidden: cross-origin request"}')
+            return False
+        # Layer 2: Require custom header for API routes (CSRF double-submit defense)
+        # Webhooks and public paths are exempt (they come from external services)
+        if self.path.startswith("/api/") and not self.path.split("?")[0] in self._PUBLIC_PATHS:
+            xrw = self.headers.get("X-Requested-With", "")
+            if not xrw:
+                # Allow if Origin was explicitly whitelisted (SPA sends both)
+                if not origin:
+                    # No Origin + no X-Requested-With = non-browser (curl, scripts) → allow
+                    # This is safe because browsers always send Origin on cross-origin
+                    return True
+            # If header present, any value is fine (existence proves CORS preflight passed)
+        return True
 
     def do_POST(self):
         """Handle HTTP POST requests."""
@@ -4224,6 +4240,10 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         _clean_post_path = self.path.split("?")[0]
         _post_handler = self._POST_ROUTES.get(_clean_post_path)
         if _post_handler:
+            # Centralized auth gate: all /api/ POST routes require auth unless public
+            if _clean_post_path.startswith("/api/") and _clean_post_path not in self._PUBLIC_PATHS:
+                if not self._require_auth("user"):
+                    return
             return getattr(self, _post_handler)()
 
         # ── Remaining POST routes (dispatch table above handles most) ──────

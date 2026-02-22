@@ -10,6 +10,18 @@
   let _tok=sessionStorage.getItem('tok')||'',pendingFile=null;
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
+  // CSRF: monkey-patch fetch to add X-Requested-With on same-origin /api/ requests
+  const _origFetch=window.fetch;
+  window.fetch=function(url,opts){
+    opts=opts||{};
+    const u=typeof url==='string'?url:(url&&url.url)||'';
+    if(u.startsWith('/api/')){
+      opts.headers=opts.headers||{};
+      if(opts.headers instanceof Headers){opts.headers.set('X-Requested-With','SalmAlm');}
+      else{opts.headers['X-Requested-With']='SalmAlm';}
+    }
+    return _origFetch.call(window,url,opts);
+  };
 
 
   /* ═══ 05-sessions.js ═══ */

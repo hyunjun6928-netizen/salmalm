@@ -3,11 +3,11 @@
 Directory-based plugin system with dynamic tool registration and hook integration.
 
 Plugin structure:
-  ~/.salmalm/plugins/my_plugin/
+  ~/SalmAlm/plugins/my_plugin/
     plugin.json    # metadata: name, version, description, tools, hooks
     __init__.py    # entry point
 
-Config: ~/.salmalm/plugins.json (enabled/disabled state)
+Config: ~/SalmAlm/plugins.json (enabled/disabled state)
 """
 
 import importlib.util
@@ -18,7 +18,9 @@ from typing import Dict, List, Optional
 
 from salmalm.security.crypto import log
 
-PLUGINS_DIR = Path.home() / ".salmalm" / "plugins"
+from salmalm.constants import DATA_DIR
+
+PLUGINS_DIR = DATA_DIR / "plugins"
 PLUGINS_STATE_FILE = Path.home() / ".salmalm" / "plugins.json"
 
 
@@ -77,7 +79,7 @@ class PluginManager:
             log.error(f"[PLUGIN] Failed to save state: {e}")
 
     def scan_and_load(self):
-        """Scan ~/.salmalm/plugins/ and load all valid plugins."""
+        """Scan ~/SalmAlm/plugins/ and load all valid plugins."""
         PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
 
         with self._lock:
