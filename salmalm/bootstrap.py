@@ -202,12 +202,8 @@ async def run_server():
             _bind_addr,
         )
     elif not vault.is_unlocked and not VAULT_FILE.exists():
-        # Fresh install: create vault with empty password
-        try:
-            vault.create("", save_to_keychain=False)
-            log.info("[VAULT] Created new vault (no password)")
-        except Exception as _e:
-            log.warning(f"[VAULT] Auto-create failed: {_e}")
+        # Fresh install: let the web setup wizard handle vault creation
+        log.info("[VAULT] No vault found — web setup wizard will guide creation")
     _allow_auto_unlock = not _is_external_bind or os.environ.get("SALMALM_AUTO_UNLOCK")
     if _allow_auto_unlock and not vault.is_unlocked and VAULT_FILE.exists():
         # 1. Try OS keychain

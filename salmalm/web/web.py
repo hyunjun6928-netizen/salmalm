@@ -103,11 +103,12 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
-        # CSP: strict nonce mode by default; SALMALM_CSP_COMPAT=1 for legacy
-        if os.environ.get("SALMALM_CSP_COMPAT"):
-            script_src = "'self' 'unsafe-inline'"
-        else:
+        # CSP: unsafe-inline by default (setup/unlock templates use inline scripts).
+        # Set SALMALM_CSP_STRICT=1 to use nonce-based script-src instead.
+        if os.environ.get("SALMALM_CSP_STRICT"):
             script_src = f"'self' 'nonce-{self._csp_nonce}'"
+        else:
+            script_src = "'self' 'unsafe-inline'"
         self.send_header(
             "Content-Security-Policy",
             f"default-src 'self'; "
@@ -122,11 +123,15 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         )
 
     def _html(self, content: str):
-        body = content.encode("utf-8")
+        body_raw = content
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self._security_headers()
+        # Inject CSP nonce into inline <script> tags (after _security_headers generates nonce)
+        if self._csp_nonce and "<script>" in body_raw:
+            body_raw = body_raw.replace("<script>", f'<script nonce="{self._csp_nonce}">')
+        body = body_raw.encode("utf-8")
         body = self._maybe_gzip(body)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
