@@ -245,8 +245,11 @@ def _make_pinned_opener(resolved_ip: str, hostname: str):
 
     class _PinnedHTTPSConnection(http.client.HTTPSConnection):
         def connect(self):
-            self.host = resolved_ip
-            super().connect()
+            # Connect TCP to pinned IP, but use original hostname for SNI + cert check
+            import socket as _sock
+            self.sock = _sock.create_connection((resolved_ip, self.port or 443), self.timeout)
+            ctx = ssl.create_default_context()
+            self.sock = ctx.wrap_socket(self.sock, server_hostname=hostname)
             self.host = hostname
 
     class _PinnedHTTPHandler(urllib.request.HTTPHandler):

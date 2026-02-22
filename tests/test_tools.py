@@ -68,7 +68,7 @@ class TestPythonEvalBlocklist(unittest.TestCase):
         content = tools_py.read_text(encoding='utf-8')
         match = re.search(r'_EVAL_BLOCKLIST\s*=\s*\[(.*?)\]', content, re.DOTALL)
         self.assertIsNotNone(match, "_EVAL_BLOCKLIST not found")
-        return re.findall(r"'([^']+)'", match.group(1))
+        return re.findall(r"""['"]([^'"]+)['"]""", match.group(1))
 
     def test_blocklist_exists(self):
         bl = self._get_blocklist()
