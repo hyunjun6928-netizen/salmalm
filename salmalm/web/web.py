@@ -614,10 +614,21 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     ],
                 }
             )
+        # Check session-level override (more accurate than global router state)
+        _cur = llm_router.current_model
+        try:
+            _sid = self.headers.get("X-Session-Id") or "web"
+            from salmalm.core import get_session as _gs_prov
+            _s = _gs_prov(_sid)
+            _override = getattr(_s, 'model_override', None)
+            if _override:
+                _cur = _override
+        except Exception:
+            pass
         self._json(
             {
                 "providers": providers,
-                "current_model": llm_router.current_model,
+                "current_model": _cur,
                 "all_models": list_available_models(),
             }
         )
@@ -3250,7 +3261,9 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             _s.model_override = model if model != 'auto' else 'auto'
         except Exception:
             pass
-        self._json({"ok": "✅" in msg, "message": msg, "current_model": llm_router.current_model})
+        # Return the effective model (session override takes precedence)
+        _effective = model if model else llm_router.current_model
+        self._json({"ok": "✅" in msg, "message": msg, "current_model": _effective})
 
     def _post_api_test_provider(self):
         """Handle /api/llm-router/test-key and /api/test-provider."""
