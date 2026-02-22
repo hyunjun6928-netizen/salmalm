@@ -3950,6 +3950,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             'reflection': os.environ.get('SALMALM_REFLECT', '0') == '1',
             'compaction_threshold': COMPACTION_THRESHOLD,
             'cost_cap': os.environ.get('SALMALM_COST_CAP', ''),
+            'max_tool_iterations': int(os.environ.get('SALMALM_MAX_TOOL_ITER', '15')),
         })
 
     def _post_api_engine_settings(self):
@@ -3967,6 +3968,13 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 val = int(body['compaction_threshold'])
                 if 10000 <= val <= 200000:
                     _const.COMPACTION_THRESHOLD = val
+            except (ValueError, TypeError):
+                pass
+        if 'max_tool_iterations' in body:
+            try:
+                val = int(body['max_tool_iterations'])
+                if 3 <= val <= 50:
+                    os.environ['SALMALM_MAX_TOOL_ITER'] = str(val)
             except (ValueError, TypeError):
                 pass
         if 'cost_cap' in body:

@@ -1171,6 +1171,7 @@
       var rf=document.getElementById('eng-reflection');if(rf)rf.checked=!!d.reflection;
       var cp=document.getElementById('eng-compaction');if(cp)cp.value=String(d.compaction_threshold||30000);
       var cc=document.getElementById('eng-cost-cap');if(cc)cc.value=d.cost_cap||'';
+      var mi=document.getElementById('eng-max-tool-iter');if(mi)mi.value=String(d.max_tool_iterations||15);
     }).catch(function(){});
     if(window._checkTgStatus)window._checkTgStatus();
     if(window._checkDcStatus)window._checkDcStatus();
@@ -1965,6 +1966,7 @@
         planning:!!document.getElementById('eng-planning').checked,
         reflection:!!document.getElementById('eng-reflection').checked,
         compaction_threshold:parseInt(document.getElementById('eng-compaction').value)||30000,
+        max_tool_iterations:parseInt(document.getElementById('eng-max-tool-iter').value)||15,
         cost_cap:document.getElementById('eng-cost-cap').value.trim()
       };
       fetch('/api/engine/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})

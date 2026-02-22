@@ -795,6 +795,41 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           </div>
         </div>
 
+        <!-- Max Tool Iterations -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <span style="font-size:14px"><b>🔄 Max Tool Iterations / 최대 도구 반복 횟수</b></span>
+          </div>
+          <div style="margin-bottom:8px">
+            <select id="eng-max-tool-iter" style="width:auto;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+              <option value="5">Conservative (5)</option>
+              <option value="10">Moderate (10)</option>
+              <option value="15" selected>Default (15)</option>
+              <option value="25">Extended (25)</option>
+              <option value="40">Maximum (40)</option>
+            </select>
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8">
+            Maximum number of tool calls the AI can make in a single response. When reached, the AI stops and returns "Reached maximum tool iterations."<br>
+            Higher values allow complex multi-step tasks (file editing, multi-search) to complete, but cost more tokens per turn.<br>
+            <b>5 (Conservative):</b> Simple tasks only. Limits runaway loops. <span style="color:#4ade80">Cheapest — caps output at ~2K tok/turn</span><br>
+            <b>10 (Moderate):</b> Most coding tasks complete. <span style="color:#facc15">~4K tok/turn max</span><br>
+            <b>15 (Default):</b> Good balance — handles multi-file edits. <span style="color:#f97316">~6K tok/turn max</span><br>
+            <b>25 (Extended):</b> Complex refactoring, multi-tool chains. <span style="color:#f87171">~10K tok/turn max</span><br>
+            <b>40 (Maximum):</b> Long autonomous coding sessions. <span style="color:#f87171">~16K tok/turn max — expensive!</span><br>
+            <br>
+            AI가 한 번의 응답에서 실행할 수 있는 최대 도구 호출 횟수입니다. 도달 시 "Reached maximum tool iterations" 메시지와 함께 중단됩니다.<br>
+            높을수록 복잡한 다단계 작업(파일 편집, 다중 검색)이 완료되지만, 턴당 토큰 비용이 증가합니다.<br>
+            <b>5 (보수적):</b> 단순 작업만. 폭주 루프 방지. <span style="color:#4ade80">최저 비용</span><br>
+            <b>15 (기본):</b> 적절한 균형 — 멀티 파일 편집 처리 가능<br>
+            <b>25 (확장):</b> 복잡한 리팩토링, 다중 도구 체인<br>
+            <b>40 (최대):</b> 긴 자율 코딩 세션. <span style="color:#f87171">비용 주의!</span><br>
+            <br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> No hard iteration limit exposed to users. Tool loops run until the model decides to stop or hits provider context limits. Internal loop detection prevents infinite cycles.<br>
+            🆚 <b>오픈클로:</b> 사용자에게 노출된 반복 제한 없음. 모델이 스스로 중단하거나 프로바이더 컨텍스트 한도에 도달할 때까지 실행. 내부 루프 감지로 무한 순환 방지.</span>
+          </div>
+        </div>
+
         <!-- Cost Cap -->
         <div style="border-left:3px solid var(--accent);padding-left:14px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">

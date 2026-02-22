@@ -629,7 +629,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         iteration = 0
         consecutive_errors = 0
         _session_id = getattr(session, 'id', '')
-        while iteration < self.MAX_TOOL_ITERATIONS:
+        _max_iter = int(_os.environ.get('SALMALM_MAX_TOOL_ITER', str(self.MAX_TOOL_ITERATIONS)))
+        while iteration < _max_iter:
             # Abort check (생성 중지 체크) — LibreChat style
             from salmalm.features.edge_cases import abort_controller
             if abort_controller.is_aborted(_session_id):
@@ -878,7 +879,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             return response
 
         # Loop exhausted — MAX_TOOL_ITERATIONS reached
-        log.warning(f"[BREAK] Max iterations ({self.MAX_TOOL_ITERATIONS}) reached")
+        log.warning(f"[BREAK] Max iterations ({_max_iter}) reached")
         response = result.get('content', 'Reached maximum tool iterations. Please try a simpler request.')  # noqa: F821
         if not response:
             response = 'Reached maximum tool iterations. Please try a simpler request.'
