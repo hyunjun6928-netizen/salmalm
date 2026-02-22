@@ -31,6 +31,9 @@ from salmalm.web.auth import auth_manager, rate_limiter, extract_auth, RateLimit
 from salmalm.utils.logging_ext import request_logger, set_correlation_id
 from salmalm.web import templates as _tmpl
 
+# Google OAuth CSRF state tokens {state: timestamp}
+_google_oauth_pending_states: dict = {}
+
 # ============================================================
 
 
@@ -91,23 +94,20 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     def _security_headers(self):
         """Add security headers to all responses.
 
-        CSP uses nonce-based script-src when SALMALM_CSP_NONCE=1 (strict mode).
-        Default: 'unsafe-inline' for compatibility with single-page inline scripts.
-        TODO(v0.18): Migrate all inline scripts to external files, remove unsafe-inline.
+        CSP defaults to nonce-based script-src (strict mode).
+        Set SALMALM_CSP_COMPAT=1 to fall back to 'unsafe-inline' for compatibility.
         """
-        import secrets as _secrets
-
-        self._csp_nonce = _secrets.token_urlsafe(16)
+        self._csp_nonce = secrets.token_urlsafe(16)
 
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
-        # CSP: nonce mode (strict) vs inline mode (compat)
-        if os.environ.get("SALMALM_CSP_NONCE"):
-            script_src = f"'self' 'nonce-{self._csp_nonce}'"
-        else:
+        # CSP: strict nonce mode by default; SALMALM_CSP_COMPAT=1 for legacy
+        if os.environ.get("SALMALM_CSP_COMPAT"):
             script_src = "'self' 'unsafe-inline'"
+        else:
+            script_src = f"'self' 'nonce-{self._csp_nonce}'"
         self.send_header(
             "Content-Security-Policy",
             f"default-src 'self'; "
@@ -278,11 +278,6 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             from salmalm.core import _get_db
 
             conn = _get_db()
-            try:
-                conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
-                conn.commit()
-            except Exception:
-                pass
             conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
             conn.commit()
             self._json({"ok": True})
@@ -1306,12 +1301,6 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         from salmalm.core import _get_db
 
         conn = _get_db()
-        # Ensure title column exists
-        try:
-            conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
-            conn.commit()
-        except Exception:
-            pass
         rows = conn.execute(
             "SELECT session_id, updated_at, title, parent_session_id FROM session_store ORDER BY updated_at DESC"
         ).fetchall()
@@ -1648,6 +1637,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         port = self.server.server_address[1]
         redirect_uri = f"http://localhost:{port}/api/google/callback"
+        # CSRF protection: generate and store state token
+        state = secrets.token_urlsafe(32)
+        _google_oauth_pending_states[state] = time.time()
         params = urllib.parse.urlencode(
             {
                 "client_id": client_id,
@@ -1656,6 +1648,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 "scope": "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/calendar",
                 "access_type": "offline",
                 "prompt": "consent",
+                "state": state,
             }
         )
         url = f"https://accounts.google.com/o/oauth2/v2/auth?{params}"
@@ -1957,7 +1950,29 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query)
             code = params.get("code", [""])[0]
+            state = params.get("state", [""])[0]
             error = params.get("error", [""])[0]
+            # CSRF: validate state token
+            if not state or state not in _google_oauth_pending_states:
+                self._html(
+                    '<html><body><h2>Invalid OAuth State</h2>'
+                    "<p>CSRF protection: state token missing or invalid.</p>"
+                    '<p><a href="/">Back</a></p></body></html>'
+                )
+                return
+            issued_at = _google_oauth_pending_states.pop(state)
+            # Expire states older than 10 minutes
+            if time.time() - issued_at > 600:
+                self._html(
+                    '<html><body><h2>OAuth State Expired</h2>'
+                    '<p>Please try again.</p><p><a href="/">Back</a></p></body></html>'
+                )
+                return
+            # Cleanup stale states (older than 15 min)
+            cutoff = time.time() - 900
+            stale = [k for k, v in _google_oauth_pending_states.items() if v < cutoff]
+            for k in stale:
+                _google_oauth_pending_states.pop(k, None)
             if error:
                 self._html(
                     f'<html><body><h2>Google OAuth Error</h2><p>{error}</p><p><a href="/">Back</a></p></body></html>'
@@ -2994,12 +3009,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         from salmalm.core import _get_db
 
         conn = _get_db()
-        # Store title in a separate column (add if not exists)
-        try:
-            conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
-            conn.commit()
-        except Exception:
-            pass  # column already exists
         conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
         conn.commit()
         self._json({"ok": True})

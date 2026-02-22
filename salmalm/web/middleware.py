@@ -8,7 +8,6 @@ skip auth or audit.
 from __future__ import annotations
 
 import logging
-import time
 from typing import Dict, Optional
 
 log = logging.getLogger(__name__)
@@ -102,25 +101,10 @@ def register_route_policy(path: str, policy: RoutePolicy) -> None:
     _ROUTE_POLICIES[path] = policy
 
 
-# ── Rate limiter (in-memory, per-IP) ──
-
-_rate_buckets: Dict[str, list] = {}  # key -> [timestamp, ...]
-_RATE_WINDOW = 60  # seconds
-_RATE_LIMIT = 60  # requests per window (per IP)
-
-
-def check_rate_limit(key: str) -> bool:
-    """Returns True if request is allowed, False if rate limited."""
-    now = time.time()
-    cutoff = now - _RATE_WINDOW
-    bucket = _rate_buckets.get(key, [])
-    bucket = [t for t in bucket if t > cutoff]
-    if len(bucket) >= _RATE_LIMIT:
-        _rate_buckets[key] = bucket
-        return False
-    bucket.append(now)
-    _rate_buckets[key] = bucket
-    return True
+# ── Rate limiter ──
+# Unified rate limiter lives in auth.py (RateLimiter class with token bucket).
+# Legacy per-IP sliding window removed in v0.18.50 to eliminate duplication.
+# Use: from salmalm.web.auth import rate_limiter
 
 
 # ── External exposure safety checks ──
