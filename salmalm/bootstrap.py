@@ -243,8 +243,10 @@ async def run_server():
     if vault.is_unlocked:
         tg_token = vault.get('telegram_token')
         tg_owner = vault.get('telegram_owner_id')
+        log.info(f"[TELEGRAM] token={'YES' if tg_token else 'NO'}, owner={'YES' if tg_owner else 'NO'}, vault_unlocked={vault.is_unlocked}")
         if tg_token and tg_owner:
             telegram_bot.configure(tg_token, tg_owner)
+            log.info("[TELEGRAM] Bot configured, starting polling...")
             import os as _os2
             _wh_url = _os2.environ.get('SALMALM_TELEGRAM_WEBHOOK_URL') or vault.get('telegram_webhook_url') or ''
             if _wh_url:
@@ -253,6 +255,20 @@ async def run_server():
                                          else _wh_url)
             else:
                 asyncio.create_task(telegram_bot.poll())
+
+    # ── Phase 12: Discord Bot ──
+    if vault.is_unlocked:
+        dc_token = vault.get('discord_token')
+        dc_guild = vault.get('discord_guild_id')
+        log.info(f"[DISCORD] token={'YES' if dc_token else 'NO'}, guild={'YES' if dc_guild else 'NO'}")
+        if dc_token:
+            try:
+                from salmalm.channels.discord_bot import discord_bot
+                discord_bot.configure(dc_token, dc_guild)
+                asyncio.create_task(discord_bot.poll())
+                log.info("[DISCORD] Bot configured, starting polling...")
+            except Exception as e:
+                log.warning(f"[DISCORD] Failed to start: {e}")
 
     _rag_stats = rag_engine.get_stats()  # noqa: F841
     st = f"{selftest['passed']}/{selftest['total']}"
