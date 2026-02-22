@@ -5,6 +5,9 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
+# Enable HMAC-CTR fallback when cryptography is not installed
+os.environ.setdefault("SALMALM_VAULT_FALLBACK", "1")
+
 
 class TestVaultLifecycle:
     """Test vault creation and unlock."""

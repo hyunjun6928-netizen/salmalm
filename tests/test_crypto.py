@@ -7,6 +7,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+# Enable HMAC-CTR fallback when cryptography is not installed
+os.environ.setdefault("SALMALM_VAULT_FALLBACK", "1")
+
 try:
     import cryptography  # noqa: F401
     _HAS_CRYPTO = True

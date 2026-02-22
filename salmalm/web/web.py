@@ -148,6 +148,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         "/api/google/callback",
         "/webhook/telegram",
         "/webhook/slack",
+        "/api/check-update",
     }
 
     def _require_auth(self, min_role: str = "user") -> Optional[dict]:
