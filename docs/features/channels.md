@@ -1,45 +1,86 @@
 # Telegram & Discord
-# 텔레그램 및 디스코드
 
-## Overview / 개요
+## Telegram Bot
 
-SalmAlm connects to Telegram and Discord as a bot, providing the full AI assistant experience on mobile.
+### Setup
 
-SalmAlm은 텔레그램과 디스코드에 봇으로 연결되어 모바일에서 완전한 AI 비서 경험을 제공합니다.
+1. [@BotFather](https://t.me/BotFather) → `/newbot` → Copy token
+2. Web UI → Settings → Telegram → Paste token + chat ID
+3. Restart SalmAlm
 
-## Telegram / 텔레그램
+### Features
 
-### Setup / 설정
+| Feature | Description |
+|---|---|
+| 👀 Ack reaction | Shows processing indicator on message |
+| 💬 Reply-to | Responses quote the original message |
+| ⌨️ Typing indicator | Continuous typing while processing |
+| 📝 Streaming preview | Draft message edited in real-time as tokens arrive |
+| 📋 Command menu | 12 commands registered via setMyCommands |
+| ✂️ Smart split | 4096-char chunks respecting code blocks and paragraphs |
+| 🔘 Inline buttons | Clickable action buttons in responses |
+| 🖼️ Media | Image, audio, document sending |
+| 🎤 Voice | TTS voice message responses |
+| 🌐 Webhook | Optional webhook mode for production |
 
-1. Create a bot via [@BotFather](https://t.me/BotFather) / @BotFather로 봇 생성
-2. Set environment variables / 환경변수 설정:
+### Commands
 
-```ini
-TELEGRAM_TOKEN=123456:ABC...
-TELEGRAM_OWNER_ID=your_user_id
+```
+/start       — Status
+/help        — Show commands
+/usage       — Token usage & cost
+/model       — Switch AI model
+/briefing    — Daily briefing
+/routine     — Morning/evening routine
+/note        — Quick note
+/remind      — Reminders
+/expense     — Expense tracking
+/cal         — Calendar
+/mail        — Email
+/clear       — Clear conversation
+/compact     — Compress history
+/tts on|off  — Toggle voice
 ```
 
-### Features / 기능
+### Group Chat
 
-- Polling + webhook support / 폴링 + 웹훅 지원
-- Inline buttons / 인라인 버튼
-- Image/voice/document uploads / 이미지/음성/문서 업로드
-- All slash commands / 모든 슬래시 명령어
-- Real-time streaming / 실시간 스트리밍
+- Bot responds only when @mentioned or replied to
+- Privacy mode must be disabled for full group visibility (BotFather → `/setprivacy`)
+- Each group gets an isolated session
 
-## Discord / 디스코드
+## Discord Bot
 
-### Setup / 설정
+### Setup
 
-1. Create a bot at [Discord Developer Portal](https://discord.com/developers) / 디스코드 개발자 포털에서 봇 생성
-2. Set environment variable / 환경변수 설정:
+1. [Developer Portal](https://discord.com/developers/applications) → New Application
+2. Bot → Enable **Message Content Intent**
+3. OAuth2 → `bot` + `applications.commands` → Generate URL → Add to server
+4. Web UI → Settings → Discord → Paste token
+5. Restart SalmAlm
 
-```ini
-DISCORD_TOKEN=...
+### Features
+
+| Feature | Description |
+|---|---|
+| 👀 Ack reaction | Shows processing indicator |
+| 💬 Reply-to | Responses reference the original message |
+| ⌨️ Typing indicator | Continuous typing (8s refresh) |
+| 📝 Streaming preview | Draft message edited as tokens arrive |
+| ✂️ Smart split | 2000-char chunks respecting paragraphs |
+
+### Commands
+
+```
+/start    — Status
+/help     — Show commands
+/usage    — Token usage & cost
+/model    — Switch AI model
+/clear    — Clear conversation
+/compact  — Compress history
 ```
 
-### Features / 기능
+### Behavior
 
-- Guild support / 길드 지원
-- Message reactions / 메시지 리액션
-- Thread support / 스레드 지원
+- **DMs**: Bot responds to all messages
+- **Guilds**: Bot responds only when @mentioned
+- Each channel gets its own isolated session

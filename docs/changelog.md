@@ -1,47 +1,95 @@
 # Changelog
-# 변경 이력
 
-See the full changelog at [CHANGELOG.md on GitHub](https://github.com/hyunjun6928-netizen/salmalm/blob/main/CHANGELOG.md).
+## v0.18.73 (2026-02-23)
 
-전체 변경 이력은 [GitHub의 CHANGELOG.md](https://github.com/hyunjun6928-netizen/salmalm/blob/main/CHANGELOG.md)에서 확인하세요.
+### Bot UX (OpenClaw-style)
+- **Telegram**: Ack reaction (👀), reply-to threading, setMyCommands menu (12 commands)
+- **Discord**: Ack reaction, reply-to, streaming preview (draft→edit), smart message splitting, 6 built-in commands
 
-## v0.14.0 (Latest / 최신)
+### Memory System
+- Auto-curate: promote important daily entries to MEMORY.md after compaction
+- Auto-log: significant conversations recorded to daily memory automatically
 
-Current release with 66 tools, multi-channel support, and enterprise security features.
+### Cron Jobs
+- Error tracking with `last_error` and `error_count` per job
+- Auto-disable after 5 consecutive failures
+- Failure notifications to owner via Telegram
 
-66개 내장 도구, 멀티채널 지원, 엔터프라이즈 보안 기능을 갖춘 현재 릴리스.
+## v0.18.72 (2026-02-23)
 
-## v0.12.4
+### Fresh Install UX
+- Setup wizard always shown on fresh install (bootstrap vault auto-create removed)
+- CSP default flipped to `unsafe-inline` (templates use inline scripts)
+- Strict nonce mode opt-in via `SALMALM_CSP_STRICT=1`
+- 7 E2E tests: vault→setup→onboarding→main UI
 
-- Google OAuth2 Setup Wizard / 구글 OAuth2 설정 마법사
-- 43 tools with categorized system prompt / 43개 도구 카테고리 시스템 프롬프트
+### Engine Refactor
+- `_execute_loop` god object split: 280→130 lines
+- 10 helper functions extracted to `core/loop_helpers.py`
 
-## v0.12.2
+## v0.18.64 (2026-02-22)
 
-- 4 new tools: `weather`, `rss_reader`, `translate`, `qr_code` / 4개 새 도구
-- Korean natural language time parsing / 한국어 자연어 시간 파싱
+### Security (5 review rounds)
+- Session user_id scoping (multi-tenant isolation)
+- Vault export requires admin role
+- `@register('browser')` misplacement fix
+- Path validation `startswith()` → `Path.is_relative_to()`
 
-## v0.12.0
+## v0.18.63
 
-- MCP Server + Client (JSON-RPC 2.0) / MCP 서버 + 클라이언트
-- 7 new tools (39 total) / 7개 새 도구 (총 39개)
-- Dockerfile + Ollama support / Dockerfile + Ollama 지원
+### Security
+- Tool tier names aligned to 67 registered tools (CRITICAL 14, HIGH 9)
+- Irreversible action gate: email_send, gmail send, calendar_delete require `_confirmed=true`
+- Browser SSRF defense: `_is_internal_url()` blocks private/loopback on external bind
+- Exec bypass test vectors (find -exec, tar --to-command, etc.)
 
-## v0.11.5
+## v0.18.61
 
-- CSP nonce security / CSP 논스 보안
-- 98% docstring coverage / 98% 독스트링 커버리지
-- 375 tests / 375개 테스트
+### Security
+- Shared `security/redact.py` module (9 secret patterns)
+- Audit log redaction in tool_handlers and tool_registry
+- Write tools blocked outside allowed roots
+- Memory delegates to shared redact (DRY)
 
-## v0.11.1
+## v0.18.55
 
-- Multi-session UI / 멀티세션 UI
-- Dashboard with Chart.js / Chart.js 대시보드
-- STT (Speech-to-Text) / 음성 텍스트 변환
-- PWA installable / PWA 설치 가능
+### Security
+- CLI OAuth gated behind `SALMALM_CLI_OAUTH=1`
+- Memory secret scrubbing before write
+- Elevated command blocking on external bind
 
-## v0.11.0
+## v0.18.37
 
-- `image_analyze` vision tool / 비전 도구
-- SSE streaming / SSE 스트리밍
-- CI/CD GitHub Actions / CI/CD
+### Security (P0-P2)
+- `ruff format` applied to 226 files
+- BackgroundSession kill: Popen + os.killpg()
+- Plugins default OFF (`SALMALM_PLUGINS=1`)
+- SSRF DNS pinning defense
+- shlex.split for exec parser
+- Audit logging standardized
+- 19 security regression tests
+
+## v0.18.35
+
+### Model Router
+- `X-Session-Id` header in model router requests
+- `model_override` semantics fixed
+- Graceful restart support
+- Auto routing classification hints
+
+## v0.18.30
+
+### Cost Optimization
+- Dynamic tool selection: 67→0 (chat) / 7-12 (actions)
+- Tool schema compression: 7,749→693 tokens (91%)
+- Smart model routing: simple→Haiku, moderate→Sonnet, complex→Opus
+- Intent-based max_tokens and history trim
+- System prompt compressed: 762→310 tokens
+- **Result: $7.09/day → $1.23/day (83% savings)**
+
+### Web UI
+- Engine Optimization panel with all toggles
+- Auto Routing panel with classification guide
+- i18n EN/KR split (`.eng-en`/`.eng-kr` CSS classes)
+- Telegram & Discord settings panels
+- OpenClaw-like preset

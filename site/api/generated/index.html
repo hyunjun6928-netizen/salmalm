@@ -1,0 +1,4063 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Personal AI Gateway — Your AI Assistant in One Command">
+      
+      
+      
+        <link rel="canonical" href="https://hyunjun6928-netizen.github.io/salmalm/api/generated/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+    
+    
+      
+        <title>Auto-Generated API Reference - SalmAlm Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#auto-generated-api-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="SalmAlm Documentation" class="md-header__button md-logo" aria-label="SalmAlm Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SalmAlm Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Auto-Generated API Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/hyunjun6928-netizen/salmalm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    hyunjun6928-netizen/salmalm
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../commands/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Commands
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../tools/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Tools
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../architecture/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../features/" class="md-tabs__link">
+          
+  
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../deployment/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Deployment
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="SalmAlm Documentation" class="md-nav__button md-logo" aria-label="SalmAlm Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    SalmAlm Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/hyunjun6928-netizen/salmalm" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    hyunjun6928-netizen/salmalm
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../channels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Channels
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utils
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/multi-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Model Routing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/thinking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extended Thinking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/rag/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RAG & Knowledge Base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/sessions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Session Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/personal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Personal Assistant
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/channels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Telegram & Discord
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/self-evolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-Evolution
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/sla/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SLA & Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="auto-generated-api-reference">Auto-Generated API Reference<a class="headerlink" href="#auto-generated-api-reference" title="Permanent link">&para;</a></h1>
+<h1 id="api">자동 생성 API 레퍼런스<a class="headerlink" href="#api" title="Permanent link">&para;</a></h1>
+<p>Generated from source docstrings. Run <code>python docs/gen_api.py</code> to update.
+소스 docstring에서 생성됨. <code>python docs/gen_api.py</code>를 실행하여 업데이트.</p>
+<h2 id="core-core-engine-llm-session-llm">core/ — Core — Engine, LLM, Session / 코어 — 엔진, LLM, 세션<a class="headerlink" href="#core-core-engine-llm-session-llm" title="Permanent link">&para;</a></h2>
+<h3 id="salmalmcore__init__"><code>salmalm.core.__init__</code><a class="headerlink" href="#salmalmcore__init__" title="Permanent link">&para;</a></h3>
+<h4 id="class-_pkgproxy"><code>class _PkgProxy</code><a class="headerlink" href="#class-_pkgproxy" title="Permanent link">&para;</a></h4>
+<h3 id="salmalmcorecore"><code>salmalm.core.core</code><a class="headerlink" href="#salmalmcorecore" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm core — audit, cache, usage, router, compaction, search,</p>
+</blockquote>
+<h4 id="class-responsecache"><code>class ResponseCache</code><a class="headerlink" href="#class-responsecache" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Simple TTL cache for LLM responses to avoid duplicate calls.</p>
+</blockquote>
+<ul>
+<li><code>get(model, messages, session_id)</code>
+  — Get a cached response by key, or None if expired/missing.</li>
+<li><code>put(model, messages, response, session_id)</code>
+  — Store a response in cache with TTL.</li>
+</ul>
+<h4 id="class-costcapexceeded"><code>class CostCapExceeded</code><a class="headerlink" href="#class-costcapexceeded" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Raised when cumulative API spend exceeds the cost cap.</p>
+</blockquote>
+<h4 id="class-modelrouter"><code>class ModelRouter</code><a class="headerlink" href="#class-modelrouter" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Routes queries to appropriate models based on complexity.</p>
+</blockquote>
+<ul>
+<li><code>set_force_model(model)</code>
+  — Set and persist model preference.</li>
+<li><code>route(user_message, has_tools, iteration)</code>
+  — Route a message to the best model based on intent classification.</li>
+</ul>
+<h4 id="class-tfidfsearch"><code>class TFIDFSearch</code><a class="headerlink" href="#class-tfidfsearch" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Lightweight TF-IDF + cosine similarity search. No external deps.</p>
+</blockquote>
+<ul>
+<li><code>search(query, max_results)</code>
+  — Search with TF-IDF + cosine similarity. Returns [(score, label, lineno, snippet)].</li>
+</ul>
+<h4 id="class-llmcronmanager"><code>class LLMCronManager</code><a class="headerlink" href="#class-llmcronmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>OpenClaw-style LLM cron with isolated session execution.</p>
+</blockquote>
+<ul>
+<li><code>load_jobs()</code>
+  — Load persisted cron jobs from file.</li>
+<li><code>save_jobs()</code>
+  — Persist cron jobs to file.</li>
+<li><code>add_job(name, schedule, prompt, model, notify)</code>
+  — Add a new LLM cron job.</li>
+<li><code>remove_job(job_id)</code>
+  — Remove a scheduled cron job by ID.</li>
+<li><code>list_jobs()</code>
+  — List all registered cron jobs with their schedules.</li>
+<li><code>async tick()</code>
+  — Check and execute due jobs. Also runs heartbeat if due.</li>
+</ul>
+<h4 id="class-session"><code>class Session</code><a class="headerlink" href="#class-session" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>OpenClaw-style isolated session with its own context.</p>
+</blockquote>
+<ul>
+<li><code>add_system(content)</code>
+  — Add a system message to the session.</li>
+<li><code>add_user(content)</code>
+  — Add a user message to the session.</li>
+<li><code>add_assistant(content)</code>
+  — Add an assistant response to the session.</li>
+<li><code>add_tool_results(results)</code>
+  — Add tool results as a single user message with all results.</li>
+</ul>
+<h4 id="class-cronscheduler"><code>class CronScheduler</code><a class="headerlink" href="#class-cronscheduler" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>OpenClaw-style cron scheduler with isolated session execution.</p>
+</blockquote>
+<ul>
+<li><code>add_job(name, interval_seconds, callback)</code>
+  — Add a new cron job with the given schedule and callback.</li>
+<li><code>async run()</code>
+  — Start the cron scheduler loop.</li>
+<li><code>stop()</code>
+  — Stop the cron scheduler loop.</li>
+</ul>
+<h4 id="class-heartbeatmanager"><code>class HeartbeatManager</code><a class="headerlink" href="#class-heartbeatmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>OpenClaw-style heartbeat: periodic self-check with HEARTBEAT.md.</p>
+</blockquote>
+<ul>
+<li><code>get_prompt(cls)</code>
+  — Read HEARTBEAT.md for the heartbeat checklist.</li>
+<li><code>should_beat(cls)</code>
+  — Check if it's time for a heartbeat.</li>
+<li><code>get_state(cls)</code>
+  — Get current heartbeat state (for tools/API).</li>
+<li><code>update_check(cls, check_name)</code>
+  — Record that a specific check was performed (email, calendar, etc).</li>
+<li><code>time_since_check(cls, check_name)</code>
+  — Seconds since a named check was last performed. None if never.</li>
+<li>
+<p><code>async beat(cls)</code>
+  — Execute a heartbeat check in an isolated session.</p>
+</li>
+<li>
+<p><code>audit_log(event, detail, session_id, detail_dict)</code>
+  — Write an audit event to the security log (v1 chain + v2 structured).</p>
+</li>
+<li><code>audit_log_cleanup(days)</code>
+  — Delete audit_log_v2 entries older than <code>days</code> days.</li>
+<li><code>query_audit_log(limit, event_type, session_id)</code>
+  — Query structured audit log entries.</li>
+<li><code>close_all_db_connections()</code>
+  — Close all tracked SQLite connections (for graceful shutdown).</li>
+<li><code>check_cost_cap()</code>
+  — Raise CostCapExceeded if cumulative cost exceeds the cap. 0 = disabled.</li>
+<li><code>set_current_user_id(user_id)</code>
+  — Set the current user_id for cost tracking (thread-local).</li>
+<li><code>get_current_user_id()</code>
+  — Get the current user_id from thread-local context.</li>
+<li><code>track_usage(model, input_tokens, output_tokens, user_id)</code>
+  — Record token usage and cost for a model call.</li>
+<li><code>get_usage_report()</code>
+  — Generate a formatted usage report with token counts and costs.</li>
+<li><code>compact_messages(messages, model, session)</code>
+  — Multi-stage compaction: trim tool results → drop old tools → summarize.</li>
+<li><code>get_telegram_bot()</code>
+  — Accessor for the Telegram bot instance (avoids direct global access).</li>
+<li><code>set_telegram_bot(bot)</code>
+  — Set the Telegram bot instance (called during startup).</li>
+<li><code>get_session(session_id, user_id)</code>
+  — Get or create a chat session by ID.</li>
+<li><code>rollback_session(session_id, count)</code>
+  — Roll back the last <code>count</code> user+assistant message pairs.</li>
+<li><code>branch_session(session_id, message_index)</code>
+  — Create a new session branching from session_id at message_index.</li>
+</ul>
+<h3 id="salmalmcoreengine"><code>salmalm.core.engine</code><a class="headerlink" href="#salmalmcoreengine" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Intelligence Engine — TaskClassifier + IntelligenceEngine + process_message.</p>
+</blockquote>
+<h4 id="class-taskclassifier"><code>class TaskClassifier</code><a class="headerlink" href="#class-taskclassifier" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Classify user intent to determine execution strategy.</p>
+</blockquote>
+<ul>
+<li><code>classify(cls, message, context_len)</code>
+  — Classify user message intent and determine processing tier.</li>
+</ul>
+<h4 id="class-intelligenceengine"><code>class IntelligenceEngine</code><a class="headerlink" href="#class-intelligenceengine" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Core AI reasoning engine — surpasses OpenClaw's capabilities.</p>
+</blockquote>
+<ul>
+<li>
+<p><code>async run(session, user_message, model_override, on_tool, classification)</code>
+  — Main execution loop — Plan → Execute → Reflect.</p>
+</li>
+<li>
+<p><code>get_routing_config()</code>
+  — Public getter for routing config (used by web API).</p>
+</li>
+<li><code>async process_message(session_id, user_message, model_override, image_data, on_tool)</code>
+  — Process a user message through the Intelligence Engine pipeline.</li>
+<li><code>estimate_tokens(text)</code>
+  — Estimate tokens: Korean /2, English /4, mixed weighted.</li>
+<li><code>estimate_cost(model, usage)</code>
+  — Estimate cost in USD from usage dict.</li>
+<li><code>record_response_usage(session_id, model, usage)</code>
+  — Record per-response usage for /usage command.</li>
+<li><code>begin_shutdown()</code>
+  — Signal the engine to stop accepting new requests.</li>
+<li><code>wait_for_active_requests(timeout)</code>
+  — Wait for active requests to complete. Returns True if all done, False if timed out.</li>
+</ul>
+<h3 id="salmalmcoreexceptions"><code>salmalm.core.exceptions</code><a class="headerlink" href="#salmalmcoreexceptions" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm exception hierarchy.</p>
+</blockquote>
+<h4 id="class-salmalmerror"><code>class SalmAlmError</code><a class="headerlink" href="#class-salmalmerror" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Base exception for all SalmAlm errors.</p>
+</blockquote>
+<h4 id="class-llmerror"><code>class LLMError</code><a class="headerlink" href="#class-llmerror" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>LLM API call or response errors.</p>
+</blockquote>
+<h4 id="class-toolerror"><code>class ToolError</code><a class="headerlink" href="#class-toolerror" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Tool execution errors.</p>
+</blockquote>
+<h4 id="class-autherror"><code>class AuthError</code><a class="headerlink" href="#class-autherror" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Authentication / authorization errors.</p>
+</blockquote>
+<h4 id="class-configerror"><code>class ConfigError</code><a class="headerlink" href="#class-configerror" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Configuration loading / validation errors.</p>
+</blockquote>
+<h4 id="class-sessionerror"><code>class SessionError</code><a class="headerlink" href="#class-sessionerror" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Session management errors.</p>
+</blockquote>
+<h3 id="salmalmcoreexport"><code>salmalm.core.export</code><a class="headerlink" href="#salmalmcoreexport" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Conversation Export — export current session as Markdown, JSON, or HTML.</p>
+</blockquote>
+<ul>
+<li><code>export_session(session, fmt)</code>
+  — Export a session to the specified format.</li>
+</ul>
+<h3 id="salmalmcorehealth"><code>salmalm.core.health</code><a class="headerlink" href="#salmalmcorehealth" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Health Endpoint — K8s readiness/liveness probe compatible.</p>
+</blockquote>
+<ul>
+<li><code>get_health_report()</code>
+  — Build comprehensive health report.</li>
+</ul>
+<h3 id="salmalmcoreimage_resize"><code>salmalm.core.image_resize</code><a class="headerlink" href="#salmalmcoreimage_resize" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Auto-resize images for vision input to reduce token cost.</p>
+</blockquote>
+<ul>
+<li><code>resize_image_b64(b64_data, mime, max_dim)</code>
+  — Resize a base64-encoded image so its longest side &lt;= max_dim.</li>
+</ul>
+<h3 id="salmalmcorellm"><code>salmalm.core.llm</code><a class="headerlink" href="#salmalmcorellm" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm LLM — Multi-provider API calls with caching and fallback.</p>
+</blockquote>
+<ul>
+<li><code>call_llm(messages, model, tools, max_tokens, thinking)</code>
+  — Call LLM API. Returns {'content': str, 'tool_calls': list, 'usage': dict}.</li>
+<li><code>stream_anthropic(messages, model, tools, max_tokens, thinking)</code>
+  — Stream Anthropic API responses token-by-token using raw urllib SSE.</li>
+</ul>
+<h3 id="salmalmcorellm_loop"><code>salmalm.core.llm_loop</code><a class="headerlink" href="#salmalmcorellm_loop" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>LLM call loop — streaming, failover, cooldowns, routing.</p>
+</blockquote>
+<ul>
+<li><code>get_failover_config()</code>
+  — Public getter for failover config (used by web API / settings).</li>
+<li><code>save_failover_config(config)</code>
+  — Save user's failover chain config.</li>
+<li><code>async call_with_failover(messages, model, tools, max_tokens, thinking)</code>
+  — LLM call with automatic failover on failure.</li>
+<li><code>async try_llm_call(messages, model, tools, max_tokens, thinking)</code>
+  — Single LLM call attempt. Sets _failed=True on exception.</li>
+</ul>
+<h3 id="salmalmcorellm_task"><code>salmalm.core.llm_task</code><a class="headerlink" href="#salmalmcorellm_task" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Structured LLM output — JSON Schema validated LLM calls.</p>
+</blockquote>
+<h4 id="class-llmtask"><code>class LLMTask</code><a class="headerlink" href="#class-llmtask" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>JSON Schema 검증 기반 구조화 LLM 호출.</p>
+</blockquote>
+<ul>
+<li><code>async run(prompt, input_data, schema, model, max_tokens)</code>
+  — LLM에 JSON-only 응답 요청, schema로 검증.</li>
+</ul>
+<h3 id="salmalmcorememory"><code>salmalm.core.memory</code><a class="headerlink" href="#salmalmcorememory" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Enhanced Memory System — OpenClaw-style two-layer memory.</p>
+</blockquote>
+<h4 id="class-memorymanager"><code>class MemoryManager</code><a class="headerlink" href="#class-memorymanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>OpenClaw-style memory management with auto-curation.</p>
+</blockquote>
+<ul>
+<li><code>read(filename)</code>
+  — Read a memory file. Supports MEMORY.md and memory/YYYY-MM-DD.md.</li>
+<li><code>write(filename, content, append)</code>
+  — Write to a memory file.</li>
+<li><code>search(query, max_results)</code>
+  — Search across all memory files using TF-IDF.</li>
+<li><code>list_files()</code>
+  — List all memory files.</li>
+<li><code>load_session_context()</code>
+  — Load today + yesterday memory for session startup injection.</li>
+<li><code>flush_before_compaction(session)</code>
+  — Save important context from session to daily log before compaction.</li>
+<li><code>auto_curate(days_back)</code>
+  — Scan recent daily logs and promote important entries to MEMORY.md.</li>
+</ul>
+<h3 id="salmalmcoreplugin_watcher"><code>salmalm.core.plugin_watcher</code><a class="headerlink" href="#salmalmcoreplugin_watcher" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Plugin Hot-Reload — polling-based watcher for plugins/ directory.</p>
+</blockquote>
+<h4 id="class-pluginwatcher"><code>class PluginWatcher</code><a class="headerlink" href="#class-pluginwatcher" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Polling-based watcher for plugin hot-reload.</p>
+</blockquote>
+<ul>
+<li><code>start()</code>
+  — Start watching plugins/ directory in background.</li>
+<li><code>stop()</code>
+  — Stop the watcher.</li>
+<li><code>running()</code></li>
+<li><code>reload_plugins(names)</code>
+  — Reload specific plugins or all if names is None.</li>
+<li><code>reload_all()</code>
+  — Reload all plugins (for /plugins reload command).</li>
+</ul>
+<h3 id="salmalmcoreprompt"><code>salmalm.core.prompt</code><a class="headerlink" href="#salmalmcoreprompt" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>ensure_personas_dir()</code>
+  — Create personas directory and install built-in presets if missing.</li>
+<li><code>list_personas()</code>
+  — List all available personas.</li>
+<li><code>get_persona(name)</code>
+  — Get persona content by name.</li>
+<li><code>create_persona(name, content)</code>
+  — Create or update a custom persona.</li>
+<li><code>delete_persona(name)</code>
+  — Delete a custom persona (cannot delete built-in ones).</li>
+<li><code>switch_persona(session_id, name)</code>
+  — Switch active persona for a session. Returns persona content or None.</li>
+<li><code>get_active_persona(session_id)</code>
+  — Get the active persona name for a session.</li>
+<li><code>get_user_soul()</code>
+  — Read user SOUL.md from ~/.salmalm/SOUL.md. Returns empty string if not found.</li>
+<li><code>set_user_soul(content)</code>
+  — Write user SOUL.md to ~/.salmalm/SOUL.md.</li>
+<li><code>reset_user_soul()</code>
+  — Delete user SOUL.md (revert to default).</li>
+<li><code>build_system_prompt(full, mode)</code>
+  — Build system prompt from SOUL.md + context files.</li>
+</ul>
+<h3 id="salmalmcoresession_manager"><code>salmalm.core.session_manager</code><a class="headerlink" href="#salmalmcoresession_manager" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Session management — pruning, compaction, cache TTL tracking.</p>
+</blockquote>
+<ul>
+<li><code>prune_context(messages)</code>
+  — Prune old tool_result messages before LLM call.</li>
+</ul>
+<h3 id="salmalmcoreshutdown"><code>salmalm.core.shutdown</code><a class="headerlink" href="#salmalmcoreshutdown" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Graceful Shutdown Manager — drain LLM streams, cancel tools, flush sessions, notify WS.</p>
+</blockquote>
+<h4 id="class-shutdownmanager"><code>class ShutdownManager</code><a class="headerlink" href="#class-shutdownmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Coordinates graceful shutdown across all subsystems.</p>
+</blockquote>
+<ul>
+<li><code>is_shutting_down()</code></li>
+<li><code>async execute(timeout)</code>
+  — Run the full shutdown sequence.</li>
+</ul>
+<h2 id="tools-tools-58-built-in-tools-66">tools/ — Tools — 58+ Built-in Tools / 도구 — 66개 내장 도구<a class="headerlink" href="#tools-tools-58-built-in-tools-66" title="Permanent link">&para;</a></h2>
+<h3 id="salmalmtools__init__"><code>salmalm.tools.__init__</code><a class="headerlink" href="#salmalmtools__init__" title="Permanent link">&para;</a></h3>
+<h4 id="class-_pkgproxy_1"><code>class _PkgProxy</code><a class="headerlink" href="#class-_pkgproxy_1" title="Permanent link">&para;</a></h4>
+<h3 id="salmalmtoolstool_handlers"><code>salmalm.tools.tool_handlers</code><a class="headerlink" href="#salmalmtoolstool_handlers" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm tool handlers — thin shim delegating to tool_registry.</p>
+</blockquote>
+<ul>
+<li><code>execute_tool(name, args)</code>
+  — Execute a tool — delegates to tool_registry.</li>
+</ul>
+<h3 id="salmalmtoolstool_registry"><code>salmalm.tools.tool_registry</code><a class="headerlink" href="#salmalmtoolstool_registry" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Tool registry — decorator-based tool dispatch replacing if-elif chain.</p>
+</blockquote>
+<ul>
+<li><code>register(name)</code>
+  — Decorator to register a tool handler function.</li>
+<li><code>register_dynamic(name, handler, tool_def)</code>
+  — Dynamically register a tool at runtime (for plugins).</li>
+<li><code>unregister_dynamic(name)</code>
+  — Remove a dynamically registered tool.</li>
+<li><code>get_dynamic_tools()</code>
+  — Return all dynamically registered tool definitions.</li>
+<li><code>execute_tool(name, args)</code>
+  — Execute a tool and return result string. Auto-dispatches to remote node if available.</li>
+</ul>
+<h3 id="salmalmtoolstools"><code>salmalm.tools.tools</code><a class="headerlink" href="#salmalmtoolstools" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm tool definitions — schema for all 66 tools.</p>
+</blockquote>
+<h3 id="salmalmtoolstools_agent"><code>salmalm.tools.tools_agent</code><a class="headerlink" href="#salmalmtoolstools_agent" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Agent tools: sub_agent, skill_manage, plugin_manage, cron_manage, mcp_manage, node_manage.</p>
+</blockquote>
+<ul>
+<li><code>handle_sub_agent(args)</code></li>
+<li><code>handle_skill_manage(args)</code></li>
+<li><code>handle_plugin_manage(args)</code></li>
+<li><code>handle_cron_manage(args)</code></li>
+<li><code>handle_mcp_manage(args)</code></li>
+<li><code>handle_node_manage(args)</code></li>
+<li><code>handle_rag_search(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_browser"><code>salmalm.tools.tools_browser</code><a class="headerlink" href="#salmalmtoolstools_browser" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Browser tool.</p>
+</blockquote>
+<ul>
+<li><code>handle_browser(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_calendar"><code>salmalm.tools.tools_calendar</code><a class="headerlink" href="#salmalmtoolstools_calendar" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Google Calendar tools — granular calendar_list, calendar_add, calendar_delete.</p>
+</blockquote>
+<ul>
+<li><code>handle_calendar_list(args)</code>
+  — List upcoming calendar events.</li>
+<li><code>handle_calendar_add(args)</code>
+  — Add a calendar event.</li>
+<li><code>handle_calendar_delete(args)</code>
+  — Delete a calendar event.</li>
+</ul>
+<h3 id="salmalmtoolstools_common"><code>salmalm.tools.tools_common</code><a class="headerlink" href="#salmalmtoolstools_common" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Shared helper functions for tool modules.</p>
+</blockquote>
+<h3 id="salmalmtoolstools_email"><code>salmalm.tools.tools_email</code><a class="headerlink" href="#salmalmtoolstools_email" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Gmail tools — granular email_inbox, email_read, email_send, email_search.</p>
+</blockquote>
+<ul>
+<li><code>handle_email_inbox(args)</code>
+  — List recent inbox messages.</li>
+<li><code>handle_email_read(args)</code>
+  — Read a specific email by message_id.</li>
+<li><code>handle_email_send(args)</code>
+  — Send an email.</li>
+<li><code>handle_email_search(args)</code>
+  — Search emails with Gmail query syntax.</li>
+</ul>
+<h3 id="salmalmtoolstools_exec"><code>salmalm.tools.tools_exec</code><a class="headerlink" href="#salmalmtoolstools_exec" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Exec tools: exec, python_eval, background session management.</p>
+</blockquote>
+<ul>
+<li><code>handle_exec(args)</code></li>
+<li><code>handle_exec_session(args)</code>
+  — Manage background exec sessions: list, poll, kill.</li>
+<li><code>handle_python_eval(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_file"><code>salmalm.tools.tools_file</code><a class="headerlink" href="#salmalmtoolstools_file" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>File tools: read_file, write_file, edit_file, diff_files.</p>
+</blockquote>
+<ul>
+<li><code>handle_read_file(args)</code></li>
+<li><code>handle_write_file(args)</code></li>
+<li><code>handle_edit_file(args)</code></li>
+<li><code>handle_diff_files(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_google"><code>salmalm.tools.tools_google</code><a class="headerlink" href="#salmalmtoolstools_google" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Google tools: google_calendar, gmail.</p>
+</blockquote>
+<ul>
+<li><code>handle_google_calendar(args)</code></li>
+<li><code>handle_gmail(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_media"><code>salmalm.tools.tools_media</code><a class="headerlink" href="#salmalmtoolstools_media" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Media tools: image_generate, image_analyze, tts, stt, screenshot, tts_generate.</p>
+</blockquote>
+<ul>
+<li><code>handle_image_generate(args)</code></li>
+<li><code>handle_image_analyze(args)</code></li>
+<li><code>handle_tts(args)</code></li>
+<li><code>handle_stt(args)</code></li>
+<li><code>handle_screenshot(args)</code></li>
+<li><code>handle_tts_generate(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_memory"><code>salmalm.tools.tools_memory</code><a class="headerlink" href="#salmalmtoolstools_memory" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Memory tools: memory_read, memory_write, memory_search, usage_report.</p>
+</blockquote>
+<ul>
+<li><code>handle_memory_read(args)</code></li>
+<li><code>handle_memory_write(args)</code></li>
+<li><code>handle_memory_search(args)</code></li>
+<li><code>handle_usage_report(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_misc"><code>salmalm.tools.tools_misc</code><a class="headerlink" href="#salmalmtoolstools_misc" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Misc tools: reminder, workflow, file_index, notification, weather, rss_reader.</p>
+</blockquote>
+<ul>
+<li><code>handle_reminder(args)</code></li>
+<li><code>handle_workflow(args)</code></li>
+<li><code>handle_file_index(args)</code></li>
+<li><code>handle_notification(args)</code></li>
+<li><code>handle_weather(args)</code></li>
+<li><code>handle_rss_reader(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_patch"><code>salmalm.tools.tools_patch</code><a class="headerlink" href="#salmalmtoolstools_patch" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>apply_patch tool — multi-file patch application.</p>
+</blockquote>
+<ul>
+<li><code>apply_patch(patch_text, base_dir)</code>
+  — Apply a multi-file patch.</li>
+</ul>
+<h3 id="salmalmtoolstools_personal"><code>salmalm.tools.tools_personal</code><a class="headerlink" href="#salmalmtoolstools_personal" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Personal assistant tools — notes, expenses, saved links, pomodoro, routines, briefing.</p>
+</blockquote>
+<ul>
+<li><code>handle_note(args)</code>
+  — Personal notes / knowledge base.</li>
+<li><code>handle_expense(args)</code>
+  — Expense tracker.</li>
+<li><code>handle_save_link(args)</code>
+  — Save a link/article for later reading.</li>
+<li><code>handle_pomodoro(args)</code>
+  — Pomodoro timer.</li>
+<li><code>handle_routine(args)</code>
+  — Morning/evening routine automation.</li>
+<li><code>handle_briefing(args)</code>
+  — Generate daily briefing.</li>
+</ul>
+<h3 id="salmalmtoolstools_reaction"><code>salmalm.tools.tools_reaction</code><a class="headerlink" href="#salmalmtoolstools_reaction" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Reaction Tools — Send emoji reactions across channels.</p>
+</blockquote>
+<ul>
+<li><code>send_reaction(channel, message_id, emoji)</code>
+  — Send an emoji reaction to a message.</li>
+</ul>
+<h3 id="salmalmtoolstools_reminder"><code>salmalm.tools.tools_reminder</code><a class="headerlink" href="#salmalmtoolstools_reminder" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Enhanced reminder tools — natural language time parsing (KR+EN), recurring reminders.</p>
+</blockquote>
+<ul>
+<li><code>parse_natural_time(text)</code>
+  — Parse natural language time expression into datetime.</li>
+<li><code>parse_repeat_pattern(text)</code>
+  — Parse repeat pattern from text.</li>
+</ul>
+<h3 id="salmalmtoolstools_system"><code>salmalm.tools.tools_system</code><a class="headerlink" href="#salmalmtoolstools_system" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>System tools: system_monitor, health_check.</p>
+</blockquote>
+<ul>
+<li><code>handle_system_monitor(args)</code></li>
+<li><code>handle_health_check(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_util"><code>salmalm.tools.tools_util</code><a class="headerlink" href="#salmalmtoolstools_util" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Utility tools: hash_text, regex_test, json_query, clipboard, qr_code, translate.</p>
+</blockquote>
+<ul>
+<li><code>handle_hash_text(args)</code></li>
+<li><code>handle_regex_test(args)</code></li>
+<li><code>handle_json_query(args)</code></li>
+<li><code>handle_clipboard(args)</code></li>
+<li><code>handle_translate(args)</code></li>
+<li><code>handle_qr_code(args)</code></li>
+</ul>
+<h3 id="salmalmtoolstools_web"><code>salmalm.tools.tools_web</code><a class="headerlink" href="#salmalmtoolstools_web" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Web tools: web_search, web_fetch, http_request.</p>
+</blockquote>
+<ul>
+<li><code>handle_web_search(args)</code></li>
+<li><code>handle_web_fetch(args)</code></li>
+<li><code>handle_http_request(args)</code></li>
+</ul>
+<h2 id="features-features-commands-rag-mcp-rag-mcp">features/ — Features — Commands, RAG, MCP / 기능 — 명령어, RAG, MCP<a class="headerlink" href="#features-features-commands-rag-mcp-rag-mcp" title="Permanent link">&para;</a></h2>
+<h3 id="salmalmfeaturesa2a"><code>salmalm.features.a2a</code><a class="headerlink" href="#salmalmfeaturesa2a" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Agent-to-Agent Protocol — inter-instance communication.</p>
+</blockquote>
+<h4 id="class-a2aprotocol"><code>class A2AProtocol</code><a class="headerlink" href="#class-a2aprotocol" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>SalmAlm instance-to-instance negotiation protocol.</p>
+</blockquote>
+<ul>
+<li><code>sign(payload, secret)</code>
+  — HMAC-SHA256 signature over canonical JSON.</li>
+<li><code>verify(payload, signature, secret)</code></li>
+<li><code>pair(url, shared_secret, peer_name)</code>
+  — Register a peer instance.</li>
+<li><code>unpair(peer_id)</code></li>
+<li><code>list_peers()</code></li>
+<li><code>build_request(action, params)</code>
+  — Build an unsigned A2A request payload.</li>
+<li><code>send(peer_id, action, params, timeout)</code>
+  — Send an A2A request to a paired peer. Returns the response dict.</li>
+<li><code>receive(body)</code>
+  — Process an incoming A2A request. Returns response dict.</li>
+<li><code>approve(request_id)</code>
+  — Approve a pending inbox request.</li>
+<li><code>reject(request_id)</code>
+  — Reject a pending inbox request.</li>
+</ul>
+<h3 id="salmalmfeaturesabort"><code>salmalm.features.abort</code><a class="headerlink" href="#salmalmfeaturesabort" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Abort Generation (생성 중지) — LibreChat style.</p>
+</blockquote>
+<h4 id="class-abortcontroller"><code>class AbortController</code><a class="headerlink" href="#class-abortcontroller" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Per-session abort flag for stopping LLM generation.</p>
+</blockquote>
+<ul>
+<li><code>set_abort(session_id)</code></li>
+<li><code>is_aborted(session_id)</code></li>
+<li><code>clear(session_id)</code></li>
+<li><code>save_partial(session_id, text)</code></li>
+<li><code>get_partial(session_id)</code></li>
+</ul>
+<h3 id="salmalmfeaturesagents"><code>salmalm.features.agents</code><a class="headerlink" href="#salmalmfeaturesagents" title="Permanent link">&para;</a></h3>
+<h4 id="class-subagent"><code>class SubAgent</code><a class="headerlink" href="#class-subagent" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Background task executor with notification on completion.</p>
+</blockquote>
+<ul>
+<li><code>spawn(cls, task, model, notify_telegram, _depth)</code>
+  — Spawn a background sub-agent. Returns agent ID.</li>
+<li><code>list_agents(cls)</code>
+  — List all sub-agents with their status, label, and runtime.</li>
+<li><code>stop_agent(cls, agent_id)</code>
+  — Stop a running sub-agent.</li>
+<li><code>get_log(cls, agent_id, limit)</code>
+  — Get sub-agent transcript.</li>
+<li><code>get_info(cls, agent_id)</code>
+  — Get detailed metadata for a sub-agent.</li>
+<li><code>get_result(cls, agent_id)</code>
+  — Get the result of a completed sub-agent run.</li>
+<li><code>send_message(cls, agent_id, message)</code>
+  — Send a follow-up message to a completed sub-agent's session.</li>
+</ul>
+<h4 id="class-skillloader"><code>class SkillLoader</code><a class="headerlink" href="#class-skillloader" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>OpenClaw-style skill loader.</p>
+</blockquote>
+<ul>
+<li><code>scan(cls)</code>
+  — Scan skills directory, return list of available skills.</li>
+<li><code>load(cls, skill_name)</code>
+  — Load a skill's SKILL.md content.</li>
+<li><code>match(cls, user_message)</code>
+  — Auto-detect which skill matches the user's request. Returns skill content or None.</li>
+<li><code>install(cls, url)</code>
+  — Install a skill from a Git URL or GitHub shorthand (user/repo).</li>
+<li><code>uninstall(cls, skill_name)</code>
+  — Remove a skill directory.</li>
+</ul>
+<h4 id="class-pluginloader"><code>class PluginLoader</code><a class="headerlink" href="#class-pluginloader" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Discover and load tool plugins from plugins/*.py files.</p>
+</blockquote>
+<ul>
+<li><code>scan(cls)</code>
+  — Scan plugins/ directory and load all .py files as tool providers.</li>
+<li><code>get_all_tools(cls)</code>
+  — Return all tool definitions from all plugins.</li>
+<li><code>execute(cls, tool_name, args)</code>
+  — Execute a plugin tool by name.</li>
+<li><code>reload(cls)</code>
+  — Reload all plugins.</li>
+</ul>
+<h4 id="class-agentconfig"><code>class AgentConfig</code><a class="headerlink" href="#class-agentconfig" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Configuration and paths for a single agent (에이전트 설정).</p>
+</blockquote>
+<ul>
+<li><code>save()</code></li>
+<li><code>display_name()</code></li>
+<li><code>model()</code></li>
+<li><code>soul_file()</code></li>
+<li><code>api_key()</code></li>
+<li><code>allowed_tools()</code>
+  — None means all tools allowed.</li>
+<li><code>to_dict()</code></li>
+</ul>
+<h4 id="class-agentmanager"><code>class AgentManager</code><a class="headerlink" href="#class-agentmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages multiple agents with routing by Telegram chat/user.</p>
+</blockquote>
+<ul>
+<li><code>scan()</code>
+  — Scan agents directory and load all agent configs.</li>
+<li><code>resolve(chat_key)</code>
+  — Resolve which agent handles a given chat key (e.g. 'telegram:12345').</li>
+<li><code>get_agent(agent_id)</code>
+  — Get agent config by ID.</li>
+<li><code>get_session_id(agent_id, base_session_id)</code>
+  — Get agent-scoped session ID.</li>
+<li><code>create(agent_id, display_name, model)</code>
+  — Create a new agent. 새 에이전트 생성.</li>
+<li><code>delete(agent_id)</code>
+  — Delete an agent (cannot delete 'main').</li>
+<li><code>bind(chat_key, agent_id)</code>
+  — Bind a chat to an agent. 채팅을 에이전트에 바인딩.</li>
+<li><code>unbind(chat_key)</code>
+  — Remove a chat binding.</li>
+<li><code>list_agents()</code>
+  — List all agents. 전체 에이전트 목록.</li>
+<li><code>list_bindings()</code>
+  — Return all chat→agent bindings.</li>
+</ul>
+<h3 id="salmalmfeaturesbookmarks"><code>salmalm.features.bookmarks</code><a class="headerlink" href="#salmalmfeaturesbookmarks" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Message Bookmarks (메시지 북마크) — LobeChat style.</p>
+</blockquote>
+<h4 id="class-bookmarkmanager"><code>class BookmarkManager</code><a class="headerlink" href="#class-bookmarkmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manage message bookmarks across sessions.</p>
+</blockquote>
+<ul>
+<li><code>add(session_id, message_index, content_preview, note, role)</code></li>
+<li><code>remove(session_id, message_index)</code></li>
+<li><code>list_all(limit)</code></li>
+<li><code>list_session(session_id)</code></li>
+<li><code>is_bookmarked(session_id, message_index)</code></li>
+</ul>
+<h3 id="salmalmfeaturesbriefing"><code>salmalm.features.briefing</code><a class="headerlink" href="#salmalmfeaturesbriefing" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Daily Briefing — morning/evening summary generator.</p>
+</blockquote>
+<h4 id="class-dailybriefing"><code>class DailyBriefing</code><a class="headerlink" href="#class-dailybriefing" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Generate daily briefing summaries.</p>
+</blockquote>
+<ul>
+<li><code>generate(sections)</code>
+  — Generate a full briefing. sections: list of section names to include.</li>
+<li><code>configure(key, value)</code>
+  — Update briefing config.</li>
+</ul>
+<h3 id="salmalmfeaturescommands"><code>salmalm.features.commands</code><a class="headerlink" href="#salmalmfeaturescommands" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Extended slash command router (30+ commands).</p>
+</blockquote>
+<h4 id="class-commandrouter"><code>class CommandRouter</code><a class="headerlink" href="#class-commandrouter" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Central slash-command dispatcher.</p>
+</blockquote>
+<ul>
+<li><code>register(command, handler)</code>
+  — Register exact-match command.</li>
+<li><code>register_prefix(prefix, handler)</code>
+  — Register prefix-match command.</li>
+<li><code>async dispatch(text, session)</code>
+  — Dispatch a command string. Returns response or None.</li>
+<li><code>parse_directives(text)</code>
+  — Extract directive commands from message text.</li>
+<li><code>find_inline_shortcuts(text)</code>
+  — Find inline shortcut commands within a message.</li>
+<li>
+<p><code>get_completions()</code>
+  — Return command list for autocomplete / /api/commands.</p>
+</li>
+<li>
+<p><code>register_telegram_commands(bot_token)</code>
+  — Register commands with Telegram's setMyCommands API.</p>
+</li>
+<li><code>get_router(engine_dispatch)</code></li>
+</ul>
+<h3 id="salmalmfeaturescompare"><code>salmalm.features.compare</code><a class="headerlink" href="#salmalmfeaturescompare" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Response Compare / Beam (응답 비교) — BIG-AGI style.</p>
+</blockquote>
+<ul>
+<li><code>async compare_models(session_id, message, models)</code></li>
+</ul>
+<h3 id="salmalmfeaturesdashboard_life"><code>salmalm.features.dashboard_life</code><a class="headerlink" href="#salmalmfeaturesdashboard_life" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Life Dashboard — one-page overview of personal data from existing tools.</p>
+</blockquote>
+<h4 id="class-lifedashboard"><code>class LifeDashboard</code><a class="headerlink" href="#class-lifedashboard" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Aggregates data from personal tools into a unified dashboard.</p>
+</blockquote>
+<ul>
+<li><code>generate_dashboard()</code></li>
+<li><code>text_summary(section)</code></li>
+<li><code>render_html()</code></li>
+</ul>
+<h4 id="class-proactivedigest"><code>class ProactiveDigest</code><a class="headerlink" href="#class-proactivedigest" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Generates morning/evening digest messages.</p>
+</blockquote>
+<ul>
+<li><code>morning_digest()</code></li>
+<li><code>evening_digest()</code></li>
+<li>
+<p><code>should_send(hour)</code></p>
+</li>
+<li>
+<p><code>get_dashboard()</code></p>
+</li>
+<li><code>get_digest()</code></li>
+</ul>
+<h3 id="salmalmfeaturesdeadman"><code>salmalm.features.deadman</code><a class="headerlink" href="#salmalmfeaturesdeadman" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Dead Man's Switch — triggers actions after prolonged user inactivity.</p>
+</blockquote>
+<h4 id="class-deadmanswitch"><code>class DeadManSwitch</code><a class="headerlink" href="#class-deadmanswitch" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Monitors user activity and triggers emergency actions on prolonged inactivity.</p>
+</blockquote>
+<ul>
+<li><code>record_activity()</code>
+  — Record user activity (message or command).</li>
+<li><code>reset()</code>
+  — Manually reset the timer.</li>
+<li><code>status()</code>
+  — Return current switch status.</li>
+<li><code>format_status()</code></li>
+<li><code>setup(inactivity_days, warning_hours, actions, confirmation_required)</code></li>
+<li><code>disable()</code></li>
+<li><code>check(send_fn, user_name)</code>
+  — Periodic check — called from heartbeat.</li>
+<li><code>confirm_alive()</code>
+  — User confirms they're alive after warning.</li>
+<li><code>test(user_name)</code>
+  — Simulate activation without actually sending anything.</li>
+<li><code>handle_command(args, send_fn, user_name)</code>
+  — Handle /deadman subcommands.</li>
+</ul>
+<h3 id="salmalmfeaturesdocs"><code>salmalm.features.docs</code><a class="headerlink" href="#salmalmfeaturesdocs" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>generate_api_docs_html()</code>
+  — Generate API documentation HTML page.</li>
+</ul>
+<h3 id="salmalmfeaturesdoctor"><code>salmalm.features.doctor</code><a class="headerlink" href="#salmalmfeaturesdoctor" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Doctor — self-diagnosis and repair tool.</p>
+</blockquote>
+<h4 id="class-doctor"><code>class Doctor</code><a class="headerlink" href="#class-doctor" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>SalmAlm 자가 진단 + 수복 도구.</p>
+</blockquote>
+<ul>
+<li><code>run_all(auto_fix)</code>
+  — 전체 진단 실행, 결과 리스트 반환.</li>
+<li><code>check_config_integrity()</code>
+  — 설정 파일 존재/유효성/권한 검사.</li>
+<li><code>check_database_integrity()</code>
+  — SQLite DB 무결성 (PRAGMA integrity_check).</li>
+<li><code>check_session_integrity()</code>
+  — 세션 파일 존재/크기/손상 검사.</li>
+<li><code>check_api_keys()</code>
+  — API 키 설정 여부.</li>
+<li><code>check_port_availability()</code>
+  — 서버 포트 사용 가능 여부.</li>
+<li><code>check_disk_space()</code>
+  — 디스크 여유 공간.</li>
+<li><code>check_permissions()</code>
+  — 설정 파일 권한 (600 권장).</li>
+<li><code>check_oauth_expiry()</code>
+  — OAuth 토큰 만료 임박 여부.</li>
+<li><code>migrate_config()</code>
+  — 구 설정 → 신 설정 자동 마이그레이션.</li>
+</ul>
+<h3 id="salmalmfeaturesedge_cases"><code>salmalm.features.edge_cases</code><a class="headerlink" href="#salmalmfeaturesedge_cases" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Backward-compatibility shim — re-exports from decomposed modules.</p>
+</blockquote>
+<h3 id="salmalmfeaturesfile_upload"><code>salmalm.features.file_upload</code><a class="headerlink" href="#salmalmfeaturesfile_upload" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Enhanced File Upload (파일 업로드 강화) — Open WebUI style.</p>
+</blockquote>
+<ul>
+<li><code>validate_upload(filename, size_bytes)</code></li>
+<li><code>extract_pdf_text(data)</code></li>
+<li><code>process_uploaded_file(filename, data)</code></li>
+</ul>
+<h3 id="salmalmfeaturesfork"><code>salmalm.features.fork</code><a class="headerlink" href="#salmalmfeaturesfork" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Conversation Fork / Regenerate (대화 포크) — LibreChat style.</p>
+</blockquote>
+<h4 id="class-conversationfork"><code>class ConversationFork</code><a class="headerlink" href="#class-conversationfork" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manage alternative responses at the same message index.</p>
+</blockquote>
+<ul>
+<li><code>save_alternative(session_id, message_index, content, model, active)</code></li>
+<li><code>get_alternatives(session_id, message_index)</code></li>
+<li><code>switch_alternative(session_id, message_index, alt_id)</code></li>
+<li><code>async regenerate(session_id, message_index)</code></li>
+</ul>
+<h3 id="salmalmfeaturesheartbeat"><code>salmalm.features.heartbeat</code><a class="headerlink" href="#salmalmfeaturesheartbeat" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Heartbeat — Cache warming for Anthropic prompt caching.</p>
+</blockquote>
+<h4 id="class-cachewarmer"><code>class CacheWarmer</code><a class="headerlink" href="#class-cachewarmer" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Periodically warm Anthropic prompt cache to prevent TTL expiry.</p>
+</blockquote>
+<ul>
+<li><code>start()</code>
+  — Start the cache warming background thread.</li>
+<li><code>stop()</code>
+  — Stop the cache warming thread.</li>
+<li><code>stats()</code></li>
+</ul>
+<h4 id="class-heartbeatmanager_1"><code>class HeartbeatManager</code><a class="headerlink" href="#class-heartbeatmanager_1" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Heartbeat manager with active hours support.</p>
+</blockquote>
+<ul>
+<li><code>reload()</code></li>
+<li><code>config()</code></li>
+<li><code>is_active_hours()</code>
+  — Check if current time is within active hours.</li>
+<li>
+<p><code>should_heartbeat()</code>
+  — Check if heartbeat should run now.</p>
+</li>
+<li>
+<p><code>load_cache_config()</code>
+  — Load cache config from ~/.salmalm/cache.json.</p>
+</li>
+<li><code>save_cache_config(config)</code>
+  — Save cache config.</li>
+</ul>
+<h3 id="salmalmfeatureshooks"><code>salmalm.features.hooks</code><a class="headerlink" href="#salmalmfeatureshooks" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Hooks System — 이벤트 훅 매니저 (Event Hook Manager).</p>
+</blockquote>
+<h4 id="class-hookmanager"><code>class HookManager</code><a class="headerlink" href="#class-hookmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages event hooks — loads config, fires hooks asynchronously.</p>
+</blockquote>
+<ul>
+<li><code>reload()</code>
+  — Reload hooks from ~/.salmalm/hooks.json.</li>
+<li><code>save()</code>
+  — Save current hooks config.</li>
+<li><code>register_plugin_hook(event, callback)</code>
+  — Register a plugin callback for an event.</li>
+<li><code>unregister_plugin_hooks(callbacks)</code>
+  — Remove specific plugin callbacks.</li>
+<li><code>fire(event, context)</code>
+  — Fire an event — runs all registered hooks asynchronously (non-blocking).</li>
+<li><code>list_hooks()</code>
+  — Return all configured hooks.</li>
+<li><code>test_hook(event)</code>
+  — Test-fire a hook event with dummy context.</li>
+<li><code>add_hook(event, command)</code>
+  — Add a command to an event hook.</li>
+<li><code>remove_hook(event, index)</code>
+  — Remove a hook command by event and index.</li>
+</ul>
+<h3 id="salmalmfeaturesmcp"><code>salmalm.features.mcp</code><a class="headerlink" href="#salmalmfeaturesmcp" title="Permanent link">&para;</a></h3>
+<h4 id="class-mcpserver"><code>class MCPServer</code><a class="headerlink" href="#class-mcpserver" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>MCP Server that exposes SalmAlm tools via JSON-RPC 2.0.</p>
+</blockquote>
+<ul>
+<li><code>set_tools(tools, executor)</code>
+  — Register tools and their executor function.</li>
+<li><code>async handle_message(msg)</code>
+  — Handle a single JSON-RPC message. Returns response or None for notifications.</li>
+<li><code>async run_stdio()</code>
+  — Run MCP server on stdin/stdout (for subprocess transport).</li>
+</ul>
+<h4 id="class-mcpclientconnection"><code>class MCPClientConnection</code><a class="headerlink" href="#class-mcpclientconnection" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>A connection to a single external MCP server (stdio transport).</p>
+</blockquote>
+<ul>
+<li><code>connect()</code>
+  — Start the MCP server subprocess and initialize.</li>
+<li><code>disconnect()</code>
+  — Disconnect from an MCP server.</li>
+<li><code>tools()</code>
+  — List all available tools from connected MCP servers.</li>
+<li><code>call_tool(name, arguments, timeout)</code>
+  — Call a tool on the remote MCP server.</li>
+<li><code>read_resource(uri)</code>
+  — Read a resource from the remote MCP server.</li>
+</ul>
+<h4 id="class-mcpmanager"><code>class MCPManager</code><a class="headerlink" href="#class-mcpmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages multiple MCP client connections + the server instance.</p>
+</blockquote>
+<ul>
+<li><code>server()</code>
+  — Get connection info for a specific MCP server.</li>
+<li><code>add_server(name, command, env, cwd, auto_connect)</code>
+  — Add and optionally connect to an external MCP server.</li>
+<li><code>remove_server(name)</code>
+  — Disconnect and remove an MCP server.</li>
+<li><code>list_servers()</code>
+  — List all configured MCP servers and their status.</li>
+<li><code>get_all_tools()</code>
+  — Get all tools from all connected MCP servers (for LLM tool lists).</li>
+<li><code>call_tool(prefixed_name, arguments)</code>
+  — Call an MCP tool by its prefixed name (mcp_servername_toolname).</li>
+<li><code>save_config()</code>
+  — Save server configurations to JSON.</li>
+<li><code>load_config()</code>
+  — Load and auto-connect configured MCP servers.</li>
+<li><code>shutdown()</code>
+  — Disconnect all clients.</li>
+</ul>
+<h3 id="salmalmfeaturesmcp_marketplace"><code>salmalm.features.mcp_marketplace</code><a class="headerlink" href="#salmalmfeaturesmcp_marketplace" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>MCP Marketplace — catalog, install, manage MCP servers.</p>
+</blockquote>
+<h4 id="class-mcpmarketplace"><code>class MCPMarketplace</code><a class="headerlink" href="#class-mcpmarketplace" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manage MCP server catalog, installation, and lifecycle.</p>
+</blockquote>
+<ul>
+<li><code>install(name, params)</code>
+  — Install an MCP server from catalog.</li>
+<li><code>remove(name)</code></li>
+<li><code>list_installed()</code></li>
+<li><code>catalog()</code></li>
+<li><code>status()</code></li>
+<li><code>search(query)</code></li>
+<li><code>auto_connect_all(retries)</code>
+  — Connect all installed servers on startup.</li>
+<li><code>get_catalog_json()</code>
+  — Return catalog for /api/mcp/catalog.</li>
+<li><code>get_installed_json()</code>
+  — Return installed list for /api/mcp/installed.</li>
+</ul>
+<h3 id="salmalmfeaturesmodel_detect"><code>salmalm.features.model_detect</code><a class="headerlink" href="#salmalmfeaturesmodel_detect" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Model Auto-Detection (모델 자동 감지) — Open WebUI style.</p>
+</blockquote>
+<h4 id="class-modeldetector"><code>class ModelDetector</code><a class="headerlink" href="#class-modeldetector" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Auto-detect available models from all configured providers.</p>
+</blockquote>
+<ul>
+<li><code>detect_all(force)</code></li>
+</ul>
+<h3 id="salmalmfeaturesmood"><code>salmalm.features.mood</code><a class="headerlink" href="#salmalmfeaturesmood" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Mood-Aware Response — detects user emotion and adjusts response tone.</p>
+</blockquote>
+<h4 id="class-mooddetector"><code>class MoodDetector</code><a class="headerlink" href="#class-mooddetector" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Detects user mood from text using keywords, patterns, and emoji.</p>
+</blockquote>
+<ul>
+<li><code>enabled()</code></li>
+<li><code>sensitivity()</code></li>
+<li><code>set_mode(mode)</code>
+  — Set mood detection mode: on, off, sensitive.</li>
+<li><code>detect(text)</code>
+  — Detect mood from text. Returns (mood, confidence 0.0-1.0).</li>
+<li><code>get_tone_injection(mood)</code>
+  — Get tone injection string for system prompt.</li>
+<li><code>record_mood(mood, confidence)</code>
+  — Record mood to history.</li>
+<li><code>get_status(text)</code>
+  — Return current mood status.</li>
+<li><code>generate_report(period)</code>
+  — Generate mood report for the given period.</li>
+</ul>
+<h3 id="salmalmfeaturesnodes"><code>salmalm.features.nodes</code><a class="headerlink" href="#salmalmfeaturesnodes" title="Permanent link">&para;</a></h3>
+<h4 id="class-sshnode"><code>class SSHNode</code><a class="headerlink" href="#class-sshnode" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Remote node accessible via SSH.</p>
+</blockquote>
+<ul>
+<li><code>run(command, timeout)</code>
+  — Execute command on remote node.</li>
+<li><code>status()</code>
+  — Get node system status (CPU, memory, disk, uptime).</li>
+<li><code>upload(local_path, remote_path)</code>
+  — Upload file via SCP.</li>
+<li><code>download(remote_path, local_path)</code>
+  — Download file via SCP.</li>
+<li><code>is_reachable()</code>
+  — Quick ping check.</li>
+</ul>
+<h4 id="class-httpnode"><code>class HTTPNode</code><a class="headerlink" href="#class-httpnode" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Remote node accessible via HTTP agent protocol.</p>
+</blockquote>
+<ul>
+<li><code>run(command, timeout)</code>
+  — Execute a command on a remote node.</li>
+<li><code>status()</code>
+  — Get the status of a remote node.</li>
+<li><code>upload(local_path, remote_path)</code>
+  — Upload via HTTP (base64 in JSON — for small files).</li>
+<li><code>is_reachable()</code>
+  — Check if a remote node is reachable.</li>
+</ul>
+<h4 id="class-nodemanager"><code>class NodeManager</code><a class="headerlink" href="#class-nodemanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages all remote nodes.</p>
+</blockquote>
+<ul>
+<li><code>load_config()</code>
+  — Load nodes from nodes.json.</li>
+<li><code>save_config()</code>
+  — Save node configs to JSON.</li>
+<li><code>add_ssh_node(name, host, user, port, key)</code>
+  — Add an SSH node.</li>
+<li><code>add_http_node(name, url, token)</code>
+  — Add an HTTP agent node.</li>
+<li><code>remove_node(name)</code>
+  — Remove a registered remote node.</li>
+<li><code>get_node(name)</code>
+  — Get configuration for a specific node.</li>
+<li><code>list_nodes()</code>
+  — List all nodes with basic status.</li>
+<li><code>run_on(name, command, timeout)</code>
+  — Execute command on a specific node.</li>
+<li><code>status_all()</code>
+  — Get status of all nodes.</li>
+<li><code>wake_on_lan(mac_address, broadcast, port)</code>
+  — Send Wake-on-LAN magic packet.</li>
+</ul>
+<h4 id="class-gatewayregistry"><code>class GatewayRegistry</code><a class="headerlink" href="#class-gatewayregistry" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Gateway side: manages registered nodes that can execute tools remotely.</p>
+</blockquote>
+<ul>
+<li><code>set_gateway_token(token)</code>
+  — Set the gateway authentication token. Nodes must provide this to register.</li>
+<li><code>register(node_id, url, token, capabilities, name)</code>
+  — Register a node with the gateway. Requires auth_token if gateway_token is set.</li>
+<li><code>heartbeat(node_id)</code>
+  — Update node heartbeat timestamp.</li>
+<li><code>unregister(node_id)</code>
+  — Remove a node.</li>
+<li><code>list_nodes()</code>
+  — List all registered nodes with status.</li>
+<li><code>find_node(tool_name)</code>
+  — Find an online node that supports the given tool.</li>
+<li><code>dispatch(node_id, tool_name, tool_args, timeout)</code>
+  — Dispatch a tool call to a specific node.</li>
+<li><code>dispatch_auto(tool_name, tool_args, timeout)</code>
+  — Auto-find a node for this tool and dispatch. Returns None if no node available.</li>
+</ul>
+<h4 id="class-nodeagent"><code>class NodeAgent</code><a class="headerlink" href="#class-nodeagent" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Node side: lightweight agent that receives and executes tool calls from gateway.</p>
+</blockquote>
+<ul>
+<li><code>register()</code>
+  — Register this node with the gateway.</li>
+<li><code>start_heartbeat(interval)</code>
+  — Start background heartbeat to gateway.</li>
+<li><code>stop()</code>
+  — Stop the node manager and close connections.</li>
+</ul>
+<h3 id="salmalmfeaturesplugin_manager"><code>salmalm.features.plugin_manager</code><a class="headerlink" href="#salmalmfeaturesplugin_manager" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Plugin Architecture — 디렉토리 기반 플러그인 시스템.</p>
+</blockquote>
+<h4 id="class-plugininfo"><code>class PluginInfo</code><a class="headerlink" href="#class-plugininfo" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Metadata and runtime state for a loaded plugin.</p>
+</blockquote>
+<ul>
+<li><code>to_dict()</code></li>
+</ul>
+<h4 id="class-pluginmanager"><code>class PluginManager</code><a class="headerlink" href="#class-pluginmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages directory-based plugins with tool registration and hook integration.</p>
+</blockquote>
+<ul>
+<li><code>scan_and_load()</code>
+  — Scan ~/.salmalm/plugins/ and load all valid plugins.</li>
+<li><code>get_all_tools()</code>
+  — Return all tool definitions from enabled plugins.</li>
+<li><code>list_plugins()</code>
+  — Return list of all plugins with their status.</li>
+<li><code>enable(name)</code>
+  — Enable a plugin.</li>
+<li><code>disable(name)</code>
+  — Disable a plugin.</li>
+<li><code>reload_all()</code>
+  — Reload all plugins.</li>
+</ul>
+<h3 id="salmalmfeaturespresence"><code>salmalm.features.presence</code><a class="headerlink" href="#salmalmfeaturespresence" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Presence System — Track connected clients.</p>
+</blockquote>
+<h4 id="class-presenceentry"><code>class PresenceEntry</code><a class="headerlink" href="#class-presenceentry" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>state()</code></li>
+<li><code>is_expired()</code></li>
+<li><code>touch()</code>
+  — Update last activity and optional fields.</li>
+<li><code>to_dict()</code></li>
+</ul>
+<h4 id="class-presencemanager"><code>class PresenceManager</code><a class="headerlink" href="#class-presencemanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Track connected client instances with TTL-based expiry.</p>
+</blockquote>
+<ul>
+<li><code>register(instance_id)</code>
+  — Register or update a client instance.</li>
+<li><code>heartbeat(instance_id)</code>
+  — Update last activity for a client.</li>
+<li><code>unregister(instance_id)</code></li>
+<li><code>get(instance_id)</code></li>
+<li><code>list_all(include_expired)</code>
+  — List all presence entries.</li>
+<li><code>count()</code></li>
+<li><code>count_by_state()</code></li>
+<li><code>clear()</code></li>
+</ul>
+<h3 id="salmalmfeaturesprompt_vars"><code>salmalm.features.prompt_vars</code><a class="headerlink" href="#salmalmfeaturesprompt_vars" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>System Prompt Variables (시스템 프롬프트 변수) — LobeChat style.</p>
+</blockquote>
+<ul>
+<li><code>substitute_prompt_variables(text, session_id, model, user)</code></li>
+</ul>
+<h3 id="salmalmfeaturesprovider_health"><code>salmalm.features.provider_health</code><a class="headerlink" href="#salmalmfeaturesprovider_health" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Provider Health Check (프로바이더 상태 확인) — Open WebUI style.</p>
+</blockquote>
+<h4 id="class-providerhealthcheck"><code>class ProviderHealthCheck</code><a class="headerlink" href="#class-providerhealthcheck" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Check health of all configured LLM providers.</p>
+</blockquote>
+<ul>
+<li><code>check_all(force)</code></li>
+</ul>
+<h3 id="salmalmfeaturesrag"><code>salmalm.features.rag</code><a class="headerlink" href="#salmalmfeaturesrag" title="Permanent link">&para;</a></h3>
+<h4 id="class-ragengine"><code>class RAGEngine</code><a class="headerlink" href="#class-ragengine" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Hybrid BM25 + TF-IDF vector retrieval engine with persistent SQLite index.</p>
+</blockquote>
+<ul>
+<li><code>config()</code></li>
+<li><code>index_file(label, fpath)</code>
+  — Index a single file.</li>
+<li><code>reindex(force)</code>
+  — Rebuild the index from source files.</li>
+<li><code>search(query, max_results, min_score)</code>
+  — Hybrid search (BM25 + Vector). Returns list of {score, source, line, text}.</li>
+<li><code>build_context(query, max_chars, max_results)</code>
+  — Build a context string for RAG injection into LLM prompts.</li>
+<li><code>get_stats()</code>
+  — Return index statistics.</li>
+<li>
+<p><code>close()</code>
+  — Close the RAG database connection.</p>
+</li>
+<li>
+<p><code>decompose_jamo(text)</code>
+  — Decompose Korean syllables into jamo (초성/중성/종성).</p>
+</li>
+<li><code>simple_stem(word)</code>
+  — Simple English suffix stripping.</li>
+<li><code>expand_query(tokens)</code>
+  — Expand query tokens with synonyms.</li>
+<li><code>load_rag_config(config_path)</code>
+  — Load rag.json config, falling back to defaults.</li>
+<li><code>compute_tf(tokens)</code>
+  — Compute term frequency vector (normalized).</li>
+<li><code>cosine_similarity(v1, v2)</code>
+  — Cosine similarity between two sparse vectors (dict-based).</li>
+<li><code>inject_rag_context(messages, system_prompt, max_chars)</code>
+  — Analyze recent messages and inject relevant RAG context into system prompt.</li>
+</ul>
+<h3 id="salmalmfeaturesscreen_capture"><code>salmalm.features.screen_capture</code><a class="headerlink" href="#salmalmfeaturesscreen_capture" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Screen capture and Computer Use module.</p>
+</blockquote>
+<h4 id="class-screencapture"><code>class ScreenCapture</code><a class="headerlink" href="#class-screencapture" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Platform-aware screen capture using native tools.</p>
+</blockquote>
+<ul>
+<li><code>capture_screen()</code>
+  — Capture screen and return PNG bytes.</li>
+<li><code>ocr_image(image_path)</code>
+  — Run OCR on image using tesseract if available.</li>
+<li><code>image_to_base64(png_bytes)</code></li>
+<li><code>capture_and_analyze(llm_func)</code>
+  — Capture screen and optionally analyze with LLM Vision.</li>
+</ul>
+<h4 id="class-screenhistory"><code>class ScreenHistory</code><a class="headerlink" href="#class-screenhistory" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages periodic capture history (Rewind-style).</p>
+</blockquote>
+<ul>
+<li><code>save_capture(png_bytes, ocr_text)</code>
+  — Save a capture to history.</li>
+<li><code>get_history(n)</code>
+  — Get most recent N captures.</li>
+<li><code>search(query)</code>
+  — Search captures by OCR text.</li>
+<li><code>start_watching()</code>
+  — Start periodic capture.</li>
+<li><code>stop_watching()</code></li>
+</ul>
+<h4 id="class-screenmanager"><code>class ScreenManager</code><a class="headerlink" href="#class-screenmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>High-level interface for /screen commands.</p>
+</blockquote>
+<ul>
+<li><code>capture(llm_func)</code></li>
+<li><code>watch(toggle)</code></li>
+<li><code>history(n)</code></li>
+<li><code>search(query)</code></li>
+</ul>
+<h3 id="salmalmfeaturesself_evolve"><code>salmalm.features.self_evolve</code><a class="headerlink" href="#salmalmfeaturesself_evolve" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Self-Evolving Prompt — learns user preferences from conversation patterns.</p>
+</blockquote>
+<h4 id="class-patternanalyzer"><code>class PatternAnalyzer</code><a class="headerlink" href="#class-patternanalyzer" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Analyzes conversation patterns using pure Python heuristics.</p>
+</blockquote>
+<ul>
+<li><code>analyze_length_preference(messages)</code>
+  — Analyze if user prefers concise or detailed responses.</li>
+<li><code>analyze_time_patterns(messages)</code>
+  — Analyze conversation tone by time of day.</li>
+<li><code>analyze_topic_frequency(messages)</code>
+  — Count topic categories from messages.</li>
+<li><code>analyze_language_ratio(messages)</code>
+  — Analyze Korean vs English ratio. 0.0=all EN, 1.0=all KR.</li>
+<li><code>analyze_feedback_signals(messages)</code>
+  — Detect positive/negative feedback patterns.</li>
+<li><code>analyze_code_comment_preference(messages)</code>
+  — Detect if user prefers or dislikes code comments.</li>
+</ul>
+<h4 id="class-promptevolver"><code>class PromptEvolver</code><a class="headerlink" href="#class-promptevolver" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Learns user preferences and evolves the system prompt over time.</p>
+</blockquote>
+<ul>
+<li><code>record_conversation(messages)</code>
+  — Record a conversation for pattern analysis.</li>
+<li><code>should_suggest_evolution()</code>
+  — Check if we should suggest evolving SOUL.md.</li>
+<li><code>generate_rules()</code>
+  — Generate auto-evolution rules from learned preferences.</li>
+<li><code>apply_to_soul(soul_path)</code>
+  — Apply auto-evolved rules to SOUL.md. Returns status message.</li>
+<li><code>get_status()</code>
+  — Return current evolution status.</li>
+<li><code>get_history()</code>
+  — Return evolution history.</li>
+<li><code>reset()</code>
+  — Reset all evolution data.</li>
+</ul>
+<h3 id="salmalmfeaturessession_groups"><code>salmalm.features.session_groups</code><a class="headerlink" href="#salmalmfeaturessession_groups" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Session Groups (대화 주제 그룹) — LobeChat style.</p>
+</blockquote>
+<h4 id="class-sessiongroupmanager"><code>class SessionGroupManager</code><a class="headerlink" href="#class-sessiongroupmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manage session groups/folders for organizing conversations.</p>
+</blockquote>
+<ul>
+<li><code>list_groups()</code></li>
+<li><code>create_group(name, color)</code></li>
+<li><code>update_group(group_id)</code></li>
+<li><code>delete_group(group_id)</code></li>
+<li><code>move_session(session_id, group_id)</code></li>
+</ul>
+<h3 id="salmalmfeaturesshadow"><code>salmalm.features.shadow</code><a class="headerlink" href="#salmalmfeaturesshadow" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Shadow Mode — learn user style and proxy-reply when absent.</p>
+</blockquote>
+<h4 id="class-shadowmode"><code>class ShadowMode</code><a class="headerlink" href="#class-shadowmode" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Learn user messaging style and generate proxy replies when absent.</p>
+</blockquote>
+<ul>
+<li><code>learn(messages)</code>
+  — Analyse <em>user</em> messages and build a style profile.</li>
+<li><code>build_proxy_prompt(incoming_message)</code>
+  — Build an LLM system prompt that mimics the user's style.</li>
+<li><code>generate_proxy_response(incoming_message, confidence)</code>
+  — Generate a proxy response. If confidence is below threshold, return a polite away message.</li>
+<li><code>should_proxy()</code>
+  — Return True if shadow mode is active and profile exists.</li>
+<li><code>handle_command(args, session_messages)</code>
+  — Handle /shadow subcommands. Returns response text.</li>
+</ul>
+<h3 id="salmalmfeaturessla"><code>salmalm.features.sla</code><a class="headerlink" href="#salmalmfeaturessla" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm SLA Engine — Uptime monitoring, latency tracking, watchdog.</p>
+</blockquote>
+<h4 id="class-slaconfig"><code>class SLAConfig</code><a class="headerlink" href="#class-slaconfig" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Runtime-reloadable SLA configuration from ~/.salmalm/sla.json.</p>
+</blockquote>
+<ul>
+<li><code>load()</code>
+  — Load config from disk. Creates default if missing.</li>
+<li><code>save()</code>
+  — Write current config to disk.</li>
+<li><code>get(key, default)</code></li>
+<li><code>set(key, value)</code></li>
+<li><code>get_all()</code></li>
+<li><code>update(data)</code></li>
+</ul>
+<h4 id="class-uptimemonitor"><code>class UptimeMonitor</code><a class="headerlink" href="#class-uptimemonitor" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Track server uptime, detect crashes, log downtime events.</p>
+</blockquote>
+<ul>
+<li><code>init_db()</code>
+  — Create uptime_log table if not exists.</li>
+<li><code>on_startup()</code>
+  — Called at server startup: check lockfile, record crash if needed.</li>
+<li><code>on_shutdown()</code>
+  — Called on graceful shutdown: remove lockfile.</li>
+<li><code>record_downtime(start, end, duration, reason)</code>
+  — Manually record a downtime event.</li>
+<li><code>get_uptime_seconds()</code></li>
+<li><code>get_uptime_human()</code></li>
+<li><code>get_monthly_uptime_pct(year, month)</code>
+  — Calculate uptime percentage for a given month.</li>
+<li><code>get_daily_uptime_pct(date_str)</code>
+  — Calculate uptime percentage for a given day.</li>
+<li><code>get_recent_incidents(limit)</code>
+  — Get recent downtime incidents.</li>
+<li><code>get_stats()</code>
+  — Full uptime stats for API/dashboard.</li>
+</ul>
+<h4 id="class-latencytracker"><code>class LatencyTracker</code><a class="headerlink" href="#class-latencytracker" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Track TTFT and total response time with ring buffer.</p>
+</blockquote>
+<ul>
+<li><code>record(ttft_ms, total_ms, model, timed_out, session_id)</code>
+  — Record a single request's latency.</li>
+<li><code>should_failover()</code>
+  — Check if consecutive timeouts warrant a model failover.</li>
+<li><code>reset_timeout_counter()</code></li>
+<li><code>get_stats()</code>
+  — Get latency statistics: P50/P95/P99 + histogram.</li>
+</ul>
+<h4 id="class-watchdog"><code>class Watchdog</code><a class="headerlink" href="#class-watchdog" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Background watchdog: periodic self-diagnosis + auto-recovery.</p>
+</blockquote>
+<ul>
+<li><code>start()</code>
+  — Start watchdog background thread.</li>
+<li><code>stop()</code>
+  — Stop watchdog.</li>
+<li><code>get_last_report()</code>
+  — Get the most recent watchdog report.</li>
+<li><code>get_detailed_health()</code>
+  — Detailed health report for /health detail command.</li>
+</ul>
+<h3 id="salmalmfeaturessmart_paste"><code>salmalm.features.smart_paste</code><a class="headerlink" href="#salmalmfeaturessmart_paste" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Smart Paste (스마트 붙여넣기) — BIG-AGI style.</p>
+</blockquote>
+<ul>
+<li><code>detect_paste_type(text)</code></li>
+</ul>
+<h3 id="salmalmfeaturessplit_response"><code>salmalm.features.split_response</code><a class="headerlink" href="#salmalmfeaturessplit_response" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm A/B Split Response — dual-perspective answers.</p>
+</blockquote>
+<h4 id="class-splitresponder"><code>class SplitResponder</code><a class="headerlink" href="#class-splitresponder" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Generate dual-perspective responses for a single question.</p>
+</blockquote>
+<ul>
+<li><code>available_modes()</code></li>
+<li><code>should_suggest_split(text)</code>
+  — Check if the text contains patterns suggesting a split response.</li>
+<li><code>set_custom(label_a, label_b, prompt_a, prompt_b)</code></li>
+<li><code>async generate(question, mode)</code>
+  — Generate split responses. Returns dict with responses and metadata.</li>
+<li><code>format_result(result)</code>
+  — Format split result for display.</li>
+<li><code>format_buttons()</code>
+  — Return inline button descriptors.</li>
+<li><code>suggest_button()</code>
+  — Return a 'suggest split' inline button descriptor.</li>
+<li><code>async merge(result)</code>
+  — Merge two perspectives into a combined response.</li>
+<li><code>async continue_with(result, choice, follow_up)</code>
+  — Continue conversation with the chosen perspective.</li>
+<li><code>handle_command(args)</code>
+  — Handle /split subcommands (sync wrapper). Returns text.</li>
+</ul>
+<h3 id="salmalmfeaturesstability"><code>salmalm.features.stability</code><a class="headerlink" href="#salmalmfeaturesstability" title="Permanent link">&para;</a></h3>
+<h4 id="class-circuitbreaker"><code>class CircuitBreaker</code><a class="headerlink" href="#class-circuitbreaker" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Track error rates per component. Trip after threshold.</p>
+</blockquote>
+<ul>
+<li><code>record_error(component, error)</code>
+  — Record an error for a component.</li>
+<li><code>record_success(component)</code>
+  — Record successful operation — helps reset breaker.</li>
+<li><code>is_tripped(component)</code>
+  — Check if circuit breaker is open (too many errors).</li>
+<li><code>get_status()</code>
+  — Get all component statuses.</li>
+</ul>
+<h4 id="class-healthmonitor"><code>class HealthMonitor</code><a class="headerlink" href="#class-healthmonitor" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Comprehensive health monitoring and auto-recovery.</p>
+</blockquote>
+<ul>
+<li><code>check_health()</code>
+  — Run comprehensive health check. Returns health report.</li>
+<li><code>async auto_recover()</code>
+  — Attempt to recover crashed components.</li>
+<li>
+<p><code>startup_selftest()</code>
+  — Run self-test on startup to verify all modules.</p>
+</li>
+<li>
+<p><code>async watchdog_tick(monitor)</code>
+  — Periodic watchdog check — run via cron every 5 minutes.</p>
+</li>
+</ul>
+<h3 id="salmalmfeaturesstt"><code>salmalm.features.stt</code><a class="headerlink" href="#salmalmfeaturesstt" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>STT (Speech-to-Text) Manager — voice input via Web Speech API and OpenAI Whisper.</p>
+</blockquote>
+<h4 id="class-sttmanager"><code>class STTManager</code><a class="headerlink" href="#class-sttmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Speech-to-text manager supporting Web Speech API and OpenAI Whisper.</p>
+</blockquote>
+<ul>
+<li><code>enabled()</code></li>
+<li><code>web_enabled()</code></li>
+<li><code>telegram_voice()</code></li>
+<li><code>get_web_js()</code>
+  — Return JavaScript snippet for Web Speech API integration.</li>
+<li><code>transcribe(audio_data, filename, content_type)</code>
+  — Transcribe audio using OpenAI Whisper API. Returns text or error.</li>
+<li><code>handle_telegram_voice(file_data, file_name)</code>
+  — Process a Telegram voice message. Returns transcribed text or None.</li>
+</ul>
+<h3 id="salmalmfeaturessummary_card"><code>salmalm.features.summary_card</code><a class="headerlink" href="#salmalmfeaturessummary_card" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Conversation Summary Card (대화 요약 카드) — BIG-AGI style.</p>
+</blockquote>
+<ul>
+<li><code>get_summary_card(session_id)</code></li>
+</ul>
+<h3 id="salmalmfeaturesthoughts"><code>salmalm.features.thoughts</code><a class="headerlink" href="#salmalmfeaturesthoughts" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Thought Stream — quick thought capture with SQLite storage and RAG integration.</p>
+</blockquote>
+<h4 id="class-thoughtstream"><code>class ThoughtStream</code><a class="headerlink" href="#class-thoughtstream" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Quick thought capture with SQLite storage.</p>
+</blockquote>
+<ul>
+<li><code>add(content, mood)</code>
+  — Add a thought. Returns the thought ID.</li>
+<li><code>list_recent(n)</code>
+  — List most recent N thoughts.</li>
+<li><code>search(query)</code>
+  — Search thoughts using RAG or simple LIKE.</li>
+<li><code>by_tag(tag)</code>
+  — Filter thoughts by tag.</li>
+<li><code>timeline(date_str)</code>
+  — Get thoughts for a specific date (YYYY-MM-DD). Defaults to today.</li>
+<li><code>stats()</code>
+  — Get thought statistics.</li>
+<li><code>export_markdown()</code>
+  — Export all thoughts as Markdown.</li>
+<li><code>delete(thought_id)</code>
+  — Delete a thought by ID.</li>
+</ul>
+<h3 id="salmalmfeaturestimecapsule"><code>salmalm.features.timecapsule</code><a class="headerlink" href="#salmalmfeaturestimecapsule" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Time Capsule — schedule messages to your future self.</p>
+</blockquote>
+<h4 id="class-timecapsule"><code>class TimeCapsule</code><a class="headerlink" href="#class-timecapsule" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages time capsules stored in SQLite.</p>
+</blockquote>
+<ul>
+<li><code>create(date_text, message, channel)</code>
+  — Create a new time capsule.</li>
+<li><code>list_pending()</code>
+  — List capsules not yet delivered.</li>
+<li><code>list_delivered()</code>
+  — List already delivered capsules.</li>
+<li><code>peek(capsule_id)</code>
+  — Peek at a capsule (spoiler warning).</li>
+<li><code>cancel(capsule_id)</code>
+  — Cancel (delete) a pending capsule.</li>
+<li><code>get_due_capsules(today)</code>
+  — Get capsules due for delivery today.</li>
+<li><code>mark_delivered(capsule_id)</code>
+  — Mark a capsule as delivered.</li>
+<li><code>deliver_due(send_fn, today)</code>
+  — Deliver all due capsules. Returns list of delivery results.</li>
+<li><code>handle_command(args, channel)</code>
+  — Handle /capsule subcommands.</li>
+</ul>
+<h3 id="salmalmfeaturestranscript_hygiene"><code>salmalm.features.transcript_hygiene</code><a class="headerlink" href="#salmalmfeaturestranscript_hygiene" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Transcript Hygiene — provider-specific session history sanitization.</p>
+</blockquote>
+<h4 id="class-transcripthygiene"><code>class TranscriptHygiene</code><a class="headerlink" href="#class-transcripthygiene" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Clean conversation history per provider rules before LLM API calls.</p>
+</blockquote>
+<ul>
+<li><code>clean(messages)</code>
+  — Return a sanitized copy of messages. Original is never modified.</li>
+</ul>
+<h3 id="salmalmfeaturestray"><code>salmalm.features.tray</code><a class="headerlink" href="#salmalmfeaturestray" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Windows System Tray for SalmAlm — pure ctypes implementation.</p>
+</blockquote>
+<ul>
+<li><code>is_windows()</code></li>
+<li><code>run_tray(port)</code>
+  — Run SalmAlm with system tray icon (Windows only).</li>
+</ul>
+<h3 id="salmalmfeaturesusage"><code>salmalm.features.usage</code><a class="headerlink" href="#salmalmfeaturesusage" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Token Usage Tracking (사용량 추적) — LibreChat style.</p>
+</blockquote>
+<h4 id="class-usagetracker"><code>class UsageTracker</code><a class="headerlink" href="#class-usagetracker" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Per-user, per-model token usage tracking with daily/monthly reports.</p>
+</blockquote>
+<ul>
+<li><code>record(session_id, model, input_tokens, output_tokens, cost)</code></li>
+<li><code>daily_report(days)</code></li>
+<li><code>monthly_report(months)</code></li>
+<li><code>model_breakdown()</code></li>
+</ul>
+<h3 id="salmalmfeaturesusers"><code>salmalm.features.users</code><a class="headerlink" href="#salmalmfeaturesusers" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Users — Multi-tenant user management, quotas, per-user isolation.</p>
+</blockquote>
+<h4 id="class-quotaexceeded"><code>class QuotaExceeded</code><a class="headerlink" href="#class-quotaexceeded" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Raised when a user exceeds their daily or monthly cost quota.</p>
+</blockquote>
+<h4 id="class-usermanager"><code>class UserManager</code><a class="headerlink" href="#class-usermanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Multi-tenant user manager with quotas and data isolation.</p>
+</blockquote>
+<ul>
+<li><code>multi_tenant_enabled()</code>
+  — Check if multi-tenant mode is enabled.</li>
+<li><code>enable_multi_tenant(enabled)</code>
+  — Enable or disable multi-tenant mode.</li>
+<li><code>get_config(key, default)</code>
+  — Get a multi-tenant config value.</li>
+<li><code>set_config(key, value)</code>
+  — Set a multi-tenant config value.</li>
+<li><code>ensure_quota(user_id)</code>
+  — Create quota record for user if it doesn't exist.</li>
+<li><code>check_quota(user_id)</code>
+  — Check if user is within quota. Returns quota info.</li>
+<li><code>record_cost(user_id, cost)</code>
+  — Record cost against user quota.</li>
+<li><code>set_quota(user_id, daily_limit, monthly_limit)</code>
+  — Set quota limits for a user (admin only).</li>
+<li><code>get_quota(user_id)</code>
+  — Get quota info for a user.</li>
+<li><code>reset_all_daily_quotas()</code>
+  — Reset all users' daily quotas. Called at midnight.</li>
+</ul>
+<h3 id="salmalmfeaturesvault_chat"><code>salmalm.features.vault_chat</code><a class="headerlink" href="#salmalmfeaturesvault_chat" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Encrypted Vault Chat — AES-256-GCM encrypted conversation store.</p>
+</blockquote>
+<h4 id="class-vaultchat"><code>class VaultChat</code><a class="headerlink" href="#class-vaultchat" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Encrypted vault for private notes and conversations.</p>
+</blockquote>
+<ul>
+<li><code>is_setup()</code>
+  — Check if vault has been set up (meta file exists).</li>
+<li><code>setup(password)</code>
+  — Initial vault setup — create password hash and empty encrypted DB.</li>
+<li><code>change_password(old_password, new_password)</code>
+  — Change vault password.</li>
+<li><code>open(password)</code>
+  — Unlock the vault.</li>
+<li><code>close()</code>
+  — Lock the vault — flush to disk and wipe key from memory.</li>
+<li><code>is_open()</code></li>
+<li><code>vault_note(content, category)</code>
+  — Add a note to the vault.</li>
+<li><code>vault_list(category, limit)</code>
+  — List vault entries.</li>
+<li><code>vault_search(query)</code>
+  — Search vault entries.</li>
+<li><code>vault_delete(entry_id)</code>
+  — Delete a vault entry.</li>
+</ul>
+<h3 id="salmalmfeatureswatcher"><code>salmalm.features.watcher</code><a class="headerlink" href="#salmalmfeatureswatcher" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>File Watcher + Auto-Index — polling-based file change detection with RAG re-indexing.</p>
+</blockquote>
+<h4 id="class-filewatcher"><code>class FileWatcher</code><a class="headerlink" href="#class-filewatcher" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Polling-based file watcher that detects created/modified/deleted files.</p>
+</blockquote>
+<ul>
+<li><code>start()</code>
+  — Start watching in a background thread.</li>
+<li><code>stop()</code>
+  — Stop the watcher.</li>
+<li><code>running()</code></li>
+<li><code>get_watched_files()</code>
+  — Return current tracked files and their mtimes.</li>
+</ul>
+<h4 id="class-ragfilewatcher"><code>class RAGFileWatcher</code><a class="headerlink" href="#class-ragfilewatcher" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>FileWatcher that triggers RAG re-indexing on file changes.</p>
+</blockquote>
+<h3 id="salmalmfeaturesworkflow"><code>salmalm.features.workflow</code><a class="headerlink" href="#salmalmfeaturesworkflow" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Workflow Engine — multi-step automation pipelines with variable substitution.</p>
+</blockquote>
+<h4 id="class-stepresult"><code>class StepResult</code><a class="headerlink" href="#class-stepresult" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>to_dict()</code></li>
+</ul>
+<h4 id="class-workflowengine"><code>class WorkflowEngine</code><a class="headerlink" href="#class-workflowengine" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Execute multi-step workflows with variable substitution.</p>
+</blockquote>
+<ul>
+<li><code>list_workflows()</code></li>
+<li><code>get_workflow(name)</code></li>
+<li><code>save_workflow(workflow)</code></li>
+<li><code>delete_workflow(name)</code></li>
+<li><code>run(name)</code></li>
+<li><code>execute(workflow)</code></li>
+<li><code>get_logs(name, limit)</code></li>
+<li><code>get_presets()</code></li>
+<li>
+<p><code>install_preset(name)</code></p>
+</li>
+<li>
+<p><code>handle_workflow_command(text)</code></p>
+</li>
+</ul>
+<h2 id="channels-channels-telegram-discord">channels/ — Channels — Telegram, Discord / 채널 — 텔레그램, 디스코드<a class="headerlink" href="#channels-channels-telegram-discord" title="Permanent link">&para;</a></h2>
+<h3 id="salmalmchannelschannel_router"><code>salmalm.channels.channel_router</code><a class="headerlink" href="#salmalmchannelschannel_router" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Channel Router — Multi-channel message routing.</p>
+</blockquote>
+<h4 id="class-channelrouter"><code>class ChannelRouter</code><a class="headerlink" href="#class-channelrouter" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Routes messages between multiple channels and the agent engine.</p>
+</blockquote>
+<ul>
+<li><code>register(name)</code>
+  — Register a channel for routing.</li>
+<li><code>unregister(name)</code></li>
+<li><code>set_handler(channel, handler)</code>
+  — Set inbound message handler for a channel.</li>
+<li><code>get_handler(channel)</code></li>
+<li><code>channels()</code></li>
+<li><code>is_enabled(name)</code></li>
+<li><code>route_outbound(channel, is_group)</code>
+  — Send a message through the specified channel.</li>
+<li><code>async route_inbound(channel, message, process_fn)</code>
+  — Route an inbound message from a channel to the agent, return response.</li>
+<li><code>list_channels()</code>
+  — List all registered channels with status.</li>
+<li>
+<p><code>save_config()</code>
+  — Persist current channel config.</p>
+</li>
+<li>
+<p><code>format_for_channel(text, channel)</code>
+  — Format text according to channel-specific rules.</p>
+</li>
+</ul>
+<h3 id="salmalmchannelsdiscord_bot"><code>salmalm.channels.discord_bot</code><a class="headerlink" href="#salmalmchannelsdiscord_bot" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Discord Bot — Pure stdlib Discord Gateway + HTTP API.</p>
+</blockquote>
+<h4 id="class-discordbot"><code>class DiscordBot</code><a class="headerlink" href="#class-discordbot" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Minimal Discord bot using Gateway WebSocket + REST API.</p>
+</blockquote>
+<ul>
+<li><code>configure(token, owner_id)</code>
+  — Configure the Discord bot with token and channel settings.</li>
+<li><code>on_message(func)</code>
+  — Decorator to register message handler.</li>
+<li><code>send_message(channel_id, content, reply_to)</code>
+  — Send a message to a channel.</li>
+<li><code>send_typing(channel_id)</code>
+  — Send typing indicator.</li>
+<li><code>start_typing_loop(channel_id)</code>
+  — Start a continuous typing indicator loop (refreshes every 8s).</li>
+<li><code>add_reaction(channel_id, message_id, emoji)</code>
+  — Add an emoji reaction to a Discord message.</li>
+<li><code>async poll()</code>
+  — Main gateway loop.</li>
+<li><code>stop()</code>
+  — Stop the Discord bot.</li>
+</ul>
+<h3 id="salmalmchannelsslack_bot"><code>salmalm.channels.slack_bot</code><a class="headerlink" href="#salmalmchannelsslack_bot" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Slack Bot — Pure stdlib Slack integration.</p>
+</blockquote>
+<h4 id="class-slackbot"><code>class SlackBot</code><a class="headerlink" href="#class-slackbot" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Minimal Slack bot using Event API (webhook) + Web API (urllib).</p>
+</blockquote>
+<ul>
+<li><code>configure(bot_token, signing_secret)</code>
+  — Configure the Slack bot.</li>
+<li><code>on_message(func)</code>
+  — Register message handler.</li>
+<li><code>send_message(channel, text)</code>
+  — Send a message to a Slack channel.</li>
+<li><code>add_reaction(channel, timestamp, emoji)</code>
+  — Add an emoji reaction to a message.</li>
+<li><code>get_bot_info()</code>
+  — Fetch bot user info.</li>
+<li><code>verify_request(timestamp, signature, body)</code>
+  — Verify Slack request signature.</li>
+<li><code>handle_event(payload)</code>
+  — Handle an incoming Slack event.</li>
+<li><code>update_message(channel, ts, text)</code>
+  — Update an existing message.</li>
+<li><code>delete_message(channel, ts)</code>
+  — Delete a message.</li>
+</ul>
+<h3 id="salmalmchannelstelegram"><code>salmalm.channels.telegram</code><a class="headerlink" href="#salmalmchannelstelegram" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Telegram bot.</p>
+</blockquote>
+<h4 id="class-telegrambot"><code>class TelegramBot</code><a class="headerlink" href="#class-telegrambot" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>configure(token, owner_id)</code>
+  — Configure the Telegram bot with token and owner chat ID.</li>
+<li><code>set_message_reaction(chat_id, message_id, emoji)</code>
+  — React to a message with an emoji via setMessageReaction API.</li>
+<li><code>send_message(chat_id, text, parse_mode, reply_markup, message_thread_id)</code>
+  — Send a text message to a Telegram chat, with optional inline keyboard.</li>
+<li><code>send_typing(chat_id)</code>
+  — Send a typing indicator to a Telegram chat.</li>
+<li><code>edit_message(chat_id, message_id, text, parse_mode)</code>
+  — Edit an existing Telegram message.</li>
+<li><code>set_webhook(url)</code>
+  — Set Telegram webhook. Generates a secret_token for request verification.</li>
+<li><code>delete_webhook()</code>
+  — Delete Telegram webhook and return to polling mode.</li>
+<li><code>verify_webhook_request(secret_token)</code>
+  — Verify the X-Telegram-Bot-Api-Secret-Token header.</li>
+<li><code>async handle_webhook_update(update)</code>
+  — Process a single update received via webhook.</li>
+<li><code>async poll()</code>
+  — Long-polling loop for Telegram updates.</li>
+</ul>
+<h2 id="security-security-crypto-sandbox">security/ — Security — Crypto, Sandbox / 보안 — 암호화, 샌드박스<a class="headerlink" href="#security-security-crypto-sandbox" title="Permanent link">&para;</a></h2>
+<h3 id="salmalmsecurity__init__"><code>salmalm.security.__init__</code><a class="headerlink" href="#salmalmsecurity__init__" title="Permanent link">&para;</a></h3>
+<h4 id="class-_pkgproxy_2"><code>class _PkgProxy</code><a class="headerlink" href="#class-_pkgproxy_2" title="Permanent link">&para;</a></h4>
+<h3 id="salmalmsecuritycontainer"><code>salmalm.security.container</code><a class="headerlink" href="#salmalmsecuritycontainer" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm DI Container — Lightweight service registry.</p>
+</blockquote>
+<h4 id="class-container"><code>class Container</code><a class="headerlink" href="#class-container" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Lightweight DI container with lazy initialization.</p>
+</blockquote>
+<ul>
+<li><code>register(name, factory)</code>
+  — Register a lazy factory for a service.</li>
+<li><code>set(name, instance)</code>
+  — Set an already-created service instance.</li>
+<li><code>get(name)</code>
+  — Get a service, creating it lazily if needed.</li>
+<li><code>replace(name, instance)</code>
+  — Replace a service (for testing). Returns old instance.</li>
+<li><code>has(name)</code>
+  — Check if a service is registered.</li>
+<li><code>reset()</code>
+  — Clear all services (for testing).</li>
+<li><code>vault()</code>
+  — Get the Vault service instance.</li>
+<li><code>router()</code>
+  — Get the ModelRouter service instance.</li>
+<li><code>auth_manager()</code>
+  — Get the AuthManager service instance.</li>
+<li><code>rate_limiter()</code>
+  — Get the RateLimiter service instance.</li>
+</ul>
+<h3 id="salmalmsecuritycrypto"><code>salmalm.security.crypto</code><a class="headerlink" href="#salmalmsecuritycrypto" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm crypto — AES-256-GCM vault with HMAC-CTR fallback.</p>
+</blockquote>
+<h4 id="class-vault"><code>class Vault</code><a class="headerlink" href="#class-vault" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Encrypted key-value store for API keys and secrets.</p>
+</blockquote>
+<ul>
+<li><code>is_unlocked()</code>
+  — Whether the vault has been unlocked with a valid password.</li>
+<li><code>create(password)</code>
+  — Create a new vault with the given master password.</li>
+<li><code>unlock(password)</code>
+  — Unlock an existing vault. Returns True on success.</li>
+<li><code>get(key, default)</code>
+  — Get a stored value. Falls back to environment variable if not in vault.</li>
+<li><code>set(key, value)</code>
+  — Store a value (triggers re-encryption).</li>
+<li><code>delete(key)</code>
+  — Delete a key.</li>
+<li><code>change_password(old_password, new_password)</code>
+  — Change vault master password. Returns True on success.</li>
+<li><code>keys()</code>
+  — List all stored key names.</li>
+</ul>
+<h3 id="salmalmsecurityexec_approvals"><code>salmalm.security.exec_approvals</code><a class="headerlink" href="#salmalmsecurityexec_approvals" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Exec approval system — allowlist/denylist + dangerous command detection.</p>
+</blockquote>
+<h4 id="class-backgroundsession"><code>class BackgroundSession</code><a class="headerlink" href="#class-backgroundsession" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages a background exec process.</p>
+</blockquote>
+<ul>
+<li><code>start()</code>
+  — Start the background process.</li>
+<li><code>poll()</code>
+  — Poll current status.</li>
+<li><code>kill()</code>
+  — Kill the background process.</li>
+<li><code>list_sessions(cls)</code>
+  — List all background sessions.</li>
+<li><code>get_session(cls, session_id)</code>
+  — Get a background session by ID.</li>
+<li>
+<p><code>kill_session(cls, session_id)</code>
+  — Kill a specific background session.</p>
+</li>
+<li>
+<p><code>check_approval(command)</code>
+  — Check if a command needs approval.</p>
+</li>
+<li><code>check_env_override(env)</code>
+  — Check if env dict tries to override blocked variables.</li>
+</ul>
+<h3 id="salmalmsecuritysandbox"><code>salmalm.security.sandbox</code><a class="headerlink" href="#salmalmsecuritysandbox" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Sandboxing — Docker container or subprocess isolation.</p>
+</blockquote>
+<h4 id="class-sandboxresult"><code>class SandboxResult</code><a class="headerlink" href="#class-sandboxresult" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Result from a sandboxed execution.</p>
+</blockquote>
+<ul>
+<li><code>output()</code>
+  — Combined output suitable for display.</li>
+</ul>
+<h4 id="class-sandboxmanager"><code>class SandboxManager</code><a class="headerlink" href="#class-sandboxmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages sandboxed command execution.</p>
+</blockquote>
+<ul>
+<li><code>save_config()</code>
+  — Persist current config to disk.</li>
+<li><code>config()</code></li>
+<li><code>mode()</code>
+  — Resolved execution mode.</li>
+<li><code>is_dangerous(command)</code>
+  — Check if a command matches dangerous patterns.</li>
+<li><code>run(command, timeout, workspace, env, sandbox)</code>
+  — Execute a command in the appropriate sandbox.</li>
+<li><code>exec_command(command, timeout, sandbox)</code>
+  — Execute command and return formatted output string.</li>
+</ul>
+<h3 id="salmalmsecuritysecurity"><code>salmalm.security.security</code><a class="headerlink" href="#salmalmsecuritysecurity" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Security Module — OWASP compliance, security audit, hardening.</p>
+</blockquote>
+<h4 id="class-loginratelimiter"><code>class LoginRateLimiter</code><a class="headerlink" href="#class-loginratelimiter" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Per-key exponential backoff for login attempts.</p>
+</blockquote>
+<ul>
+<li><code>check(key)</code>
+  — Check if login attempt is allowed.</li>
+<li><code>record_failure(key)</code>
+  — Record a failed login attempt. 실패한 로그인 기록.</li>
+<li><code>record_success(key)</code>
+  — Clear attempts on successful login. 성공 시 시도 기록 초기화.</li>
+<li><code>cleanup()</code>
+  — Remove stale entries. 오래된 항목 정리.</li>
+</ul>
+<h4 id="class-securityauditor"><code>class SecurityAuditor</code><a class="headerlink" href="#class-securityauditor" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Generate OWASP Top 10 compliance report.</p>
+</blockquote>
+<ul>
+<li><code>audit()</code>
+  — Run full security audit. Returns report dict.</li>
+<li>
+<p><code>format_report()</code>
+  — Format audit report as human-readable text.</p>
+</li>
+<li>
+<p><code>redact_sensitive(text)</code>
+  — 민감 정보를 [REDACTED]로 치환.</p>
+</li>
+<li><code>is_internal_ip(url)</code>
+  — Check if URL resolves to internal/private IP.</li>
+<li><code>sanitize_session_id(session_id)</code>
+  — Sanitize session ID to prevent injection.</li>
+<li><code>validate_input_size(data, max_size)</code>
+  — Check input doesn't exceed size limit.</li>
+</ul>
+<h2 id="utils-utils-http-queue-retry-http">utils/ — Utils — HTTP, Queue, Retry / 유틸리티 — HTTP, 큐, 재시도<a class="headerlink" href="#utils-utils-http-queue-retry-http" title="Permanent link">&para;</a></h2>
+<h3 id="salmalmutilsasync_http"><code>salmalm.utils.async_http</code><a class="headerlink" href="#salmalmutilsasync_http" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Async HTTP client built on stdlib asyncio (no third-party deps).</p>
+</blockquote>
+<h4 id="class-asynchttpresponse"><code>class AsyncHTTPResponse</code><a class="headerlink" href="#class-asynchttpresponse" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Lightweight async HTTP response wrapper.</p>
+</blockquote>
+<ul>
+<li><code>async read()</code>
+  — Read entire response body (handles chunked transfer-encoding).</li>
+<li><code>async json()</code></li>
+<li><code>async text()</code></li>
+<li><code>async iter_lines()</code>
+  — Yield lines as they arrive (for SSE / streaming).</li>
+<li><code>async iter_chunks(size)</code>
+  — Yield raw byte chunks.</li>
+</ul>
+<h4 id="class-asynchttpclient"><code>class AsyncHTTPClient</code><a class="headerlink" href="#class-asynchttpclient" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Pure-stdlib asyncio HTTP/1.1 client.</p>
+</blockquote>
+<ul>
+<li><code>async request(method, url)</code>
+  — Send an HTTP/1.1 request and return an :class:<code>AsyncHTTPResponse</code>.</li>
+<li><code>async get(url)</code></li>
+<li><code>async post(url)</code></li>
+<li><code>async post_json(url, data)</code></li>
+</ul>
+<h3 id="salmalmutilsbrowser"><code>salmalm.utils.browser</code><a class="headerlink" href="#salmalmutilsbrowser" title="Permanent link">&para;</a></h3>
+<h4 id="class-cdpconnection"><code>class CDPConnection</code><a class="headerlink" href="#class-cdpconnection" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Low-level CDP WebSocket connection to Chrome.</p>
+</blockquote>
+<ul>
+<li><code>async connect(ws_url)</code>
+  — Connect to CDP WebSocket endpoint.</li>
+<li><code>async disconnect()</code>
+  — Disconnect from the browser WebSocket.</li>
+<li><code>async send(method, params, timeout)</code>
+  — Send CDP command and wait for response.</li>
+<li><code>on_event(method, handler)</code>
+  — Register event handler.</li>
+</ul>
+<h4 id="class-browsercontroller"><code>class BrowserController</code><a class="headerlink" href="#class-browsercontroller" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>High-level browser automation API over CDP.</p>
+</blockquote>
+<ul>
+<li><code>connected()</code>
+  — Check if the browser connection is active.</li>
+<li><code>async connect(tab_index)</code>
+  — Connect to Chrome's first tab via CDP.</li>
+<li><code>async disconnect()</code>
+  — Disconnect from the browser WebSocket.</li>
+<li><code>async navigate(url, wait_load)</code>
+  — Navigate to URL. Returns {frameId, loaderId}.</li>
+<li><code>async screenshot(full_page, format, quality)</code>
+  — Take screenshot, return base64 encoded image.</li>
+<li><code>async get_text()</code>
+  — Extract page text content.</li>
+<li><code>async get_html()</code>
+  — Get page HTML.</li>
+<li><code>async evaluate(expression, return_by_value)</code>
+  — Execute JavaScript and return result.</li>
+<li><code>async click(selector)</code>
+  — Click an element by CSS selector.</li>
+<li><code>async type_text(selector, text)</code>
+  — Type text into an input element.</li>
+</ul>
+<h4 id="class-browsermanager"><code>class BrowserManager</code><a class="headerlink" href="#class-browsermanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages Chrome lifecycle — auto-detect, launch, connect, close.</p>
+</blockquote>
+<ul>
+<li><code>find_chrome()</code>
+  — Auto-detect Chrome/Chromium binary.</li>
+<li><code>async launch(url, headless)</code>
+  — Launch Chrome and connect via CDP.</li>
+<li><code>controller()</code></li>
+<li><code>connected()</code></li>
+<li><code>async close()</code>
+  — Disconnect and kill Chrome.</li>
+<li>
+<p><code>close_sync()</code>
+  — Kill Chrome process (sync).</p>
+</li>
+<li>
+<p><code>async browser_open(url)</code>
+  — Open a URL. Launches Chrome if not connected.</p>
+</li>
+<li><code>async browser_screenshot()</code>
+  — Take screenshot, return base64 PNG.</li>
+<li><code>async browser_snapshot()</code>
+  — Extract page text (accessibility tree approximation).</li>
+<li><code>async browser_click(selector)</code>
+  — Click element by CSS selector.</li>
+<li><code>async browser_type(selector, text)</code>
+  — Type text into element.</li>
+<li><code>async browser_evaluate(js)</code>
+  — Execute JavaScript and return result.</li>
+<li><code>async browser_close()</code>
+  — Close browser.</li>
+</ul>
+<h3 id="salmalmutilschunker"><code>salmalm.utils.chunker</code><a class="headerlink" href="#salmalmutilschunker" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Smart block chunking — code fence aware, coalescing, human-like pacing.</p>
+</blockquote>
+<h4 id="class-chunkerconfig"><code>class ChunkerConfig</code><a class="headerlink" href="#class-chunkerconfig" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Configuration for EmbeddedBlockChunker.</p>
+</blockquote>
+<ul>
+<li><code>effective_hard_cap()</code></li>
+<li><code>effective_max_lines()</code></li>
+<li><code>uses_plain_fallback()</code></li>
+</ul>
+<h4 id="class-embeddedblockchunker"><code>class EmbeddedBlockChunker</code><a class="headerlink" href="#class-embeddedblockchunker" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Accumulates streaming text and emits Markdown-safe chunks.</p>
+</blockquote>
+<ul>
+<li><code>buffer()</code></li>
+<li><code>chunk_count()</code></li>
+<li><code>feed(text)</code>
+  — Feed a token/text fragment. May emit a chunk via callback.</li>
+<li><code>check_idle()</code>
+  — Check if idle timeout has elapsed and flush if needed.</li>
+<li><code>flush()</code>
+  — Flush any remaining buffer as the final chunk.</li>
+<li><code>compute_delay()</code>
+  — Compute human-like delay before sending the next chunk.</li>
+<li>
+<p><code>split_for_channel(text)</code>
+  — Split a complete text into channel-appropriate messages.</p>
+</li>
+<li>
+<p><code>load_config_from_file(path)</code>
+  — Load streaming config from ~/.salmalm/streaming.json if it exists.</p>
+</li>
+</ul>
+<h3 id="salmalmutilsdedup"><code>salmalm.utils.dedup</code><a class="headerlink" href="#salmalmutilsdedup" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Message deduplication and channel-aware debouncing.</p>
+</blockquote>
+<h4 id="class-messagededuplicator"><code>class MessageDeduplicator</code><a class="headerlink" href="#class-messagededuplicator" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Deduplicates inbound messages using a TTL cache.</p>
+</blockquote>
+<ul>
+<li><code>is_duplicate(channel, account, peer, message_id)</code>
+  — Return True if this message was already seen within the TTL window.</li>
+<li><code>size()</code></li>
+<li>
+<p><code>clear()</code></p>
+</li>
+<li>
+<p><code>get_debounce_ms(channel)</code>
+  — Get debounce time in ms for a channel.</p>
+</li>
+<li><code>should_skip_debounce(message, has_media)</code>
+  — Return True if this message should skip debouncing.</li>
+</ul>
+<h3 id="salmalmutilsfile_logger"><code>salmalm.utils.file_logger</code><a class="headerlink" href="#salmalmutilsfile_logger" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Structured file logger — JSON Lines format.</p>
+</blockquote>
+<h4 id="class-filelogger"><code>class FileLogger</code><a class="headerlink" href="#class-filelogger" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>JSON Lines 파일 로거.</p>
+</blockquote>
+<ul>
+<li><code>log(level, category, message)</code>
+  — JSON 라인 로그 기록.</li>
+<li><code>tail(lines, level)</code>
+  — 최근 로그 조회.</li>
+<li><code>search(query, days)</code>
+  — 로그 검색.</li>
+<li><code>cleanup(retain_days)</code>
+  — 오래된 로그 삭제. Returns number of files removed.</li>
+</ul>
+<h3 id="salmalmutilslogging_ext"><code>salmalm.utils.logging_ext</code><a class="headerlink" href="#salmalmutilslogging_ext" title="Permanent link">&para;</a></h3>
+<h4 id="class-jsonformatter"><code>class JSONFormatter</code><a class="headerlink" href="#class-jsonformatter" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Format log records as JSON lines.</p>
+</blockquote>
+<ul>
+<li><code>format(record)</code>
+  — Format a log record with correlation ID prefix.</li>
+</ul>
+<h4 id="class-requestlogger"><code>class RequestLogger</code><a class="headerlink" href="#class-requestlogger" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Middleware-style request/response logger.</p>
+</blockquote>
+<ul>
+<li><code>log_request(method, path, ip, user, status_code)</code>
+  — Log a request with structured data.</li>
+<li>
+<p><code>get_metrics()</code>
+  — Get request metrics (exclude internal durations list).</p>
+</li>
+<li>
+<p><code>setup_production_logging(json_log, max_bytes, backup_count)</code>
+  — Configure production-grade logging with rotation.</p>
+</li>
+<li><code>get_correlation_id()</code>
+  — Get or create correlation ID for current request.</li>
+<li><code>set_correlation_id(cid)</code>
+  — Set the correlation ID for the current thread context.</li>
+<li><code>safe_execute(func)</code>
+  — Execute a function with graceful error recovery.</li>
+<li><code>async safe_execute_async(coro, fallback, tag)</code>
+  — Async version of safe_execute.</li>
+</ul>
+<h3 id="salmalmutilsmarkdown_ir"><code>salmalm.utils.markdown_ir</code><a class="headerlink" href="#salmalmutilsmarkdown_ir" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Markdown IR — intermediate representation for cross-channel rendering.</p>
+</blockquote>
+<h4 id="class-stylespan"><code>class StyleSpan</code><a class="headerlink" href="#class-stylespan" title="Permanent link">&para;</a></h4>
+<h4 id="class-linkspan"><code>class LinkSpan</code><a class="headerlink" href="#class-linkspan" title="Permanent link">&para;</a></h4>
+<h4 id="class-codeblock"><code>class CodeBlock</code><a class="headerlink" href="#class-codeblock" title="Permanent link">&para;</a></h4>
+<h4 id="class-tabledata"><code>class TableData</code><a class="headerlink" href="#class-tabledata" title="Permanent link">&para;</a></h4>
+<h4 id="class-markdownir"><code>class MarkdownIR</code><a class="headerlink" href="#class-markdownir" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>parse(markdown)</code>
+  — Parse markdown text into MarkdownIR.</li>
+<li><code>render_telegram(ir, table_mode)</code>
+  — Render IR to Telegram HTML.</li>
+<li><code>render_discord(ir, table_mode)</code>
+  — Render IR to Discord Markdown.</li>
+<li><code>render_slack(ir, table_mode)</code>
+  — Render IR to Slack mrkdwn format.</li>
+<li><code>render_plain(ir)</code>
+  — Render IR as plain text (no formatting).</li>
+<li><code>chunk_ir(ir, max_chars)</code>
+  — Split IR into chunks that don't break style spans.</li>
+</ul>
+<h3 id="salmalmutilsmigration"><code>salmalm.utils.migration</code><a class="headerlink" href="#salmalmutilsmigration" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Agent Migration — Export/Import agent state (인격/기억/설정 이동).</p>
+</blockquote>
+<h4 id="class-agentexporter"><code>class AgentExporter</code><a class="headerlink" href="#class-agentexporter" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Export agent state to a ZIP file.</p>
+</blockquote>
+<ul>
+<li><code>export_agent()</code>
+  — Export agent state to ZIP bytes.</li>
+</ul>
+<h4 id="class-importresult"><code>class ImportResult</code><a class="headerlink" href="#class-importresult" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Result of an import operation.</p>
+</blockquote>
+<ul>
+<li><code>to_dict()</code></li>
+<li><code>summary()</code>
+  — Human-readable summary / 사람이 읽을 수 있는 요약.</li>
+</ul>
+<h4 id="class-agentimporter"><code>class AgentImporter</code><a class="headerlink" href="#class-agentimporter" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Import agent state from a ZIP file.</p>
+</blockquote>
+<ul>
+<li><code>preview(zip_data)</code>
+  — Preview what's in the ZIP without importing.</li>
+<li>
+<p><code>import_agent(zip_data)</code>
+  — Import agent state from ZIP bytes.</p>
+</li>
+<li>
+<p><code>quick_sync_export()</code>
+  — Export core agent state as lightweight JSON.</p>
+</li>
+<li><code>quick_sync_import(data)</code>
+  — Import core agent state from lightweight JSON.</li>
+<li><code>export_agent(include_vault, include_sessions, include_data)</code>
+  — Export agent state to ZIP bytes. Convenience wrapper.</li>
+<li><code>import_agent(zip_data, conflict_mode)</code>
+  — Import agent state from ZIP bytes. Convenience wrapper.</li>
+<li><code>preview_import(zip_data)</code>
+  — Preview ZIP contents without importing.</li>
+<li><code>export_filename()</code>
+  — Generate export filename with date.</li>
+</ul>
+<h3 id="salmalmutilsqueue"><code>salmalm.utils.queue</code><a class="headerlink" href="#salmalmutilsqueue" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Message Queue — lane-based FIFO with 5 modes, overflow policies, concurrency control.</p>
+</blockquote>
+<h4 id="class-queuemode"><code>class QueueMode</code><a class="headerlink" href="#class-queuemode" title="Permanent link">&para;</a></h4>
+<h4 id="class-droppolicy"><code>class DropPolicy</code><a class="headerlink" href="#class-droppolicy" title="Permanent link">&para;</a></h4>
+<h4 id="class-queuedmessage"><code>class QueuedMessage</code><a class="headerlink" href="#class-queuedmessage" title="Permanent link">&para;</a></h4>
+<h4 id="class-sessionoptions"><code>class SessionOptions</code><a class="headerlink" href="#class-sessionoptions" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Per-session overrides, set via /queue command.</p>
+</blockquote>
+<h4 id="class-queuelane"><code>class QueueLane</code><a class="headerlink" href="#class-queuelane" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Per-session FIFO lane with serial execution guarantee.</p>
+</blockquote>
+<ul>
+<li><code>async enqueue(message, processor, cfg, channel)</code>
+  — Main entry: enqueue message, apply mode logic, return result.</li>
+<li><code>get_steer_event()</code>
+  — Get/create the steer event for the current execution.</li>
+<li><code>consume_steer()</code>
+  — Consume a steered message (called at tool boundaries).</li>
+<li><code>reset_options()</code>
+  — Reset per-session overrides to defaults.</li>
+</ul>
+<h4 id="class-_semaphorecontext"><code>class _SemaphoreContext</code><a class="headerlink" href="#class-_semaphorecontext" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Async context manager for semaphore.</p>
+</blockquote>
+<h4 id="class-messagequeue"><code>class MessageQueue</code><a class="headerlink" href="#class-messagequeue" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Global message queue manager with lane-based concurrency control.</p>
+</blockquote>
+<ul>
+<li><code>config()</code></li>
+<li><code>reload_config()</code></li>
+<li><code>async process(session_id, message, processor, channel)</code>
+  — Process a message through the session's lane.</li>
+<li><code>get_lane(session_id)</code>
+  — Get lane without creating.</li>
+<li><code>handle_queue_command(session_id, args)</code>
+  — Handle /queue command. Returns user-facing response.</li>
+<li><code>cleanup(max_idle)</code>
+  — Remove idle session lanes.</li>
+<li><code>active_sessions()</code></li>
+<li><code>main_semaphore()</code></li>
+<li>
+<p><code>subagent_semaphore()</code></p>
+</li>
+<li>
+<p><code>load_config()</code>
+  — Load queue config from ~/.salmalm/queue.json, falling back to defaults.</p>
+</li>
+<li><code>save_config(cfg)</code>
+  — Persist config to ~/.salmalm/queue.json.</li>
+<li><code>apply_overflow(pending, cap, policy)</code>
+  — Enforce cap on pending list. Returns (trimmed_list, summary_or_none).</li>
+</ul>
+<h3 id="salmalmutilsretry"><code>salmalm.utils.retry</code><a class="headerlink" href="#salmalmutilsretry" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Retry Policy — exponential backoff with jitter.</p>
+</blockquote>
+<ul>
+<li><code>retry_with_backoff(fn)</code>
+  — Decorator: retry function with exponential backoff + jitter.</li>
+<li><code>async async_retry_with_backoff(coro_fn)</code>
+  — Async version: retry an async callable with exponential backoff.</li>
+<li><code>retry_call(fn)</code>
+  — Functional retry: call fn with retry logic (not a decorator).</li>
+</ul>
+<h3 id="salmalmutilstls"><code>salmalm.utils.tls</code><a class="headerlink" href="#salmalmutilstls" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>ensure_cert(cn, days)</code>
+  — Generate self-signed certificate if not exists. Returns True if cert exists.</li>
+<li><code>create_ssl_context()</code>
+  — Create SSL context with the server certificate.</li>
+<li><code>create_https_server(address, handler_class, ssl_context)</code>
+  — Create a ThreadingHTTPServer with optional TLS.</li>
+<li><code>get_cert_info()</code>
+  — Get certificate info.</li>
+</ul>
+<h2 id="web-web-server-websocket-oauth-oauth">web/ — Web — Server, WebSocket, OAuth / 웹 — 서버, 웹소켓, OAuth<a class="headerlink" href="#web-web-server-websocket-oauth-oauth" title="Permanent link">&para;</a></h2>
+<h3 id="salmalmweb__init__"><code>salmalm.web.__init__</code><a class="headerlink" href="#salmalmweb__init__" title="Permanent link">&para;</a></h3>
+<h4 id="class-_pkgproxy_3"><code>class _PkgProxy</code><a class="headerlink" href="#class-_pkgproxy_3" title="Permanent link">&para;</a></h4>
+<h3 id="salmalmwebauth"><code>salmalm.web.auth</code><a class="headerlink" href="#salmalmwebauth" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Auth — Multi-user authentication, session isolation, RBAC, rate limiting.</p>
+</blockquote>
+<h4 id="class-tokenmanager"><code>class TokenManager</code><a class="headerlink" href="#class-tokenmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Stateless token creation/verification using HMAC-SHA256.</p>
+</blockquote>
+<ul>
+<li><code>create(payload, expires_in)</code>
+  — Create a signed token. Default expiry: 24h.</li>
+<li><code>verify(token)</code>
+  — Verify token signature and expiry. Returns payload or None.</li>
+</ul>
+<h4 id="class-ratelimitexceeded"><code>class RateLimitExceeded</code><a class="headerlink" href="#class-ratelimitexceeded" title="Permanent link">&para;</a></h4>
+<h4 id="class-ratelimiter"><code>class RateLimiter</code><a class="headerlink" href="#class-ratelimiter" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Token bucket rate limiter per key (user_id or IP).</p>
+</blockquote>
+<ul>
+<li><code>check(key, role)</code>
+  — Check rate limit. Raises RateLimitExceeded if exceeded.</li>
+<li><code>get_remaining(key)</code>
+  — Get remaining requests allowed in the current rate limit window.</li>
+<li><code>cleanup()</code>
+  — Remove stale buckets (&gt;1h inactive).</li>
+</ul>
+<h4 id="class-authmanager"><code>class AuthManager</code><a class="headerlink" href="#class-authmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Multi-user authentication with SQLite backend.</p>
+</blockquote>
+<ul>
+<li><code>create_user(username, password, role)</code>
+  — Create a new user. Returns user info.</li>
+<li><code>authenticate(username, password)</code>
+  — Authenticate user. Returns user dict or None.</li>
+<li><code>authenticate_api_key(api_key)</code>
+  — Authenticate via API key (constant-time hash comparison).</li>
+<li><code>create_token(user, expires_in)</code>
+  — Create auth token for authenticated user.</li>
+<li><code>verify_token(token)</code>
+  — Verify auth token. Returns user info or None.</li>
+<li><code>list_users()</code>
+  — List all users (admin only).</li>
+<li><code>delete_user(username)</code>
+  — Delete a user account by username.</li>
+<li><code>change_password(username, new_password)</code>
+  — Change a user password. Returns True on success.</li>
+<li>
+<p><code>has_permission(user, action)</code>
+  — Check if user has permission for action.</p>
+</li>
+<li>
+<p><code>extract_auth(headers)</code>
+  — Extract user from headers. Accepts dict (case-sensitive) or HTTPMessage (case-insensitive).</p>
+</li>
+</ul>
+<h3 id="salmalmweboauth"><code>salmalm.web.oauth</code><a class="headerlink" href="#salmalmweboauth" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>OAuth subscription authentication for Anthropic and OpenAI.</p>
+</blockquote>
+<h4 id="class-anthropicoauth"><code>class AnthropicOAuth</code><a class="headerlink" href="#class-anthropicoauth" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>get_auth_url(redirect_uri, state)</code></li>
+<li><code>exchange_code(code, redirect_uri)</code></li>
+<li><code>refresh_token(refresh_token)</code></li>
+<li><code>is_expired(token_data)</code></li>
+<li><code>is_expiring_soon(token_data, threshold)</code></li>
+<li><code>auto_refresh(token_data)</code></li>
+</ul>
+<h4 id="class-openaioauth"><code>class OpenAIOAuth</code><a class="headerlink" href="#class-openaioauth" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>get_auth_url(redirect_uri, state)</code></li>
+<li><code>exchange_code(code, redirect_uri)</code></li>
+<li><code>refresh_token(refresh_token)</code></li>
+<li><code>is_expired(token_data)</code></li>
+</ul>
+<h4 id="class-oauthmanager"><code>class OAuthManager</code><a class="headerlink" href="#class-oauthmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Manages OAuth tokens for multiple providers.</p>
+</blockquote>
+<ul>
+<li><code>setup(provider, redirect_uri)</code></li>
+<li><code>handle_callback(code, state, redirect_uri)</code></li>
+<li><code>status()</code></li>
+<li><code>revoke(provider)</code></li>
+<li><code>refresh(provider)</code></li>
+<li><code>get_token(provider)</code>
+  — Get access token for provider, auto-refreshing if needed.</li>
+<li><code>get_api_status()</code>
+  — Return status dict for /api/oauth/status.</li>
+</ul>
+<h3 id="salmalmwebtemplates"><code>salmalm.web.templates</code><a class="headerlink" href="#salmalmwebtemplates" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm HTML templates — thin loader over static/ files.</p>
+</blockquote>
+<h3 id="salmalmwebweb"><code>salmalm.web.web</code><a class="headerlink" href="#salmalmwebweb" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>SalmAlm Web UI — HTML + WebHandler.</p>
+</blockquote>
+<h4 id="class-webhandler"><code>class WebHandler</code><a class="headerlink" href="#class-webhandler" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>HTTP handler for web UI and API.</p>
+</blockquote>
+<ul>
+<li><code>log_message(format)</code>
+  — Suppress default HTTP request logging.</li>
+<li><code>do_PUT()</code>
+  — Handle HTTP PUT requests.</li>
+<li><code>do_OPTIONS()</code>
+  — Handle CORS preflight requests.</li>
+<li><code>do_GET()</code>
+  — Handle HTTP GET requests.</li>
+<li><code>do_POST()</code>
+  — Handle HTTP POST requests.</li>
+</ul>
+<h3 id="salmalmwebws"><code>salmalm.web.ws</code><a class="headerlink" href="#salmalmwebws" title="Permanent link">&para;</a></h3>
+<h4 id="class-wsclient"><code>class WSClient</code><a class="headerlink" href="#class-wsclient" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Represents a single WebSocket connection.</p>
+</blockquote>
+<ul>
+<li><code>async send_json(data)</code>
+  — Send a JSON message as a WebSocket text frame.</li>
+<li><code>async send_text(text)</code>
+  — Send a text message to a connected WebSocket client.</li>
+<li><code>async recv_frame()</code>
+  — Read one WebSocket frame. Returns (opcode, payload) or None on close.</li>
+<li><code>async close(code, reason)</code>
+  — Send close frame and close connection.</li>
+</ul>
+<h4 id="class-websocketserver"><code>class WebSocketServer</code><a class="headerlink" href="#class-websocketserver" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Async WebSocket server that handles upgrade from raw TCP.</p>
+</blockquote>
+<ul>
+<li><code>on_message(fn)</code>
+  — Handle an incoming WebSocket message.</li>
+<li><code>on_connect(fn)</code>
+  — Handle a new WebSocket client connection.</li>
+<li><code>on_disconnect(fn)</code>
+  — Handle a WebSocket client disconnection.</li>
+<li><code>async start()</code>
+  — Start listening for WebSocket connections.</li>
+<li><code>async shutdown()</code>
+  — Graceful shutdown: notify clients with shutdown message, then close.</li>
+<li><code>async stop()</code>
+  — Stop the WebSocket server (alias for shutdown).</li>
+<li><code>async broadcast(data, session_id)</code>
+  — Send to all connected clients (or filtered by session).</li>
+<li><code>client_count()</code>
+  — Get the number of connected WebSocket clients.</li>
+</ul>
+<h4 id="class-streamingresponse"><code>class StreamingResponse</code><a class="headerlink" href="#class-streamingresponse" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>Helper to stream LLM response chunks to a WS client.</p>
+</blockquote>
+<ul>
+<li><code>async send_chunk(text)</code>
+  — Send a text chunk (partial response).</li>
+<li><code>async send_tool_call(tool_name, tool_input, result)</code>
+  — Notify client about a tool call.</li>
+<li><code>async send_thinking(text)</code>
+  — Send thinking/reasoning chunk.</li>
+<li><code>async send_done(full_text)</code>
+  — Signal completion.</li>
+<li><code>async send_error(error)</code>
+  — Send an error message to a WebSocket client.</li>
+</ul>
+<h2 id="salmalm-top-level-modules">salmalm/ — Top-level Modules / 최상위 모듈<a class="headerlink" href="#salmalm-top-level-modules" title="Permanent link">&para;</a></h2>
+<h3 id="salmalmbootstrap"><code>salmalm.bootstrap</code><a class="headerlink" href="#salmalmbootstrap" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Server bootstrap — start all SalmAlm services.</p>
+</blockquote>
+<ul>
+<li><code>async run_server()</code>
+  — Main async entry point — boot all services.</li>
+</ul>
+<h3 id="salmalmcli"><code>salmalm.cli</code><a class="headerlink" href="#salmalmcli" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>CLI argument parsing for SalmAlm.</p>
+</blockquote>
+<ul>
+<li><code>setup_workdir()</code>
+  — Set working directory and load .env.</li>
+<li><code>dispatch_cli()</code>
+  — Handle CLI flags. Returns True if a flag was handled (caller should exit).</li>
+</ul>
+<h3 id="salmalmconfig_manager"><code>salmalm.config_manager</code><a class="headerlink" href="#salmalmconfig_manager" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Centralized configuration manager for SalmAlm.</p>
+</blockquote>
+<h4 id="class-configmanager"><code>class ConfigManager</code><a class="headerlink" href="#class-configmanager" title="Permanent link">&para;</a></h4>
+<blockquote>
+<p>중앙집중 설정 관리자.</p>
+</blockquote>
+<ul>
+<li><code>load(cls, name, defaults)</code>
+  — 설정 파일 로드. name='mood' → ~/.salmalm/mood.json</li>
+<li><code>save(cls, name, config)</code>
+  — 설정 파일 저장.</li>
+<li><code>resolve(cls, name, key, default)</code>
+  — Resolve a single config value with full priority chain.</li>
+<li><code>get(cls, name, key, default)</code>
+  — 단일 키 조회 (resolve 사용).</li>
+<li><code>set(cls, name, key, value)</code>
+  — 단일 키 설정.</li>
+<li><code>exists(cls, name)</code></li>
+<li><code>delete(cls, name)</code></li>
+<li><code>list_configs(cls)</code>
+  — 모든 설정 파일 목록.</li>
+<li>
+<p><code>migrate(cls, name)</code>
+  — 설정 파일 마이그레이션 실행.</p>
+</li>
+<li>
+<p><code>set_cli_overrides(overrides)</code>
+  — Set CLI argument overrides (called at startup).</p>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/hyunjun6928-netizen/salmalm" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://pypi.org/project/salmalm/" target="_blank" rel="noopener" title="pypi.org" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

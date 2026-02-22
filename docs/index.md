@@ -1,52 +1,55 @@
 # 😈 SalmAlm
 
 ## Personal AI Gateway — Your AI Assistant in One Command
-## 개인 AI 게이트웨이 — 한 줄로 시작하는 AI 비서
 
 ---
 
-**SalmAlm** is a pure-Python personal AI gateway that turns any LLM API into a fully-featured AI assistant with 66 built-in tools, multi-channel support (Web, Telegram, Discord), and zero external dependencies.
+**SalmAlm** is a pure-Python personal AI gateway that turns any LLM API into a fully-featured AI assistant with 67 built-in tools, multi-channel support (Web, Telegram, Discord), and minimal dependencies.
 
-**SalmAlm**은 순수 파이썬으로 작성된 개인 AI 게이트웨이로, 어떤 LLM API든 66개의 내장 도구, 멀티채널 지원(Web, Telegram, Discord)을 갖춘 완전한 AI 비서로 변환합니다. 외부 의존성이 없습니다.
-
-## Quick Start / 빠른 시작
+## Quick Start
 
 ```bash
 pip install salmalm
-python -m salmalm start
+salmalm
 ```
 
-Open **http://localhost:18800** and start chatting!
+Open **http://localhost:18800** — the Setup Wizard guides you through API key configuration.
 
-**http://localhost:18800**을 열고 바로 대화를 시작하세요!
+## Key Features
 
-## Key Features / 주요 기능
-
-| Feature / 기능 | Description / 설명 |
+| Feature | Description |
 |---|---|
-| 🤖 Multi-model routing | Opus/Sonnet/Haiku auto-select / 멀티모델 자동 라우팅 |
-| 🧠 Extended thinking | Deep reasoning mode / 확장 사고 모드 |
-| 🔧 66 built-in tools | File, web, exec, email, calendar, and more / 파일, 웹, 실행, 이메일, 캘린더 등 |
-| 💬 30+ slash commands | Full control via chat / 채팅으로 완전한 제어 |
-| 🔗 Telegram & Discord | Multi-channel integration / 멀티채널 통합 |
-| 📊 SLA & Monitoring | 99.9% uptime tracking / 업타임 모니터링 |
-| 🔒 Enterprise security | OWASP Top 10, AES-256 vault / 엔터프라이즈급 보안 |
-| 📱 PWA installable | Mobile-ready web UI / 모바일 지원 웹 UI |
+| 🤖 Smart model routing | Auto-selects by complexity: simple→Haiku, moderate→Sonnet, complex→Opus |
+| 🧠 Extended thinking | Deep reasoning with budget control |
+| 🔧 67 built-in tools | File, web, exec, email, calendar, RAG, TTS, image gen, browser, and more |
+| 💬 30+ slash commands | Full control via Telegram/Discord |
+| 🔗 Telegram & Discord | OpenClaw-style UX: ack reactions, reply-to, streaming preview, command menus |
+| 💰 Cost optimization | $7/day → $1.2/day (83% savings at 100 calls/day) |
+| 🔒 Security hardened | 150+ security tests, AES-256 vault, SSRF defense, tool risk tiers |
+| 🦙 Local LLM | Ollama, LM Studio, vLLM support |
+| 📱 PWA installable | Mobile-ready web UI with EN/KR i18n |
+| 🧠 Memory system | Auto-curated long-term memory + daily logs + TF-IDF search |
 
-## Supported LLM Providers / 지원 LLM 프로바이더
+## Supported Providers
 
-- **Anthropic** (Claude Opus, Sonnet, Haiku)
-- **OpenAI** (GPT-4o, GPT-4, GPT-3.5)
-- **Google** (Gemini)
-- **xAI** (Grok)
-- **OpenRouter** (any model)
-- **Ollama** (local models / 로컬 모델)
+| Provider | Models |
+|---|---|
+| **Anthropic** | Claude Opus 4, Sonnet 4, Haiku 4.5 |
+| **OpenAI** | GPT-5.2, GPT-4.1, o3, o4-mini |
+| **Google** | Gemini 3 Pro/Flash, 2.5 Pro/Flash |
+| **xAI** | Grok-4, Grok-3 |
+| **Local LLM** | Ollama, LM Studio, vLLM (any OpenAI-compatible endpoint) |
 
-## Project Info / 프로젝트 정보
+## Project Info
 
-- **Version / 버전**: v0.14.0
-- **License / 라이선스**: MIT
+- **Version**: v0.18.73
+- **License**: MIT
 - **Python**: 3.10+
-- **Tests / 테스트**: 586+ passing
-- **Repository / 저장소**: [GitHub](https://github.com/hyunjun6928-netizen/salmalm)
-- **PyPI**: [salmalm](https://pypi.org/project/salmalm/)
+- **Tests**: 1,809 passing
+- **Modules**: 234
+- **Lines**: 49K+
+
+## Links
+
+- [GitHub](https://github.com/hyunjun6928-netizen/salmalm)
+- [PyPI](https://pypi.org/project/salmalm/)
