@@ -2403,19 +2403,19 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             import subprocess
             import sys
 
+            # Try pipx first (common install method), fallback to pip
+            import shutil
+            _use_pipx = shutil.which('pipx') is not None
+            if _use_pipx:
+                _update_cmd = ['pipx', 'install', 'salmalm', '--force']
+            else:
+                _update_cmd = [sys.executable, '-m', 'pip', 'install',
+                               '--upgrade', '--no-cache-dir', 'salmalm']
             result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "--upgrade",
-                    "--no-cache-dir",
-                    "salmalm",
-                ],
+                _update_cmd,
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=120,
             )
             if result.returncode == 0:
                 # Get installed version
