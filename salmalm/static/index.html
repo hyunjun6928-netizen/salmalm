@@ -715,7 +715,10 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>ON (권장):</b> 메시지 의도에 따라 필요한 도구만 전송합니다.<br>
             잡담 → <span style="color:#4ade80">0개 (0 토큰)</span> · 날씨/일정 → <span style="color:#facc15">7-12개 (~750 토큰)</span> · 코딩 → <span style="color:#f97316">11개 (~700 토큰)</span><br>
             <b>OFF:</b> 매번 62개 도구 전부 전송 → <span style="color:#f87171">요청당 ~7,750 토큰 오버헤드</span><br>
-            <span style="color:var(--accent)">💰 Opus 기준 ON vs OFF 차이: 하루 100회 호출 시 <b>~$10/day 절감</b></span>
+            <span style="color:var(--accent)">💰 Opus 기준 ON vs OFF 차이: 하루 100회 호출 시 <b>~$10/day 절감</b></span><br>
+            <br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> Uses <b>Skills</b> — reads SKILL.md on-demand when task matches a skill description. Tools are always available but skills load lazily.<br>
+            🆚 <b>오픈클로:</b> <b>스킬</b> 시스템 사용 — 작업이 스킬 설명에 매칭되면 SKILL.md를 온디맨드로 로드. 도구는 항상 사용 가능하되 스킬은 지연 로딩.</span>
           </div>
         </div>
 
@@ -732,7 +735,10 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <br>
             <b>ON:</b> 복잡한 코드/분석 작업 전에 AI가 접근 방법을 먼저 계획하도록 프롬프트를 주입합니다. 다단계 작업의 정확도를 높일 수 있습니다.<br>
             <b>비용:</b> <span style="color:#f97316">복잡한 요청당 +~150 입력 토큰</span> (Opus 기준 ~$0.002/호출)<br>
-            <b>OFF (기본):</b> AI가 응답 내에서 자연스럽게 계획합니다. 대부분의 작업에 충분합니다.
+            <b>OFF (기본):</b> AI가 응답 내에서 자연스럽게 계획합니다. 대부분의 작업에 충분합니다.<br>
+            <br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> No separate planning phase. Uses <b>extended thinking</b> (reasoning mode) for complex tasks — model plans internally.<br>
+            🆚 <b>오픈클로:</b> 별도 계획 단계 없음. 복잡한 작업에 <b>확장 사고</b>(reasoning 모드)를 사용 — 모델이 내부적으로 계획.</span>
           </div>
         </div>
 
@@ -751,7 +757,10 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>ON:</b> 코드/분석 생성 후 <b>두 번째 LLM 호출</b>로 응답을 검토하고 개선합니다. 버그, 환각, 불완전한 답변을 잡아냅니다.<br>
             <b>비용:</b> <span style="color:#f87171">복잡한 작업 비용 2배</span> (LLM 2회 호출). 예: $0.05 코딩 응답 → $0.10<br>
             <b>추천 상황:</b> 프로덕션 코드, 보안 감사, 정확도가 속도보다 중요한 분석<br>
-            <b>OFF (기본):</b> 단일 패스 생성. 더 빠르고 저렴합니다. 대부분의 작업에 충분한 품질.
+            <b>OFF (기본):</b> 단일 패스 생성. 더 빠르고 저렴합니다. 대부분의 작업에 충분한 품질.<br>
+            <br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> No self-reflection pass. Relies on model's native reasoning + <b>extended thinking</b> for accuracy.<br>
+            🆚 <b>오픈클로:</b> 자기 검증 패스 없음. 모델의 네이티브 추론 + <b>확장 사고</b>로 정확도 확보.</span>
           </div>
         </div>
 
@@ -779,7 +788,10 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>15K (적극적):</b> 자주 압축. 비용 절감 최적. <span style="color:#4ade80">Opus 기준 턴당 평균 ~$0.01</span><br>
             <b>30K (균형):</b> 적절한 중간값. <span style="color:#facc15">턴당 평균 ~$0.02</span><br>
             <b>60K (여유):</b> 더 많은 히스토리 유지. <span style="color:#f97316">턴당 평균 ~$0.04</span><br>
-            <b>120K (최대):</b> 전체 컨텍스트 유지. 긴 코딩 세션에 적합. <span style="color:#f87171">턴당 평균 ~$0.08</span>
+            <b>120K (최대):</b> 전체 컨텍스트 유지. 긴 코딩 세션에 적합. <span style="color:#f87171">턴당 평균 ~$0.08</span><br>
+            <br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> Auto-compacts conversation history into summaries when context grows large. Not user-configurable — handled internally.<br>
+            🆚 <b>오픈클로:</b> 컨텍스트가 커지면 대화 히스토리를 자동 요약 압축. 사용자 설정 불가 — 내부적으로 처리.</span>
           </div>
         </div>
 
@@ -798,7 +810,10 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>Suggested values:</b> Casual use: <span style="color:#4ade80">$1-2/day</span> · Active use: <span style="color:#facc15">$5-10/day</span> · Heavy dev: <span style="color:#f97316">$20-50/day</span><br>
             <br>
             일일 비용이 이 한도에 도달하면 다음 날(UTC 기준)까지 새 요청 처리를 중단합니다. 비워두면 제한 없음.<br>
-            <b>권장값:</b> 가벼운 사용: <span style="color:#4ade80">$1-2/일</span> · 활발한 사용: <span style="color:#facc15">$5-10/일</span> · 집중 개발: <span style="color:#f97316">$20-50/일</span>
+            <b>권장값:</b> 가벼운 사용: <span style="color:#4ade80">$1-2/일</span> · 활발한 사용: <span style="color:#facc15">$5-10/일</span> · 집중 개발: <span style="color:#f97316">$20-50/일</span><br>
+            <br>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> Tracks cost per session via <code>/status</code>. No hard daily cap — user monitors manually.<br>
+            🆚 <b>오픈클로:</b> <code>/status</code>로 세션별 비용 추적. 하드 일일 한도 없음 — 사용자가 수동 모니터링.</span>
           </div>
         </div>
 
@@ -854,7 +869,10 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
       <p style="font-size:12px;color:var(--text2);margin:4px 0 12px;line-height:1.8">
         SalmAlm automatically classifies each message by complexity and routes it to the optimal model.<br>
         This saves money by using cheap models for simple tasks and powerful models only when needed.<br>
-        삶앎은 각 메시지의 복잡도를 자동 분류하여 최적의 모델로 라우팅합니다. 간단한 작업에 저렴한 모델을, 복잡한 작업에만 강력한 모델을 사용하여 비용을 절감합니다.
+        삶앎은 각 메시지의 복잡도를 자동 분류하여 최적의 모델로 라우팅합니다. 간단한 작업에 저렴한 모델을, 복잡한 작업에만 강력한 모델을 사용하여 비용을 절감합니다.<br>
+        <br>
+        <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">🆚 <b>OpenClaw:</b> Uses a single model per session (default or <code>/model</code> override). No auto-routing — user manually selects model. Model aliases supported (e.g. <code>gemini</code>, <code>gpt</code>, <code>opus</code>).<br>
+        🆚 <b>오픈클로:</b> 세션당 단일 모델 사용 (기본값 또는 <code>/model</code> 오버라이드). 자동 라우팅 없음 — 사용자가 수동 선택. 모델 별칭 지원 (예: <code>gemini</code>, <code>gpt</code>, <code>opus</code>).</span>
       </p>
 
       <!-- How classification works -->
