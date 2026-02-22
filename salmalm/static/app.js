@@ -1831,6 +1831,28 @@
   window.exportJson=function(){document.getElementById('export-menu').classList.remove('open');window.exportChat('json')};
   window.exportServerMd=function(){document.getElementById('export-menu').classList.remove('open');window.open('/api/sessions/'+encodeURIComponent(_currentSession)+'/export?format=md')};
   window.exportServerJson=function(){document.getElementById('export-menu').classList.remove('open');window.open('/api/sessions/'+encodeURIComponent(_currentSession)+'/export?format=json')};
+  window.importChat=function(){
+    var inp=document.createElement('input');inp.type='file';inp.accept='.json';
+    inp.onchange=function(){
+      if(!inp.files[0])return;
+      var reader=new FileReader();
+      reader.onload=function(e){
+        try{
+          var data=JSON.parse(e.target.result);
+          var msgs=data.messages||data;
+          if(!Array.isArray(msgs)){alert('Invalid format: messages array not found');return}
+          var title=data.title||data.session||'Imported Chat';
+          fetch('/api/sessions/import',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({messages:msgs,title:title})})
+          .then(function(r){return r.json()}).then(function(d){
+            if(d.ok){loadSessions();addMsg('assistant','✅ '+((_lang==='ko')?'대화를 가져왔습니다':'Chat imported')+': '+title)}
+            else{alert(d.error||'Import failed')}
+          });
+        }catch(err){alert('JSON 파싱 오류: '+err.message)}
+      };
+      reader.readAsText(inp.files[0]);
+    };
+    inp.click();
+  };
 
   /* --- Command Palette (Ctrl+Shift+P) --- */
   var _cmdPalette=document.createElement('div');_cmdPalette.id='cmd-palette';
@@ -1941,6 +1963,7 @@
     else if(a==='exportJson')window.exportJson();
     else if(a==='exportServerMd')window.exportServerMd();
     else if(a==='exportServerJson')window.exportServerJson();
+    else if(a==='importChat')window.importChat();
     else if(a==='pwaInstall')window.pwaInstall();
     else if(a==='pwaDismiss')window.pwaDismiss();
     else if(a==='toggleThinking')window.toggleThinking();

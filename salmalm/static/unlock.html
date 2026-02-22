@@ -54,12 +54,19 @@ async function loginUser(){
 document.getElementById('login-user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('login-pw').focus()});
 document.getElementById('login-pw').addEventListener('keydown',function(e){if(e.key==='Enter')loginUser()});
 document.getElementById('pw').addEventListener('keydown',function(e){if(e.key==='Enter')unlock()});
+let _unlockCooldown=false;
 async function unlock(){
+  if(_unlockCooldown){document.getElementById('err').textContent='잠시 후 다시 시도하세요 (rate limited)';document.getElementById('err').style.display='block';return}
   const pw=document.getElementById('pw').value;
-  const r=await fetch('/api/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-  const d=await r.json();
-  if(d.ok){sessionStorage.setItem('tok',d.token||'');location.reload()}
-  else{const e=document.getElementById('err');e.textContent=d.error;e.style.display='block'}
+  const btn=document.getElementById('unlock-btn');btn.disabled=true;btn.textContent='...';
+  try{
+    const r=await fetch('/api/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+    if(r.status===429){_unlockCooldown=true;document.getElementById('err').textContent='너무 많은 시도. 30초 후 다시 시도하세요.';document.getElementById('err').style.display='block';setTimeout(()=>{_unlockCooldown=false},30000);btn.disabled=false;btn.textContent='Unlock';return}
+    const d=await r.json();
+    if(d.ok){sessionStorage.setItem('tok',d.token||'');location.reload()}
+    else{document.getElementById('err').textContent=d.error||'Wrong password';document.getElementById('err').style.display='block'}
+  }catch(e){document.getElementById('err').textContent='네트워크 오류';document.getElementById('err').style.display='block'}
+  btn.disabled=false;btn.textContent='Unlock';
 }
 document.getElementById('unlock-btn').addEventListener('click',()=>unlock());
 document.getElementById('login-btn').addEventListener('click',()=>loginUser());

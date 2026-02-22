@@ -2896,6 +2896,28 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             pass
         self._json({"ok": True, "session_id": sid})
 
+    def _post_api_sessions_import(self):
+        """Import a chat session from JSON export."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        messages = body.get("messages", [])
+        title = body.get("title", "Imported Chat")
+        if not messages or not isinstance(messages, list):
+            self._json({"ok": False, "error": "messages array required"}, 400)
+            return
+        import uuid
+        sid = f"imported_{uuid.uuid4().hex[:8]}"
+        from salmalm.core import _get_db
+        conn = _get_db()
+        conn.execute(
+            "INSERT OR REPLACE INTO session_store (session_id, messages, title, updated_at) VALUES (?, ?, ?, datetime('now'))",
+            (sid, json.dumps(messages, ensure_ascii=False), title),
+        )
+        conn.commit()
+        audit_log("session_import", sid, detail_dict={"title": title, "msg_count": len(messages)})
+        self._json({"ok": True, "session_id": sid})
+
     def _post_api_sessions_delete(self):
         body = self._body
         if not self._require_auth("user"):
@@ -4085,6 +4107,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         "/api/cron/toggle": "_post_api_cron_toggle",
         "/api/sessions/create": "_post_api_sessions_create",
         "/api/sessions/delete": "_post_api_sessions_delete",
+        "/api/sessions/import": "_post_api_sessions_import",
         "/api/soul": "_post_api_soul",
         "/api/routing": "_post_api_routing",
         "/api/failover": "_post_api_failover",
