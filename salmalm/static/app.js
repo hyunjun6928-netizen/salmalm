@@ -749,7 +749,7 @@
       'tab-general':'⚙️ General','tab-features':'📖 Features',
       'features-search-ph':'Search features...','features-empty':'No features found.',
       'h-model':'🤖 Model Settings','h-keys':'🔑 API Key Management','h-update':'🔄 Update','h-lang':'🌐 Language','h-color':'Accent Color',
-      'lbl-model':'Default Model','lbl-ollama':'Ollama URL',
+      'lbl-model':'Default Model','lbl-ollama':'Ollama / Local LLM URL','lbl-ollama-key':'API Key (Optional — only if your endpoint requires auth)',
       'btn-save':'Save','btn-test':'Test','btn-check':'Check for Updates','btn-update':'⬆️ Update',
       'btn-export':'📥 Export','btn-send':'Send',
       'lbl-anthropic':'Anthropic API Key','lbl-openai':'OpenAI API Key',
@@ -766,7 +766,7 @@
       'nav-image':'Image Gen','nav-tts':'TTS','nav-calendar':'Calendar','nav-mail':'Mail',
       'nav-weather':'Weather','nav-rss':'RSS','nav-remind':'Reminders','nav-translate':'Translate',
       'nav-workflow':'Workflows','nav-qr':'QR Code','nav-notify':'Notifications','nav-fileindex':'File Search',
-      'btn-save-ollama':'Save Ollama URL','btn-newchat':'🗨 New Chat',
+      'btn-save-ollama':'Save Local LLM Config','btn-newchat':'🗨 New Chat',
       'sec-chats':'💬 Chats','sec-channels':'Channels','sec-admin':'Admin','sec-manage':'Manage',
       'h-password':'🔒 Master Password',
       'pw-current':'Current Password','pw-new':'New Password','pw-confirm':'Confirm New Password',
@@ -868,7 +868,7 @@
       'tab-general':'⚙️ 일반','tab-features':'📖 기능 가이드',
       'features-search-ph':'기능 검색...','features-empty':'검색 결과가 없습니다.',
       'h-model':'🤖 모델 설정','h-keys':'🔑 API 키 관리','h-update':'🔄 업데이트','h-lang':'🌐 언어','h-color':'테마 색상',
-      'lbl-model':'기본 모델','lbl-ollama':'Ollama URL',
+      'lbl-model':'기본 모델','lbl-ollama':'Ollama / 로컬 LLM URL','lbl-ollama-key':'API 키 (선택 — 인증이 필요한 엔드포인트만)',
       'btn-save':'저장','btn-test':'테스트','btn-check':'업데이트 확인','btn-update':'⬆️ 업데이트',
       'btn-export':'📥 내보내기','btn-send':'전송',
       'lbl-anthropic':'Anthropic API 키','lbl-openai':'OpenAI API 키',
@@ -885,7 +885,7 @@
       'nav-image':'이미지 생성','nav-tts':'음성 합성','nav-calendar':'캘린더','nav-mail':'메일',
       'nav-weather':'날씨','nav-rss':'뉴스 피드','nav-remind':'리마인더','nav-translate':'번역',
       'nav-workflow':'워크플로우','nav-qr':'QR 코드','nav-notify':'알림','nav-fileindex':'파일 검색',
-      'btn-save-ollama':'Ollama URL 저장','btn-newchat':'🗨 새 대화',
+      'btn-save-ollama':'로컬 LLM 설정 저장','btn-newchat':'🗨 새 대화',
       'sec-chats':'💬 대화','sec-channels':'채널','sec-admin':'관리','sec-manage':'관리',
       'h-password':'🔒 마스터 비밀번호',
       'pw-current':'현재 비밀번호','pw-new':'새 비밀번호','pw-confirm':'새 비밀번호 확인',
@@ -1254,7 +1254,8 @@
         h+='<span style="font-size:18px">'+icon+'</span>';
         h+='<span style="font-weight:600;font-size:14px">'+p.name.charAt(0).toUpperCase()+p.name.slice(1)+'</span>';
         h+=status;
-        h+='<span style="font-size:11px;color:var(--text2);margin-left:auto">'+(p.available?(kr?'연결됨':'Connected'):(kr?'키 없음':'No key'))+'</span>';
+        var statusText=p.available?(kr?'연결됨':'Connected'):((p.name==='ollama')?(kr?'오프라인':'Offline'):(kr?'키 없음':'No key'));
+        h+='<span style="font-size:11px;color:var(--text2);margin-left:auto">'+statusText+'</span>';
         h+='</div>';
         p.models.forEach(function(m){
           var isActive=cur&&(cur===m.full||cur===m.name);
@@ -1265,6 +1266,9 @@
           if(priceStr)h+='<div style="font-size:10px;color:var(--text2)">'+priceStr+' '+(kr?'/ 1M 토큰':'/ 1M tok')+'</div>';
           h+='</div></div>';
         });
+        if(!p.models||!p.models.length){
+          h+='<div style="font-size:12px;color:var(--text2);padding:6px 10px">'+(kr?'모델이 없습니다':'No models available')+'</div>';
+        }
         h+='</div>';
       });
       gridEl.innerHTML=h;
@@ -2043,7 +2047,7 @@
     else if(a==='fillCommand'){var inp=document.getElementById('input');inp.value=el.getAttribute('data-cmd');inp.focus()}
     else if(a==='toggleUser'){var uid=parseInt(el.getAttribute('data-uid'));var en=el.getAttribute('data-enabled')==='true';window.toggleUser(uid,en)}
     else if(a==='deleteUser'){window.deleteUser(el.getAttribute('data-username'))}
-    else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;var k=document.getElementById('s-ollama-key')?document.getElementById('s-ollama-key').value:'';fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){if(k){return fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_api_key',value:k})})}}).then(function(){addMsg('assistant','✅ Local LLM config saved');if(typeof loadProviders==='function')loadProviders()})}
+    else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;var k=document.getElementById('s-ollama-key')?document.getElementById('s-ollama-key').value:'';fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){if(k){return fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_api_key',value:k})})}}).then(function(){addMsg('assistant','✅ Local LLM config saved');if(typeof window._loadModelRouter==='function')window._loadModelRouter()})}
     else if(a==='saveRouting'){var rc={simple:document.getElementById('route-simple').value,moderate:document.getElementById('route-moderate').value,complex:document.getElementById('route-complex').value};fetch('/api/routing',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify(rc)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('route-status');if(st){st.textContent='✅ Saved!';setTimeout(function(){st.textContent=''},2000)}}).catch(function(){var st=document.getElementById('route-status');if(st)st.textContent='❌ Error'})}
     else if(a==='saveSoul'){
       var sc=document.getElementById('soul-editor').value;
