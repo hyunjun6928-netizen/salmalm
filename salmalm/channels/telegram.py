@@ -46,6 +46,8 @@ class TelegramBot:
                 self._bot_username = me["result"].get("username")
         except Exception:
             pass
+        # Register command menu (OpenClaw-style)
+        self._register_commands()
 
     def _api(self, method: str, data: Optional[dict] = None) -> dict:
         url = f"https://api.telegram.org/bot{self.token}/{method}"
@@ -70,6 +72,42 @@ class TelegramBot:
         clean = _re2.sub(r"<!--buttons:(\[.*?\])-->", _repl, text)
         return clean.strip(), buttons
 
+    def _register_commands(self):
+        """Register bot command menu via setMyCommands (OpenClaw-style)."""
+        commands = [
+            {"command": "start", "description": "Start / show status"},
+            {"command": "help", "description": "Show available commands"},
+            {"command": "usage", "description": "Token usage & cost report"},
+            {"command": "model", "description": "Switch AI model"},
+            {"command": "briefing", "description": "Daily briefing"},
+            {"command": "clear", "description": "Clear conversation"},
+            {"command": "compact", "description": "Compress conversation"},
+            {"command": "tts", "description": "Toggle voice responses"},
+            {"command": "note", "description": "Quick note"},
+            {"command": "remind", "description": "Reminders"},
+            {"command": "cal", "description": "Calendar"},
+            {"command": "mail", "description": "Email"},
+        ]
+        try:
+            self._api("setMyCommands", {"commands": commands})
+            log.info(f"[TG] Registered {len(commands)} bot commands")
+        except Exception as e:
+            log.warning(f"[TG] setMyCommands failed: {e}")
+
+    def ack_reaction(self, chat_id, message_id: int):
+        """Send ack reaction (👀) while processing — OpenClaw-style."""
+        return self.set_message_reaction(chat_id, message_id, "👀")
+
+    def clear_reaction(self, chat_id, message_id: int):
+        """Clear reaction after processing completes."""
+        try:
+            return self._api(
+                "setMessageReaction",
+                {"chat_id": chat_id, "message_id": message_id, "reaction": []},
+            )
+        except Exception:
+            pass
+
     def set_message_reaction(self, chat_id, message_id: int, emoji: str = "👍") -> dict:
         """React to a message with an emoji via setMessageReaction API."""
         try:
@@ -93,6 +131,7 @@ class TelegramBot:
         parse_mode: Optional[str] = None,
         reply_markup: Optional[dict] = None,
         message_thread_id: Optional[int] = None,
+        reply_to_message_id: Optional[int] = None,
     ):
         """Send a text message to a Telegram chat, with optional inline keyboard.
 
@@ -127,6 +166,8 @@ class TelegramBot:
             data = {"chat_id": chat_id, "text": chunk}
             if message_thread_id:
                 data["message_thread_id"] = message_thread_id
+            if reply_to_message_id and idx == 0:
+                data["reply_to_message_id"] = reply_to_message_id
             if parse_mode:
                 data["parse_mode"] = parse_mode
             if reply_markup and idx == len(chunks) - 1:
@@ -721,6 +762,10 @@ class TelegramBot:
         if _session_user_id and not _sess_obj.user_id:
             _sess_obj.user_id = _session_user_id
 
+        # Ack reaction (OpenClaw-style 👀 while processing)
+        _msg_id = msg.get("message_id")
+        self.ack_reaction(chat_id, _msg_id)
+
         # Start continuous typing indicator
         typing_task = None
         if self.typing_mode != "never":
@@ -812,7 +857,10 @@ class TelegramBot:
             if _draft_sent[0]:
                 self._finalize_draft(chat_id, response, suffix)
             else:
-                self.send_message(chat_id, f"{response}{suffix}")
+                self.send_message(chat_id, f"{response}{suffix}", reply_to_message_id=_msg_id)
+
+        # Clear ack reaction after response
+        self.clear_reaction(chat_id, _msg_id)
 
         # TTS: send voice message if enabled
         if getattr(session_obj, "tts_enabled", False):
