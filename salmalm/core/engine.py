@@ -232,13 +232,13 @@ _KEYWORD_TOOLS = {
 
 # Dynamic max_tokens per intent
 INTENT_MAX_TOKENS = {
-    'chat': 1024,
-    'memory': 1024,
+    'chat': 512,
+    'memory': 512,
     'creative': 1024,
-    'search': 2048,
+    'search': 1024,
     'analysis': 2048,
     'code': 4096,
-    'system': 2048,
+    'system': 1024,
 }
 
 # Keywords that trigger higher max_tokens
@@ -381,20 +381,24 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         return all_tools
 
     # Max chars per tool result sent to LLM context (default + per-type overrides)
-    MAX_TOOL_RESULT_CHARS = 50_000
-    # Aggressive truncation for tools that produce verbose/binary output
+    MAX_TOOL_RESULT_CHARS = 20_000
+    # Aggressive truncation — every char costs tokens
     _TOOL_TRUNCATE_LIMITS = {
-        'exec': 20_000,          # Shell output can be huge
-        'exec_session': 10_000,  # Background session output
-        'sandbox_exec': 20_000,
-        'python_eval': 15_000,
-        'browser': 10_000,       # HTML/accessibility trees
-        'http_request': 15_000,  # API responses
-        'web_fetch': 15_000,
-        'read': 30_000,          # File content
-        'rag_search': 10_000,    # Search results
-        'system_info': 5_000,
-        'canvas': 5_000,
+        'exec': 8_000,
+        'exec_session': 4_000,
+        'sandbox_exec': 8_000,
+        'python_eval': 6_000,
+        'browser': 5_000,
+        'http_request': 6_000,
+        'web_fetch': 6_000,
+        'read': 10_000,
+        'rag_search': 4_000,
+        'system_info': 2_000,
+        'canvas': 2_000,
+        'web_search': 4_000,
+        'weather': 2_000,
+        'google_calendar': 3_000,
+        'gmail': 4_000,
     }
     # Per-tool hard timeout (seconds) — total wall-clock including subprocess/IO
     _TOOL_TIMEOUTS = {
@@ -655,6 +659,15 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             think_this_call = (use_thinking and iteration == 0
                                and provider == 'anthropic'
                                and ('opus' in model or 'sonnet' in model))
+
+            # Aggressive history trim for simple intents — keep only recent messages
+            _INTENT_HISTORY_LIMIT = {'chat': 10, 'memory': 10, 'creative': 20}
+            _hist_limit = _INTENT_HISTORY_LIMIT.get(classification['intent'])
+            if _hist_limit and len(session.messages) > _hist_limit:
+                # Keep system messages + last N messages
+                _sys = [m for m in session.messages if m.get('role') == 'system']
+                _recent = [m for m in session.messages if m.get('role') != 'system'][-_hist_limit:]
+                session.messages = _sys + _recent
 
             # Session pruning — only when cache TTL expired (preserves Anthropic prompt cache)
             if _should_prune_for_cache():

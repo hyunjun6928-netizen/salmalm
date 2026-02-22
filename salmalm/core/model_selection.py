@@ -76,10 +76,16 @@ def select_model(message: str, session) -> Tuple[str, str]:
             return override, 'manual'
 
     rc = load_routing_config()
+    # Smart defaults: simple→haiku (cheapest), moderate→sonnet, complex→sonnet
+    _tier_defaults = {
+        'simple': _MODELS.get('haiku', ''),
+        'moderate': _MODELS.get('sonnet', ''),
+        'complex': _MODELS.get('sonnet', ''),
+    }
     _default_fallback = getattr(session, '_default_model', None) or _MODELS.get('sonnet', '')
     for k in ('simple', 'moderate', 'complex'):
         if not rc[k]:
-            rc[k] = _default_fallback
+            rc[k] = _tier_defaults.get(k, _default_fallback)
     msg_lower = message.lower()
     msg_len = len(message)
 
