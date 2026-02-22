@@ -175,9 +175,9 @@ class TestToolTiers(unittest.TestCase):
         from salmalm.web.middleware import get_tool_tier
         self.assertEqual(get_tool_tier('exec'), 'critical')
 
-    def test_bash_is_critical(self):
+    def test_exec_is_critical(self):
         from salmalm.web.middleware import get_tool_tier
-        self.assertEqual(get_tool_tier('bash'), 'critical')
+        self.assertEqual(get_tool_tier('exec'), 'critical')
 
     def test_http_request_is_high(self):
         from salmalm.web.middleware import get_tool_tier
@@ -406,3 +406,91 @@ class TestWritePathBlocking(unittest.TestCase):
         result = execute_tool("read_file", {"path": "/tmp/nonexistent_abc123.txt"})
         # /tmp is an allowed root, so this should pass through
         self.assertNotIn("Path outside", str(result))
+
+
+class TestExecBypassVectors(unittest.TestCase):
+    """Test that common exec bypass patterns are blocked."""
+
+    def _check_blocked(self, cmd):
+        from salmalm.tools.tools_exec import _is_safe_command
+        result = _is_safe_command(cmd)
+        # _is_safe_command returns (bool, reason) tuple
+        if isinstance(result, tuple):
+            self.assertFalse(result[0], f"Should be blocked: {cmd}")
+        else:
+            self.assertFalse(result, f"Should be blocked: {cmd}")
+
+    def test_find_exec_blocked(self):
+        self._check_blocked("find / -exec cat /etc/passwd {} \\;")
+
+    def test_tar_to_command(self):
+        self._check_blocked("tar --to-command='cat /etc/shadow' -xf archive.tar")
+
+    def test_awk_system(self):
+        self._check_blocked("awk 'BEGIN{system(\"id\")}'")
+
+    def test_xargs_shell(self):
+        self._check_blocked("echo 'rm -rf /' | xargs bash -c")
+
+    def test_curl_internal(self):
+        self._check_blocked("curl http://169.254.169.254/latest/meta-data/")
+
+
+class TestIrreversibleActionGate(unittest.TestCase):
+    """Test that irreversible actions require confirmation."""
+
+    def test_email_send_requires_confirm(self):
+        from salmalm.tools.tool_handlers import execute_tool
+        result = execute_tool("email_send", {"to": "test@test.com", "body": "hi"})
+        self.assertIn("Confirmation required", result)
+
+    def test_email_send_with_confirm(self):
+        """With _confirmed=true, should pass through to actual handler."""
+        from salmalm.tools.tool_handlers import execute_tool
+        result = execute_tool("email_send", {"to": "test@test.com", "body": "hi", "_confirmed": True})
+        # Should NOT hit the confirmation gate (may fail for other reasons like no oauth)
+        self.assertNotIn("Confirmation required", result)
+
+    def test_gmail_requires_confirm(self):
+        from salmalm.tools.tool_handlers import execute_tool
+        result = execute_tool("gmail", {"action": "send", "to": "test@test.com"})
+        self.assertIn("Confirmation required", result)
+
+    def test_calendar_delete_requires_confirm(self):
+        from salmalm.tools.tool_handlers import execute_tool
+        result = execute_tool("calendar_delete", {"event_id": "abc123"})
+        self.assertIn("Confirmation required", result)
+
+
+class TestToolTierAlignment(unittest.TestCase):
+    """Verify tool tier names match actual registered tools."""
+
+    def test_critical_tools_exist(self):
+        """All critical tier tools should be actual registered tool names."""
+        from salmalm.web.middleware import TOOL_TIER_CRITICAL
+        from salmalm.tools.tool_registry import _HANDLERS, _ensure_modules
+        _ensure_modules()
+        registered = set(_HANDLERS.keys())
+        for tool in TOOL_TIER_CRITICAL:
+            self.assertIn(tool, registered, f"Critical tier tool '{tool}' not registered")
+
+    def test_high_tools_exist(self):
+        """All high tier tools should be actual registered tool names."""
+        from salmalm.web.middleware import TOOL_TIER_HIGH
+        from salmalm.tools.tool_registry import _HANDLERS, _ensure_modules
+        _ensure_modules()
+        registered = set(_HANDLERS.keys())
+        for tool in TOOL_TIER_HIGH:
+            self.assertIn(tool, registered, f"High tier tool '{tool}' not registered")
+
+
+class TestBrowserSSRF(unittest.TestCase):
+    """Test browser SSRF prevention."""
+
+    def test_internal_url_detection(self):
+        from salmalm.tools.tools_browser import _is_internal_url
+        self.assertTrue(_is_internal_url("http://127.0.0.1:8080"))
+        self.assertTrue(_is_internal_url("http://192.168.1.1"))
+        self.assertTrue(_is_internal_url("http://169.254.169.254/latest/meta-data/"))
+        self.assertFalse(_is_internal_url("https://google.com"))
+        self.assertFalse(_is_internal_url("about:blank"))

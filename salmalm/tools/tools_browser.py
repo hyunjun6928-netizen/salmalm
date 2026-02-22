@@ -160,6 +160,31 @@ def _run_playwright_script(script: str, args: list, timeout: int = 60) -> dict:
 
 
 @register("browser")
+def _is_internal_url(url: str) -> bool:
+    """Check if URL targets internal/private network (SSRF prevention)."""
+    try:
+        from urllib.parse import urlparse
+        import socket
+        import ipaddress
+
+        parsed = urlparse(url)
+        hostname = (parsed.hostname or "").strip("[]")
+        if not hostname or hostname in ("about", ""):
+            return False  # about:blank is safe
+        # Resolve hostname
+        addrs = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _, _, _, sockaddr in addrs:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return True
+        # Also check metadata endpoints
+        if hostname in ("169.254.169.254", "metadata.google.internal"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def handle_browser(args: dict) -> str:
     """Browser automation — OpenClaw snapshot/act pattern.
 
@@ -181,10 +206,23 @@ def handle_browser(args: dict) -> str:
             "Install / 설치: `pip install salmalm[browser]` → `playwright install chromium`"
         )
 
+    # SSRF: block internal/private URLs when externally bound
+    def _check_url_safe(url: str) -> str | None:
+        if url.startswith("about:"):
+            return None
+        if _is_internal_url(url):
+            bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+            if bind != "127.0.0.1":
+                return "❌ Browser blocked: internal/private URL not allowed on external bind"
+        return None
+
     if action == "snapshot":
         url = args.get("url", "about:blank")
         if not url.startswith(("http://", "https://", "about:")):
             url = "https://" + url
+        err = _check_url_safe(url)
+        if err:
+            return err
         timeout = args.get("timeout", 30000)
         result = _run_playwright_script(_SNAPSHOT_SCRIPT, [url, str(timeout)])
         if "error" in result:
@@ -209,6 +247,9 @@ def handle_browser(args: dict) -> str:
         }
         if not act_args["url"].startswith(("http://", "https://", "about:")):
             act_args["url"] = "https://" + act_args["url"]
+        err = _check_url_safe(act_args["url"])
+        if err:
+            return err
         result = _run_playwright_script(_ACT_SCRIPT, [json.dumps(act_args)])
         if "error" in result:
             return f"❌ Browser error: {result['error']}"
@@ -226,6 +267,9 @@ def handle_browser(args: dict) -> str:
         url = args.get("url", "about:blank")
         if not url.startswith(("http://", "https://", "about:")):
             url = "https://" + url
+        err = _check_url_safe(url)
+        if err:
+            return err
         screenshot_path = str(_SCREENSHOT_DIR / f"screenshot_{int(time.time())}.png")
         act_args = {
             "url": url,

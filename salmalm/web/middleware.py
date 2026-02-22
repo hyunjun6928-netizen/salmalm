@@ -122,25 +122,34 @@ def check_external_exposure_safety(bind_addr: str, handler) -> list:
     import os
     from salmalm.constants import DATA_DIR
 
-    db_path = DATA_DIR / "salmalm.db"
-    if db_path.exists():
-        try:
-            import sqlite3
+    # Use the canonical auth DB (same source as auth.py)
+    try:
+        from salmalm.web.auth import AUTH_DB
 
-            conn = sqlite3.connect(str(db_path))
-            cur = conn.execute("SELECT COUNT(*) FROM users WHERE password_hash IS NOT NULL")
-            count = cur.fetchone()[0]
-            conn.close()
-            if count == 0:
-                warnings.append(
-                    "⚠️  SECURITY: No admin password set! Run 'salmalm' and set a password "
-                    "before exposing to network. Anyone can access all tools including /bash."
-                )
-        except Exception:
-            pass
-    else:
+        auth_db_path = AUTH_DB
+    except ImportError:
+        auth_db_path = DATA_DIR / "auth.db"
+
+    has_admin = False
+    for db_candidate in (auth_db_path, DATA_DIR / "salmalm.db"):
+        if db_candidate.exists():
+            try:
+                import sqlite3
+
+                conn = sqlite3.connect(str(db_candidate))
+                cur = conn.execute("SELECT COUNT(*) FROM users WHERE password_hash IS NOT NULL")
+                count = cur.fetchone()[0]
+                conn.close()
+                if count > 0:
+                    has_admin = True
+                    break
+            except Exception:
+                continue
+
+    if not has_admin:
         warnings.append(
-            "⚠️  SECURITY: No database found. First-time setup should be done on localhost before binding to 0.0.0.0."
+            "⚠️  SECURITY: No admin password set! Run 'salmalm' and set a password "
+            "before exposing to network. Anyone can access all tools including exec/write_file/browser."
         )
 
     # Check if dangerous tools should be restricted
@@ -157,22 +166,34 @@ def check_external_exposure_safety(bind_addr: str, handler) -> list:
 
 TOOL_TIER_CRITICAL = frozenset(
     {
+        # Actual registered tool names (verified from tool_registry._HANDLERS)
         "exec",
-        "bash",
-        "file_write",
-        "file_delete",
+        "exec_session",
+        "write_file",
+        "edit_file",
         "python_eval",
-        "browser_action",
         "sandbox_exec",
+        "browser",
+        "email_send",
+        "gmail",
+        "google_calendar",
+        "calendar_delete",
+        "calendar_add",
+        "node_manage",
+        "plugin_manage",
     }
 )
 TOOL_TIER_HIGH = frozenset(
     {
         "http_request",
-        "send_email",
-        "file_read",
-        "mesh_task",
-        "mesh_broadcast",
+        "read_file",
+        "memory_write",
+        "mesh",
+        "sub_agent",
+        "cron_manage",
+        "screenshot",
+        "tts",
+        "stt",
     }
 )
 TOOL_TIER_NORMAL = frozenset()  # everything else

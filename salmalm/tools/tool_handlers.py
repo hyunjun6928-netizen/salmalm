@@ -145,6 +145,21 @@ def execute_tool(name: str, args: dict) -> str:
     # Tool tier enforcement is handled by tool_registry.execute_tool()
     # via _authenticated arg (injected by engine from session state).
 
+    # Irreversible action gate — require explicit confirmation for destructive ops
+    _IRREVERSIBLE_TOOLS = {
+        "email_send": "send email",
+        "gmail": "send email via Gmail",
+        "calendar_delete": "delete calendar event",
+    }
+    if name in _IRREVERSIBLE_TOOLS and not args.pop("_confirmed", False):
+        action_desc = _IRREVERSIBLE_TOOLS[name]
+        preview = _audit_args[:150]
+        return (
+            f"⚠️ Confirmation required to {action_desc}.\n"
+            f"Preview: {preview}\n"
+            f"Call this tool again with _confirmed=true to proceed."
+        )
+
     # Try remote node dispatch first (if gateway has registered nodes)
     try:
         from salmalm.features.nodes import gateway
