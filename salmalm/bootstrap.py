@@ -145,10 +145,34 @@ async def run_server():
         webbrowser.open(url)
 
     # ── Phase 5: Vault Auto-unlock ──
-    vault_pw = os.environ.get('SALMALM_VAULT_PW')
-    if vault_pw and VAULT_FILE.exists():
-        if vault.unlock(vault_pw):
-            log.info("[UNLOCK] Vault auto-unlocked from env")
+    if not vault.is_unlocked and VAULT_FILE.exists():
+        # 1. Try OS keychain
+        if vault.try_keychain_unlock():
+            log.info("[UNLOCK] Vault auto-unlocked from keychain")
+        # 2. Try .vault_auto file (WSL/no-keychain fallback)
+        if not vault.is_unlocked:
+            try:
+                _pw_hint_file = VAULT_FILE.parent / '.vault_auto'
+                if _pw_hint_file.exists():
+                    _hint = _pw_hint_file.read_text(encoding='utf-8').strip()
+                    if _hint:
+                        import base64 as _b64
+                        _auto_pw = _b64.b64decode(_hint).decode()
+                    else:
+                        _auto_pw = ""
+                    if vault.unlock(_auto_pw, save_to_keychain=True):
+                        log.info("[UNLOCK] Vault auto-unlocked from .vault_auto")
+            except Exception as _e:
+                log.warning(f"[UNLOCK] .vault_auto read failed: {_e}")
+        # 3. Try env var (deprecated)
+        vault_pw = os.environ.get('SALMALM_VAULT_PW')
+        if not vault.is_unlocked and vault_pw:
+            if vault.unlock(vault_pw, save_to_keychain=True):
+                log.info("[UNLOCK] Vault auto-unlocked from env")
+        # 4. Try empty password
+        if not vault.is_unlocked:
+            if vault.unlock(""):
+                log.info("[UNLOCK] Vault auto-unlocked (no password)")
 
     _core.set_telegram_bot(telegram_bot)
 
@@ -240,6 +264,8 @@ async def run_server():
     asyncio.create_task(cron.run())
 
     # ── Phase 11: Telegram Bot ──
+    if not vault.is_unlocked:
+        log.warning("[TELEGRAM] Skipped — vault is locked. Unlock vault to enable Telegram.")
     if vault.is_unlocked:
         tg_token = vault.get('telegram_token')
         tg_owner = vault.get('telegram_owner_id')
