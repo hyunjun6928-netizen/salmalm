@@ -1647,7 +1647,14 @@
     }).catch(function(){st.innerHTML=''})
   };
   window.setModel=function(m){modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
-    fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'/model '+(m==='auto'?'auto':m),session:_currentSession})});
+    fetch('/api/model/switch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({model:m,session:_currentSession})})
+    .then(function(){if(typeof window._loadModelRouter==='function')window._loadModelRouter()});
+    /* Update Model tab display */
+    var cn=document.getElementById('mr-current-name');
+    if(cn)cn.textContent=m==='auto'?'🔄 Auto Routing':m;
+    /* Update select dropdown */
+    var sel=document.getElementById('s-model');
+    if(sel)sel.value=m;
     /* Show/hide routing override hint */
     var hint=document.getElementById('mr-routing-hint');
     if(hint){hint.style.display=m==='auto'?'none':'block'}};
