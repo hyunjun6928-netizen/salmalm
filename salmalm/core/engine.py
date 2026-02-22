@@ -655,6 +655,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         self, session, user_message, model_override, on_tool, classification, tier, on_token=None, on_status=None
     ):
         from salmalm.core.loop_helpers import (
+            auto_log_conversation,
             check_abort,
             select_model,
             trim_history,
@@ -807,6 +808,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 f"[CHAT] Response ({result.get('model', '?')}): {len(response)} chars, "
                 f"iteration {iteration + 1}, intent={classification['intent']}"
             )
+            # Auto-log significant conversations to daily memory
+            auto_log_conversation(user_message, response, classification)
             session.messages = [m for m in session.messages if not m.get("_plan_injected")]
             return response
 

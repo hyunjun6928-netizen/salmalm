@@ -373,7 +373,7 @@ async def run_server():
                 discord_bot.configure(dc_token, dc_guild)
 
                 # Register message handler → core engine
-                async def _discord_message_handler(content, raw_data):
+                async def _discord_message_handler(content, raw_data, on_token=None):
                     import time as _t
 
                     _channel_id = raw_data.get("channel_id", "")
@@ -381,7 +381,7 @@ async def run_server():
                     _start = _t.time()
                     from salmalm.core.engine import process_message
 
-                    response = await process_message(_session_id, content)
+                    response = await process_message(_session_id, content, on_token=on_token)
                     _elapsed = _t.time() - _start
                     return f"{response}\n\n⏱️ {_elapsed:.1f}s" if response else None
 

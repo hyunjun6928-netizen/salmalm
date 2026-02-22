@@ -854,6 +854,15 @@ def compact_messages(
         f"[PKG] Stage 5 compacted: {len(messages)} -> {len(compacted)} messages, "
         f"{total_chars} → {sum(len(_msg_content_str(m)) for m in compacted)} chars"
     )
+
+    # Auto-curate: promote important daily entries to MEMORY.md after compaction
+    try:
+        result = memory_manager.auto_curate(days_back=3)
+        if "No new" not in result:
+            log.info(f"[MEM] Post-compaction auto-curate: {result}")
+    except Exception as e:
+        log.warning(f"[MEM] Auto-curate error: {e}")
+
     return compacted
 
 
@@ -1213,6 +1222,8 @@ class LLMCronManager:
                     log.warning(f"[CRON] Job {job['name']} cost ${cron_cost:.2f} — exceeds ${MAX_CRON_JOB_COST} cap")
                 job["last_run"] = datetime.now(KST).isoformat()  # noqa: F405
                 job["run_count"] = job.get("run_count", 0) + 1
+                job["error_count"] = 0  # Reset on success
+                job.pop("last_error", None)
                 self.save_jobs()
                 log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
 
@@ -1277,7 +1288,23 @@ class LLMCronManager:
             except Exception as e:
                 log.error(f"LLM cron error ({job['name']}): {e}")
                 job["last_run"] = datetime.now(KST).isoformat()  # noqa: F405
+                job["last_error"] = str(e)[:200]
+                job["error_count"] = job.get("error_count", 0) + 1
                 self.save_jobs()
+
+                # Notify owner about cron failure
+                error_text = f"⚠️ Cron job failed: {job['name']}\nError: {str(e)[:200]}"
+                try:
+                    if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
+                        _tg_bot.send_message(_tg_bot.owner_id, error_text)
+                except Exception:
+                    pass
+
+                # Auto-disable after 5 consecutive failures
+                if job.get("error_count", 0) >= 5:
+                    job["enabled"] = False
+                    self.save_jobs()
+                    log.warning(f"[CRON] Job {job['name']} disabled after 5 consecutive failures")
 
 
 # ============================================================

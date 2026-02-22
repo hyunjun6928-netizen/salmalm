@@ -58,11 +58,35 @@ class DiscordBot:
             return {}
 
     def send_message(self, channel_id: str, content: str, reply_to: Optional[str] = None) -> dict:
-        """Send a message to a channel."""
-        body: Dict[str, Any] = {"content": content[:2000]}
-        if reply_to:
-            body["message_reference"] = {"message_id": reply_to}
-        return self._api("POST", f"/channels/{channel_id}/messages", body)
+        """Send a message to a channel, splitting if over 2000 chars."""
+        chunks = self._smart_split(content, 2000)
+        last_result = {}
+        for i, chunk in enumerate(chunks):
+            body: Dict[str, Any] = {"content": chunk}
+            if reply_to and i == 0:
+                body["message_reference"] = {"message_id": reply_to}
+            last_result = self._api("POST", f"/channels/{channel_id}/messages", body)
+        return last_result
+
+    @staticmethod
+    def _smart_split(text: str, max_len: int = 2000) -> list:
+        """Split text respecting code blocks and paragraph boundaries."""
+        if len(text) <= max_len:
+            return [text]
+        chunks = []
+        while text:
+            if len(text) <= max_len:
+                chunks.append(text)
+                break
+            # Try splitting at paragraph boundary
+            cut = text.rfind("\n\n", 0, max_len)
+            if cut < max_len // 2:
+                cut = text.rfind("\n", 0, max_len)
+            if cut < max_len // 2:
+                cut = max_len
+            chunks.append(text[:cut])
+            text = text[cut:].lstrip("\n")
+        return chunks
 
     def send_typing(self, channel_id: str):
         """Send typing indicator."""
@@ -89,6 +113,11 @@ class DiscordBot:
         """Add an emoji reaction to a Discord message."""
         encoded = urllib.parse.quote(emoji)
         self._api("PUT", f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me")
+
+    def remove_reaction(self, channel_id: str, message_id: str, emoji: str):
+        """Remove bot's own reaction from a Discord message."""
+        encoded = urllib.parse.quote(emoji)
+        self._api("DELETE", f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me")
 
     # ── Gateway WebSocket ──
 
@@ -272,17 +301,69 @@ class DiscordBot:
                 if not content:
                     return
 
+                # Built-in slash commands
+                if content.startswith("/"):
+                    cmd_response = self._handle_command(content, channel_id)
+                    if cmd_response:
+                        self.send_message(channel_id, cmd_response, reply_to=message_id)
+                        return
+
                 if self._on_message:
+                    # Ack reaction (OpenClaw-style 👀)
+                    try:
+                        self.add_reaction(channel_id, message_id, "👀")
+                    except Exception:
+                        pass
+
                     # Start continuous typing indicator
                     typing_task = self.start_typing_loop(channel_id)
+
+                    # Streaming preview: send draft message and edit it
+                    _stream_buf = []
+                    _draft_msg_id = [None]
+                    _STREAM_THRESHOLD = 200
+
+                    def _on_stream_token(event):
+                        etype = event.get("type", "")
+                        if etype == "content_delta":
+                            delta = event.get("text", "")
+                            if delta:
+                                _stream_buf.append(delta)
+                                full = "".join(_stream_buf)
+                                if not _draft_msg_id[0] and len(full) >= _STREAM_THRESHOLD:
+                                    try:
+                                        resp = self._api("POST", f"/channels/{channel_id}/messages", {
+                                            "content": full[:1900] + " ▍",
+                                            "message_reference": {"message_id": message_id},
+                                        })
+                                        _draft_msg_id[0] = resp.get("id")
+                                    except Exception:
+                                        pass
+                                elif _draft_msg_id[0] and len(full) % 150 < 10:
+                                    try:
+                                        self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}", {
+                                            "content": full[:1900] + " ▍",
+                                        })
+                                    except Exception:
+                                        pass
+
                     try:
-                        response = await self._on_message(content, d)
+                        response = await self._on_message(content, d, on_token=_on_stream_token)
                         if response:
-                            # Split long messages
-                            while response:
-                                chunk = response[:2000]
-                                response = response[2000:]
-                                self.send_message(channel_id, chunk, reply_to=message_id)
+                            if _draft_msg_id[0]:
+                                # Edit final response into draft message
+                                chunks = self._smart_split(response, 2000)
+                                try:
+                                    self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}", {
+                                        "content": chunks[0],
+                                    })
+                                except Exception:
+                                    self.send_message(channel_id, chunks[0], reply_to=message_id)
+                                # Send remaining chunks
+                                for chunk in chunks[1:]:
+                                    self.send_message(channel_id, chunk)
+                            else:
+                                self.send_message(channel_id, response, reply_to=message_id)
                     except Exception as e:
                         log.error(f"Discord message handler error: {e}")
                         self.send_message(channel_id, f"❌ Error: {str(e)[:200]}", reply_to=message_id)
@@ -292,6 +373,63 @@ class DiscordBot:
                             await typing_task
                         except asyncio.CancelledError:
                             pass
+                        # Clear ack reaction
+                        try:
+                            self.remove_reaction(channel_id, message_id, "👀")
+                        except Exception:
+                            pass
+
+    def _handle_command(self, text: str, channel_id: str) -> Optional[str]:
+        """Handle built-in commands. Returns response text or None."""
+        cmd = text.split()[0].lower()
+        try:
+            if cmd == "/start" or cmd == "/hello":
+                from salmalm import __version__
+
+                return f"😈 SalmAlm v{__version__} ready!"
+            elif cmd == "/help":
+                return (
+                    "😈 **SalmAlm Commands**\n\n"
+                    "📋 `/help` — Show this help\n"
+                    "📊 `/usage` — Token usage & cost\n"
+                    "🤖 `/model [name|auto]` — Switch model\n"
+                    "🗑️ `/clear` — Clear conversation\n"
+                    "📦 `/compact` — Compress conversation history\n"
+                    "🔊 `/tts on|off` — Toggle voice responses\n"
+                    "\nJust type normally to chat!"
+                )
+            elif cmd == "/usage":
+                from salmalm.tools.tool_registry import execute_tool
+
+                return execute_tool("usage_report", {})
+            elif cmd == "/model":
+                parts = text.split(maxsplit=1)
+                from salmalm.core.engine import router
+
+                if len(parts) > 1:
+                    choice = parts[1].strip()
+                    router.force_model = choice if choice != "auto" else None
+                    return f"Model: {choice}"
+                current = router.force_model or "auto (routing)"
+                return f"Current model: {current}\nUse `/model auto` to reset"
+            elif cmd == "/clear":
+                from salmalm.core import get_session
+                from salmalm.core.prompt import build_system_prompt
+
+                session = get_session(f"discord_{channel_id}")
+                session.messages = []
+                session.add_system(build_system_prompt())
+                return "🗑️ Conversation cleared"
+            elif cmd == "/compact":
+                from salmalm.core import get_session, compact_messages
+
+                session = get_session(f"discord_{channel_id}")
+                before = len(session.messages)
+                session.messages = compact_messages(session.messages)
+                return f"📦 Compacted: {before} → {len(session.messages)} messages"
+        except Exception as e:
+            return f"❌ Command error: {str(e)[:200]}"
+        return None
 
     async def poll(self):
         """Main gateway loop."""
