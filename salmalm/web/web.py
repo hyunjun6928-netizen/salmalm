@@ -2995,6 +2995,33 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         self._json({"ok": True, "config": cfg})
         return
 
+    def _post_api_routing_optimize(self):
+        """POST /api/routing/optimize — Auto-optimize routing based on available keys."""
+        if not self._require_auth("user"):
+            return
+        from salmalm.core.model_selection import auto_optimize_and_save
+        available_keys = []
+        for key_name in ("anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key"):
+            if vault.get(key_name):
+                available_keys.append(key_name)
+        if not available_keys:
+            self._json({"ok": False, "error": "No API keys configured"}, 400)
+            return
+        config = auto_optimize_and_save(available_keys)
+        # Build human-readable summary
+        from salmalm.core.model_selection import _MODEL_COSTS
+        summary = {}
+        for tier, model in config.items():
+            cost = _MODEL_COSTS.get(model, (0, 0))
+            provider = model.split('/')[0] if '/' in model else '?'
+            name = model.split('/')[-1] if '/' in model else model
+            summary[tier] = {
+                'model': model, 'provider': provider, 'name': name,
+                'cost_input': cost[0], 'cost_output': cost[1],
+            }
+        self._json({"ok": True, "config": config, "summary": summary,
+                     "keys_used": available_keys})
+
     def _post_api_failover(self):
         body = self._body
         if not self._require_auth("user"):
@@ -3849,8 +3876,22 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             except Exception as e:
                 test_results.append(f"⚠️ Google: {str(e)[:80]}")
         audit_log("onboarding", f"keys: {', '.join(saved)}")
+        # Auto-optimize routing based on available keys
+        routing_config = {}
+        try:
+            from salmalm.core.model_selection import auto_optimize_and_save
+            available_keys = []
+            for key_name in ("anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key"):
+                if vault.get(key_name):
+                    available_keys.append(key_name)
+            if available_keys:
+                routing_config = auto_optimize_and_save(available_keys)
+                log.info(f"[ONBOARDING] Auto-optimized routing: {routing_config}")
+        except Exception as e:
+            log.warning(f"[ONBOARDING] Auto-routing failed (ignored): {e}")
         test_result = " | ".join(test_results) if test_results else "Keys saved."
-        self._json({"ok": True, "saved": saved, "test_result": test_result})
+        self._json({"ok": True, "saved": saved, "test_result": test_result,
+                     "routing": routing_config})
         return
 
     def _post_api_onboarding_preferences(self):
@@ -4142,6 +4183,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         "/api/sessions/import": "_post_api_sessions_import",
         "/api/soul": "_post_api_soul",
         "/api/routing": "_post_api_routing",
+        "/api/routing/optimize": "_post_api_routing_optimize",
         "/api/failover": "_post_api_failover",
         "/api/sessions/rename": "_post_api_sessions_rename",
         "/api/sessions/rollback": "_post_api_sessions_rollback",

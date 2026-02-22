@@ -58,6 +58,90 @@ def save_routing_config(config: dict) -> None:
         pass
 
 
+# ── Cost-per-1M-token table (input/output) for auto-optimization ──
+_MODEL_COSTS = {
+    # Anthropic
+    'anthropic/claude-haiku-3.5-20241022':   (1.0, 5.0),
+    'anthropic/claude-sonnet-4-20250514':    (3.0, 15.0),
+    'anthropic/claude-opus-4-6':             (5.0, 25.0),
+    # OpenAI
+    'openai/gpt-4.1-nano':                   (0.1, 0.4),
+    'openai/gpt-4.1-mini':                   (0.4, 1.6),
+    'openai/gpt-4.1':                        (2.0, 8.0),
+    'openai/gpt-5.3-codex':                  (2.0, 8.0),
+    'openai/gpt-5.1-codex':                  (1.5, 6.0),
+    'openai/o4-mini':                        (1.1, 4.4),
+    # Google
+    'google/gemini-2.5-flash':               (0.15, 0.6),
+    'google/gemini-3-flash-preview':         (0.15, 0.6),
+    'google/gemini-2.5-pro':                 (1.25, 10.0),
+    'google/gemini-3-pro-preview':           (1.25, 10.0),
+    # xAI
+    'xai/grok-3-mini':                       (0.3, 0.5),
+    'xai/grok-3':                            (3.0, 15.0),
+    'xai/grok-4':                            (3.0, 15.0),
+}
+
+# Tier candidates: (model_id, provider_key_name)
+_TIER_CANDIDATES = {
+    'simple': [
+        ('openai/gpt-4.1-nano', 'openai_api_key'),          # $0.1/$0.4
+        ('google/gemini-3-flash-preview', 'google_api_key'), # $0.15/$0.6
+        ('google/gemini-2.5-flash', 'google_api_key'),       # $0.15/$0.6
+        ('xai/grok-3-mini', 'xai_api_key'),                  # $0.3/$0.5
+        ('openai/gpt-4.1-mini', 'openai_api_key'),           # $0.4/$1.6
+        ('anthropic/claude-haiku-3.5-20241022', 'anthropic_api_key'),  # $1/$5
+    ],
+    'moderate': [
+        ('openai/gpt-4.1-mini', 'openai_api_key'),           # $0.4/$1.6
+        ('google/gemini-2.5-flash', 'google_api_key'),        # $0.15/$0.6
+        ('anthropic/claude-haiku-3.5-20241022', 'anthropic_api_key'),  # $1/$5
+        ('openai/o4-mini', 'openai_api_key'),                 # $1.1/$4.4
+        ('openai/gpt-4.1', 'openai_api_key'),                 # $2/$8
+        ('anthropic/claude-sonnet-4-20250514', 'anthropic_api_key'),  # $3/$15
+    ],
+    'complex': [
+        ('openai/gpt-4.1', 'openai_api_key'),                # $2/$8
+        ('openai/gpt-5.3-codex', 'openai_api_key'),          # $2/$8
+        ('anthropic/claude-sonnet-4-20250514', 'anthropic_api_key'),  # $3/$15
+        ('google/gemini-3-pro-preview', 'google_api_key'),    # $1.25/$10
+        ('xai/grok-4', 'xai_api_key'),                       # $3/$15
+        ('anthropic/claude-opus-4-6', 'anthropic_api_key'),   # $5/$25
+    ],
+}
+
+
+def auto_optimize_routing(available_keys: list[str]) -> dict:
+    """Generate optimal routing config based on available API keys.
+
+    Args:
+        available_keys: list of key names like ['anthropic_api_key', 'openai_api_key']
+
+    Returns:
+        dict with {simple, moderate, complex} model IDs optimized for cost.
+    """
+    key_set = set(available_keys)
+    result = {}
+
+    for tier in ('simple', 'moderate', 'complex'):
+        for model_id, required_key in _TIER_CANDIDATES[tier]:
+            if required_key in key_set:
+                result[tier] = model_id
+                break
+        if tier not in result:
+            # Fallback: use whatever is available
+            result[tier] = _MODELS.get('sonnet', 'anthropic/claude-sonnet-4-20250514')
+
+    return result
+
+
+def auto_optimize_and_save(available_keys: list[str]) -> dict:
+    """Auto-optimize routing and save to config file. Returns the config."""
+    config = auto_optimize_routing(available_keys)
+    save_routing_config(config)
+    return config
+
+
 def select_model(message: str, session) -> Tuple[str, str]:
     """Select optimal model based on message complexity.
 

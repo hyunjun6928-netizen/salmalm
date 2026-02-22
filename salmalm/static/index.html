@@ -1073,9 +1073,14 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
         <span style="color:var(--text2)"><span class="eng-en">💡 Tip: Use <code>/model opus</code> in chat to temporarily override for a single session without changing these defaults.</span><span class="eng-kr">💡 팁: 채팅에서 <code>/model opus</code>로 이 기본값을 바꾸지 않고 현재 세션만 일시적으로 오버라이드할 수 있습니다.</span></span>
       </div>
 
-      <div style="margin-top:14px;display:flex;align-items:center;gap:8px">
+      <div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <button data-action="saveRouting" style="padding:8px 16px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-size:13px;font-weight:600" data-i18n="btn-save-routing">💾 Save Routing / 저장</button>
+        <button data-action="autoOptimizeRouting" style="padding:8px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#4ade80,#22d3ee);color:#000;cursor:pointer;font-size:13px;font-weight:600">⚡ <span class="eng-en">Auto Optimize</span><span class="eng-kr">자동 최적화</span></button>
         <span id="route-status" style="font-size:12px;color:var(--text2)"></span>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text2);line-height:1.6">
+        <span class="eng-en">⚡ <b>Auto Optimize</b> analyzes your API keys and picks the cheapest model for each tier, mixing across providers for maximum savings.</span>
+        <span class="eng-kr">⚡ <b>자동 최적화</b>는 보유한 API 키를 분석하여, 프로바이더를 교차 활용해 각 티어별 가장 저렴한 모델을 자동 선택합니다.</span>
       </div>
     </div>
     <!-- Ollama -->

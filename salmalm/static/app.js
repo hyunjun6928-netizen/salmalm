@@ -2048,6 +2048,31 @@
     else if(a==='toggleUser'){var uid=parseInt(el.getAttribute('data-uid'));var en=el.getAttribute('data-enabled')==='true';window.toggleUser(uid,en)}
     else if(a==='deleteUser'){window.deleteUser(el.getAttribute('data-username'))}
     else if(a==='saveOllama'){var u=document.getElementById('s-ollama-url').value;var k=document.getElementById('s-ollama-key')?document.getElementById('s-ollama-key').value:'';fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_url',value:u})}).then(function(){if(k){return fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set',key:'ollama_api_key',value:k})})}}).then(function(){addMsg('assistant','✅ Local LLM config saved');if(typeof window._loadModelRouter==='function')window._loadModelRouter()})}
+    else if(a==='autoOptimizeRouting'){
+      var st=document.getElementById('route-status');if(st)st.textContent='⏳...';
+      fetch('/api/routing/optimize',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:'{}'}).then(function(r){return r.json()}).then(function(d){
+        if(d.ok&&d.config){
+          var kr=document.documentElement.lang==='kr';
+          // Update dropdowns
+          ['simple','moderate','complex'].forEach(function(t){
+            var sel=document.getElementById('route-'+t);
+            if(sel&&d.config[t]){sel.value=d.config[t]}
+          });
+          // Build summary text
+          var parts=[];
+          if(d.summary){
+            ['simple','moderate','complex'].forEach(function(t){
+              var s=d.summary[t];if(s){
+                var label=t==='simple'?(kr?'간단':'Simple'):t==='moderate'?(kr?'보통':'Moderate'):(kr?'복잡':'Complex');
+                parts.push(label+': '+s.name+' ($'+s.cost_input+'/'+s.cost_output+')');
+              }
+            });
+          }
+          if(st)st.innerHTML='✅ '+(kr?'최적화 완료! ':'Optimized! ')+parts.join(' · ');
+          setTimeout(function(){if(st)st.textContent=''},5000);
+        }else{if(st)st.textContent='❌ '+(d.error||'Failed')}
+      }).catch(function(e){if(st)st.textContent='❌ '+e})
+    }
     else if(a==='saveRouting'){var rc={simple:document.getElementById('route-simple').value,moderate:document.getElementById('route-moderate').value,complex:document.getElementById('route-complex').value};fetch('/api/routing',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify(rc)}).then(function(r){return r.json()}).then(function(d){var st=document.getElementById('route-status');if(st){st.textContent='✅ Saved!';setTimeout(function(){st.textContent=''},2000)}}).catch(function(){var st=document.getElementById('route-status');if(st)st.textContent='❌ Error'})}
     else if(a==='saveSoul'){
       var sc=document.getElementById('soul-editor').value;
