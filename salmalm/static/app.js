@@ -1661,18 +1661,26 @@
       else{st.innerHTML='<span style="color:var(--text2)">'+t('google-not-connected')+'</span>'}
     }).catch(function(){st.innerHTML=''})
   };
-  window.setModel=function(m){modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
-    fetch('/api/model/switch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({model:m,session:_currentSession})})
-    .then(function(){if(typeof window._loadModelRouter==='function')window._loadModelRouter()});
-    /* Update Model tab display */
+  window.setModel=function(m){
+    modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
+    /* Immediately update UI (optimistic) */
     var cn=document.getElementById('mr-current-name');
     if(cn)cn.textContent=m==='auto'?'🔄 Auto Routing':m;
-    /* Update select dropdown */
     var sel=document.getElementById('s-model');
     if(sel)sel.value=m;
-    /* Show/hide routing override hint */
     var hint=document.getElementById('mr-routing-hint');
-    if(hint){hint.style.display=m==='auto'?'none':'block'}};
+    if(hint){hint.style.display=m==='auto'?'none':'block'}
+    /* Then persist to server, reload after server confirms */
+    fetch('/api/model/switch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({model:m,session:_currentSession})})
+    .then(function(r){return r.json()}).then(function(d){
+      /* Re-update from server response to ensure consistency */
+      var eff=d.current_model||m;
+      if(cn)cn.textContent=eff==='auto'?'🔄 Auto Routing':eff;
+      modelBadge.textContent=eff==='auto'?'auto routing':eff.split('/').pop();
+      if(sel)sel.value=eff;
+      if(hint){hint.style.display=eff==='auto'?'none':'block'}
+    });
+  };
 
   /* --- Drag highlight --- */
   var ia=document.getElementById('input-area');
