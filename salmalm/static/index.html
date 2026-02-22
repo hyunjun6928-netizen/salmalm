@@ -377,22 +377,71 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
     </div>
     <details style="margin-top:12px">
       <summary style="font-size:12px;color:var(--text2);cursor:pointer" data-i18n="tg-guide-title">📋 Setup Guide (click to expand)</summary>
-      <ol class="tg-guide-en" style="font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2.2">
-        <li>Open Telegram and search for <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--accent2)">@BotFather</a></li>
-        <li>Send <code>/newbot</code> and follow the prompts to create a bot</li>
-        <li>Copy the <b>Bot Token</b> and paste it above</li>
-        <li>Send a message to your new bot, then visit <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> to find your <b>Chat ID</b></li>
-        <li>Paste your Chat ID in the Owner Chat ID field → Save</li>
-        <li>Restart SalmAlm to activate the bot</li>
-      </ol>
-      <ol class="tg-guide-kr" style="display:none;font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2.2">
-        <li>Telegram에서 <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--accent2)">@BotFather</a> 검색</li>
-        <li><code>/newbot</code> 전송 후 안내에 따라 봇 생성</li>
-        <li><b>Bot Token</b>을 복사하여 위에 붙여넣기</li>
-        <li>새 봇에게 아무 메시지를 보낸 후 <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> 에서 <b>Chat ID</b> 확인</li>
-        <li>Owner Chat ID에 붙여넣기 → Save</li>
-        <li>SalmAlm 재시작하면 봇 활성화</li>
-      </ol>
+      <div class="tg-guide-en" style="font-size:12px;color:var(--text2);margin-top:10px;line-height:2">
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border)">
+          <b>Step 1: Create a Telegram Bot</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>Open the <a href="https://telegram.org/apps" target="_blank" rel="noopener" style="color:var(--accent2)">Telegram app</a> on your phone or desktop</li>
+            <li>In the search bar, type <code>@BotFather</code> and open the official bot (blue checkmark ✓)</li>
+            <li>Send <code>/newbot</code> to BotFather</li>
+            <li>BotFather will ask: <b>"What name for your bot?"</b> → Type any name (e.g. <code>My AI Assistant</code>)</li>
+            <li>Next: <b>"Choose a username"</b> → Must end in <code>bot</code> (e.g. <code>myai_salmalm_bot</code>)</li>
+            <li>BotFather replies with your <b>Bot Token</b> — looks like: <code>7123456789:AAH...</code></li>
+            <li><b>Copy the entire token</b> and paste it in the "Bot Token" field above → click <b>Save</b></li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>Step 2: Find your Chat ID</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>Open your new bot in Telegram (search its username) and send any message (e.g. <code>hello</code>)</li>
+            <li>Open this URL in your browser (replace <code>&lt;TOKEN&gt;</code> with your actual bot token):<br>
+              <code style="background:var(--bg2);padding:4px 8px;border-radius:4px;display:inline-block;margin:4px 0">https://api.telegram.org/bot<b>&lt;TOKEN&gt;</b>/getUpdates</code></li>
+            <li>Look for <code>"chat":{"id":<b>123456789</b></code> in the response — that number is your <b>Chat ID</b></li>
+            <li>Paste it in the "Owner Chat ID" field above → click <b>Save</b></li>
+          </ol>
+          <div style="color:var(--accent);margin-top:4px">💡 <b>Tip:</b> You can also use <a href="https://t.me/userinfobot" target="_blank" rel="noopener" style="color:var(--accent2)">@userinfobot</a> on Telegram — just send it any message and it replies with your Chat ID.</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>Step 3: Activate</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>Restart SalmAlm: close the terminal and run <code>salmalm</code> again</li>
+            <li>Send a message to your bot in Telegram — you should get an AI response! 🎉</li>
+          </ol>
+          <div style="color:var(--accent);margin-top:4px">💡 <b>Note:</b> Only the Owner Chat ID can talk to the bot. Other users will be ignored for security.</div>
+        </div>
+      </div>
+      <div class="tg-guide-kr" style="display:none;font-size:12px;color:var(--text2);margin-top:10px;line-height:2">
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border)">
+          <b>1단계: 텔레그램 봇 생성</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li><a href="https://telegram.org/apps" target="_blank" rel="noopener" style="color:var(--accent2)">텔레그램 앱</a>을 열고 검색창에 <code>@BotFather</code> 입력 (파란 체크마크 ✓ 확인)</li>
+            <li>BotFather에게 <code>/newbot</code> 전송</li>
+            <li><b>"봇 이름을 정하세요"</b> → 원하는 이름 입력 (예: <code>내 AI 비서</code>)</li>
+            <li><b>"유저네임을 정하세요"</b> → 반드시 <code>bot</code>으로 끝나야 함 (예: <code>myai_salmalm_bot</code>)</li>
+            <li>BotFather가 <b>Bot Token</b>을 알려줌 — <code>7123456789:AAH...</code> 형태</li>
+            <li><b>토큰 전체를 복사</b>하여 위 "봇 토큰" 필드에 붙여넣기 → <b>저장</b> 클릭</li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>2단계: Chat ID 찾기</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>텔레그램에서 방금 만든 봇을 찾아 아무 메시지나 보내기 (예: <code>안녕</code>)</li>
+            <li>브라우저에서 아래 URL 열기 (<code>&lt;TOKEN&gt;</code>을 실제 토큰으로 교체):<br>
+              <code style="background:var(--bg2);padding:4px 8px;border-radius:4px;display:inline-block;margin:4px 0">https://api.telegram.org/bot<b>&lt;TOKEN&gt;</b>/getUpdates</code></li>
+            <li>응답에서 <code>"chat":{"id":<b>123456789</b></code> 부분 찾기 — 이 숫자가 <b>Chat ID</b></li>
+            <li>위 "소유자 Chat ID" 필드에 붙여넣기 → <b>저장</b> 클릭</li>
+          </ol>
+          <div style="color:var(--accent);margin-top:4px">💡 <b>팁:</b> 텔레그램에서 <a href="https://t.me/userinfobot" target="_blank" rel="noopener" style="color:var(--accent2)">@userinfobot</a>에게 아무 메시지를 보내면 Chat ID를 바로 알려줍니다.</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>3단계: 활성화</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>SalmAlm 재시작: 터미널을 닫고 <code>salmalm</code> 다시 실행</li>
+            <li>텔레그램에서 봇에게 메시지 보내기 — AI 응답이 오면 성공! 🎉</li>
+          </ol>
+          <div style="color:var(--accent);margin-top:4px">💡 <b>참고:</b> Owner Chat ID만 봇과 대화할 수 있습니다. 다른 사용자의 메시지는 보안을 위해 무시됩니다.</div>
+        </div>
+      </div>
     </details>
   </div>
   <div class="settings-card" id="discord-card">
@@ -409,24 +458,126 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
     </div>
     <details style="margin-top:12px">
       <summary style="font-size:12px;color:var(--text2);cursor:pointer" data-i18n="dc-guide-title">📋 Setup Guide (click to expand)</summary>
-      <ol class="dc-guide-en" style="font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2.2">
-        <li>Go to <a href="https://discord.com/developers/applications" target="_blank" rel="noopener" style="color:var(--accent2)">Discord Developer Portal</a></li>
-        <li>Click <b>New Application</b> → name it → Create</li>
-        <li>Left menu → <b>Bot</b> → Click <b>Reset Token</b> → Copy the token</li>
-        <li>Enable <b>Message Content Intent</b> under Privileged Gateway Intents</li>
-        <li>Left menu → <b>OAuth2</b> → <b>URL Generator</b> → Scopes: <code>bot</code> → Permissions: <code>Send Messages, Read Message History</code></li>
-        <li>Copy the generated URL → Open in browser → Add bot to your server</li>
-        <li>Paste the Bot Token above → Save → Restart SalmAlm</li>
-      </ol>
-      <ol class="dc-guide-kr" style="display:none;font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2.2">
-        <li><a href="https://discord.com/developers/applications" target="_blank" rel="noopener" style="color:var(--accent2)">Discord 개발자 포털</a> 접속</li>
-        <li><b>New Application</b> 클릭 → 이름 입력 → Create</li>
-        <li>좌측 메뉴 → <b>Bot</b> → <b>Reset Token</b> 클릭 → 토큰 복사</li>
-        <li>Privileged Gateway Intents에서 <b>Message Content Intent</b> 활성화</li>
-        <li>좌측 메뉴 → <b>OAuth2</b> → <b>URL Generator</b> → Scopes: <code>bot</code> → Permissions: <code>Send Messages, Read Message History</code></li>
-        <li>생성된 URL 복사 → 브라우저에서 열기 → 서버에 봇 추가</li>
-        <li>위에 Bot Token 붙여넣기 → Save → SalmAlm 재시작</li>
-      </ol>
+      <div class="dc-guide-en" style="font-size:12px;color:var(--text2);margin-top:10px;line-height:2">
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border)">
+          <b>Step 1: Create a Discord Application</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>Go to <a href="https://discord.com/developers/applications" target="_blank" rel="noopener" style="color:var(--accent2)">discord.com/developers/applications</a> and log in</li>
+            <li>Click the <b>New Application</b> button (top right)</li>
+            <li>Enter a name (e.g. <code>SalmAlm AI</code>) → check the ToS box → click <b>Create</b></li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>Step 2: Get the Bot Token</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>In the left sidebar, click <b>Bot</b></li>
+            <li>Click <b>Reset Token</b> → confirm → <b>copy the token</b> that appears</li>
+            <li>⚠️ <b>Important:</b> This token is shown only once! Save it immediately.</li>
+            <li>Paste it in the "Bot Token" field above → click <b>Save</b></li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>Step 3: Enable Message Content Intent</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>Still on the <b>Bot</b> page, scroll down to <b>Privileged Gateway Intents</b></li>
+            <li>Turn ON: <b>Message Content Intent</b> ← <span style="color:#f87171">Required! Without this, the bot can't read messages.</span></li>
+            <li>Click <b>Save Changes</b> at the bottom</li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>Step 4: Invite the Bot to Your Server</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>Left sidebar → <b>OAuth2</b> → <b>URL Generator</b></li>
+            <li>Under <b>Scopes</b>, check: <code>bot</code></li>
+            <li>Under <b>Bot Permissions</b>, check:
+              <ul style="padding-left:16px;margin:4px 0">
+                <li>✅ Send Messages</li>
+                <li>✅ Read Message History</li>
+                <li>✅ Attach Files (for images/file sharing)</li>
+                <li>✅ Add Reactions (optional, for emoji reactions)</li>
+              </ul>
+            </li>
+            <li>Copy the <b>Generated URL</b> at the bottom</li>
+            <li>Open it in your browser → select your server → click <b>Authorize</b></li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>Step 5: Get Server (Guild) ID <span style="font-weight:400">(optional but recommended)</span></b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>In Discord, go to <b>Settings → Advanced → Developer Mode</b> → turn ON</li>
+            <li>Right-click your server name → <b>Copy Server ID</b></li>
+            <li>Paste it in the "Server (Guild) ID" field above → click <b>Save</b></li>
+          </ol>
+          <div style="color:var(--accent);margin-top:4px">💡 <b>Why?</b> Limits the bot to this server only. Without it, the bot responds in all servers it's in.</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>Step 6: Activate</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>Restart SalmAlm: close the terminal and run <code>salmalm</code> again</li>
+            <li>The bot should appear online in your server — send a message to test! 🎉</li>
+          </ol>
+        </div>
+      </div>
+      <div class="dc-guide-kr" style="display:none;font-size:12px;color:var(--text2);margin-top:10px;line-height:2">
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border)">
+          <b>1단계: Discord 애플리케이션 생성</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li><a href="https://discord.com/developers/applications" target="_blank" rel="noopener" style="color:var(--accent2)">discord.com/developers/applications</a> 접속 후 로그인</li>
+            <li>오른쪽 상단 <b>New Application</b> 버튼 클릭</li>
+            <li>이름 입력 (예: <code>삶앎 AI</code>) → 약관 동의 체크 → <b>Create</b> 클릭</li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>2단계: 봇 토큰 발급</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>좌측 메뉴에서 <b>Bot</b> 클릭</li>
+            <li><b>Reset Token</b> 클릭 → 확인 → 나타나는 <b>토큰을 복사</b></li>
+            <li>⚠️ <b>중요:</b> 토큰은 한 번만 표시됩니다! 즉시 저장하세요.</li>
+            <li>위 "봇 토큰" 필드에 붙여넣기 → <b>저장</b> 클릭</li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>3단계: Message Content Intent 활성화</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li><b>Bot</b> 페이지에서 아래로 스크롤 → <b>Privileged Gateway Intents</b> 섹션</li>
+            <li><b>Message Content Intent</b> 켜기 ← <span style="color:#f87171">필수! 이걸 안 켜면 봇이 메시지를 읽을 수 없습니다.</span></li>
+            <li>하단 <b>Save Changes</b> 클릭</li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>4단계: 서버에 봇 초대</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>좌측 메뉴 → <b>OAuth2</b> → <b>URL Generator</b></li>
+            <li><b>Scopes</b>에서 체크: <code>bot</code></li>
+            <li><b>Bot Permissions</b>에서 체크:
+              <ul style="padding-left:16px;margin:4px 0">
+                <li>✅ Send Messages (메시지 전송)</li>
+                <li>✅ Read Message History (메시지 기록 읽기)</li>
+                <li>✅ Attach Files (파일 첨부 — 이미지/파일 공유용)</li>
+                <li>✅ Add Reactions (반응 추가 — 선택사항)</li>
+              </ul>
+            </li>
+            <li>하단의 <b>Generated URL</b> 복사</li>
+            <li>브라우저에서 열기 → 서버 선택 → <b>Authorize</b> 클릭</li>
+          </ol>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>5단계: 서버 (Guild) ID 설정 <span style="font-weight:400">(선택사항이지만 권장)</span></b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>Discord에서 <b>설정 → 고급 → 개발자 모드</b> → 켜기</li>
+            <li>서버 이름 우클릭 → <b>서버 ID 복사</b></li>
+            <li>위 "서버 (Guild) ID" 필드에 붙여넣기 → <b>저장</b> 클릭</li>
+          </ol>
+          <div style="color:var(--accent);margin-top:4px">💡 <b>왜 필요한가요?</b> 봇을 이 서버에서만 작동하도록 제한합니다. 설정하지 않으면 봇이 초대된 모든 서버에서 응답합니다.</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border);margin-top:8px">
+          <b>6단계: 활성화</b>
+          <ol style="padding-left:20px;margin:8px 0">
+            <li>SalmAlm 재시작: 터미널을 닫고 <code>salmalm</code> 다시 실행</li>
+            <li>봇이 서버에서 온라인으로 표시되면 성공 — 메시지를 보내 테스트! 🎉</li>
+          </ol>
+        </div>
+      </div>
     </details>
   </div>
   <div class="settings-card" id="soul-card">
