@@ -181,8 +181,11 @@ class TestWebFetchTool(unittest.TestCase):
         mock_resp.getheader.return_value = 'text/html'
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch('urllib.request.urlopen', return_value=mock_resp):
-            result = execute_tool('web_fetch', {'url': 'https://example.com'})
+        mock_opener = MagicMock()
+        mock_opener.open.return_value = mock_resp
+        with patch('salmalm.tools.tools_web._is_private_url_follow_redirects', return_value=(False, '', 'https://example.com')):
+            with patch('salmalm.tools.tools_common._resolve_and_pin', return_value=mock_opener):
+                result = execute_tool('web_fetch', {'url': 'https://example.com'})
         self.assertIn('Hello', str(result))
 
 
