@@ -105,7 +105,13 @@ get_routing_config = _load_routing_config
 _select_model = _select_model_impl
 
 
-_main_loop = None  # Captured by process_message for cross-thread scheduling
+def _get_event_loop():
+    """Get the running event loop safely (no stale global reference)."""
+    try:
+        loop = asyncio.get_running_loop()
+        return loop if loop.is_running() else None
+    except RuntimeError:
+        return None
 
 
 def _safe_callback(cb, *args):
@@ -123,8 +129,9 @@ def _safe_callback(cb, *args):
             loop.create_task(result)
         except RuntimeError:
             # We're in a sync thread — schedule on the main loop
-            if _main_loop and _main_loop.is_running():
-                asyncio.run_coroutine_threadsafe(result, _main_loop)
+            _loop = _get_event_loop()
+            if _loop:
+                asyncio.run_coroutine_threadsafe(result, _loop)
             else:
                 result.close()
 
@@ -943,11 +950,7 @@ async def process_message(
     - Shutdown rejection
     - Unhandled exceptions → graceful error message
     """
-    global _main_loop
-    try:
-        _main_loop = asyncio.get_running_loop()
-    except RuntimeError:
-        pass
+    # Event loop reference is now obtained dynamically via _get_event_loop()
     # Reject new requests during shutdown
     if _shutting_down:
         return "⚠️ Server is shutting down. Please try again later. / 서버가 종료 중입니다."

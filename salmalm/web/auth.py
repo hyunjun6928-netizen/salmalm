@@ -305,7 +305,13 @@ class RateLimiter:
                     del self._buckets[k]
                 self._last_cleanup = now
 
+            # Hard cap: prevent memory exhaustion from IP flooding
             if key not in self._buckets:
+                if len(self._buckets) >= 50000:
+                    # Emergency eviction: remove oldest 10%
+                    oldest = sorted(self._buckets.items(), key=lambda x: x[1]["last_refill"])[:5000]
+                    for k, _ in oldest:
+                        del self._buckets[k]
                 self._buckets[key] = {
                     "tokens": limit["burst"],
                     "last_refill": now,
