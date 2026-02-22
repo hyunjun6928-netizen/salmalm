@@ -1217,6 +1217,7 @@
     fetch('/api/llm-router/providers',{headers:hdr}).then(function(r){return r.json()}).then(function(d){
       var cur=d.current_model||'auto';
       document.getElementById('mr-current-name').textContent=cur==='auto'?'🔄 Auto Routing':cur;
+      var hint=document.getElementById('mr-routing-hint');if(hint){hint.style.display=cur==='auto'?'none':'block'}
       /* Update s-model dropdown */
       var sel=document.getElementById('s-model');
       if(sel){
@@ -1636,7 +1637,10 @@
     }).catch(function(){st.innerHTML=''})
   };
   window.setModel=function(m){modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
-    fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'/model '+(m==='auto'?'auto':m),session:_currentSession})})};
+    fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'/model '+(m==='auto'?'auto':m),session:_currentSession})});
+    /* Show/hide routing override hint */
+    var hint=document.getElementById('mr-routing-hint');
+    if(hint){hint.style.display=m==='auto'?'none':'block'}};
 
   /* --- Drag highlight --- */
   var ia=document.getElementById('input-area');

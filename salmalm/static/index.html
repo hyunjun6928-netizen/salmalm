@@ -684,6 +684,12 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           <option value="auto">🔄 Auto Routing</option>
         </select>
       </div>
+      <div id="mr-routing-hint" style="padding:10px 16px;font-size:12px;color:var(--text2);line-height:1.6;display:none;background:var(--bg);border-radius:0 0 10px 10px;border-top:1px solid var(--border)">
+        ⚠️ <b>Fixed model selected</b> — Auto Routing is disabled. All messages use this model regardless of complexity.<br>
+        Select <b>🔄 Auto Routing</b> above to enable cost-optimized routing (Haiku for chat, Sonnet for code).<br>
+        ⚠️ <b>고정 모델 선택됨</b> — 자동 라우팅이 비활성화됩니다. 복잡도에 관계없이 모든 메시지가 이 모델을 사용합니다.<br>
+        비용 최적화 라우팅을 사용하려면 위에서 <b>🔄 Auto Routing</b>을 선택하세요.
+      </div>
     </div>
     <!-- Provider Cards -->
     <div class="settings-card">
