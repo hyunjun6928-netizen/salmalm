@@ -78,6 +78,8 @@
       if(hist.length){window._restoring=true;hist.forEach(function(m){if(m&&m.role)addMsg(m.role,m.text,m.model)});window._restoring=false}
     }
     loadSessionList();
+    /* Refresh model panel to reflect this session's override */
+    if(typeof window._loadModelRouter==='function')window._loadModelRouter();
     /* Return to chat view if on settings/usage/dashboard */
     showChat();
     /* Close sidebar on mobile */
@@ -564,7 +566,11 @@
     }else if(data.type==='done'){
       if(typingEl)typingEl.remove();
       var _secs=((Date.now()-_wsSendStart)/1000).toFixed(1);
-      addMsg('assistant',data.text||'','⏱️'+_secs+'s');
+      var _wcIcons={simple:'⚡',moderate:'🔧',complex:'💎'};
+      var _wcLabel=data.complexity&&data.complexity!=='auto'?(_wcIcons[data.complexity]||'')+data.complexity+' → ':'';
+      var _wmShort=(data.model||'').split('/').pop();
+      addMsg('assistant',data.text||'',_wcLabel+_wmShort+' · ⏱️'+_secs+'s');
+      if(_wmShort)modelBadge.textContent=_wmShort;
       fetch('/api/status').then(function(r){return r.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
       /* Queue drain: send next queued message */
       if(window._msgQueue&&window._msgQueue.length>0){var _nextMsg=window._msgQueue.shift();setTimeout(function(){var _inp=document.getElementById('input');if(_inp){_inp.value=_nextMsg;window.doSend()}},500)}
@@ -636,7 +642,11 @@
             gotDone=true;
             if(typingEl)typingEl.remove();
             var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
-            addMsg('assistant',edata.response||'',(edata.model||'')+' · ⏱️'+_secs+'s');
+            var _cIcons={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
+            var _cLabel=edata.complexity&&edata.complexity!=='auto'?(_cIcons[edata.complexity]||'')+edata.complexity+' → ':'';
+            var _mShort=(edata.model||'').split('/').pop();
+            addMsg('assistant',edata.response||'',_cLabel+_mShort+' · ⏱️'+_secs+'s');
+            modelBadge.textContent=_mShort||'auto routing';
             fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
           }
         }
@@ -652,7 +662,7 @@
       var d=await r2.json();
       if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
       var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
-      if(d.response)addMsg('assistant',d.response,(d.model||'')+' · ⏱️'+_secs2+'s');
+      if(d.response){var _fcI={simple:'⚡',moderate:'🔧',complex:'💎'};var _fcL=d.complexity&&d.complexity!=='auto'?(_fcI[d.complexity]||'')+d.complexity+' → ':'';var _fmS=(d.model||'').split('/').pop();addMsg('assistant',d.response,_fcL+_fmS+' · ⏱️'+_secs2+'s');if(_fmS)modelBadge.textContent=_fmS;}
       else if(d.error)addMsg('assistant','❌ '+d.error);
       fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
     }
@@ -1223,7 +1233,7 @@
     return _MODEL_PRICES[short]||null;
   }
   window._loadModelRouter=function(){
-    var hdr={'X-Session-Token':_tok};
+    var hdr={'X-Session-Token':_tok,'X-Session-Id':_currentSession};
     fetch('/api/llm-router/providers',{headers:hdr}).then(function(r){return r.json()}).then(function(d){
       var cur=d.current_model||'auto';
       document.getElementById('mr-current-name').textContent=cur==='auto'?'🔄 Auto Routing':cur;

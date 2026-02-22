@@ -649,8 +649,10 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             from salmalm.core import get_session as _gs_prov
             _s = _gs_prov(_sid)
             _override = getattr(_s, 'model_override', None)
-            if _override:
+            if _override is not None and _override != 'auto':
                 _cur = _override
+            elif _override == 'auto':
+                _cur = 'auto'
         except Exception:
             pass
         self._json(
@@ -2516,8 +2518,15 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
         audit_log("restart", "user-initiated restart")
         self._json({"ok": True, "message": "Restarting..."})
-        # Restart the server process
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        # Graceful restart: flush response, then replace process after a short delay
+        import threading, sys as _sys
+
+        def _do_restart():
+            import time
+            time.sleep(0.5)  # Let HTTP response flush
+            os.execv(_sys.executable, [_sys.executable] + _sys.argv)
+
+        threading.Thread(target=_do_restart, daemon=True).start()
         return
 
     def _post_api_update(self):
@@ -3335,7 +3344,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         try:
             from salmalm.core import get_session as _gs_switch
             _s = _gs_switch(sid)
-            _s.model_override = model if model != 'auto' else 'auto'
+            _s.model_override = None if model == 'auto' else model
         except Exception:
             pass
         # Return the effective model (session override takes precedence)
