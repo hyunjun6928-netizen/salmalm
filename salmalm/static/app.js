@@ -1595,6 +1595,17 @@
       var re=document.getElementById('key-test-result');
       re.innerHTML='<span style="color:#4ade80">✅ '+vaultKey+' Saved</span>';
       document.getElementById(inputId).value='';
+      // Auto-optimize routing when an LLM provider key is saved
+      var llmKeys=['anthropic_api_key','openai_api_key','xai_api_key','google_api_key'];
+      if(llmKeys.indexOf(vaultKey)!==-1){
+        fetch('/api/routing/optimize',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:'{}'})
+        .then(function(r){return r.json()}).then(function(od){
+          if(od.ok){
+            var kr=document.documentElement.lang==='kr';
+            re.innerHTML+='<br><span style="color:#22d3ee">⚡ '+(kr?'라우팅 자동 최적화됨':'Routing auto-optimized')+'</span>';
+          }
+        }).catch(function(){});
+      }
       window.showSettings()})};
   window.testKey=function(provider){
     var re=document.getElementById('key-test-result');
