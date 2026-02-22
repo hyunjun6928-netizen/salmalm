@@ -3782,8 +3782,18 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
     def _post_api_onboarding_inner(self):
         body = self._body
         if not vault.is_unlocked:
-            self._json({"error": "Vault locked"}, 403)
-            return
+            # Fresh install: auto-create vault with empty password
+            try:
+                from salmalm.security.crypto import VAULT_FILE
+                if not VAULT_FILE.exists():
+                    vault.create("", save_to_keychain=False)
+                else:
+                    vault.unlock("")
+            except Exception:
+                pass
+            if not vault.is_unlocked:
+                self._json({"error": "Vault locked"}, 403)
+                return
         # Save all provided API keys + Ollama URL
         saved = []
         for key in (

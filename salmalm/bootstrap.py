@@ -145,6 +145,13 @@ async def run_server():
         webbrowser.open(url)
 
     # ── Phase 5: Vault Auto-unlock ──
+    if not vault.is_unlocked and not VAULT_FILE.exists():
+        # Fresh install: create vault with empty password
+        try:
+            vault.create("", save_to_keychain=False)
+            log.info("[VAULT] Created new vault (no password)")
+        except Exception as _e:
+            log.warning(f"[VAULT] Auto-create failed: {_e}")
     if not vault.is_unlocked and VAULT_FILE.exists():
         # 1. Try OS keychain
         if vault.try_keychain_unlock():
