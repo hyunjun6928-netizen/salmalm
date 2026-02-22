@@ -231,32 +231,32 @@ class TestRoutePolicy(unittest.TestCase):
 
 
 class TestRateLimiter(unittest.TestCase):
-    """In-memory rate limiter."""
+    """Unified token bucket rate limiter (auth.py)."""
 
     def test_under_limit_allowed(self):
-        from salmalm.web.middleware import check_rate_limit
-        # Use unique key to avoid pollution
-        self.assertTrue(check_rate_limit('test_under_limit_key'))
+        from salmalm.web.auth import RateLimiter
+        rl = RateLimiter()
+        self.assertTrue(rl.check('test_under_limit_key', 'anonymous'))
 
     def test_over_limit_blocked(self):
-        from salmalm.web import middleware
-        from salmalm.web.middleware import check_rate_limit
-        old_limit = middleware._RATE_LIMIT
-        middleware._RATE_LIMIT = 3
+        from salmalm.web.auth import RateLimiter, RateLimitExceeded
+        rl = RateLimiter()
+        # anonymous = 5 req/min, burst 10; exhaust burst
         key = 'test_over_limit_key'
-        middleware._rate_buckets.pop(key, None)
-        try:
-            self.assertTrue(check_rate_limit(key))
-            self.assertTrue(check_rate_limit(key))
-            self.assertTrue(check_rate_limit(key))
-            self.assertFalse(check_rate_limit(key))  # 4th should fail
-        finally:
-            middleware._RATE_LIMIT = old_limit
+        exceeded = False
+        for _ in range(20):
+            try:
+                rl.check(key, 'anonymous')
+            except RateLimitExceeded:
+                exceeded = True
+                break
+        self.assertTrue(exceeded)
 
     def test_different_keys_independent(self):
-        from salmalm.web.middleware import check_rate_limit
-        self.assertTrue(check_rate_limit('key_a_unique'))
-        self.assertTrue(check_rate_limit('key_b_unique'))
+        from salmalm.web.auth import RateLimiter
+        rl = RateLimiter()
+        self.assertTrue(rl.check('key_a_unique', 'admin'))
+        self.assertTrue(rl.check('key_b_unique', 'admin'))
 
 
 class TestSQLiteWAL(unittest.TestCase):
