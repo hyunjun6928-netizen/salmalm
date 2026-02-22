@@ -153,3 +153,25 @@ def finalize_response(result: dict, response: str) -> str:
     if stop_reason in ("content_filter", "safety"):
         response = "⚠️ 안전 필터에 의해 응답이 차단되었습니다. / Response blocked by content filter."
     return response
+
+
+def auto_log_conversation(user_message: str, response: str, classification: dict):
+    """Auto-log significant conversations to daily memory."""
+    try:
+        # Skip trivial exchanges
+        if not user_message or len(user_message) < 20:
+            return
+        intent = classification.get("intent", "")
+        if intent in ("chat",) and len(response) < 100:
+            return  # Skip short casual chat
+
+        # Log code/search/action results and substantial conversations
+        from salmalm.core import write_daily_log
+
+        q_snippet = user_message[:150].replace("\n", " ")
+        a_snippet = response[:200].replace("\n", " ")
+        tag = f"[{intent}]" if intent else "[conv]"
+        entry = f"{tag} Q: {q_snippet}\n  A: {a_snippet}"
+        write_daily_log(entry)
+    except Exception:
+        pass  # Memory logging should never break the main flow
