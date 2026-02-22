@@ -924,24 +924,46 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
 
       <!-- Summary bar -->
       <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:20px;font-size:12px;line-height:1.8">
-        <span class="eng-en"><b>💡 Recommended Presets:</b><br>
-        🟢 <b>Maximum Savings:</b> Planning ❌ · Reflection ❌ · Compaction 15K · Cache 24h · Early Stop ✅ · File Summary ✅ · Cap $2/day<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.0005/turn, Coding ~$0.008/turn</span><br>
-        🟡 <b>Balanced:</b> Planning ❌ · Reflection ❌ · Compaction 30K · Cache 4h · Cap $10/day<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.002/turn, Coding ~$0.02/turn</span><br>
-        🔴 <b>Maximum Quality:</b> Planning ✅ · Reflection ✅ · Compaction 120K · Cache off · No cap<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">Chat ~$0.05/turn, Coding ~$0.15/turn</span><br>
-        🔵 <b>OpenClaw-like:</b> Planning ❌ · Reflection ❌ · Compaction 120K · Tool Iterations ♾️ · Cache off · No cap<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">No limits — same behavior as OpenClaw. Most expensive but maximum freedom.</span></span>
-        <span class="eng-kr"><b>💡 권장 프리셋:</b><br>
-        🟢 <b>최대 절약:</b> 계획 ❌ · 검증 ❌ · 압축 15K · 캐시 24시간 · 조기중단 ✅ · 파일요약 ✅ · 하루 $2 제한<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.0005/턴, 코딩 ~$0.008/턴</span><br>
-        🟡 <b>균형:</b> 계획 ❌ · 검증 ❌ · 압축 30K · 캐시 4시간 · 하루 $10 제한<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.002/턴, 코딩 ~$0.02/턴</span><br>
-        🔴 <b>최대 품질:</b> 계획 ✅ · 검증 ✅ · 압축 120K · 캐시 없음 · 제한 없음<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">잡담 ~$0.05/턴, 코딩 ~$0.15/턴</span><br>
-        🔵 <b>오픈클로처럼:</b> 계획 ❌ · 검증 ❌ · 압축 120K · 도구 반복 ♾️ · 캐시 없음 · 제한 없음<br>
-        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">제한 없음 — 오픈클로와 동일한 동작. 가장 비싸지만 최대 자유도.</span></span>
+        <span class="eng-en"><b>💡 Recommended Presets:</b><br><br>
+        🟢 <b>Maximum Savings</b> — Cheapest possible. Good for casual chat.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;Planning ❌ · Reflection ❌ · Compaction 15K · Iterations 10 · Cap $2/day<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;Cache 24h · Batch API ❌ · File Summary ✅ · Early Stop ✅<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#4ade80">Chat ~$0.0005/turn, Coding ~$0.008/turn</span><br><br>
+        🟡 <b>Balanced</b> — Best for daily use. Cost-conscious but capable.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;Planning ❌ · Reflection ❌ · Compaction 30K · Iterations 15 · Cap $10/day<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;Cache 4h · Batch API ❌ · File Summary ❌ · Early Stop ❌<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#facc15">Chat ~$0.002/turn, Coding ~$0.02/turn</span><br><br>
+        🔴 <b>Maximum Quality</b> — Best results. AI thinks deeper and verifies its own work.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;Planning ✅ · Reflection ✅ · Compaction 120K · Iterations 25 · No cap<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;Cache off · Batch API ❌ · File Summary ❌ · Early Stop ❌<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#f87171">Chat ~$0.05/turn, Coding ~$0.15/turn</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">↑ Uses Planning + Reflection for best accuracy. Good for important tasks.</span><br><br>
+        🔵 <b>OpenClaw-like</b> — Mimics OpenClaw behavior. Raw power, no guardrails.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;Planning ❌ · Reflection ❌ · Compaction 120K · Iterations ♾️ · No cap<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;Cache off · Batch API ❌ · File Summary ❌ · Early Stop ❌<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#f87171">Chat ~$0.03/turn, Coding ~$0.10/turn</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">↑ No Planning/Reflection (OpenClaw doesn't have them). Unlimited tool loops instead.</span><br><br>
+        <span style="background:var(--bg);padding:6px 10px;border-radius:6px;border:1px solid var(--border);display:inline-block">🔴 vs 🔵 — <b>Quality</b> thinks more carefully (plan → execute → verify). <b>OpenClaw</b> just executes freely with no limits. Quality costs more per turn but makes fewer mistakes.</span></span>
+        <span class="eng-kr"><b>💡 권장 프리셋:</b><br><br>
+        🟢 <b>최대 절약</b> — 가장 저렴. 가벼운 대화용.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;계획 ❌ · 검증 ❌ · 압축 15K · 반복 10회 · 하루 $2 제한<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;캐시 24시간 · 배치API ❌ · 파일요약 ✅ · 조기중단 ✅<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#4ade80">잡담 ~$0.0005/턴, 코딩 ~$0.008/턴</span><br><br>
+        🟡 <b>균형</b> — 일상 사용에 최적. 비용 절약하면서도 유능.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;계획 ❌ · 검증 ❌ · 압축 30K · 반복 15회 · 하루 $10 제한<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;캐시 4시간 · 배치API ❌ · 파일요약 ❌ · 조기중단 ❌<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#facc15">잡담 ~$0.002/턴, 코딩 ~$0.02/턴</span><br><br>
+        🔴 <b>최대 품질</b> — 최상의 결과. AI가 더 깊이 생각하고 자기 검증까지 수행.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;계획 ✅ · 검증 ✅ · 압축 120K · 반복 25회 · 제한 없음<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;캐시 없음 · 배치API ❌ · 파일요약 ❌ · 조기중단 ❌<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#f87171">잡담 ~$0.05/턴, 코딩 ~$0.15/턴</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">↑ 계획+검증으로 정확도 최대화. 중요한 작업에 추천.</span><br><br>
+        🔵 <b>오픈클로처럼</b> — 오픈클로 동작 재현. 제한 없는 원시적 파워.<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;계획 ❌ · 검증 ❌ · 압축 120K · 반복 ♾️ · 제한 없음<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;캐시 없음 · 배치API ❌ · 파일요약 ❌ · 조기중단 ❌<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#f87171">잡담 ~$0.03/턴, 코딩 ~$0.10/턴</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">↑ 계획/검증 없음 (오픈클로에 해당 기능 없음). 대신 도구 무한 반복 허용.</span><br><br>
+        <span style="background:var(--bg);padding:6px 10px;border-radius:6px;border:1px solid var(--border);display:inline-block">🔴 vs 🔵 — <b>최대 품질</b>은 신중하게 (계획→실행→검증). <b>오픈클로</b>는 제한 없이 자유롭게 실행. 품질이 턴당 비용은 높지만 실수가 적음.</span></span>
       </div>
 
       <button class="btn" data-action="saveEngineSettings" style="margin-top:16px;font-size:14px;padding:10px 24px"><span class="eng-en">💾 Save</span><span class="eng-kr">💾 저장</span></button>
