@@ -1140,8 +1140,13 @@
       var mainSel=document.getElementById('s-model');
       if(mainSel){for(var i=0;i<mainSel.options.length;i++){var o=mainSel.options[i];if(o.value&&o.value!=='auto'){var found=false;for(var j=0;j<allModels.length;j++){if(allModels[j].val===o.value){found=true;break}}if(!found)allModels.push({key:o.value,val:o.value})}}}
       opts='';for(var i=0;i<allModels.length;i++){opts+='<option value="'+allModels[i].val+'">'+allModels[i].val.split('/').pop()+' ('+allModels[i].key+')</option>'}
+      var _autoDefaults={simple:'Haiku (cheapest / 최저가)',moderate:'Sonnet (balanced / 균형)',complex:'Sonnet (balanced / 균형)'};
       ['simple','moderate','complex'].forEach(function(tier){
-        var sel=document.getElementById('route-'+tier);if(sel){sel.innerHTML=opts;sel.value=cfg[tier]||''}
+        var sel=document.getElementById('route-'+tier);
+        if(sel){
+          sel.innerHTML='<option value="">🔄 Auto — '+_autoDefaults[tier]+'</option>'+opts;
+          sel.value=cfg[tier]||'';
+        }
       });
     }).catch(function(){});
     /* Load SOUL.md */
