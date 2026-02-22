@@ -178,6 +178,9 @@ class LLMRouter:
 
     def switch_model(self, model: str) -> str:
         """Switch to a new model. Returns confirmation message."""
+        if model == 'auto':
+            self._current_model = 'auto'
+            return '✅ Switched to **auto routing** (cost-optimized)'
         provider, bare = detect_provider(model)
         if not is_provider_available(provider):
             return f'❌ Provider `{provider}` not configured (missing API key)'
