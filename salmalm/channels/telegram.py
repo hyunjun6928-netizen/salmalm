@@ -970,12 +970,25 @@ class TelegramBot:
         elif cmd == "/model":
             parts = text.split(maxsplit=1)
             if len(parts) > 1:
-                router.force_model = parts[1] if parts[1] != "auto" else None
-                self.send_message(chat_id, f"Model changed: {parts[1]}")
+                choice = parts[1].strip()
+                if choice == "auto":
+                    router.set_force_model(None)
+                    self.send_message(chat_id, "🤖 Auto routing enabled")
+                else:
+                    router.set_force_model(choice)
+                    self.send_message(chat_id, f"🤖 Model fixed: {choice}")
             else:
-                current = router.force_model or "auto (routing)"
-                models = "\n".join(f"  {m}" for tier in router.TIERS.values() for m in tier)
-                self.send_message(chat_id, f"Current: {current}\n\nAvailable:\n{models}\n\n/model auto — auto")
+                current = router.force_model or "auto"
+                lines = [f"🤖 Current: {current}"]
+                if not router.force_model:
+                    tier_names = {1: "Simple (싼 모델)", 2: "Moderate (기본)", 3: "Complex (고급)"}
+                    for tier_num, label in tier_names.items():
+                        model = router._pick_available(tier_num)
+                        lines.append(f"  {label}: {model.split('/')[-1]}")
+                lines.append("")
+                lines.append("/model <name> — fix model")
+                lines.append("/model auto — auto routing")
+                self.send_message(chat_id, "\n".join(lines))
         elif cmd == "/compact":
             session = get_session(f"telegram_{chat_id}")
             before = len(session.messages)

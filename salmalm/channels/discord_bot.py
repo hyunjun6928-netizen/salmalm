@@ -408,10 +408,20 @@ class DiscordBot:
 
                 if len(parts) > 1:
                     choice = parts[1].strip()
-                    router.force_model = choice if choice != "auto" else None
-                    return f"Model: {choice}"
-                current = router.force_model or "auto (routing)"
-                return f"Current model: {current}\nUse `/model auto` to reset"
+                    if choice == "auto":
+                        router.set_force_model(None)
+                        return "🤖 Auto routing enabled"
+                    router.set_force_model(choice)
+                    return f"🤖 Model fixed: {choice}"
+                current = router.force_model or "auto"
+                lines = [f"🤖 Current: {current}"]
+                if not router.force_model:
+                    tier_names = {1: "Simple", 2: "Moderate", 3: "Complex"}
+                    for tier_num, label in tier_names.items():
+                        model = router._pick_available(tier_num)
+                        lines.append(f"  {label}: {model.split('/')[-1]}")
+                lines.append("\n`/model <name>` — fix model\n`/model auto` — auto routing")
+                return "\n".join(lines)
             elif cmd == "/clear":
                 from salmalm.core import get_session
                 from salmalm.core.prompt import build_system_prompt
