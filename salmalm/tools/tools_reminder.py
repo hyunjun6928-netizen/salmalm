@@ -47,6 +47,30 @@ _EN_WEEKDAYS = {
 }
 
 
+def _parse_relative_en(m, s_lower, now):
+    """Parse English relative time (in N minutes/hours/days/weeks)."""
+    val = int(m.group(1))
+    unit = m.group(2)[0]
+    deltas = {"m": timedelta(minutes=val), "h": timedelta(hours=val), "d": timedelta(days=val), "w": timedelta(weeks=val)}
+    base = now + deltas.get(unit, timedelta(minutes=val))
+    hour, minute = _extract_time_en(s_lower)
+    if hour is not None:
+        base = base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return base
+
+
+def _parse_relative_kr(m, s, now):
+    """Parse Korean relative time expression (N분/시간/일/주 후)."""
+    val = int(m.group(1))
+    unit = m.group(2)
+    deltas = {"분": timedelta(minutes=val), "시간": timedelta(hours=val), "일": timedelta(days=val), "주": timedelta(weeks=val)}
+    base = now + deltas[unit]
+    hour, minute = _extract_time_kr(s)
+    if hour is not None:
+        base = base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return base
+
+
 def parse_natural_time(text: str) -> datetime:
     """Parse natural language time expression into datetime.
 
@@ -67,37 +91,12 @@ def parse_natural_time(text: str) -> datetime:
     # === Relative Korean: N분/시간/일/주 후 ===
     m = re.search(r"(\d+)\s*(분|시간|일|주)\s*후", s)
     if m:
-        val = int(m.group(1))
-        unit = m.group(2)
-        deltas = {
-            "분": timedelta(minutes=val),
-            "시간": timedelta(hours=val),
-            "일": timedelta(days=val),
-            "주": timedelta(weeks=val),
-        }
-        base = now + deltas[unit]
-        # Check if there's also a specific time
-        hour, minute = _extract_time_kr(s)
-        if hour is not None:
-            base = base.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        return base
+        return _parse_relative_kr(m, s, now)
 
     # === Relative English: in N minutes/hours/days/weeks ===
     m = re.search(r"in\s+(\d+)\s*(min(?:ute)?s?|hours?|days?|weeks?)", s_lower)
     if m:
-        val = int(m.group(1))
-        unit = m.group(2)[0]
-        deltas = {
-            "m": timedelta(minutes=val),
-            "h": timedelta(hours=val),
-            "d": timedelta(days=val),
-            "w": timedelta(weeks=val),
-        }
-        base = now + deltas.get(unit, timedelta(minutes=val))
-        hour, minute = _extract_time_en(s_lower)
-        if hour is not None:
-            base = base.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        return base
+        return _parse_relative_en(m, s_lower, now)
 
     # === Day reference ===
     day_offset = _parse_day_offset(s, s_lower, now)

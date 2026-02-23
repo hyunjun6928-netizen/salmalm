@@ -554,6 +554,18 @@ def _cmd_voice(cmd: str, session, **_) -> str:
     return f"Available voices: {', '.join(valid_voices)}"
 
 
+def _subagent_list(SubAgent) -> str:
+    """List active sub-agents."""
+    agents = SubAgent.list_agents()
+    if not agents:
+        return "🤖 No active sub-agents."
+    lines = ["🤖 **Sub-agents**\n"]
+    for i, a in enumerate(agents, 1):
+        icon = {"running": "🔄", "completed": "✅", "error": "❌", "stopped": "⏹"}.get(a["status"].split(".")[0], "❓")
+        lines.append(f"{icon} #{i} `{a['id']}` — {a['label']} [{a['status']}] ({a['runtime_s']}s, ${a.get('estimated_cost', 0):.4f})")
+    return "\n".join(lines)
+
+
 def _cmd_subagents(cmd: str, session, **_) -> str:
     """Handle /subagents commands: list, spawn, stop, steer, log, info, collect."""
     from salmalm.features.agents import SubAgent
@@ -563,19 +575,7 @@ def _cmd_subagents(cmd: str, session, **_) -> str:
     arg = parts[2] if len(parts) > 2 else ""
 
     if sub == "list":
-        agents = SubAgent.list_agents()
-        if not agents:
-            return "🤖 No active sub-agents."
-        lines = ["🤖 **Sub-agents**\n"]
-        for i, a in enumerate(agents, 1):
-            icon = {"running": "🔄", "completed": "✅", "error": "❌", "stopped": "⏹"}.get(
-                a["status"].split(".")[0], "❓"
-            )
-            lines.append(
-                f"{icon} #{i} `{a['id']}` — {a['label']} [{a['status']}] "
-                f"({a['runtime_s']}s, ${a.get('estimated_cost', 0):.4f})"
-            )
-        return "\n".join(lines)
+        return _subagent_list(SubAgent)
 
     elif sub == "spawn":
         if not arg:

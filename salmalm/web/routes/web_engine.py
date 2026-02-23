@@ -7,6 +7,22 @@ import os
 from salmalm.constants import COMPACTION_THRESHOLD, MODEL_COSTS
 
 
+def _apply_int_setting(body: dict, key: str, min_val: int, max_val: int, env_key: str = None, const_attr=None) -> None:
+    """Apply an integer setting from request body."""
+    if key not in body:
+        return
+    try:
+        val = int(body[key])
+        if min_val <= val <= max_val:
+            if env_key:
+                os.environ[env_key] = str(val)
+            if const_attr:
+                attr_name, module = const_attr
+                setattr(module, attr_name, val)
+    except (ValueError, TypeError):
+        pass
+
+
 class WebEngineMixin:
     """Mixin providing engine route handlers."""
     def _get_sla(self):
@@ -158,47 +174,27 @@ class WebEngineMixin:
         import salmalm.constants as _const
 
         body = self._body
-        if "dynamic_tools" in body:
-            os.environ["SALMALM_ALL_TOOLS"] = "0" if body["dynamic_tools"] else "1"
-        if "planning" in body:
-            os.environ["SALMALM_PLANNING"] = "1" if body["planning"] else "0"
-        if "reflection" in body:
-            os.environ["SALMALM_REFLECT"] = "1" if body["reflection"] else "0"
-        if "compaction_threshold" in body:
-            try:
-                val = int(body["compaction_threshold"])
-                if 10000 <= val <= 200000:
-                    _const.COMPACTION_THRESHOLD = val
-            except (ValueError, TypeError):
-                pass
-        if "max_tool_iterations" in body:
-            try:
-                val = int(body["max_tool_iterations"])
-                if 3 <= val <= 999:
-                    os.environ["SALMALM_MAX_TOOL_ITER"] = str(val)
-            except (ValueError, TypeError):
-                pass
-        if "cache_ttl" in body:
-            try:
-                val = int(body["cache_ttl"])
-                if 0 <= val <= 86400:
-                    os.environ["SALMALM_CACHE_TTL"] = str(val)
-                    _const.CACHE_TTL = val
-            except (ValueError, TypeError):
-                pass
-        if "batch_api" in body:
-            os.environ["SALMALM_BATCH_API"] = "1" if body["batch_api"] else "0"
-        if "file_presummary" in body:
-            os.environ["SALMALM_FILE_PRESUMMARY"] = "1" if body["file_presummary"] else "0"
-        if "early_stop" in body:
-            os.environ["SALMALM_EARLY_STOP"] = "1" if body["early_stop"] else "0"
+        _BOOL_SETTINGS = {
+            "dynamic_tools": ("SALMALM_ALL_TOOLS", True),  # inverted
+            "planning": ("SALMALM_PLANNING", False),
+            "reflection": ("SALMALM_REFLECT", False),
+            "batch_api": ("SALMALM_BATCH_API", False),
+            "file_presummary": ("SALMALM_FILE_PRESUMMARY", False),
+            "early_stop": ("SALMALM_EARLY_STOP", False),
+        }
+        for key, (env_key, inverted) in _BOOL_SETTINGS.items():
+            if key in body:
+                val = body[key]
+                os.environ[env_key] = ("0" if val else "1") if inverted else ("1" if val else "0")
+        _apply_int_setting(body, "compaction_threshold", 10000, 200000, const_attr=("COMPACTION_THRESHOLD", _const))
+        _apply_int_setting(body, "max_tool_iterations", 3, 999, env_key="SALMALM_MAX_TOOL_ITER")
+        _apply_int_setting(body, "cache_ttl", 0, 86400, env_key="SALMALM_CACHE_TTL", const_attr=("CACHE_TTL", _const))
         for _tk in ("temperature_chat", "temperature_tool"):
             if _tk in body:
                 try:
                     val = float(body[_tk])
                     if 0.0 <= val <= 2.0:
-                        _env_key = "SALMALM_TEMP_CHAT" if _tk == "temperature_chat" else "SALMALM_TEMP_TOOL"
-                        os.environ[_env_key] = str(val)
+                        os.environ["SALMALM_TEMP_CHAT" if _tk == "temperature_chat" else "SALMALM_TEMP_TOOL"] = str(val)
                 except (ValueError, TypeError):
                     pass
         if "cost_cap" in body:

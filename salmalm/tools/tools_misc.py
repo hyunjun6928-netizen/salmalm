@@ -672,6 +672,61 @@ _RSS_DISPATCH = {
 }
 
 
+def _rss_fetch(args: dict) -> str:
+    """Fetch RSS articles from URL or subscribed feeds."""
+    url = args.get("url", "")
+    count = args.get("count", 5)
+    if not url:
+        return _rss_fetch_all_feeds(count)
+    req = urllib.request.Request(url, headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            xml = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        return f"❌ RSS fetch failed: {e}"
+    articles = _parse_rss(xml)
+    if not articles:
+        return f"📰 No articles found in feed: {url}"
+    return _format_articles(articles[:count])
+
+
+def _rss_fetch_all_feeds(count: int) -> str:
+    """Fetch articles from all subscribed feeds."""
+    feeds = _load_feeds()
+    if not feeds:
+        return "❌ No URL provided and no subscribed feeds."
+    all_articles = []
+    for name, info in feeds.items():
+        try:
+            req = urllib.request.Request(info["url"], headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                xml = resp.read().decode("utf-8", errors="replace")
+            articles = _parse_rss(xml)
+            for a in articles[:3]:
+                a["feed"] = name
+            all_articles.extend(articles[:3])
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+    if not all_articles:
+        return "📰 No articles fetched from subscribed feeds."
+    return _format_articles(all_articles[:count])
+
+
+def _format_articles(articles: list) -> str:
+    """Format articles list for display."""
+    lines = [f"📰 **Articles ({len(articles)}):**"]
+    for a in articles:
+        feed_tag = f" [{a.get('feed', '')}]" if a.get("feed") else ""
+        lines.append(f"  📄 **{a['title']}**{feed_tag}")
+        if a.get("date"):
+            lines.append(f"     {a['date']}")
+        if a.get("summary"):
+            lines.append(f"     {a['summary'][:100]}")
+        if a.get("link"):
+            lines.append(f"     🔗 {a['link']}")
+    return "\n".join(lines)
+
+
 @register("rss_reader")
 def handle_rss_reader(args: dict) -> str:
     """Handle rss reader."""
@@ -681,59 +736,5 @@ def handle_rss_reader(args: dict) -> str:
         return handler(args)
 
     if action == "fetch":
-        url = args.get("url", "")
-        count = args.get("count", 5)
-
-        if not url:
-            feeds = _load_feeds()
-            if not feeds:
-                return "❌ No URL provided and no subscribed feeds."
-            all_articles = []
-            for name, info in feeds.items():
-                try:
-                    req = urllib.request.Request(info["url"], headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
-                    with urllib.request.urlopen(req, timeout=10) as resp:
-                        xml = resp.read().decode("utf-8", errors="replace")
-                    articles = _parse_rss(xml)
-                    for a in articles[:3]:
-                        a["feed"] = name
-                    all_articles.extend(articles[:3])
-                except Exception as e:  # noqa: broad-except
-                    log.debug(f"Suppressed: {e}")
-            if not all_articles:
-                return "📰 No articles fetched from subscribed feeds."
-            lines = [f"📰 **Latest Articles ({len(all_articles)}):**"]
-            for a in all_articles[:count]:
-                feed_tag = f" [{a.get('feed', '')}]" if a.get("feed") else ""
-                lines.append(f"  📄 **{a['title']}**{feed_tag}")
-                if a["date"]:
-                    lines.append(f"     {a['date']}")
-                if a["summary"]:
-                    lines.append(f"     {a['summary'][:100]}")
-                if a["link"]:
-                    lines.append(f"     🔗 {a['link']}")
-            return "\n".join(lines)
-
-        req = urllib.request.Request(url, headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                xml = resp.read().decode("utf-8", errors="replace")
-        except Exception as e:
-            return f"❌ RSS fetch failed: {e}"
-
-        articles = _parse_rss(xml)
-        if not articles:
-            return f"📰 No articles found in feed: {url}"
-
-        lines = [f"📰 **Articles ({min(count, len(articles))}):**"]
-        for a in articles[:count]:
-            lines.append(f"  📄 **{a['title']}**")
-            if a["date"]:
-                lines.append(f"     {a['date']}")
-            if a["summary"]:
-                lines.append(f"     {a['summary'][:100]}")
-            if a["link"]:
-                lines.append(f"     🔗 {a['link']}")
-        return "\n".join(lines)
-
+        return _rss_fetch(args)
     return f"❌ Unknown rss_reader action: {action}"

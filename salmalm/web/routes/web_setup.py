@@ -9,6 +9,19 @@ from salmalm.constants import DATA_DIR, VAULT_FILE
 from salmalm.core import audit_log
 
 
+def _ensure_vault_unlocked(vault) -> bool:
+    """Ensure vault is unlocked (auto-create or unlock with empty password). Returns True if unlocked."""
+    try:
+        from salmalm.security.crypto import VAULT_FILE
+        if not VAULT_FILE.exists():
+            vault.create("", save_to_keychain=False)
+        else:
+            vault.unlock("")
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
+    return vault.is_unlocked
+
+
 class WebSetupMixin:
     """Mixin providing setup route handlers."""
     def _needs_onboarding(self) -> bool:
@@ -102,17 +115,7 @@ class WebSetupMixin:
         """Post api onboarding inner."""
         body = self._body
         if not vault.is_unlocked:
-            # Fresh install: auto-create vault with empty password
-            try:
-                from salmalm.security.crypto import VAULT_FILE
-
-                if not VAULT_FILE.exists():
-                    vault.create("", save_to_keychain=False)
-                else:
-                    vault.unlock("")
-            except Exception as e:
-                log.debug(f"Suppressed: {e}")
-            if not vault.is_unlocked:
+            if not _ensure_vault_unlocked(vault):
                 self._json({"error": "Vault locked"}, 403)
                 return
         # Save all provided API keys + Ollama URL

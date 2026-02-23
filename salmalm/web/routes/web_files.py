@@ -1,6 +1,51 @@
 """SalmAlm Web — WebFilesMixin routes."""
 
 
+def _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, export_user, _json, datetime) -> None:
+    """Populate export zip file with soul, memory, config, sessions, data, vault."""
+    from salmalm.constants import DATA_DIR, MEMORY_DIR, VERSION
+    # Soul + memory
+    for name in ("soul.md", "memory.md"):
+        p = DATA_DIR / name
+        if p.exists():
+            zf.writestr(name, p.read_text(encoding="utf-8"))
+    if MEMORY_DIR.exists():
+        for f in MEMORY_DIR.glob("*"):
+            if f.is_file():
+                zf.writestr(f"memory/{f.name}", f.read_text(encoding="utf-8"))
+    # Config
+    for name in ("config.json", "routing.json"):
+        p = DATA_DIR / name
+        if p.exists():
+            zf.writestr(name, p.read_text(encoding="utf-8"))
+    # Sessions
+    if inc_sessions:
+        from salmalm.core import _get_db
+        conn = _get_db()
+        uid = export_user.get("id", 0)
+        if uid and uid > 0:
+            rows = conn.execute("SELECT session_id, messages, title FROM session_store WHERE user_id=? OR user_id IS NULL", (uid,)).fetchall()
+        else:
+            rows = conn.execute("SELECT session_id, messages, title FROM session_store").fetchall()
+        zf.writestr("sessions.json", _json.dumps([{"id": r[0], "data": r[1], "title": r[2] if len(r) > 2 else ""} for r in rows], ensure_ascii=False, indent=2))
+    # Data files
+    if inc_data:
+        for name in ("notes.json", "expenses.json", "habits.json", "journal.json", "dashboard.json"):
+            p = DATA_DIR / name
+            if p.exists():
+                zf.writestr(f"data/{name}", p.read_text(encoding="utf-8"))
+    # Vault keys
+    if inc_vault:
+        from salmalm.security.crypto import vault as _v
+        if _v.is_unlocked:
+            keys = {k: _v.get(k) for k in _v.keys() if _v.get(k)}
+            if keys:
+                zf.writestr("vault_keys.json", _json.dumps(keys, indent=2))
+    # Manifest
+    zf.writestr("manifest.json", _json.dumps({"version": VERSION, "exported_at": datetime.datetime.now().isoformat(),
+        "includes": {"sessions": inc_sessions, "data": inc_data, "vault": inc_vault}}, indent=2))
+
+
 class WebFilesMixin:
     """Mixin for web_files routes."""
 
@@ -342,95 +387,7 @@ class WebFilesMixin:
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            # Soul / personality
-            soul_path = DATA_DIR / "soul.md"
-            if soul_path.exists():
-                zf.writestr("soul.md", soul_path.read_text(encoding="utf-8"))
-            # Memory files
-            from salmalm.constants import MEMORY_DIR as _mem_dir
-
-            if _mem_dir.exists():
-                for f in _mem_dir.glob("*"):
-                    if f.is_file():
-                        zf.writestr(f"memory/{f.name}", f.read_text(encoding="utf-8"))
-            # Also include memory.md from DATA_DIR
-            mem_md = DATA_DIR / "memory.md"
-            if mem_md.exists():
-                zf.writestr("memory.md", mem_md.read_text(encoding="utf-8"))
-            # Config
-            config_path = DATA_DIR / "config.json"
-            if config_path.exists():
-                zf.writestr("config.json", config_path.read_text(encoding="utf-8"))
-            routing_path = DATA_DIR / "routing.json"
-            if routing_path.exists():
-                zf.writestr("routing.json", routing_path.read_text(encoding="utf-8"))
-            # Sessions
-            if inc_sessions:
-                from salmalm.core import _get_db
-
-                conn = _get_db()
-                _export_uid = _export_user.get("id", 0)
-                if _export_uid and _export_uid > 0:
-                    rows = conn.execute(
-                        "SELECT session_id, messages, title FROM session_store WHERE user_id=? OR user_id IS NULL",
-                        (_export_uid,),
-                    ).fetchall()
-                else:
-                    rows = conn.execute("SELECT session_id, messages, title FROM session_store").fetchall()
-                sessions = []
-                for r in rows:
-                    sessions.append(
-                        {
-                            "id": r[0],
-                            "data": r[1],
-                            "title": r[2] if len(r) > 2 else "",
-                        }
-                    )
-                zf.writestr(
-                    "sessions.json",
-                    _json.dumps(sessions, ensure_ascii=False, indent=2),
-                )
-            # Data (notes, expenses, habits, etc.)
-            if inc_data:
-                for name in (
-                    "notes.json",
-                    "expenses.json",
-                    "habits.json",
-                    "journal.json",
-                    "dashboard.json",
-                ):
-                    p = DATA_DIR / name
-                    if p.exists():
-                        zf.writestr(f"data/{name}", p.read_text(encoding="utf-8"))
-            # Vault (API keys) — only if explicitly requested
-            if inc_vault:
-                from salmalm.security.crypto import vault as _vault_mod
-
-                if _vault_mod.is_unlocked:
-                    keys = {}
-                    # Use internal vault key names (lowercase)
-                    for k in _vault_mod.keys():
-                        v = _vault_mod.get(k)
-                        if v:
-                            keys[k] = v
-                    if keys:
-                        zf.writestr("vault_keys.json", _json.dumps(keys, indent=2))
-            # Manifest
-            zf.writestr(
-                "manifest.json",
-                _json.dumps(
-                    {
-                        "version": VERSION,
-                        "exported_at": datetime.datetime.now().isoformat(),
-                        "includes": {
-                            "sessions": inc_sessions,
-                            "data": inc_data,
-                            "vault": inc_vault,
-                        },
-                    },
-                    indent=2,
-                ),
-            )
+            _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, _export_user, _json, datetime)
         buf.seek(0)
         data = buf.getvalue()
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

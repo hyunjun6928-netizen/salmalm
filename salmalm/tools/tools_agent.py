@@ -6,70 +6,37 @@ from salmalm.core import SubAgent, SkillLoader
 
 
 @register("sub_agent")
+def _agent_spawn(args): return f"🤖 Sub-agent spawned: [{SubAgent.spawn(args.get('task',''), model=args.get('model'))}]\nTask: {args.get('task','')[:100]}" if args.get("task") else "❌ Task is required"
+def _agent_list(args):
+    agents = SubAgent.list_agents()
+    if not agents: return "📋 No running sub-agents."
+    return "\n".join(f"{'🟢' if a['status']=='running' else '✅' if a['status']=='completed' else '❌'} [{a['id']}] {a['task']} — {a['status']}" for a in agents)
+def _agent_result(args):
+    info = SubAgent.get_result(args.get("agent_id", ""))
+    if "error" in info: return f"❌ {info['error']}"
+    if info["status"] == "running": return f"⏳ [{args.get('agent_id','')}] Still running.\nStarted: {info['started']}"
+    return f"{'✅' if info['status']=='completed' else '❌'} [{args.get('agent_id','')}] {info['status']}\nStarted: {info['started']}\nFinished: {info['completed']}\n\n{info.get('result','')[:3000]}"
+def _agent_send(args):
+    if not args.get("agent_id") or not args.get("message"): return "❌ agent_id and message are required"
+    return SubAgent.send_message(args["agent_id"], args["message"])
+def _agent_stop(args): return SubAgent.stop_agent(args.get("agent_id", "all"))
+def _agent_log(args): return SubAgent.get_log(args.get("agent_id",""), limit=args.get("limit",20)) if args.get("agent_id") else "❌ agent_id is required"
+def _agent_info(args): return SubAgent.get_info(args.get("agent_id","")) if args.get("agent_id") else "❌ agent_id is required"
+def _agent_steer(args):
+    if not args.get("agent_id") or not args.get("message"): return "❌ agent_id and message are required for steering"
+    try:
+        from salmalm.features.subagents import subagent_manager
+        return subagent_manager.steer(args["agent_id"], args["message"])
+    except Exception: return SubAgent.send_message(args["agent_id"], args["message"])
+
+_AGENT_DISPATCH = {"spawn": _agent_spawn, "list": _agent_list, "result": _agent_result, "send": _agent_send,
+                    "stop": _agent_stop, "kill": _agent_stop, "log": _agent_log, "info": _agent_info, "steer": _agent_steer}
+
 def handle_sub_agent(args: dict) -> str:
     """Handle sub agent."""
     action = args.get("action", "list")
-    if action == "spawn":
-        task = args.get("task", "")
-        if not task:
-            return "❌ Task is required"
-        model = args.get("model")
-        agent_id = SubAgent.spawn(task, model=model)
-        return f"🤖 Sub-agent spawned: [{agent_id}]\nTask: {task[:100]}\nWill notify on completion."
-    elif action == "list":
-        agents = SubAgent.list_agents()
-        if not agents:
-            return "📋 No running sub-agents."
-        lines = []
-        for a in agents:
-            icon = "🟢" if a["status"] == "running" else "✅" if a["status"] == "completed" else "❌"
-            lines.append(f"{icon} [{a['id']}] {a['task']} — {a['status']}")
-        return "\n".join(lines)
-    elif action == "result":
-        agent_id = args.get("agent_id", "")
-        info = SubAgent.get_result(agent_id)
-        if "error" in info:
-            return f"❌ {info['error']}"
-        status = info["status"]
-        if status == "running":
-            return f"⏳ [{agent_id}] Still running.\nStarted: {info['started']}"
-        result = info.get("result", "(no result)")
-        return f"{'✅' if status == 'completed' else '❌'} [{agent_id}] {status}\nStarted: {info['started']}\nFinished: {info['completed']}\n\n{result[:3000]}"
-    elif action == "send":
-        agent_id = args.get("agent_id", "")
-        message = args.get("message", "")
-        if not agent_id or not message:
-            return "❌ agent_id and message are required"
-        result = SubAgent.send_message(agent_id, message)
-        return result
-    elif action == "stop" or action == "kill":
-        agent_id = args.get("agent_id", "all")
-        return SubAgent.stop_agent(agent_id)
-    elif action == "log":
-        agent_id = args.get("agent_id", "")
-        if not agent_id:
-            return "❌ agent_id is required"
-        limit = args.get("limit", 20)
-        return SubAgent.get_log(agent_id, limit=limit)
-    elif action == "info":
-        agent_id = args.get("agent_id", "")
-        if not agent_id:
-            return "❌ agent_id is required"
-        return SubAgent.get_info(agent_id)
-    elif action == "steer":
-        # OpenClaw-style steering: send guidance to a running/completed sub-agent
-        agent_id = args.get("agent_id", "")
-        message = args.get("message", "")
-        if not agent_id or not message:
-            return "❌ agent_id and message are required for steering"
-        # Use the subagent_manager's steer if available, else fall back to send
-        try:
-            from salmalm.features.subagents import subagent_manager
-
-            return subagent_manager.steer(agent_id, message)
-        except Exception as e:  # noqa: broad-except
-            return SubAgent.send_message(agent_id, message)
-    return f"❌ Unknown action: {action}. Available: spawn, list, result, send, stop, log, info, steer"
+    handler = _AGENT_DISPATCH.get(action)
+    return handler(args) if handler else f"❌ Unknown action: {action}. Available: {', '.join(_AGENT_DISPATCH)}"
 
 
 @register("skill_manage")

@@ -103,6 +103,30 @@ class MCPServer:
             "inputSchema": tool.get("input_schema", {"type": "object", "properties": {}}),
         }
 
+    def _list_resources(self) -> list:
+        """List available MCP resources (memory files)."""
+        resources = []
+        mem_dir = BASE_DIR / "memory"
+        if mem_dir.exists():
+            for f in sorted(mem_dir.glob("*.md"))[-10:]:
+                resources.append({"uri": f"file://memory/{f.name}", "name": f.name, "mimeType": "text/markdown"})
+        mem_file = BASE_DIR / "MEMORY.md"
+        if mem_file.exists():
+            resources.append({"uri": "file://MEMORY.md", "name": "MEMORY.md", "mimeType": "text/markdown"})
+        return resources
+
+    async def _handle_tool_call(self, msg_id, params: dict):
+        """Handle tools/call MCP request."""
+        name = params.get("name", "")
+        args = params.get("arguments", {})
+        if not self._tool_executor:
+            return _rpc_response(msg_id, error={"code": -32603, "message": "No tool executor configured"})
+        try:
+            result = await self._tool_executor(name, args)
+            return _rpc_response(msg_id, {"content": [{"type": "text", "text": str(result)}], "isError": False})
+        except Exception as e:
+            return _rpc_response(msg_id, {"content": [{"type": "text", "text": f"Error: {e}"}], "isError": True})
+
     async def handle_message(self, msg: dict) -> Optional[dict]:
         """Handle a single JSON-RPC message. Returns response or None for notifications."""
         method = msg.get("method", "")
@@ -135,59 +159,11 @@ class MCPServer:
             return _rpc_response(msg_id, {"tools": tools})  # type: ignore[arg-type]
 
         if method == "tools/call":
-            name = params.get("name", "")
-            args = params.get("arguments", {})
-            if not self._tool_executor:
-                return _rpc_response(
-                    msg_id,
-                    error={  # type: ignore[arg-type]
-                        "code": -32603,
-                        "message": "No tool executor configured",
-                    },
-                )
-            try:
-                result = await self._tool_executor(name, args)
-                return _rpc_response(
-                    msg_id,
-                    {  # type: ignore[arg-type]
-                        "content": [{"type": "text", "text": str(result)}],
-                        "isError": False,
-                    },
-                )
-            except Exception as e:
-                return _rpc_response(
-                    msg_id,
-                    {  # type: ignore[arg-type]
-                        "content": [{"type": "text", "text": f"Error: {e}"}],
-                        "isError": True,
-                    },
-                )
+            return await self._handle_tool_call(msg_id, params)
 
         # ── Resources ──
         if method == "resources/list":
-            resources = []
-            # Expose memory files as resources
-            mem_dir = BASE_DIR / "memory"
-            if mem_dir.exists():
-                for f in sorted(mem_dir.glob("*.md"))[-10:]:
-                    resources.append(
-                        {
-                            "uri": f"file://memory/{f.name}",
-                            "name": f.name,
-                            "mimeType": "text/markdown",
-                        }
-                    )
-            # MEMORY.md
-            mem_file = BASE_DIR / "MEMORY.md"
-            if mem_file.exists():
-                resources.append(
-                    {
-                        "uri": "file://MEMORY.md",
-                        "name": "MEMORY.md",
-                        "mimeType": "text/markdown",
-                    }
-                )
-            return _rpc_response(msg_id, {"resources": resources})  # type: ignore[arg-type]
+            return _rpc_response(msg_id, {"resources": self._list_resources()})  # type: ignore[arg-type]
 
         if method == "resources/read":
             uri = params.get("uri", "")

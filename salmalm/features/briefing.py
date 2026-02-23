@@ -47,13 +47,8 @@ class DailyBriefing:
 
         # Greeting
         if config.get("greeting", True):
-            hour = now.hour
-            if hour < 12:
-                greeting = "🌅 좋은 아침이에요!"
-            elif hour < 18:
-                greeting = "☀️ 좋은 오후예요!"
-            else:
-                greeting = "🌙 좋은 저녁이에요!"
+            _GREETINGS = [(12, "🌅 좋은 아침이에요!"), (18, "☀️ 좋은 오후예요!"), (24, "🌙 좋은 저녁이에요!")]
+            greeting = next(g for h, g in _GREETINGS if now.hour < h)
             parts.append(f"{greeting}\n📋 **{now.strftime('%Y년 %m월 %d일 %A')}** 브리핑\n")
 
         # Weather

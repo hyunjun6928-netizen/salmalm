@@ -652,6 +652,26 @@ class RAGEngine:
                 continue
         return False
 
+    def _chunk_and_index(self, label, text, mtime, chunk_size, chunk_overlap, new_docs, vectors, doc_freq):
+        """Chunk text and add to index arrays."""
+        lines = text.splitlines()
+        step = max(1, chunk_size - chunk_overlap)
+        for i in range(0, len(lines), step):
+            chunk_lines = lines[i:i + chunk_size]
+            chunk_text = "\n".join(chunk_lines).strip()
+            if not chunk_text or len(chunk_text) < 10:
+                continue
+            if len(chunk_text) > MAX_CHUNK_CHARS:
+                chunk_text = chunk_text[:MAX_CHUNK_CHARS]
+            tokens = self._tokenize(chunk_text)
+            if not tokens:
+                continue
+            h = hashlib.md5(chunk_text.encode()).hexdigest()[:12]
+            new_docs.append((label, i + 1, i + len(chunk_lines), chunk_text, json.dumps(tokens), len(tokens), mtime, h))
+            vectors.append(compute_tf(tokens))
+            for t in set(tokens):
+                doc_freq[t] = doc_freq.get(t, 0) + 1
+
     def reindex(self, force: bool = False) -> None:
         """Rebuild the index from source files."""
         self._ensure_db()
@@ -671,30 +691,7 @@ class RAGEngine:
 
         def process_text(label: str, text: str, mtime: float) -> None:
             """Process text."""
-            lines = text.splitlines()
-            step = max(1, chunk_size - chunk_overlap)
-            for i in range(0, len(lines), step):
-                chunk_lines = lines[i : i + chunk_size]
-                chunk_text = "\n".join(chunk_lines).strip()
-                if not chunk_text or len(chunk_text) < 10:
-                    continue
-                if len(chunk_text) > MAX_CHUNK_CHARS:
-                    chunk_text = chunk_text[:MAX_CHUNK_CHARS]
-
-                tokens = self._tokenize(chunk_text)
-                if not tokens:
-                    continue
-
-                h = hashlib.md5(chunk_text.encode()).hexdigest()[:12]
-                new_docs.append(
-                    (label, i + 1, i + len(chunk_lines), chunk_text, json.dumps(tokens), len(tokens), mtime, h)
-                )
-
-                tf_vec = compute_tf(tokens)
-                vectors.append(tf_vec)
-
-                for t in set(tokens):
-                    doc_freq[t] = doc_freq.get(t, 0) + 1
+            self._chunk_and_index(label, text, mtime, chunk_size, chunk_overlap, new_docs, vectors, doc_freq)
 
         for label, fpath in files:
             try:
