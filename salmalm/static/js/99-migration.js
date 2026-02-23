@@ -58,12 +58,24 @@
     }).catch(function(e){document.getElementById('import-result').textContent='❌ '+e});
   };
 
-  /* PWA Service Worker */
+  /* PWA Service Worker — register for offline cache + install prompt */
   if('serviceWorker' in navigator){
-    /* Unregister any existing SW and clear caches — no offline cache needed */
-    navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister()})});
-    caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k)})});
+    navigator.serviceWorker.register('/sw.js').catch(function(e){console.warn('SW:',e)});
   }
+  /* PWA Install Prompt */
+  var _deferredInstall=null;
+  window.addEventListener('beforeinstallprompt',function(e){
+    e.preventDefault();_deferredInstall=e;
+    var btn=document.getElementById('pwa-install-btn');
+    if(btn)btn.style.display='inline-flex';
+  });
+  window.installPWA=function(){
+    if(!_deferredInstall)return;
+    _deferredInstall.prompt();
+    _deferredInstall.userChoice.then(function(){_deferredInstall=null;
+      var btn=document.getElementById('pwa-install-btn');if(btn)btn.style.display='none';
+    });
+  };
 
   /* ── Logs Tab ── */
   var _logAutoTimer=null;

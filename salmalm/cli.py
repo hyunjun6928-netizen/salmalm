@@ -247,6 +247,9 @@ def dispatch_cli() -> bool:
         port = int(os.environ.get("SALMALM_PORT", 18800))
         run_tray(port)
         return True
+    if "--tunnel" in sys.argv:
+        os.environ["SALMALM_TUNNEL"] = "1"
+        os.environ["SALMALM_OPEN_BROWSER"] = "1"
     if "--open" in sys.argv:
         # Auto-open browser after server starts
         os.environ["SALMALM_OPEN_BROWSER"] = "1"

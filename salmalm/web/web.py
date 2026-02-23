@@ -523,10 +523,22 @@ class WebHandler(
             self._json({"current": VERSION, "latest": None, "error": str(e)[:100]})  # noqa: F405
 
     def _get_sw_js(self):
-        # Return self-uninstalling SW — clears old caches and unregisters itself
-        """Get sw js."""
-        sw_js = """self.addEventListener("install",()=>self.skipWaiting());
-self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).then(()=>self.registration.unregister()))});"""
+        """Service worker — PWA offline cache + install support."""
+        from salmalm.constants import VERSION
+
+        sw_js = f"""const CACHE='salmalm-v{VERSION}';
+const PRECACHE=['/','/ static/app.js','/static/style.css','/manifest.json'];
+self.addEventListener('install',e=>{{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(PRECACHE.map(u=>u.trim()))).then(()=>self.skipWaiting()))}});
+self.addEventListener('activate',e=>{{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))}});
+self.addEventListener('fetch',e=>{{
+  if(e.request.method!=='GET')return;
+  const u=new URL(e.request.url);
+  if(u.pathname.startsWith('/api/')||u.pathname.startsWith('/ws'))return;
+  e.respondWith(fetch(e.request).then(r=>{{
+    if(r.ok){{const c=r.clone();caches.open(CACHE).then(ca=>ca.put(e.request,c))}}
+    return r;
+  }}).catch(()=>caches.match(e.request)))
+}});"""
         self.send_response(200)
         self._cors()
         self.send_header("Content-Type", "application/javascript")

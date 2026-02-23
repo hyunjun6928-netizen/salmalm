@@ -425,6 +425,56 @@ def _init_extensions() -> None:
         log.warning(f"Agent scan error: {e}")
 
 
+def _start_tunnel(port: int) -> None:
+    """Start Cloudflare Tunnel in background. Prints public URL + QR code."""
+    import shutil
+    import subprocess
+    import threading
+
+    cf = shutil.which("cloudflared")
+    if not cf:
+        print("\n  ⚠️  cloudflared not found. Install it:")
+        print("     https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/")
+        print("     Or: brew install cloudflared / apt install cloudflared / winget install Cloudflare.cloudflared\n")
+        return
+
+    def _run_tunnel():
+        """Run tunnel and parse URL from stderr."""
+        proc = subprocess.Popen(
+            [cf, "tunnel", "--url", f"http://127.0.0.1:{port}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        import re
+
+        for line in proc.stderr:
+            m = re.search(r"(https://[a-z0-9\-]+\.trycloudflare\.com)", line)
+            if m:
+                tunnel_url = m.group(1)
+                print(f"\n  🌐 Tunnel URL: {tunnel_url}")
+                print(f"  📱 폰에서 이 URL을 열거나, QR 코드를 스캔하세요:\n")
+                try:
+                    _print_qr(tunnel_url)
+                except Exception:
+                    pass
+                break
+
+    def _print_qr(url: str) -> None:
+        """Print QR code to terminal using Unicode blocks."""
+        try:
+            import urllib.request
+            import json
+
+            api = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={url}&format=svg"
+            print(f"  QR: {api}\n  (또는 브라우저에서 직접 접속: {url})\n")
+        except Exception:
+            print(f"  → {url}\n")
+
+    t = threading.Thread(target=_run_tunnel, daemon=True, name="cloudflare-tunnel")
+    t.start()
+
+
 async def run_server():
     """Main async entry point — boot all services."""
     # ── Phase 1: Database & Core State ──
@@ -483,6 +533,10 @@ async def run_server():
         import webbrowser
 
         webbrowser.open(url)
+
+    # Cloudflare Tunnel (--tunnel flag or SALMALM_TUNNEL=1)
+    if os.environ.get("SALMALM_TUNNEL", "") == "1":
+        _start_tunnel(port)
 
     await _setup_services(bind_addr, port, server, web_thread, url)
 
