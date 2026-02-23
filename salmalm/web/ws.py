@@ -377,7 +377,8 @@ class WebSocketServer:
 
                 if opcode == OP_TEXT:
                     client.last_ping = time.time()  # Any activity = alive
-                    await self._handle_text_frame(client, payload)
+                    # Fire-and-forget so recv loop continues reading PONG frames
+                    asyncio.create_task(self._handle_text_frame(client, payload))
                 elif opcode == OP_PING:
                     await client._send_frame(OP_PONG, payload)
                     client.last_ping = time.time()
@@ -408,10 +409,15 @@ class WebSocketServer:
                     except Exception as e:  # noqa: broad-except
                         dead.append(cid)
             for cid in dead:
-                c = self.clients.pop(cid, None)
+                c = self.clients.get(cid)
                 if c:
                     c.connected = False
-                    log.info("[FAST] WS client dropped (timeout)")
+                    if c._buffer:
+                        # Keep in clients dict so _resume_and_register can find buffered messages
+                        log.info(f"[FAST] WS client suspended (timeout, {len(c._buffer)} buffered)")
+                    else:
+                        self.clients.pop(cid, None)
+                        log.info("[FAST] WS client dropped (timeout)")
 
 
 # ── Streaming response helper ──────────────────────────────────
