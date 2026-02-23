@@ -73,6 +73,59 @@ def _http_get(url: str, headers: Optional[Dict[str, str]] = None, timeout: int =
         return json.loads(resp.read().decode("utf-8"))  # type: ignore[no-any-return]
 
 
+_OPENROUTER_PROVIDERS = frozenset(("deepseek", "meta-llama", "mistralai", "qwen"))
+
+
+def _try_fallback(provider, model, messages, tools, max_tokens, t0) -> Optional[dict]:
+    """Try fallback providers when primary fails. Returns result dict or None."""
+    for fb_provider in ("anthropic", "xai", "google"):
+        if fb_provider == provider:
+            continue
+        fb_key = _resolve_api_key(fb_provider)
+        if not fb_key:
+            continue
+        fb_model_id = FALLBACK_MODELS.get(fb_provider)
+        if not fb_model_id:
+            continue
+        from salmalm.core.engine import _fix_model_name
+        fb_model_id = _fix_model_name(fb_model_id)
+        log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id} [after {time.time() - t0:.2f}s]")
+        try:
+            fb_tools = _adapt_tools_for_provider(tools, fb_provider)
+            result = _call_provider(fb_provider, fb_key, fb_model_id, messages, fb_tools, max_tokens, timeout=_LLM_TIMEOUT)
+            result["model"] = f"{fb_provider}/{fb_model_id}"
+            usage = result.get("usage", {})
+            track_usage(result["model"], usage.get("input", 0), usage.get("output", 0))
+            return result
+        except Exception as e2:
+            log.error(f"Fallback {fb_provider} also failed: {e2}")
+    return None
+
+
+def _adapt_tools_for_provider(tools, provider: str) -> Optional[list]:
+    """Adapt tool schema format for different providers."""
+    if not tools:
+        return None
+    if provider == "anthropic":
+        return [{"name": t["name"], "description": t["description"],
+                 "input_schema": t.get("input_schema", t.get("parameters", {}))} for t in tools]
+    if provider in ("openai", "xai", "google"):
+        return [{"name": t["name"], "description": t["description"],
+                 "parameters": t.get("parameters", t.get("input_schema", {}))} for t in tools]
+    return None
+
+
+def _resolve_api_key(provider: str) -> Optional[str]:
+    """Resolve API key for a given provider."""
+    if provider in _OPENROUTER_PROVIDERS:
+        return vault.get("openrouter_api_key")
+    if provider == "ollama":
+        return vault.get("ollama_api_key") or "ollama"
+    if provider == "google":
+        return vault.get("google_api_key") or vault.get("gemini_api_key")
+    return vault.get(f"{provider}_api_key")
+
+
 def call_llm(
     messages: List[Dict[str, Any]],
     model: Optional[str] = None,
@@ -104,19 +157,7 @@ def call_llm(
         return {"content": f"⚠️ {e}", "tool_calls": [], "usage": {"input": 0, "output": 0}, "model": model}
 
     provider, model_id = model.split("/", 1) if "/" in model else ("anthropic", model)
-    # OpenRouter-routed providers use openrouter key
-    _openrouter_providers = ("deepseek", "meta-llama", "mistralai", "qwen")
-    if provider in _openrouter_providers:
-        api_key = vault.get("openrouter_api_key")
-    elif provider == "ollama":
-        api_key = vault.get("ollama_api_key") or "ollama"
-    elif provider == "google":
-        api_key = vault.get("google_api_key") or vault.get("gemini_api_key")
-    else:
-        api_key = vault.get(f"{provider}_api_key")
-    # Fallback: try CLI OAuth tokens (Codex CLI / Claude Code)
-    if not api_key and provider in ("openai", "anthropic"):
-        api_key = None
+    api_key = _resolve_api_key(provider)
     if not api_key:
         return {
             "content": f"❌ {provider} API key not configured.\n\n"
@@ -166,60 +207,9 @@ def call_llm(
                 "model": model,
             }
 
-        # Auto-fallback to next available provider (non-overflow errors only)
-        fallback_order = ["anthropic", "xai", "google"]
-        for fb_provider in fallback_order:
-            if fb_provider == provider:
-                continue
-            fb_key = vault.get(f"{fb_provider}_api_key")
-            if not fb_key and fb_provider in ("openai", "anthropic"):
-                fb_key = None
-            if not fb_key:
-                continue
-            fb_model_id = FALLBACK_MODELS.get(fb_provider)
-            if not fb_model_id:
-                continue
-            from salmalm.core.engine import _fix_model_name
-
-            fb_model_id = _fix_model_name(fb_model_id)
-            log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id} [after {time.time() - _t0:.2f}s]")
-            try:
-                if not tools:
-                    fb_tools = None
-                elif fb_provider == "anthropic":
-                    fb_tools = [
-                        {
-                            "name": t["name"],
-                            "description": t["description"],
-                            "input_schema": t.get("input_schema", t.get("parameters", {})),
-                        }
-                        for t in tools
-                    ]
-                elif fb_provider in ("openai", "xai", "google"):
-                    fb_tools = [
-                        {
-                            "name": t["name"],
-                            "description": t["description"],
-                            "parameters": t.get("parameters", t.get("input_schema", {})),
-                        }
-                        for t in tools
-                    ]
-                else:
-                    fb_tools = None
-                result = _call_provider(
-                    fb_provider, fb_key, fb_model_id, messages, fb_tools, max_tokens, timeout=_LLM_TIMEOUT
-                )
-                result["model"] = f"{fb_provider}/{fb_model_id}"
-                usage = result.get("usage", {})
-                inp_tok = usage.get("input", 0)
-                out_tok = usage.get("output", 0)
-                track_usage(result["model"], inp_tok, out_tok)
-                _metrics["total_tokens_in"] += inp_tok
-                _metrics["total_tokens_out"] += out_tok
-                return result
-            except Exception as e2:
-                log.error(f"Fallback {fb_provider} also failed: {e2}")
-                continue
+        fb_result = _try_fallback(provider, model, messages, tools, max_tokens, _t0)
+        if fb_result:
+            return fb_result
         return {
             "content": f"❌ All LLM calls failed. Last error: {str(e)[:200]}",
             "tool_calls": [],
@@ -606,6 +596,44 @@ def stream_google(
 # ============================================================
 
 
+def _update_stream_accumulators(event, content_text, thinking_text, tool_calls, current_tool, current_tool_json, usage):
+    """Update streaming accumulators from an SSE event. Returns updated (content, thinking, tool, tool_json)."""
+    etype = event.get("type", "")
+    if etype == "content_block_delta":
+        delta = event.get("delta", {})
+        dt = delta.get("type", "")
+        if dt == "text_delta":
+            content_text += delta.get("text", "")
+        elif dt == "thinking_delta":
+            thinking_text += delta.get("thinking", "")
+        elif dt == "input_json_delta":
+            current_tool_json += delta.get("partial_json", "")
+    elif etype == "content_block_start":
+        cb = event.get("content_block", {})
+        if cb.get("type") == "tool_use":
+            current_tool = {"id": cb["id"], "name": cb["name"]}
+            current_tool_json = ""
+    elif etype == "content_block_stop":
+        if current_tool:
+            try:
+                args = json.loads(current_tool_json) if current_tool_json else {}
+            except json.JSONDecodeError:
+                args = {}
+            tool_calls.append({**current_tool, "arguments": args})
+            current_tool = None
+            current_tool_json = ""
+    elif etype == "message_delta":
+        u = event.get("usage", {})
+        usage["output"] = u.get("output_tokens", usage["output"])
+    elif etype == "message_start":
+        msg = event.get("message", {})
+        u = msg.get("usage", {})
+        usage["input"] = u.get("input_tokens", 0)
+        usage["cache_creation_input_tokens"] = u.get("cache_creation_input_tokens", 0)
+        usage["cache_read_input_tokens"] = u.get("cache_read_input_tokens", 0)
+    return content_text, thinking_text, current_tool, current_tool_json
+
+
 def stream_anthropic(
     messages: List[Dict[str, Any]],
     model: Optional[str] = None,
@@ -725,41 +753,9 @@ def stream_anthropic(
                     yield from _process_stream_event(
                         event, content_text, thinking_text, tool_calls, current_tool, current_tool_json, usage
                     )
-                    # Update accumulators from event
-                    etype = event.get("type", "")
-                    if etype == "content_block_delta":
-                        delta = event.get("delta", {})
-                        dt = delta.get("type", "")
-                        if dt == "text_delta":
-                            content_text += delta.get("text", "")
-                        elif dt == "thinking_delta":
-                            thinking_text += delta.get("thinking", "")
-                        elif dt == "input_json_delta":
-                            current_tool_json += delta.get("partial_json", "")
-                    elif etype == "content_block_start":
-                        cb = event.get("content_block", {})
-                        if cb.get("type") == "tool_use":
-                            current_tool = {"id": cb["id"], "name": cb["name"]}
-                            current_tool_json = ""
-                    elif etype == "content_block_stop":
-                        if current_tool:
-                            try:
-                                args = json.loads(current_tool_json) if current_tool_json else {}
-                            except json.JSONDecodeError:
-                                args = {}
-                            tc = {**current_tool, "arguments": args}
-                            tool_calls.append(tc)
-                            current_tool = None
-                            current_tool_json = ""
-                    elif etype == "message_delta":
-                        u = event.get("usage", {})
-                        usage["output"] = u.get("output_tokens", usage["output"])
-                    elif etype == "message_start":
-                        msg = event.get("message", {})
-                        u = msg.get("usage", {})
-                        usage["input"] = u.get("input_tokens", 0)
-                        usage["cache_creation_input_tokens"] = u.get("cache_creation_input_tokens", 0)
-                        usage["cache_read_input_tokens"] = u.get("cache_read_input_tokens", 0)
+                    content_text, thinking_text, current_tool, current_tool_json = _update_stream_accumulators(
+                        event, content_text, thinking_text, tool_calls, current_tool, current_tool_json, usage
+                    )
 
         # Track usage
         track_usage(model, usage["input"], usage["output"])

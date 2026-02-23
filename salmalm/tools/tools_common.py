@@ -22,6 +22,82 @@ from salmalm.security.crypto import log
 _clipboard_lock = threading.Lock()
 
 
+_SENSITIVE_PATHS = (
+    "/etc/shadow", "/etc/passwd", "/etc/sudoers", "/proc/", "/sys/",
+    ".ssh/", ".gnupg/", ".aws/", ".kube/", ".docker/",
+    ".pypirc", ".netrc", ".env",
+)
+_ARCHIVE_CMDS = {"tar", "unzip", "zip", "gzip", "gunzip"}
+
+
+def _check_stage_allowlist(stage: str) -> tuple:
+    """Validate a single pipeline stage against allowlist/blocklist."""
+    try:
+        words = shlex.split(stage.strip())
+    except ValueError:
+        return False, "Malformed quoting in command"
+    if not words:
+        return True, ""
+    first_word = os.path.basename(words[0])
+    if first_word in EXEC_BLOCKLIST:
+        return False, f"Blocked command in pipeline: {first_word}"
+    if first_word in EXEC_BLOCKED_INTERPRETERS:
+        return False, f"Interpreter blocked (use python_eval tool): {first_word}"
+    if first_word in EXEC_ELEVATED:
+        _bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+        if _bind not in ("127.0.0.1", "::1", "localhost") and not os.environ.get("SALMALM_ALLOW_ELEVATED"):
+            return False, f"Elevated command '{first_word}' blocked on external bind (set SALMALM_ALLOW_ELEVATED=1 to override)"
+        log.warning(f"[WARN] Elevated exec: {first_word} (can run arbitrary code)")
+    elif first_word not in EXEC_ALLOWLIST:
+        return False, f"Command not in allowlist: {first_word}"
+    return _check_arg_blocklist(first_word, words)
+
+
+def _check_arg_blocklist(first_word: str, words: list) -> tuple:
+    """Check per-command argument blocklist."""
+    blocked_args = EXEC_ARG_BLOCKLIST.get(first_word)
+    if not blocked_args:
+        return True, ""
+    for w in words[1:]:
+        w_base = w.split("=")[0]
+        if w in blocked_args or w_base in blocked_args:
+            return False, f"Blocked argument for {first_word}: {w}"
+        for ba in blocked_args:
+            if ba.startswith("-") and w.startswith(ba) and len(w) > len(ba):
+                return False, f"Blocked argument for {first_word}: {w}"
+    return True, ""
+
+
+def _check_stage_paths(stage: str) -> tuple:
+    """Check a pipeline stage for sensitive path access."""
+    try:
+        words = shlex.split(stage.strip())
+    except ValueError:
+        return True, ""
+    if not words:
+        return True, ""
+    cmd_name = os.path.basename(words[0])
+    home = str(Path.home())
+    for arg in words[1:]:
+        if arg.startswith("-"):
+            continue
+        try:
+            resolved = str(Path(os.path.expanduser(arg)).resolve())
+            for sp in _SENSITIVE_PATHS:
+                if sp.startswith("/"):
+                    if resolved.startswith(sp) or resolved == sp.rstrip("/"):
+                        return False, f"Access to sensitive path blocked: {arg}"
+                else:
+                    sensitive_full = os.path.join(home, sp)
+                    if resolved.startswith(sensitive_full) or resolved == sensitive_full.rstrip("/"):
+                        return False, f"Access to sensitive path blocked: {arg}"
+        except (OSError, ValueError):
+            pass
+        if cmd_name in _ARCHIVE_CMDS and ".." in arg:
+            return False, f"Path traversal in archive argument blocked: {arg}"
+    return True, ""
+
+
 def _is_safe_command(cmd: str) -> tuple:
     """Check if command is safe to execute (allowlist + blocklist double defense)."""
     if not cmd.strip():
@@ -39,75 +115,14 @@ def _is_safe_command(cmd: str) -> tuple:
             return False, "Blocked inline code execution pattern"
     stages = re.split(r"\s*(?:\|\||&&|;|\|)\s*", cmd)
     for stage in stages:
-        try:
-            words = shlex.split(stage.strip())
-        except ValueError:
-            # Malformed quoting — reject
-            return False, "Malformed quoting in command"
-        if not words:
-            continue
-        first_word = os.path.basename(words[0])
-        if first_word in EXEC_BLOCKLIST:
-            return False, f"Blocked command in pipeline: {first_word}"
-        if first_word in EXEC_BLOCKED_INTERPRETERS:
-            return False, f"Interpreter blocked (use python_eval tool): {first_word}"
-        if first_word in EXEC_ELEVATED:
-            # On external bind, elevated commands are blocked by default
-            _bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
-            if _bind not in ("127.0.0.1", "::1", "localhost"):
-                if not os.environ.get("SALMALM_ALLOW_ELEVATED"):
-                    return False, f"Elevated command '{first_word}' blocked on external bind (set SALMALM_ALLOW_ELEVATED=1 to override)"
-            log.warning(f"[WARN] Elevated exec: {first_word} (can run arbitrary code)")
-        elif first_word not in EXEC_ALLOWLIST:
-            return False, f"Command not in allowlist: {first_word}"
-        # Per-command arg/flag blocklist
-        blocked_args = EXEC_ARG_BLOCKLIST.get(first_word)
-        if blocked_args:
-            for w in words[1:]:
-                w_base = w.split("=")[0]
-                if w in blocked_args or w_base in blocked_args:
-                    return False, f"Blocked argument for {first_word}: {w}"
-                # Match flags with attached values (e.g., -I{} matches -I)
-                for ba in blocked_args:
-                    if ba.startswith("-") and w.startswith(ba) and len(w) > len(ba):
-                        return False, f"Blocked argument for {first_word}: {w}"
-    # ── Path safety: block access to sensitive paths outside workspace ──
-    _SENSITIVE_PATHS = (
-        "/etc/shadow", "/etc/passwd", "/etc/sudoers", "/proc/", "/sys/",
-        ".ssh/", ".gnupg/", ".aws/", ".kube/", ".docker/",
-        ".pypirc", ".netrc", ".env",
-    )
-    _ARCHIVE_CMDS = {"tar", "unzip", "zip", "gzip", "gunzip"}
+        ok, reason = _check_stage_allowlist(stage)
+        if not ok:
+            return False, reason
+    # ── Path safety ──
     for stage in stages:
-        try:
-            words = shlex.split(stage.strip())
-        except ValueError:
-            pass
-        else:
-            cmd_name = os.path.basename(words[0]) if words else ""
-            for arg in words[1:]:
-                if arg.startswith("-"):
-                    continue
-                # Block sensitive system/user files
-                try:
-                    expanded = os.path.expanduser(arg)
-                    resolved = str(Path(expanded).resolve())
-                    home = str(Path.home())
-                    for sp in _SENSITIVE_PATHS:
-                        if sp.startswith("/"):
-                            # Absolute system paths
-                            if resolved.startswith(sp) or resolved == sp.rstrip("/"):
-                                return False, f"Access to sensitive path blocked: {arg}"
-                        else:
-                            # Relative to home (e.g. .ssh/, .pypirc)
-                            sensitive_full = os.path.join(home, sp)
-                            if resolved.startswith(sensitive_full) or resolved == sensitive_full.rstrip("/"):
-                                return False, f"Access to sensitive path blocked: {arg}"
-                except (OSError, ValueError):
-                    pass
-                # Archive commands: block path traversal (../)
-                if cmd_name in _ARCHIVE_CMDS and ".." in arg:
-                    return False, f"Path traversal in archive argument blocked: {arg}"
+        ok, reason = _check_stage_paths(stage)
+        if not ok:
+            return False, reason
 
     if re.search(r"`.*`|\$\(.*\)|<\(|>\(", cmd):
         inner = re.findall(r"`([^`]+)`|\$\(([^)]+)\)", cmd)

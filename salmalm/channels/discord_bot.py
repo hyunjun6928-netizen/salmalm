@@ -387,12 +387,10 @@ class DiscordBot:
         """Handle built-in commands. Returns response text or None."""
         cmd = text.split()[0].lower()
         try:
-            if cmd == "/start" or cmd == "/hello":
-                from salmalm import __version__
-
-                return f"😈 SalmAlm v{__version__} ready!"
-            elif cmd == "/help":
-                return (
+            _SIMPLE_CMDS = {
+                "/start": lambda: f"😈 SalmAlm v{__import__('salmalm').__version__} ready!",
+                "/hello": lambda: f"😈 SalmAlm v{__import__('salmalm').__version__} ready!",
+                "/help": lambda: (
                     "😈 **SalmAlm Commands**\n\n"
                     "📋 `/help` — Show this help\n"
                     "📊 `/usage` — Token usage & cost\n"
@@ -401,7 +399,10 @@ class DiscordBot:
                     "📦 `/compact` — Compress conversation history\n"
                     "🔊 `/tts on|off` — Toggle voice responses\n"
                     "\nJust type normally to chat!"
-                )
+                ),
+            }
+            if cmd in _SIMPLE_CMDS:
+                return _SIMPLE_CMDS[cmd]()
             elif cmd == "/usage":
                 from salmalm.tools.tool_registry import execute_tool
 
