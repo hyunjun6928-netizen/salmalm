@@ -481,6 +481,9 @@ async def run_server():
     # ── Phase 1: Database & Core State ──
     _init_audit_db()
     _restore_usage()
+    # Restore sessions from disk so dashboard/status reflect history
+    from salmalm.core.session_store import restore_all_sessions_from_disk
+    restore_all_sessions_from_disk()
     audit_log("startup", f"{APP_NAME} v{VERSION}")
     MEMORY_DIR.mkdir(exist_ok=True)
 

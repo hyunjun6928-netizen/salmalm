@@ -274,12 +274,21 @@ class CostCapExceeded(Exception):
 
 
 def _restore_usage():
-    """Restore cumulative usage from SQLite on startup."""
+    """Restore cumulative usage from SQLite on startup (usage_stats + usage_detail fallback)."""
     try:
         conn = _get_db()
+        # Try usage_stats first (primary)
         rows = conn.execute(
             "SELECT model, SUM(input_tokens), SUM(output_tokens), SUM(cost), COUNT(*) FROM usage_stats GROUP BY model"
         ).fetchall()
+        # If usage_stats is empty, try usage_detail as fallback
+        if not rows:
+            try:
+                rows = conn.execute(
+                    "SELECT model, SUM(input_tokens), SUM(output_tokens), SUM(cost), COUNT(*) FROM usage_detail GROUP BY model"
+                ).fetchall()
+            except Exception:
+                rows = []
         for model, inp, out, cost, calls in rows:
             short = model.split("/")[-1] if "/" in model else model
             _usage["total_input"] += inp or 0  # type: ignore[operator]
@@ -292,7 +301,9 @@ def _restore_usage():
                 "calls": calls or 0,
             }
         if _usage["total_cost"] > 0:  # type: ignore[operator]
-            log.info(f"[STAT] Usage restored: ${_usage['total_cost']:.4f} total")
+            log.info(f"[STAT] Usage restored: ${_usage['total_cost']:.4f} total, {len(rows)} models")
+        else:
+            log.info("[STAT] No usage data found in usage_stats or usage_detail")
     except Exception as e:
         log.warning(f"Usage restore failed: {e}")
 
