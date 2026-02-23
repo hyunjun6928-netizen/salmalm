@@ -284,7 +284,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         """Get hard timeout for a tool (total wall-clock)."""
         return self._TOOL_TIMEOUTS.get(tool_name, self._DEFAULT_TOOL_TIMEOUT)
 
-    def _execute_tools_parallel(self, tool_calls: list, on_tool=None) -> dict:
+    def _execute_tools_parallel(self, tool_calls: list, on_tool=None, session=None) -> dict:
         """Execute multiple tools in parallel, return {id: result}."""
         for tc in tool_calls:
             if on_tool:
@@ -306,8 +306,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             _metrics["tool_calls"] += 1
             t0 = _time.time()
             try:
-                tc["arguments"]["_session_id"] = getattr(self._session, "id", "")
-                tc["arguments"]["_authenticated"] = getattr(self._session, "authenticated", False)
+                tc["arguments"]["_session_id"] = getattr(session, "id", "")
+                tc["arguments"]["_authenticated"] = getattr(session, "authenticated", False)
                 result = self._truncate_tool_result(execute_tool(tc["name"], tc["arguments"]), tool_name=tc["name"])
                 elapsed = _time.time() - t0
                 audit_log(
@@ -342,8 +342,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         for tc in tool_calls:
             _metrics["tool_calls"] += 1
             start_times[tc["id"]] = _time.time()
-            tc["arguments"]["_session_id"] = getattr(self._session, "id", "")
-            tc["arguments"]["_authenticated"] = getattr(self._session, "authenticated", False)
+            tc["arguments"]["_session_id"] = getattr(session, "id", "")
+            tc["arguments"]["_authenticated"] = getattr(session, "authenticated", False)
             f = self._tool_executor.submit(execute_tool, tc["name"], tc["arguments"])
             futures[tc["id"]] = (f, tc)
         outputs = {}
@@ -555,7 +555,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         valid_tools, tool_outputs = validate_tool_calls(result["tool_calls"])
         if valid_tools:
-            exec_outputs = await asyncio.to_thread(self._execute_tools_parallel, valid_tools, on_tool)
+            exec_outputs = await asyncio.to_thread(self._execute_tools_parallel, valid_tools, on_tool, session)
             tool_outputs.update(exec_outputs)
 
         consecutive_errors, break_msg = check_circuit_breaker(
