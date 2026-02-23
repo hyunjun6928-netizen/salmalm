@@ -189,7 +189,7 @@ def _record_sla(sla_start: float, first_token_time: float, model: str, session_i
     try:
         from salmalm.features.sla import latency_tracker, sla_config as _sla_cfg
 
-        sla_end = _time.time()
+        sla_end = time.time()
         ttft_ms = (first_token_time - sla_start) * 1000 if first_token_time > 0 else (sla_end - sla_start) * 1000
         total_ms = (sla_end - sla_start) * 1000
         timed_out = total_ms > _sla_cfg.get("response_target_ms", 30000)
@@ -311,7 +311,7 @@ async def _process_message_inner(
     selected_model, complexity = _route_model(model_override, user_message, session)
 
     # ── SLA: Measure latency (레이턴시 측정) + abort token accumulation ──
-    _sla_start = _time.time()
+    _sla_start = time.time()
     _sla_first_token_time = [0.0]  # mutable for closure
     _orig_on_token = on_token
 
@@ -323,7 +323,7 @@ async def _process_message_inner(
     def _sla_on_token(event) -> None:
         """Sla on token."""
         if _sla_first_token_time[0] == 0.0:
-            _sla_first_token_time[0] = _time.time()
+            _sla_first_token_time[0] = time.time()
         # Accumulate tokens for abort recovery
         if isinstance(event, dict):
             delta = event.get("delta", {})
