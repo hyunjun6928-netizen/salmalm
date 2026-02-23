@@ -156,6 +156,15 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
     except Exception as e:
         log.warning(f"RAG injection skipped: {e}")
 
+    # Auto-recall: inject relevant memory context (OpenClaw-style)
+    try:
+        from salmalm.core.memory import memory_manager
+        recall = memory_manager.auto_recall(user_message)
+        if recall:
+            session.messages.append({"role": "system", "content": recall})
+    except Exception:
+        pass
+
     try:
         from salmalm.features.mood import mood_detector
 

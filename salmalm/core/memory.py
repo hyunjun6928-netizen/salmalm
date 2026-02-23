@@ -172,6 +172,37 @@ class MemoryManager:
             return ""
         return "# Recent Memory\n\n" + "\n\n".join(parts)
 
+    # ── Auto-Recall (OpenClaw-style mandatory memory search) ──
+
+    def auto_recall(self, user_message: str, max_results: int = 3) -> str:
+        """Search memory for context relevant to user message.
+
+        Like OpenClaw's memory_search, but automatic — runs before each
+        response to inject relevant prior context.
+
+        Returns formatted context string or empty string.
+        """
+        if not user_message or len(user_message) < 5:
+            return ""
+        try:
+            from salmalm.features.rag import rag_engine
+            results = rag_engine.search(user_message, max_results=max_results)
+            if not results:
+                return ""
+            parts = ["[Memory Recall]"]
+            for r in results:
+                source = r.get("source", "")
+                snippet = r.get("content", "")[:200]
+                score = r.get("score", 0)
+                if score < 0.1:  # Too low relevance
+                    continue
+                parts.append(f"- {source}: {snippet}")
+            if len(parts) <= 1:
+                return ""
+            return "\n".join(parts)
+        except Exception:
+            return ""
+
     # ── Pre-compaction Flush ──────────────────────────────────
 
     def flush_before_compaction(self, session) -> str:
