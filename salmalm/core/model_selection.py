@@ -192,14 +192,11 @@ def select_model(message: str, session) -> Tuple[str, str]:
     """
     override = getattr(session, "model_override", None)
     if override and override != "auto":
-        if override == "haiku":
-            return _MODELS["haiku"], "simple"
-        elif override == "sonnet":
-            return _MODELS["sonnet"], "moderate"
-        elif override == "opus":
-            return _MODELS["opus"], "complex"
-        else:
-            return override, "manual"
+        _OVERRIDE_MAP = {"haiku": ("simple", "haiku"), "sonnet": ("moderate", "sonnet"), "opus": ("complex", "opus")}
+        if override in _OVERRIDE_MAP:
+            level, key = _OVERRIDE_MAP[override]
+            return _MODELS[key], level
+        return override, "manual"
 
     rc = load_routing_config()
     # Smart defaults: simple→haiku (cheapest), moderate→sonnet, complex→sonnet

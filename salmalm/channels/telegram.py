@@ -128,6 +128,78 @@ class TelegramBot(TelegramCommandsMixin):
             log.error(f"[TG] Reaction error: {e}")
             return {}
 
+    def _check_telegram_auth(self, chat_id, user_id: str, msg: dict) -> tuple:
+        """Check multi-tenant or legacy auth. Returns (tenant_user, error_msg) or (user, None)."""
+        from salmalm.features.users import user_manager
+        if user_manager.multi_tenant_enabled:
+            tenant = user_manager.get_user_by_telegram(str(chat_id))
+            text_check = msg.get("text", "") or ""
+            if not tenant and not text_check.startswith(("/register", "/start")):
+                return None, ("🔐 등록이 필요합니다. /register <비밀번호>로 등록하세요.\n"
+                              "Registration required. Use /register <password> to sign up.")
+            if tenant and not tenant.get("enabled", True):
+                return None, "⛔ 계정이 비활성화되었습니다. 관리자에게 문의하세요. / Account disabled."
+            if tenant:
+                try:
+                    from salmalm.features.users import QuotaExceeded
+                    user_manager.check_quota(tenant["id"])
+                except QuotaExceeded as e:
+                    return None, f"⚠️ {e.message}"
+            return tenant, None
+        if user_id != self.owner_id:
+            log.warning(f"[BLOCK] Unauthorized: {user_id} tried to message")
+            audit_log("unauthorized", f"user_id={user_id}")
+            return None, "__silent__"
+        return None, None
+
+    def _handle_send_error(self, e, chat_id, data: dict, parse_mode, reply_markup, is_last: bool) -> str:
+        """Handle sendMessage errors. Returns 'continue', 'return', or '' for fallthrough."""
+        err_str = str(e).lower()
+        if "429" in str(e) or "flood" in err_str or "retry_after" in err_str:
+            wait = self._extract_retry_after(e)
+            log.warning(f"[TG] Flood wait: {wait}s for chat {chat_id}")
+            time.sleep(wait)
+            try:
+                self._api("sendMessage", data)
+            except Exception as e2:  # noqa: broad-except
+                log.debug(f"Suppressed: {e2}")
+            return "continue"
+        if "chat not found" in err_str or "400" in str(e):
+            log.warning(f"[TG] Chat not found: {chat_id}")
+            return "return"
+        if "403" in str(e) or "forbidden" in err_str or "kicked" in err_str:
+            log.warning(f"[TG] Bot kicked/blocked: {chat_id}")
+            self._cleanup_session(chat_id)
+            return "return"
+        if "not modified" in err_str:
+            return "return"
+        if parse_mode:
+            data2 = {"chat_id": chat_id, "text": data["text"]}
+            if reply_markup and is_last:
+                data2["reply_markup"] = reply_markup
+            try:
+                self._api("sendMessage", data2)
+            except Exception as e2:
+                log.error(f"[TG] Send failed even without parse_mode: {e2}")
+        else:
+            log.error(f"[TG] Send failed: {e}")
+        return ""
+
+    @staticmethod
+    def _build_send_data(chat_id, text: str, parse_mode, reply_markup,
+                         thread_id, reply_to_id, idx: int, is_last: bool) -> dict:
+        """Build sendMessage API data dict."""
+        data = {"chat_id": chat_id, "text": text}
+        if thread_id:
+            data["message_thread_id"] = thread_id
+        if reply_to_id and idx == 0:
+            data["reply_to_message_id"] = reply_to_id
+        if parse_mode:
+            data["parse_mode"] = parse_mode
+        if reply_markup and is_last:
+            data["reply_markup"] = reply_markup
+        return data
+
     def send_message(
         self,
         chat_id,
@@ -167,52 +239,17 @@ class TelegramBot(TelegramCommandsMixin):
         for idx, chunk in enumerate(chunks):
             if not chunk.strip():
                 continue
-            data = {"chat_id": chat_id, "text": chunk}
-            if message_thread_id:
-                data["message_thread_id"] = message_thread_id
-            if reply_to_message_id and idx == 0:
-                data["reply_to_message_id"] = reply_to_message_id
-            if parse_mode:
-                data["parse_mode"] = parse_mode
-            if reply_markup and idx == len(chunks) - 1:
-                data["reply_markup"] = reply_markup
+            is_last = idx == len(chunks) - 1
+            data = self._build_send_data(chat_id, chunk, parse_mode, reply_markup,
+                                          message_thread_id, reply_to_message_id, idx, is_last)
             try:
                 self._api("sendMessage", data)
             except Exception as e:
-                err_str = str(e).lower()
-                # Flood wait — respect retry_after
-                if "429" in str(e) or "flood" in err_str or "retry_after" in err_str:
-                    wait = self._extract_retry_after(e)
-                    log.warning(f"[TG] Flood wait: {wait}s for chat {chat_id}")
-                    time.sleep(wait)
-                    try:
-                        self._api("sendMessage", data)
-                    except Exception as e:  # noqa: broad-except
-                        log.debug(f"Suppressed: {e}")
+                action = self._handle_send_error(e, chat_id, data, parse_mode, reply_markup, is_last)
+                if action == "continue":
                     continue
-                # Chat not found
-                if "chat not found" in err_str or "400" in str(e):
-                    log.warning(f"[TG] Chat not found: {chat_id}")
+                if action == "return":
                     return
-                # Bot kicked from group
-                if "403" in str(e) or "forbidden" in err_str or "kicked" in err_str:
-                    log.warning(f"[TG] Bot kicked/blocked: {chat_id}")
-                    self._cleanup_session(chat_id)
-                    return
-                # MessageNotModified — ignore
-                if "not modified" in err_str:
-                    return
-                # MarkdownV2 parse error → retry without parse_mode
-                if parse_mode:
-                    data2 = {"chat_id": chat_id, "text": chunk}
-                    if reply_markup and idx == len(chunks) - 1:
-                        data2["reply_markup"] = reply_markup
-                    try:
-                        self._api("sendMessage", data2)
-                    except Exception as e2:
-                        log.error(f"[TG] Send failed even without parse_mode: {e2}")
-                else:
-                    log.error(f"[TG] Send failed: {e}")
 
     def _smart_split(self, text: str, max_len: int = 4096) -> list:
         """Split text respecting paragraph boundaries and code blocks.
@@ -612,39 +649,11 @@ class TelegramBot(TelegramCommandsMixin):
             if not _is_mention and not _is_reply_to_bot and not _msg_text.startswith("/"):
                 return  # Silent: no mention, no reply to bot
 
-        # Multi-tenant auth check
-        from salmalm.features.users import user_manager
-
-        _tenant_user = None  # Resolved multi-tenant user dict
-        if user_manager.multi_tenant_enabled:
-            _tenant_user = user_manager.get_user_by_telegram(str(chat_id))
-            text_check = msg.get("text", "") or ""
-            # Allow /register and /start for unregistered users
-            if not _tenant_user and not text_check.startswith(("/register", "/start")):
-                self.send_message(
-                    chat_id,
-                    "🔐 등록이 필요합니다. /register <비밀번호>로 등록하세요.\n"
-                    "Registration required. Use /register <password> to sign up.",
-                )
-                return
-            if _tenant_user and not _tenant_user.get("enabled", True):
-                self.send_message(chat_id, "⛔ 계정이 비활성화되었습니다. 관리자에게 문의하세요. / Account disabled.")
-                return
-            # Check quota
-            if _tenant_user:
-                try:
-                    from salmalm.features.users import QuotaExceeded
-
-                    user_manager.check_quota(_tenant_user["id"])
-                except QuotaExceeded as e:
-                    self.send_message(chat_id, f"⚠️ {e.message}")
-                    return
-        else:
-            # Legacy single-user mode: owner check
-            if user_id != self.owner_id:
-                log.warning(f"[BLOCK] Unauthorized: {user_id} tried to message")
-                audit_log("unauthorized", f"user_id={user_id}")
-                return
+        _tenant_user, auth_err = self._check_telegram_auth(chat_id, user_id, msg)
+        if auth_err:
+            if auth_err != "__silent__":
+                self.send_message(chat_id, auth_err)
+            return
 
         text = msg.get("text", "") or msg.get("caption", "") or ""
         file_info = None

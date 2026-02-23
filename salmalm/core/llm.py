@@ -596,6 +596,31 @@ def stream_google(
 # ============================================================
 
 
+def _iter_sse_events(resp, tool_calls, accum, usage):
+    """Parse SSE stream and yield events, updating accumulators in-place."""
+    buffer = ""
+    for raw_chunk in _iter_chunks(resp):
+        buffer += raw_chunk
+        while "\n" in buffer:
+            line, buffer = buffer.split("\n", 1)
+            line = line.strip()
+            if not line or not line.startswith("data: "):
+                continue
+            json_str = line[6:]
+            if json_str.strip() == "[DONE]":
+                continue
+            try:
+                event = json.loads(json_str)
+            except json.JSONDecodeError:
+                continue
+            yield from _process_stream_event(
+                event, accum["content"], accum["thinking"], tool_calls, accum["tool"], accum.get("tool_json", ""), usage
+            )
+            accum["content"], accum["thinking"], accum["tool"], accum["tool_json"] = _update_stream_accumulators(
+                event, accum["content"], accum["thinking"], tool_calls, accum["tool"], accum.get("tool_json", ""), usage
+            )
+
+
 def _update_stream_accumulators(event, content_text, thinking_text, tool_calls, current_tool, current_tool_json, usage):
     """Update streaming accumulators from an SSE event. Returns updated (content, thinking, tool, tool_json)."""
     etype = event.get("type", "")
@@ -734,43 +759,13 @@ def stream_anthropic(
 
     try:
         resp = urllib.request.urlopen(req, timeout=180)
-        buffer = ""
-        for raw_chunk in _iter_chunks(resp):
-            buffer += raw_chunk
-            while "\n" in buffer:
-                line, buffer = buffer.split("\n", 1)
-                line = line.strip()
-                if not line:
-                    continue
-                if line.startswith("data: "):
-                    json_str = line[6:]
-                    if json_str.strip() == "[DONE]":
-                        continue
-                    try:
-                        event = json.loads(json_str)
-                    except json.JSONDecodeError:
-                        continue
-                    yield from _process_stream_event(
-                        event, content_text, thinking_text, tool_calls, current_tool, current_tool_json, usage
-                    )
-                    content_text, thinking_text, current_tool, current_tool_json = _update_stream_accumulators(
-                        event, content_text, thinking_text, tool_calls, current_tool, current_tool_json, usage
-                    )
-
-        # Track usage
+        accum = {"content": "", "thinking": "", "tool": None, "tool_json": ""}
+        yield from _iter_sse_events(resp, tool_calls, accum, usage)
         track_usage(model, usage["input"], usage["output"])
-
-        result = {
-            "type": "message_end",
-            "content": content_text,
-            "tool_calls": tool_calls,
-            "usage": usage,
-            "model": model,
-        }
-        if thinking_text:
-            result["thinking"] = thinking_text
+        result = {"type": "message_end", "content": accum["content"], "tool_calls": tool_calls, "usage": usage, "model": model}
+        if accum["thinking"]:
+            result["thinking"] = accum["thinking"]
         yield result
-
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace")
         log.error(f"[STREAM] HTTP {e.code}: {err_body[:300]}")

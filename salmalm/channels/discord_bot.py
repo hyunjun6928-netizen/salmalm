@@ -273,6 +273,66 @@ class DiscordBot:
         if t == "MESSAGE_CREATE":
             await self._handle_discord_message(d)
 
+    async def _process_llm_message(self, channel_id: str, message_id: str, content: str, d: dict) -> None:
+        """Process message through LLM with streaming and draft editing."""
+        try:
+            self.add_reaction(channel_id, message_id, "👀")
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+        typing_task = self.start_typing_loop(channel_id)
+        _stream_buf = []
+        _draft_msg_id = [None]
+
+        def _on_stream_token(event):
+            """Handle streaming tokens for draft editing."""
+            if event.get("type") == "content_delta" and event.get("text"):
+                _stream_buf.append(event["text"])
+                full = "".join(_stream_buf)
+                if not _draft_msg_id[0] and len(full) >= 200:
+                    try:
+                        resp = self._api("POST", f"/channels/{channel_id}/messages",
+                                        {"content": full[:1900] + " ▍", "message_reference": {"message_id": message_id}})
+                        _draft_msg_id[0] = resp.get("id")
+                    except Exception:
+                        pass
+                elif _draft_msg_id[0] and len(full) % 150 < 10:
+                    try:
+                        self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}",
+                                 {"content": full[:1900] + " ▍"})
+                    except Exception:
+                        pass
+
+        try:
+            response = await self._on_message(content, d, on_token=_on_stream_token)
+            if response:
+                self._send_discord_response(channel_id, message_id, response, _draft_msg_id[0])
+        except Exception as e:
+            log.error(f"Discord message handler error: {e}")
+            self.send_message(channel_id, f"❌ Error: {str(e)[:200]}", reply_to=message_id)
+        finally:
+            typing_task.cancel()
+            try:
+                await typing_task
+            except asyncio.CancelledError:
+                pass
+            try:
+                self.remove_reaction(channel_id, message_id, "👀")
+            except Exception:
+                pass
+
+    def _send_discord_response(self, channel_id: str, message_id: str, response: str, draft_msg_id) -> None:
+        """Send or edit the final response message."""
+        if draft_msg_id:
+            chunks = self._smart_split(response, 2000)
+            try:
+                self._api("PATCH", f"/channels/{channel_id}/messages/{draft_msg_id}", {"content": chunks[0]})
+            except Exception:
+                self.send_message(channel_id, chunks[0], reply_to=message_id)
+            for chunk in chunks[1:]:
+                self.send_message(channel_id, chunk)
+        else:
+            self.send_message(channel_id, response, reply_to=message_id)
+
     async def _handle_discord_message(self, d: dict) -> None:
         """Handle Discord MESSAGE_CREATE dispatch."""
         author = d.get("author", {})
@@ -309,76 +369,7 @@ class DiscordBot:
                 return
 
         if self._on_message:
-            # Ack reaction (OpenClaw-style 👀)
-            try:
-                self.add_reaction(channel_id, message_id, "👀")
-            except Exception as e:  # noqa: broad-except
-                log.debug(f"Suppressed: {e}")
-
-            # Start continuous typing indicator
-            typing_task = self.start_typing_loop(channel_id)
-
-            # Streaming preview: send draft message and edit it
-            _stream_buf = []
-            _draft_msg_id = [None]
-            _STREAM_THRESHOLD = 200
-
-            def _on_stream_token(event):
-                """On stream token."""
-                etype = event.get("type", "")
-                if etype == "content_delta":
-                    delta = event.get("text", "")
-                    if delta:
-                        _stream_buf.append(delta)
-                        full = "".join(_stream_buf)
-                        if not _draft_msg_id[0] and len(full) >= _STREAM_THRESHOLD:
-                            try:
-                                resp = self._api("POST", f"/channels/{channel_id}/messages", {
-                                    "content": full[:1900] + " ▍",
-                                    "message_reference": {"message_id": message_id},
-                                })
-                                _draft_msg_id[0] = resp.get("id")
-                            except Exception as e:  # noqa: broad-except
-                                log.debug(f"Suppressed: {e}")
-                        elif _draft_msg_id[0] and len(full) % 150 < 10:
-                            try:
-                                self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}", {
-                                    "content": full[:1900] + " ▍",
-                                })
-                            except Exception as e:  # noqa: broad-except
-                                log.debug(f"Suppressed: {e}")
-
-            try:
-                response = await self._on_message(content, d, on_token=_on_stream_token)
-                if response:
-                    if _draft_msg_id[0]:
-                        # Edit final response into draft message
-                        chunks = self._smart_split(response, 2000)
-                        try:
-                            self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}", {
-                                "content": chunks[0],
-                            })
-                        except Exception as e:  # noqa: broad-except
-                            self.send_message(channel_id, chunks[0], reply_to=message_id)
-                        # Send remaining chunks
-                        for chunk in chunks[1:]:
-                            self.send_message(channel_id, chunk)
-                    else:
-                        self.send_message(channel_id, response, reply_to=message_id)
-            except Exception as e:
-                log.error(f"Discord message handler error: {e}")
-                self.send_message(channel_id, f"❌ Error: {str(e)[:200]}", reply_to=message_id)
-            finally:
-                typing_task.cancel()
-                try:
-                    await typing_task
-                except asyncio.CancelledError:
-                    pass
-                # Clear ack reaction
-                try:
-                    self.remove_reaction(channel_id, message_id, "👀")
-                except Exception as e:  # noqa: broad-except
-                    log.debug(f"Suppressed: {e}")
+            await self._process_llm_message(channel_id, message_id, content, d)
 
     def _handle_command(self, text: str, channel_id: str) -> Optional[str]:
         """Handle built-in commands. Returns response text or None."""

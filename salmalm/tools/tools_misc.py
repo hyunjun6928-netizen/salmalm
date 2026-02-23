@@ -629,42 +629,58 @@ def _parse_rss(xml_text: str) -> list:
     return articles
 
 
+def _rss_list(args: dict) -> str:
+    """List subscribed RSS feeds."""
+    feeds = _load_feeds()
+    if not feeds:
+        return "📰 No subscribed feeds."
+    lines = ["📰 **Subscribed Feeds:**"]
+    for name, info in feeds.items():
+        lines.append(f"  • **{name}** — {info['url']}")
+    return "\n".join(lines)
+
+
+def _rss_subscribe(args: dict) -> str:
+    """Subscribe to an RSS feed."""
+    url = args.get("url", "")
+    name = args.get("name", "")
+    if not url:
+        return "❌ url is required for subscribe"
+    if not name:
+        name = url.split("/")[2] if "/" in url else url[:30]
+    feeds = _load_feeds()
+    feeds[name] = {"url": url, "added": datetime.now().isoformat()}
+    _save_feeds(feeds)
+    return f"📰 Subscribed: **{name}** ({url})"
+
+
+def _rss_unsubscribe(args: dict) -> str:
+    """Unsubscribe from an RSS feed."""
+    name = args.get("name", "")
+    feeds = _load_feeds()
+    if name in feeds:
+        del feeds[name]
+        _save_feeds(feeds)
+        return f"📰 Unsubscribed: {name}"
+    return f"❌ Feed not found: {name}"
+
+
+_RSS_DISPATCH = {
+    "list": _rss_list,
+    "subscribe": _rss_subscribe,
+    "unsubscribe": _rss_unsubscribe,
+}
+
+
 @register("rss_reader")
 def handle_rss_reader(args: dict) -> str:
     """Handle rss reader."""
     action = args.get("action", "fetch")
+    handler = _RSS_DISPATCH.get(action)
+    if handler:
+        return handler(args)
 
-    if action == "list":
-        feeds = _load_feeds()
-        if not feeds:
-            return "📰 No subscribed feeds."
-        lines = ["📰 **Subscribed Feeds:**"]
-        for name, info in feeds.items():
-            lines.append(f"  • **{name}** — {info['url']}")
-        return "\n".join(lines)
-
-    elif action == "subscribe":
-        url = args.get("url", "")
-        name = args.get("name", "")
-        if not url:
-            return "❌ url is required for subscribe"
-        if not name:
-            name = url.split("/")[2] if "/" in url else url[:30]
-        feeds = _load_feeds()
-        feeds[name] = {"url": url, "added": datetime.now().isoformat()}
-        _save_feeds(feeds)
-        return f"📰 Subscribed: **{name}** ({url})"
-
-    elif action == "unsubscribe":
-        name = args.get("name", "")
-        feeds = _load_feeds()
-        if name in feeds:
-            del feeds[name]
-            _save_feeds(feeds)
-            return f"📰 Unsubscribed: {name}"
-        return f"❌ Feed not found: {name}"
-
-    elif action == "fetch":
+    if action == "fetch":
         url = args.get("url", "")
         count = args.get("count", 5)
 
