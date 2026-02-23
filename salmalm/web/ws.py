@@ -376,6 +376,7 @@ class WebSocketServer:
                 opcode, payload = frame
 
                 if opcode == OP_TEXT:
+                    client.last_ping = time.time()  # Any activity = alive
                     await self._handle_text_frame(client, payload)
                 elif opcode == OP_PING:
                     await client._send_frame(OP_PONG, payload)
@@ -399,7 +400,7 @@ class WebSocketServer:
             now = time.time()
             dead = []
             for cid, client in list(self.clients.items()):
-                if now - client.last_ping > 60:  # 60s ping timeout
+                if now - client.last_ping > 180:  # 180s ping timeout (long tool chains)
                     dead.append(cid)
                 else:
                     try:
