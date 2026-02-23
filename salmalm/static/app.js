@@ -688,34 +688,52 @@
     });
   }
 
-  /* On page load, check if there was a pending SSE request that got interrupted by refresh */
-  (function _checkPendingRecovery(){
+  /* On page load, check if there was a pending SSE request that got interrupted by refresh.
+     Called after auth is complete and chat is loaded (from 95-events.js or init flow). */
+  window._checkPendingRecovery=function(){
     var pending=localStorage.getItem('salm_sse_pending');
     if(!pending)return;
-    localStorage.removeItem('salm_sse_pending');
-    var pd=JSON.parse(pending);
+    var pd;try{pd=JSON.parse(pending)}catch(e){localStorage.removeItem('salm_sse_pending');return}
     var sid=pd.session||'web';
     var msgCount=pd.msgCount||0;
-    /* Poll /api/sessions/{id}/last to recover */
+    var startTime=pd.ts||0;
+    /* If pending flag is older than 5 minutes, discard */
+    if(startTime&&Date.now()-startTime>300000){localStorage.removeItem('salm_sse_pending');return}
+    localStorage.removeItem('salm_sse_pending');
+    /* Show recovery indicator */
+    addMsg('assistant','⏳ Recovering response after refresh...');
     var polls=0;
     function _rpoll(){
       polls++;
       fetch('/api/sessions/'+encodeURIComponent(sid)+'/last',{headers:{'X-Session-Token':_tok}})
       .then(function(r){return r.json()}).then(function(d){
         if(d.ok&&d.message&&d.msg_count>msgCount){
+          /* Remove the "recovering" message and show actual response */
+          var rows=chat.querySelectorAll('.msg-row');
+          var last=rows[rows.length-1];
+          if(last){var b=last.querySelector('.bubble');if(b&&b.textContent.indexOf('Recovering')>-1)last.remove()}
           addMsg('assistant',d.message,'🔄 recovered after refresh');
-        }else if(polls<10){setTimeout(_rpoll,2000)}
-      }).catch(function(){if(polls<10)setTimeout(_rpoll,2000)});
+        }else if(polls<30){
+          /* Server still processing — keep polling (up to 60s) */
+          setTimeout(_rpoll,2000);
+        }else{
+          /* Give up */
+          var rows2=chat.querySelectorAll('.msg-row');
+          var last2=rows2[rows2.length-1];
+          if(last2){var b2=last2.querySelector('.bubble');if(b2&&b2.textContent.indexOf('Recovering')>-1)last2.remove()}
+          addMsg('assistant','⚠️ Response may still be processing. Check back shortly or resend.');
+        }
+      }).catch(function(){if(polls<30)setTimeout(_rpoll,2000)});
     }
-    /* Delay slightly to let session/chat load first */
-    setTimeout(_rpoll,1500);
-  })();
+    /* Wait for server to finish processing */
+    setTimeout(_rpoll,3000);
+  };
 
   async function _sendViaSse(chatBody,_sendStart){
     try{
       /* Mark pending so page refresh can recover */
       var _preMsgCount=chat.querySelectorAll('.msg-row').length;
-      localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',msgCount:_preMsgCount}));
+      localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',msgCount:_preMsgCount,ts:Date.now()}));
       _currentAbort=new AbortController();
       var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify(chatBody),signal:_currentAbort.signal});
@@ -1130,6 +1148,8 @@ window._i18n={
   function t(k){return (_i18n[_lang]||_i18n.en)[k]||(_i18n.en[k]||k)}
   /* Now that t() is defined, restore deferred chat history */
   if(window._pendingRestore){try{window._pendingRestore()}catch(e){console.warn('Chat restore failed:',e);localStorage.removeItem('salm_chat')}delete window._pendingRestore;}
+  /* Check for interrupted SSE requests after chat restore + auth ready */
+  if(window._checkPendingRecovery&&_tok){try{window._checkPendingRecovery()}catch(e){console.warn('Recovery check failed:',e)}}
   /* File input change handler */
   var _fileInput=document.getElementById('file-input-hidden');
   if(_fileInput)_fileInput.addEventListener('change',function(){if(this.files[0])window.setFile(this.files[0]);this.value=''});

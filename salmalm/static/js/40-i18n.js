@@ -4,6 +4,8 @@
   function t(k){return (_i18n[_lang]||_i18n.en)[k]||(_i18n.en[k]||k)}
   /* Now that t() is defined, restore deferred chat history */
   if(window._pendingRestore){try{window._pendingRestore()}catch(e){console.warn('Chat restore failed:',e);localStorage.removeItem('salm_chat')}delete window._pendingRestore;}
+  /* Check for interrupted SSE requests after chat restore + auth ready */
+  if(window._checkPendingRecovery&&_tok){try{window._checkPendingRecovery()}catch(e){console.warn('Recovery check failed:',e)}}
   /* File input change handler */
   var _fileInput=document.getElementById('file-input-hidden');
   if(_fileInput)_fileInput.addEventListener('change',function(){if(this.files[0])window.setFile(this.files[0]);this.value=''});
