@@ -124,7 +124,7 @@ def _classify_task(session, user_message: str) -> dict:
 
 def _route_model(model_override, user_message: str, session) -> tuple:
     """Select model via routing or override. Returns (model, complexity)."""
-    from salmalm.core.model_selection import select_model as _select_model
+    from salmalm.core.model_selection import select_model as _select_model, fix_model_name as _fix_model_name
     if model_override:
         return _fix_model_name(model_override), "auto"
     selected, complexity = _select_model(user_message, session)
