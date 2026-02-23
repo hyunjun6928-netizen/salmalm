@@ -28,14 +28,20 @@ _cooldown_lock = _threading.Lock()
 
 # Default fallback chains (no config needed)
 _DEFAULT_FALLBACKS = {
-    "anthropic/claude-opus-4-6": ["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-4-5-20251001"],
-    "anthropic/claude-sonnet-4-6": ["anthropic/claude-haiku-4-5-20251001", "anthropic/claude-opus-4-6"],
-    "anthropic/claude-haiku-4-5-20251001": ["anthropic/claude-sonnet-4-6"],
-    "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.0-flash"],
-    "google/gemini-2.5-flash": ["google/gemini-2.0-flash", "google/gemini-2.5-pro"],
-    "google/gemini-2.0-flash": ["google/gemini-2.5-flash"],
-    "google/gemini-3-pro-preview": ["google/gemini-2.5-pro", "google/gemini-3-flash-preview"],
-    "google/gemini-3-flash-preview": ["google/gemini-2.0-flash", "google/gemini-2.5-flash"],
+    # Same-provider fallbacks + cross-provider fallbacks
+    "anthropic/claude-opus-4-6": ["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-4-5-20251001", "google/gemini-2.5-pro", "openai/gpt-4.1"],
+    "anthropic/claude-sonnet-4-6": ["anthropic/claude-haiku-4-5-20251001", "anthropic/claude-opus-4-6", "google/gemini-2.5-flash", "openai/gpt-4.1-mini"],
+    "anthropic/claude-haiku-4-5-20251001": ["anthropic/claude-sonnet-4-6", "google/gemini-2.0-flash", "openai/gpt-4.1-mini"],
+    "openai/gpt-5.2": ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
+    "openai/gpt-4.1": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
+    "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.0-flash", "anthropic/claude-sonnet-4-6"],
+    "google/gemini-2.5-flash": ["google/gemini-2.0-flash", "google/gemini-2.5-pro", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.0-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-3-pro-preview": ["google/gemini-2.5-pro", "google/gemini-3-flash-preview", "anthropic/claude-sonnet-4-6"],
+    "google/gemini-3-flash-preview": ["google/gemini-2.0-flash", "google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "xai/grok-4": ["xai/grok-3", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
+    "xai/grok-3": ["xai/grok-4", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
 }
 _COOLDOWN_STEPS = [60, 300, 1500, 3600]  # 1m, 5m, 25m, 1h
 
@@ -84,14 +90,34 @@ def _is_model_cooled_down(model: str) -> bool:
         return _time.time() < entry.get("until", 0)
 
 
-def _record_model_failure(model: str):
+def _cooldown_provider(model: str, cooldown_seconds: int = 3600):
+    """Cooldown all models from the same provider (e.g., invalid API key)."""
+    provider = model.split("/")[0] if "/" in model else model
+    with _cooldown_lock:
+        cd = _load_cooldowns()
+        # Find all models from this provider in fallback config
+        all_models = set()
+        for m in _DEFAULT_FALLBACKS:
+            if m.startswith(provider + "/"):
+                all_models.add(m)
+        all_models.add(model)
+        for m in all_models:
+            cd[m] = {"until": _time.time() + cooldown_seconds, "failures": 99}
+        _save_cooldowns(cd)
+    log.warning(f"[AUTH] Provider {provider} cooled down for {cooldown_seconds}s ({len(all_models)} models)")
+
+
+def _record_model_failure(model: str, cooldown_seconds: int = 0):
     """Record a model failure and set cooldown."""
     with _cooldown_lock:
         cd = _load_cooldowns()
         entry = cd.get(model, {"until": 0, "failures": 0})
         failures = entry.get("failures", 0)
-        step = min(failures, len(_COOLDOWN_STEPS) - 1)
-        cooldown_secs = _COOLDOWN_STEPS[step]
+        if cooldown_seconds > 0:
+            cooldown_secs = cooldown_seconds
+        else:
+            step = min(failures, len(_COOLDOWN_STEPS) - 1)
+            cooldown_secs = _COOLDOWN_STEPS[step]
         cd[model] = {
             "until": _time.time() + cooldown_secs,
             "failures": failures + 1,
@@ -365,6 +391,7 @@ async def try_llm_call(
         "rate limit",
         "429",
     )
+    _AUTH_PATTERNS = ("401", "invalid api key", "unauthorized", "authentication", "invalid x-api-key")
 
     last_error = None
     for attempt in range(2):  # 1 initial + 1 retry
@@ -382,6 +409,12 @@ async def try_llm_call(
             # Check for error responses — prefer explicit 'error' field over content sniffing
             if result.get("error"):
                 error_str = str(result["error"]).lower()
+                # Auth errors: cooldown entire provider (invalid key affects all models)
+                if any(p in error_str for p in _AUTH_PATTERNS):
+                    log.warning(f"[AUTH] {model} API key invalid — provider cooldown 1h: {result['error']}")
+                    _cooldown_provider(model, cooldown_seconds=3600)
+                    result["_failed"] = True
+                    return result
                 if attempt == 0 and any(p in error_str for p in _TRANSIENT_PATTERNS):
                     log.warning(f"[RETRY] Transient error from {model}: {result['error']}")
                     await asyncio.sleep(1.5)
