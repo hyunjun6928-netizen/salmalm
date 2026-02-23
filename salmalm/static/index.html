@@ -944,8 +944,18 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <span class="eng-en">🌡️ Temperature Control</span><span class="eng-kr">🌡️ 온도 설정</span>
           </div>
           <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:10px">
-            <span class="eng-en">Lower = more precise &amp; factual. Higher = more creative &amp; varied.<br>Tool-calling uses low temperature for accuracy. Chat uses higher for naturalness.</span>
-            <span class="eng-kr">낮을수록 정확하고 사실적. 높을수록 창의적이고 다양.<br>도구 호출 시 낮은 온도로 정확도 ↑, 대화 시 높은 온도로 자연스러움 유지.</span>
+            <span class="eng-en">Controls how "random" the AI's word choices are.<br>
+            <b>0.0</b> = Always picks the most likely word → deterministic, factual, repetitive<br>
+            <b>1.0</b> = Balanced between predictable and creative (recommended for chat)<br>
+            <b>2.0</b> = Maximum randomness → wild, unpredictable, may hallucinate<br><br>
+            <b>💬 Chat</b> — Your normal conversations. Default <b>0.7</b> balances natural tone with accuracy.<br>
+            <b>🔧 Tool Calling</b> — When AI calls functions (web search, file ops). Kept low (<b>0.3</b>) so it doesn't mistype command parameters.</span>
+            <span class="eng-kr">AI가 단어를 얼마나 "랜덤하게" 선택할지 결정하는 값이오.<br>
+            <b>0.0</b> = 항상 가장 확률 높은 단어 선택 → 확정적, 사실적, 반복적<br>
+            <b>1.0</b> = 예측 가능성과 창의성의 균형 (일반 대화 추천)<br>
+            <b>2.0</b> = 최대 랜덤 → 예측불가, 엉뚱한 답변, 환각 가능성 ↑<br><br>
+            <b>💬 대화</b> — 일상 대화용. 기본값 <b>0.7</b>은 자연스러움과 정확성의 균형점이오.<br>
+            <b>🔧 도구 호출</b> — AI가 웹 검색, 파일 작업 등 기능을 실행할 때. 명령어 파라미터를 틀리지 않도록 낮은 값(<b>0.3</b>)으로 유지.</span>
           </div>
           <div style="display:flex;gap:24px;flex-wrap:wrap">
             <label style="font-size:13px;flex:1;min-width:200px">
@@ -963,9 +973,25 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
         </div>
 
         <!-- Max Tokens -->
-        <div style="margin-top:16px">
-          <div style="font-weight:600;font-size:13px;margin-bottom:8px">
+        <div style="margin-top:16px;border-left:3px solid var(--accent);padding-left:14px">
+          <div style="font-weight:600;font-size:14px;margin-bottom:6px">
             <span class="eng-en">📏 Max Response Tokens</span><span class="eng-kr">📏 최대 응답 토큰</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:10px">
+            <span class="eng-en">Limits how long the AI's reply can be. 1 token ≈ 0.75 English words (한국어 1토큰 ≈ 1~2글자).<br>
+            <b>512 tokens</b> ≈ short paragraph (~380 words) — good for quick answers<br>
+            <b>4,096 tokens</b> ≈ ~2 pages of text — good for code and detailed explanations<br>
+            <b>16,384 tokens</b> ≈ ~8 pages — for very long outputs<br><br>
+            <b>💬 Chat</b> — Everyday conversations. Lower values save money; raise if replies feel cut off.<br>
+            <b>💻 Code/Analysis</b> — Programming, analysis, long-form writing. Needs more room.<br>
+            <b>⚠️ Cost impact:</b> Higher limits don't always cost more (you only pay for tokens actually used), but the AI may write longer than needed.</span>
+            <span class="eng-kr">AI 응답의 최대 길이를 제한하오. 1토큰 ≈ 한국어 1~2글자 (영어 0.75단어).<br>
+            <b>512 토큰</b> ≈ 짧은 문단 (~250자) — 간단한 답변에 적합<br>
+            <b>4,096 토큰</b> ≈ A4 2페이지 분량 — 코드, 상세 설명에 적합<br>
+            <b>16,384 토큰</b> ≈ A4 8페이지 — 매우 긴 출력용<br><br>
+            <b>💬 대화</b> — 일상 대화. 낮은 값이 비용 절감되나, 답변이 잘리면 올릴 것.<br>
+            <b>💻 코드/분석</b> — 프로그래밍, 분석, 장문 작성. 넉넉한 공간 필요.<br>
+            <b>⚠️ 비용 영향:</b> 한도를 높인다고 무조건 비싸지진 않소 (실제 사용한 토큰만 과금). 다만 AI가 필요 이상으로 길게 쓸 수 있소.</span>
           </div>
           <div style="display:flex;gap:16px;flex-wrap:wrap">
             <label style="font-size:13px;flex:1;min-width:200px">
