@@ -219,6 +219,13 @@ class RAGEngine(RAGIndexerMixin):
             vector TEXT NOT NULL,
             FOREIGN KEY (chunk_id) REFERENCES chunks(id)
         )""")
+        self._conn.execute("""CREATE TABLE IF NOT EXISTS rag_embeddings (
+            chunk_hash TEXT PRIMARY KEY,
+            embedding TEXT NOT NULL,
+            provider TEXT,
+            dimensions INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )""")
         self._conn.execute("""CREATE INDEX IF NOT EXISTS idx_chunks_source
             ON chunks(source)""")
         self._conn.commit()
@@ -388,6 +395,15 @@ class RAGEngine(RAGIndexerMixin):
             f"{len(doc_freq)} unique terms"
         )
 
+        # Generate embeddings for all chunks if API available
+        try:
+            from salmalm.features.rag_embeddings import get_available_provider, batch_embed
+            if get_available_provider():
+                chunk_texts = [doc[3] for doc in new_docs]  # text field
+                batch_embed(chunk_texts, conn=self._conn)
+        except Exception as e:
+            log.debug(f"[RAG] Embedding during reindex skipped: {e}")
+
     def _bm25_search(self, query_tokens: List[str], max_results: int, min_score: float) -> List[Dict]:
         """Pure BM25 search, returns scored results with bm25 rank."""
         term_set = set(query_tokens)
@@ -425,6 +441,57 @@ class RAGEngine(RAGIndexerMixin):
                         "chunk_id": chunk_id,
                     }
                 )
+
+        scored.sort(key=lambda x: -x["score"])
+        return scored[:max_results]
+
+    @staticmethod
+    def _has_embedding_api() -> bool:
+        """Check if any embedding API provider is available."""
+        try:
+            from salmalm.features.rag_embeddings import get_available_provider
+            return get_available_provider() is not None
+        except Exception:
+            return False
+
+    def _embedding_search(self, query: str, max_results: int) -> List[Dict]:
+        """Semantic search using embedding vectors."""
+        try:
+            from salmalm.features.rag_embeddings import get_embedding, cosine_similarity_vec
+        except Exception:
+            return []
+
+        result = get_embedding(query, conn=self._conn)
+        if result is None:
+            return []
+        query_emb, _ = result
+
+        # Get all chunks that have embeddings
+        scored = []
+        for row in self._conn.execute(
+            "SELECT c.id, c.source, c.line_start, c.text, c.hash "
+            "FROM chunks c"
+        ):
+            chunk_id, source, line_start, text, chunk_hash = row
+            # Look up embedding by chunk hash
+            emb_row = self._conn.execute(
+                "SELECT embedding FROM rag_embeddings WHERE chunk_hash=?",
+                (hashlib.sha256(text.encode()).hexdigest()[:32],),
+            ).fetchone()
+            if not emb_row:
+                continue
+            chunk_emb = json.loads(emb_row[0])
+            if len(chunk_emb) != len(query_emb):
+                continue
+            sim = cosine_similarity_vec(query_emb, chunk_emb)
+            if sim > 0:
+                scored.append({
+                    "score": sim,
+                    "source": source,
+                    "line": line_start,
+                    "text": text,
+                    "chunk_id": chunk_id,
+                })
 
         scored.sort(key=lambda x: -x["score"])
         return scored[:max_results]
@@ -514,8 +581,15 @@ class RAGEngine(RAGIndexerMixin):
         candidate_multiplier = 4
         pool_size = max_results * candidate_multiplier
 
-        # Get candidates from both methods
-        vector_results = self._vector_search(expanded_tokens, pool_size)
+        # Try embedding search first (semantic), fall back to TF-IDF vector search
+        use_embeddings = self._has_embedding_api()
+        if use_embeddings:
+            try:
+                vector_results = self._embedding_search(query, pool_size)
+            except Exception:
+                vector_results = self._vector_search(expanded_tokens, pool_size)
+        else:
+            vector_results = self._vector_search(expanded_tokens, pool_size)
         bm25_results = self._bm25_search(expanded_tokens, pool_size, 0.0)
 
         # Build score maps

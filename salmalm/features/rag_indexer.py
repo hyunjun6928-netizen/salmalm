@@ -7,7 +7,7 @@ import os
 import sqlite3
 import time
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +83,15 @@ class RAGIndexerMixin:
 
         self._conn.commit()
         self._load_stats()
+
+        # Generate embeddings for new chunks (async-friendly, non-blocking on failure)
+        try:
+            from salmalm.features.rag_embeddings import get_available_provider, batch_embed
+            if get_available_provider():
+                chunk_texts = [doc[3] for doc in new_docs]  # text field
+                batch_embed(chunk_texts, conn=self._conn)
+        except Exception as e:
+            log.debug(f"[RAG] Embedding during index_text skipped: {e}")
 
     def _get_indexable_files(self) -> List[Tuple[str, Path]]:
         """Enumerate files to index."""

@@ -370,6 +370,77 @@ class SubAgent:
         except Exception as e:
             return f"❌ Send failed: {str(e)[:200]}"
 
+    @classmethod
+    def get_agent(cls, agent_id: str = "", label: str = "") -> Optional[dict]:
+        """Get agent by id or label."""
+        if agent_id:
+            return cls._agents.get(agent_id)
+        if label:
+            for a in cls._agents.values():
+                if a.get("label") == label:
+                    return a
+        return None
+
+    @classmethod
+    def steer(cls, agent_id: str = "", message: str = "", label: str = "") -> dict:
+        """Send a steering message to a running sub-agent by id or label.
+
+        Injects a message into the agent's session for it to pick up.
+        """
+        agent = cls.get_agent(agent_id=agent_id, label=label)
+        if not agent:
+            target = agent_id or label
+            return {"ok": False, "error": f"Agent '{target}' not found"}
+
+        aid = agent["id"]
+
+        if agent["status"] not in ("running", "completed"):
+            return {"ok": False, "error": f"Agent '{aid}' status is '{agent['status']}'"}
+
+        session_id = f"subagent-{aid}"
+        try:
+            session = _core().get_session(session_id)
+            session.messages.append({"role": "user", "content": f"[Steering from parent] {message}"})
+
+            if agent["status"] == "running":
+                return {"ok": True, "agent_id": aid, "status": "steered"}
+
+            # Completed — re-run with steering message
+            from salmalm.core.engine import process_message
+
+            result = asyncio.run(process_message(session_id, message, model_override=agent.get("model")))
+            agent["result"] = result
+            return {"ok": True, "agent_id": aid, "status": "steered", "result": result[:500]}
+        except Exception as e:
+            return {"ok": False, "error": f"Steer failed: {e}"}
+
+    @classmethod
+    def send_to_agent(cls, from_id: str, to_label: str, message: str) -> dict:
+        """Inter-agent communication: send message from one agent to another by label."""
+        target = cls.get_agent(label=to_label)
+        if not target:
+            return {"ok": False, "error": f"Target agent with label '{to_label}' not found"}
+
+        tid = target["id"]
+        session_id = f"subagent-{tid}"
+        try:
+            session = _core().get_session(session_id)
+            session.messages.append({
+                "role": "user",
+                "content": f"[Message from agent {from_id}] {message}",
+            })
+            if target["status"] == "running":
+                return {"ok": True, "from": from_id, "to": tid, "status": "queued"}
+
+            # If target is completed, re-process
+            from salmalm.core.engine import process_message
+
+            result = asyncio.run(process_message(session_id, message, model_override=target.get("model")))
+            target["result"] = result
+            return {"ok": True, "from": from_id, "to": tid, "status": "delivered", "result": result[:500]}
+        except Exception as e:
+            return {"ok": False, "error": f"Send failed: {e}"}
+
 
 # ============================================================
 class PluginLoader:

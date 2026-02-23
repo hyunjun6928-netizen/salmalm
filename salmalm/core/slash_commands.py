@@ -455,7 +455,18 @@ def _cmd_agent(cmd: str, session, *, session_id="", **_) -> str:
         if len(bind_parts) == 2:
             return agent_manager.bind(bind_parts[0], bind_parts[1])
         return "❌ Usage: /agent bind <chat_key> <agent_id>"
-    return "❌ Usage: /agent list|create|switch|delete|bind <args>"
+    elif sub == "steer" and len(parts) > 2:
+        steer_parts = parts[2].split(maxsplit=1)
+        label = steer_parts[0] if steer_parts else ""
+        message = steer_parts[1] if len(steer_parts) > 1 else ""
+        if not label or not message:
+            return "❌ Usage: /agent steer <label> <message>"
+        from salmalm.features.agents import SubAgent
+        result = SubAgent.steer(label=label, message=message)
+        if result.get("ok"):
+            return f"📡 Steered agent '{label}' ({result['agent_id']}): {result['status']}"
+        return f"❌ {result.get('error', 'Steer failed')}"
+    return "❌ Usage: /agent list|create|switch|delete|bind|steer <args>"
 
 
 def _cmd_hooks(cmd: str, session, **_) -> str:

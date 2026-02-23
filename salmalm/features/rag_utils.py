@@ -201,6 +201,22 @@ def compute_tf(tokens: List[str]) -> Dict[str, float]:
     return {t: c / n for t, c in counts.items()}
 
 
+def cosine_similarity_vec(a: List[float], b: List[float]) -> float:
+    """Cosine similarity between two dense float vectors. Pure Python, no numpy."""
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = 0.0
+    norm_a = 0.0
+    norm_b = 0.0
+    for i in range(len(a)):
+        dot += a[i] * b[i]
+        norm_a += a[i] * a[i]
+        norm_b += b[i] * b[i]
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return dot / (norm_a ** 0.5 * norm_b ** 0.5)
+
+
 def cosine_similarity(v1: Dict[str, float], v2: Dict[str, float]) -> float:
     """Cosine similarity between two sparse vectors (dict-based)."""
     if not v1 or not v2:

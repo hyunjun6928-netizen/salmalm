@@ -15,9 +15,43 @@ import subprocess
 import sys
 import tempfile
 import time
+from typing import Optional
 
 from salmalm.tools.tool_registry import register
 from salmalm.constants import WORKSPACE_DIR, DATA_DIR
+
+
+def _format_aria_tree(snapshot: dict, depth: int = 0, ref_counter: list = None) -> str:
+    """Convert Playwright accessibility snapshot to compact aria-ref format.
+
+    OpenClaw-style: [e1] role "name" — much more token-efficient than raw JSON.
+    """
+    if ref_counter is None:
+        ref_counter = [0]
+    if not snapshot:
+        return ""
+    role = snapshot.get("role", "")
+    name = snapshot.get("name", "")
+    children = snapshot.get("children", [])
+    skip_roles = {"generic", "none", "presentation", "group"}
+    if role in skip_roles and not name and len(children) <= 1:
+        parts = []
+        for child in children:
+            parts.append(_format_aria_tree(child, depth, ref_counter))
+        return "\n".join(p for p in parts if p)
+    ref_counter[0] += 1
+    ref = f"e{ref_counter[0]}"
+    indent = "  " * min(depth, 6)
+    line = f"{indent}[{ref}] {role}"
+    if name:
+        short_name = name[:80] + ("..." if len(name) > 80 else "")
+        line += f' "{short_name}"'
+    parts = [line]
+    for child in children:
+        child_str = _format_aria_tree(child, depth + 1, ref_counter)
+        if child_str:
+            parts.append(child_str)
+    return "\n".join(parts)
 
 # Browser state directory
 _BROWSER_DIR = DATA_DIR / "browser"
@@ -285,7 +319,8 @@ def handle_browser(args: dict) -> str:
             lines.append(f"\n{text[:3000]}")
         snapshot = result.get("snapshot")
         if snapshot:
-            lines.append(f"\n📋 Accessibility tree: {json.dumps(snapshot, ensure_ascii=False)[:2000]}")
+            aria = _format_aria_tree(snapshot)
+            lines.append(f"\n📋 Accessibility tree (aria-ref):\n{aria[:3000]}")
         return "\n".join(lines)
 
     if action == "act":
