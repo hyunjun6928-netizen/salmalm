@@ -19,6 +19,12 @@ import base64 as b64
 import re as _re
 import traceback
 
+
+def _get_thinking_budget_map():
+    """Lazy import to avoid circular dependency."""
+    from salmalm.core.engine import _THINKING_BUDGET_MAP
+    return _THINKING_BUDGET_MAP
+
 _MAX_MESSAGE_LENGTH = 100_000
 _SESSION_ID_RE = _re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
@@ -100,7 +106,7 @@ def _classify_task(session, user_message: str) -> dict:
     classification["thinking"] = thinking_on
     level = getattr(session, "thinking_level", "medium") if thinking_on else None
     classification["thinking_level"] = level
-    classification["thinking_budget"] = _THINKING_BUDGET_MAP.get(level or "medium", 10000) if thinking_on else 0
+    classification["thinking_budget"] = _get_thinking_budget_map().get(level or "medium", 10000) if thinking_on else 0
 
     if not thinking_on and classification["tier"] >= 3 and classification["score"] >= 4:
         _suggest_key = f"_thinking_suggested_{getattr(session, 'id', '')}"

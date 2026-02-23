@@ -6,7 +6,7 @@ import os
 import time
 from pathlib import Path
 
-from salmalm.constants import DATA_DIR, VERSION, WORKSPACE_DIR, MEMORY_DIR, BASE_DIR  # noqa: F401
+from salmalm.constants import DATA_DIR, VERSION, WORKSPACE_DIR, MEMORY_DIR, BASE_DIR, AUDIT_DB  # noqa: F401
 from salmalm.security.crypto import vault, log as _log  # noqa: F401
 
 log = logging.getLogger(__name__)

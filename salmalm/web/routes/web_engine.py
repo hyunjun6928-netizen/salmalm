@@ -2,7 +2,7 @@
 
 from salmalm.security.crypto import vault, log
 import os
-from salmalm.constants import COMPACTION_THRESHOLD, MODEL_COSTS
+from salmalm.constants import COMPACTION_THRESHOLD, MODEL_COSTS, MODELS
 
 
 def _apply_int_setting(body: dict, key: str, min_val: int, max_val: int, env_key: str = None, const_attr=None) -> None:
