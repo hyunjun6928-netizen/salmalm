@@ -39,7 +39,14 @@ class WebModelMixin:
             llm_router,
         )
 
-        providers = []
+        providers = [
+            {
+                "name": "auto",
+                "available": True,
+                "env_key": "",
+                "models": [{"name": "Auto Routing (자동 라우팅)", "full": "auto"}],
+            }
+        ]
         for name, cfg in PROVIDERS.items():
             if name == "ollama":
                 # Fetch real models from local endpoint instead of hardcoded list
