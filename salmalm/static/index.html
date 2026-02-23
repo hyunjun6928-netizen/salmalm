@@ -958,7 +958,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             </label>
           </div>
           <div style="font-size:11px;color:var(--text2);margin-top:6px">
-            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Temperature <b>1.0</b> (default). Uses <code>reasoning_effort</code> instead of temperature tuning.</span><span class="eng-kr">🆚 <b>오픈클로:</b> Temperature <b>1.0</b> (기본값). 온도 대신 <code>reasoning_effort</code>로 품질 조절.</span></span>
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Chat <b>1.0</b> (provider default, not explicitly set). Tool/agent calls <b>0.0~0.3</b>. Uses <code>reasoning_effort</code> instead of temperature to control output quality.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 대화 <b>1.0</b> (프로바이더 기본값, 명시 설정 없음). 도구/에이전트 호출 <b>0.0~0.3</b>. 온도 대신 <code>reasoning_effort</code>로 출력 품질 조절.</span></span>
           </div>
         </div>
 
@@ -1006,6 +1006,21 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
         &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#f87171">잡담 ~$0.03/턴, 코딩 ~$0.10/턴</span><br>
         &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--text2)">↑ 계획/검증 없음 (오픈클로에 해당 기능 없음). 대신 도구 무한 반복 허용.</span><br><br>
         <span style="background:var(--bg);padding:6px 10px;border-radius:6px;border:1px solid var(--border);display:inline-block">🔴 vs 🔵 — <b>최대 품질</b>은 신중하게 (계획→실행→검증). <b>오픈클로</b>는 제한 없이 자유롭게 실행. 품질이 턴당 비용은 높지만 실수가 적음.</span></span>
+      </div>
+
+      <!-- Summary comparison table -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:16px;font-size:12px;line-height:2">
+        <span class="eng-en"><b>📊 SalmAlm vs OpenClaw — Engine Settings at a Glance</b></span><span class="eng-kr"><b>📊 삶앎 vs 오픈클로 — 엔진 설정 한눈에 보기</b></span><br>
+        <span style="display:inline-grid;grid-template-columns:auto 1fr 1fr;gap:2px 12px;margin-top:6px">
+          <b style="color:var(--text2)"></b><b>🔴 SalmAlm</b><b>🔵 OpenClaw</b>
+          <span class="eng-en">Temperature (Chat)</span><span class="eng-kr">온도 (대화)</span><span>0.7</span><span>1.0 <span style="color:var(--text2)">(provider default)</span></span>
+          <span class="eng-en">Temperature (Tool)</span><span class="eng-kr">온도 (도구)</span><span>0.3</span><span>0.0~0.3</span>
+          <span class="eng-en">Planning</span><span class="eng-kr">계획 단계</span><span>OFF <span style="color:var(--text2)">(opt-in)</span></span><span>OFF</span>
+          <span class="eng-en">Reflection</span><span class="eng-kr">자기 검증</span><span>OFF <span style="color:var(--text2)">(opt-in)</span></span><span>OFF</span>
+          <span class="eng-en">Max Tool Iterations</span><span class="eng-kr">최대 도구 반복</span><span>15</span><span>∞ <span style="color:var(--text2)">(unlimited)</span></span>
+          <span class="eng-en">Compaction</span><span class="eng-kr">컨텍스트 압축</span><span>30K chars</span><span>~120K tokens</span>
+          <span class="eng-en">Quality Control</span><span class="eng-kr">품질 조절</span><span style="color:var(--text2)">temperature</span><span style="color:var(--text2)">reasoning_effort</span>
+        </span>
       </div>
 
       <button class="btn" data-action="saveEngineSettings" style="margin-top:16px;font-size:14px;padding:10px 24px"><span class="eng-en">💾 Save</span><span class="eng-kr">💾 저장</span></button>
