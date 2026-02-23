@@ -1,5 +1,6 @@
 """Exec tools: exec, python_eval, background session management."""
 
+from salmalm.security.crypto import log
 import subprocess
 import sys
 import json
@@ -157,8 +158,8 @@ def handle_exec(args: dict) -> str:
                 resource.setrlimit(resource.RLIMIT_NOFILE, (100, 100))
                 # Max file size: 50MB
                 resource.setrlimit(resource.RLIMIT_FSIZE, (50 * 1024 * 1024, 50 * 1024 * 1024))
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         if sys.platform != "win32" and not needs_shell:
             extra_kwargs["preexec_fn"] = _set_exec_limits
@@ -328,8 +329,8 @@ else:
             resource.setrlimit(resource.RLIMIT_NOFILE, (50, 50))
             resource.setrlimit(resource.RLIMIT_NPROC, (10, 10))
             resource.setrlimit(resource.RLIMIT_FSIZE, (10 * 1024 * 1024, 10 * 1024 * 1024))
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     try:
         _kwargs: dict = dict(

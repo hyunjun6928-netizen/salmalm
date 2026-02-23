@@ -31,8 +31,8 @@ def load_cache_config() -> dict:
             merged = dict(_DEFAULT_CONFIG)
             merged.update(cfg)
             return merged
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
     return dict(_DEFAULT_CONFIG)
 
 
@@ -41,8 +41,8 @@ def save_cache_config(config: dict) -> None:
     try:
         _CACHE_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
         _CACHE_CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
 
 
 class CacheWarmer:
@@ -180,8 +180,8 @@ class HeartbeatManager:
             if self._CONFIG_FILE.exists():
                 data = json.loads(self._CONFIG_FILE.read_text(encoding="utf-8"))
                 cfg.update(data)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         return cfg
 
     def reload(self) -> None:

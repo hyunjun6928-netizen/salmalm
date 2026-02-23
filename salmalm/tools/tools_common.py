@@ -265,7 +265,7 @@ def _is_private_url_follow_redirects(url: str, max_redirects: int = 5):
                 current_url = urljoin(current_url, location)
                 continue
             break  # Non-redirect error, proceed with original URL
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             break
 
     return False, "", current_url

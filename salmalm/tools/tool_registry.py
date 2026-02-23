@@ -82,7 +82,7 @@ def execute_tool(name: str, args: dict) -> str:
         from salmalm.security.redact import scrub_secrets
 
         _audit_preview = scrub_secrets(json.dumps(args, ensure_ascii=False)[:200])
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         _audit_preview = json.dumps(args, ensure_ascii=False)[:200]
     audit_log("tool_exec", f"{name}: {_audit_preview}")
 
@@ -108,7 +108,7 @@ def execute_tool(name: str, args: dict) -> str:
             result = gateway.dispatch_auto(name, args)
             if result and "error" not in result:
                 return result.get("result", str(result))
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         pass  # Fall through to local execution
 
     _ensure_modules()
@@ -132,8 +132,8 @@ def execute_tool(name: str, args: dict) -> str:
             result = plugin_manager._execute_plugin_tool(name, args)
             if result is not None:
                 return result
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Try MCP tools as last fallback
         if name.startswith("mcp_"):

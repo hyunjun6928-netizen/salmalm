@@ -35,8 +35,8 @@ def _load_tool_policy() -> dict:
         if f.exists():
             try:
                 return json.loads(f.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
     return {"deny": [], "allow": []}
 
 
@@ -130,8 +130,8 @@ class SubAgent:
                         for m in session.messages
                         if m.get("role") != "system"
                     ]
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
                 # Collect token usage from session metrics
                 try:
@@ -149,8 +149,8 @@ class SubAgent:
                     else:
                         cost = (in_tokens * 3 + out_tokens * 15) / 1_000_000
                     agent_info["estimated_cost"] = round(cost, 6)
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
                 log.info(f"[BOT] Sub-agent {agent_id} completed: {len(result)} chars, {runtime_s:.1f}s")
 
@@ -535,8 +535,8 @@ class SkillLoader:
                     "metadata": metadata,
                     "has_scripts": any(skill_dir.glob("*.py")) or any(skill_dir.glob("*.sh")),
                 }
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         cls._last_scan = now  # type: ignore[assignment]
         log.info(f"[SKILL] Skills scanned: {len(cls._cache)} found")
@@ -551,7 +551,7 @@ class SkillLoader:
             return None  # type: ignore[return-value]
         try:
             return Path(skill["path"]).read_text(encoding="utf-8", errors="replace")
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return None  # type: ignore[return-value]
 
     @classmethod
@@ -778,7 +778,7 @@ class AgentConfig:
         try:
             if self.config_file.exists():
                 self._config = json.loads(self.config_file.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self._config = {}
 
     def save(self) -> None:
@@ -856,7 +856,7 @@ class AgentManager:
         try:
             if BINDINGS_FILE.exists():
                 self._bindings = json.loads(BINDINGS_FILE.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self._bindings = {}
 
     def _save_bindings(self):

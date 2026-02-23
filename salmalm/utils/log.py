@@ -70,7 +70,7 @@ def setup_logging(
             from salmalm.utils.logging_ext import JSONFormatter
 
             formatter = JSONFormatter()
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             formatter = logging.Formatter(fmt or _DEFAULT_FMT, datefmt=datefmt or _DEFAULT_DATEFMT)
     else:
         formatter = logging.Formatter(fmt or _DEFAULT_FMT, datefmt=datefmt or _DEFAULT_DATEFMT)

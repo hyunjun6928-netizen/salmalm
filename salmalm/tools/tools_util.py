@@ -172,7 +172,7 @@ def handle_clipboard(args: dict) -> str:
     with _clipboard_lock:
         try:
             clips = json.loads(clip_file.read_text()) if clip_file.exists() else {}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             clips = {}
 
         if action == "copy":

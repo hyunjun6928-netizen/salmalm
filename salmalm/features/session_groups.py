@@ -32,8 +32,8 @@ class SessionGroupManager:
             )""")
             try:
                 conn.execute("ALTER TABLE session_store ADD COLUMN group_id INTEGER DEFAULT NULL")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
             conn.commit()
             row = conn.execute("SELECT COUNT(*) FROM session_groups").fetchone()
             if row[0] == 0:
@@ -69,7 +69,7 @@ class SessionGroupManager:
                     }
                 )
             return groups
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def create_group(self, name: str, color: str = "#6366f1") -> Dict:

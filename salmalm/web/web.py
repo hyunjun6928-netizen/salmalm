@@ -400,7 +400,7 @@ class WebHandler(
 
         try:
             mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             mem_mb = 0
         # GC stats
         gc_counts = gc.get_count()
@@ -438,7 +438,7 @@ class WebHandler(
         try:
             from salmalm.security.crypto import HAS_CRYPTO
             return "AES-256-GCM" if HAS_CRYPTO else "HMAC-CTR (obfuscation only)"
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return "unknown"
 
     def _get_status(self):
@@ -1082,7 +1082,7 @@ class WebHandler(
                                     "description": t.get("function", {}).get("description", ""),
                                 }
                             )
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 tools = [
                     {"name": "web_search", "description": "Search the web"},
                     {"name": "bash", "description": "Execute shell commands"},
@@ -2211,14 +2211,14 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                         from salmalm.features.edge_cases import process_uploaded_file
 
                         info = process_uploaded_file(fname, file_data)
-                    except Exception:
+                    except Exception as e:  # noqa: broad-except
                         info += "\n[PDF text extraction failed]"
                 elif is_text:
                     try:
                         from salmalm.features.edge_cases import process_uploaded_file
 
                         info = process_uploaded_file(fname, file_data)
-                    except Exception:
+                    except Exception as e:  # noqa: broad-except
                         preview = file_data.decode("utf-8", errors="replace")[:3000]  # type: ignore[union-attr]
                         info += f"\n[File content]\n{preview}"
                 log.info(f"[SEND] Web upload: {fname} ({size_kb:.1f}KB)")

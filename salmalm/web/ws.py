@@ -66,7 +66,7 @@ class WSClient:
             async with self._send_lock:
                 payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
                 await self._send_frame(OP_TEXT, payload)
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self.connected = False
 
     async def send_text(self, text: str) -> None:
@@ -75,7 +75,7 @@ class WSClient:
             return
         try:
             await self._send_frame(OP_TEXT, text.encode("utf-8"))
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self.connected = False
 
     async def _send_frame(self, opcode: int, data: bytes):
@@ -133,10 +133,10 @@ class WSClient:
                 self.writer.close()
                 try:
                     await self.writer.wait_closed()
-                except Exception:
-                    pass
-            except Exception:
-                pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
 
 class WebSocketServer:
@@ -182,8 +182,8 @@ class WebSocketServer:
         for client in list(self.clients.values()):
             try:
                 await client.send_json({"type": "shutdown", "message": "Server is shutting down..."})
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         # Brief pause so clients can process the message
         await asyncio.sleep(0.5)
         # Close all connections
@@ -281,8 +281,8 @@ class WebSocketServer:
             if "?session=" in first_line:
                 try:
                     session_id = first_line.split("?session=")[1].split()[0].split("&")[0]
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
         client = WSClient(reader, writer, session_id)
         self.clients[client._id] = client
@@ -301,7 +301,7 @@ class WebSocketServer:
                 for buffered_msg in old_client._buffer:
                     try:
                         await client.send_json(buffered_msg)
-                    except Exception:
+                    except Exception as e:  # noqa: broad-except
                         break
                 old_client._buffer.clear()
                 self.clients.pop(old_id, None)
@@ -319,8 +319,8 @@ class WebSocketServer:
                 host=headers.get("host", ""),
                 user_agent=headers.get("user-agent", ""),
             )
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         if self._on_connect:
             try:
@@ -388,17 +388,17 @@ class WebSocketServer:
                 from salmalm.features.presence import presence_manager
 
                 presence_manager.unregister(f"ws_{client._id}")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
             if self._on_disconnect:
                 try:
                     await self._on_disconnect(client)
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
             try:
                 writer.close()
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
             log.info(f"[FAST] WS client disconnected (total={len(self.clients)})")
 
     async def _keepalive_loop(self):
@@ -413,7 +413,7 @@ class WebSocketServer:
                 else:
                     try:
                         await client._send_frame(OP_PING, b"")
-                    except Exception:
+                    except Exception as e:  # noqa: broad-except
                         dead.append(cid)
             for cid in dead:
                 c = self.clients.pop(cid, None)

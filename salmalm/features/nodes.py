@@ -125,8 +125,8 @@ class SSHNode:
                 if "load average" in line:
                     load = line.split("load average:")[-1].strip()
                     self._last_status["load"] = load  # type: ignore[index]
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         return self._last_status  # type: ignore[return-value]
 
@@ -577,7 +577,7 @@ class NodeAgent:
             ip = s.getsockname()[0]
             s.close()
             return ip  # type: ignore[no-any-return]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return "127.0.0.1"
 
     def start_heartbeat(self, interval: int = 30) -> None:
@@ -597,8 +597,8 @@ class NodeAgent:
                         f"{self.gateway_url}/api/gateway/heartbeat", data=payload, headers=headers, method="POST"
                     )
                     urllib.request.urlopen(req, timeout=10)
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
                 time.sleep(interval)
 
         self._heartbeat_thread = threading.Thread(target=_beat, daemon=True)  # type: ignore[assignment]

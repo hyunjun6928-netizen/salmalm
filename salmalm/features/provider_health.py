@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging; log = logging.getLogger("salmalm")
 import json
 import time
 from datetime import datetime
@@ -161,8 +162,8 @@ class ProviderHealthCheck:
                     data = json.loads(resp.read())
                     count = len(data.get("models", data.get("data", [])))
                     return f"ok ({count} models)"
-                except Exception:
-                    continue
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
             return "offline: no models endpoint responded"
         except Exception as e:
             return f"offline: {str(e)[:100]}"

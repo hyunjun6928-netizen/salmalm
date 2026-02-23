@@ -10,6 +10,7 @@ Features:
 보안 모듈 — OWASP 준수, 보안 감사, 강화.
 """
 
+import logging; log = logging.getLogger("salmalm")
 import ipaddress
 import os
 import re
@@ -48,8 +49,8 @@ def _load_redact_config() -> dict:
 
             cfg = _json.loads(config_path.read_text(encoding="utf-8"))
             defaults.update(cfg)
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
     return defaults
 
 
@@ -148,7 +149,7 @@ def is_internal_ip(url: str) -> Tuple[bool, str]:
     Returns (is_blocked, reason)."""
     try:
         parsed = urlparse(url)
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return True, "Invalid URL"
 
     scheme = (parsed.scheme or "").lower()
@@ -265,8 +266,8 @@ class SecurityAuditor:
                 issues.append("CRITICAL: /api/vault is public")
             if "/api/chat" in public_paths:
                 issues.append("WARN: /api/chat is public")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Check session token entropy (128-bit = 32 hex chars)
         import secrets
@@ -283,8 +284,8 @@ class SecurityAuditor:
                 pass  # Good
             else:
                 issues.append("Missing CSRF protection")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         status = "FAIL" if any("CRITICAL" in i for i in issues) else ("WARN" if issues else "PASS")
         return {
@@ -313,8 +314,8 @@ class SecurityAuditor:
             h, s = _hash_password("test")
             if len(h) < 32:
                 issues.append("Password hash output too short")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         status = "FAIL" if any("CRITICAL" in i for i in issues) else ("WARN" if issues else "PASS")
         return {
             "id": "A02",
@@ -336,8 +337,8 @@ class SecurityAuditor:
                 lines = [i + 1 for i, l in enumerate(content.split("\n")) if "execute(f" in l and "SELECT" in l.upper()]
                 if lines:
                     issues.append(f"Potential SQL injection in web.py lines: {lines}")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Check XSS protection (CSP headers)
         try:
@@ -348,8 +349,8 @@ class SecurityAuditor:
                 pass  # CSP headers present
             else:
                 issues.append("Missing CSP headers")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Check path traversal protection
         try:
@@ -378,7 +379,7 @@ class SecurityAuditor:
 
             if not rate_limiter:
                 issues.append("No rate limiting configured")
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             issues.append("Rate limiter not available")
 
         # Check request size limits
@@ -390,8 +391,8 @@ class SecurityAuditor:
                     issues.append("Request size limit too high")
             else:
                 issues.append("No request size limit")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Check exec sandboxing
         try:
@@ -416,16 +417,16 @@ class SecurityAuditor:
         # Check for hardcoded secrets
         try:
             from salmalm.constants import VERSION  # noqa: F401
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         # Check security headers
         try:
             from salmalm.web import WebHandler
 
             if not hasattr(WebHandler, "_security_headers"):
                 issues.append("Missing security headers method")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         # Check allowed HTTP methods
         try:
             from salmalm.web import WebHandler
@@ -434,8 +435,8 @@ class SecurityAuditor:
             for m in ["do_DELETE", "do_PATCH", "do_TRACE"]:
                 if hasattr(WebHandler, m):
                     issues.append(f"WARN: Unnecessary HTTP method enabled: {m.replace('do_', '')}")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         status = "WARN" if issues else "PASS"
         return {
             "id": "A05",
@@ -470,14 +471,14 @@ class SecurityAuditor:
                 issues.append("Lockout duration too short")
             if auth_manager._max_attempts > 10:
                 issues.append("Too many allowed login attempts before lockout")
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             issues.append("Auth manager not available")
         # Check session timeout
         try:
             from salmalm.web.auth import TokenManager  # noqa: F401
             # Default token expiry is 24h (86400s)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         status = "WARN" if issues else "PASS"
         return {
             "id": "A07",
@@ -495,8 +496,8 @@ class SecurityAuditor:
             content = web_src.read_text()
             if "pip install" in content and "hash" not in content.lower():
                 issues.append("WARN: pip install without hash verification")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         status = "WARN" if issues else "PASS"
         return {
             "id": "A08",

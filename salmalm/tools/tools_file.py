@@ -73,14 +73,14 @@ def handle_diff_files(args: dict) -> str:
         p1 = _resolve_path(f1)
         text1 = p1.read_text(encoding="utf-8", errors="replace").splitlines()
         label1 = f1
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         text1 = f1.splitlines()
         label1 = "text1"
     try:
         p2 = _resolve_path(f2)
         text2 = p2.read_text(encoding="utf-8", errors="replace").splitlines()
         label2 = f2
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         text2 = f2.splitlines()
         label2 = "text2"
     diff = list(difflib.unified_diff(text1, text2, fromfile=label1, tofile=label2, n=ctx))

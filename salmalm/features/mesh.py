@@ -69,7 +69,7 @@ class MeshPeer:
             self.version = data.get("version", "")
             self.capabilities = data.get("capabilities", [])
             return True
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self.status = "offline"
             return False
 
@@ -336,8 +336,8 @@ class MeshManager:
                             discovered.append(url)
                 except socket.timeout:
                     break
-                except Exception:
-                    continue
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
             sock.close()
         except Exception as e:
             log.warning(f"[MESH] Discovery error: {e}")

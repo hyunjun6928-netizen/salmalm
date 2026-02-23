@@ -128,8 +128,8 @@ class SLAConfig:
                     else:
                         return
                 self.load()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
 
 # Global config instance
@@ -185,7 +185,7 @@ class UptimeMonitor:
                 prev_data = json.loads(_RUNNING_FILE.read_text(encoding="utf-8"))
                 prev_start = prev_data.get("start_time", "")
                 prev_pid = prev_data.get("pid", "?")
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 prev_start = ""
                 prev_pid = "?"
 
@@ -196,8 +196,8 @@ class UptimeMonitor:
                 try:
                     prev_dt = datetime.fromisoformat(prev_start)
                     duration = (datetime.now(KST) - prev_dt).total_seconds()
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
             conn = self._get_db()
             conn.execute(
@@ -292,7 +292,7 @@ class UptimeMonitor:
             )
             downtime = cur.fetchone()[0] or 0.0
             conn.close()
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             downtime = 0.0
 
         uptime_pct = max(0.0, 100.0 * (1.0 - downtime / total_secs))
@@ -321,7 +321,7 @@ class UptimeMonitor:
             )
             downtime = cur.fetchone()[0] or 0.0
             conn.close()
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             downtime = 0.0
 
         return round(max(0.0, 100.0 * (1.0 - downtime / total_secs)), 4)
@@ -336,7 +336,7 @@ class UptimeMonitor:
             rows = cur.fetchall()
             conn.close()
             return [{"start": r[0], "end": r[1], "duration_sec": r[2], "reason": r[3]} for r in rows]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def get_stats(self) -> dict:
@@ -640,8 +640,8 @@ class Watchdog:
                     from salmalm.core import audit_log
 
                     audit_log("sla_health_issue", f"{name}: {detail}")
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
         # Auto-recovery attempts (자동 복구)
         if not sla_config.get("auto_recovery", True):
@@ -667,8 +667,8 @@ class Watchdog:
             if hasattr(_thread_local, "audit_conn"):
                 try:
                     _thread_local.audit_conn.close()
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
                 del _thread_local.audit_conn
             # Test new connection
             conn = sqlite3.connect(str(AUDIT_DB), timeout=5)

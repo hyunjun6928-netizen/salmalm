@@ -12,9 +12,9 @@ import urllib.request
 from typing import Any, Dict, Optional
 
 from pathlib import Path
-from salmalm.constants import APP_NAME, VERSION, WORKSPACE_DIR
+from salmalm.constants import VERSION, WORKSPACE_DIR
 from salmalm.security.crypto import vault, log
-from salmalm.core import router, get_session, audit_log, compact_messages, set_telegram_bot
+from salmalm.core import get_session, audit_log, set_telegram_bot
 from salmalm.core.llm import _http_post, _http_get
 from salmalm.core.prompt import build_system_prompt
 from salmalm.tools import execute_tool
@@ -46,8 +46,8 @@ class TelegramBot(TelegramCommandsMixin):
             me = self._api("getMe")
             if me.get("ok") and me.get("result"):
                 self._bot_username = me["result"].get("username")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         # Register command menu (OpenClaw-style)
         self._register_commands()
 
@@ -69,8 +69,8 @@ class TelegramBot(TelegramCommandsMixin):
                 import json as _j2
 
                 buttons.extend(_j2.loads(m.group(1)))
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
             return ""
 
         clean = _re2.sub(r"<!--buttons:(\[.*?\])-->", _repl, text)
@@ -109,8 +109,8 @@ class TelegramBot(TelegramCommandsMixin):
                 "setMessageReaction",
                 {"chat_id": chat_id, "message_id": message_id, "reaction": []},
             )
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     def set_message_reaction(self, chat_id, message_id: int, emoji: str = "👍") -> dict:
         """React to a message with an emoji via setMessageReaction API."""
@@ -187,8 +187,8 @@ class TelegramBot(TelegramCommandsMixin):
                     time.sleep(wait)
                     try:
                         self._api("sendMessage", data)
-                    except Exception:
-                        pass
+                    except Exception as e:  # noqa: broad-except
+                        log.debug(f"Suppressed: {e}")
                     continue
                 # Chat not found
                 if "chat not found" in err_str or "400" in str(e):
@@ -236,8 +236,8 @@ class TelegramBot(TelegramCommandsMixin):
             m = _re.search(r"retry.after[:\s]+(\d+)", err_str, _re.IGNORECASE)
             if m:
                 return float(m.group(1))
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         return 5.0  # Default wait
 
     def _cleanup_session(self, chat_id):
@@ -372,8 +372,8 @@ class TelegramBot(TelegramCommandsMixin):
             self._send_audio(chat_id, tmp_path, "")
             try:
                 tmp_path.unlink()
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
             log.info(f"[TTS] Voice sent: {len(audio_data)} bytes, voice={voice}")
         except Exception as e:
             log.error(f"[TTS] OpenAI TTS API error: {e}")
@@ -382,8 +382,8 @@ class TelegramBot(TelegramCommandsMixin):
         """Send a typing indicator to a Telegram chat."""
         try:
             self._api("sendChatAction", {"chat_id": chat_id, "action": "typing"})
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     def _start_typing_loop(self, chat_id) -> asyncio.Task:
         """Start an async typing indicator loop that refreshes every 5 seconds.
@@ -413,14 +413,15 @@ class TelegramBot(TelegramCommandsMixin):
             data["parse_mode"] = parse_mode
         try:
             self._api("editMessageText", data)
-        except Exception:
+        except Exception as e:  # noqa: broad-except
+            # Fallback without parse_mode
             # Fallback without parse_mode
             if parse_mode:
                 data2 = {k: v for k, v in data.items() if k != "parse_mode"}
                 try:
                     self._api("editMessageText", data2)
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
     def _send_draft(self, chat_id, text: str) -> Optional[int]:
         """Send initial draft message for block streaming. Returns message_id."""
@@ -435,7 +436,7 @@ class TelegramBot(TelegramCommandsMixin):
                     "last_edit": time.time(),
                 }
             return msg_id
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return None
 
     def _update_draft(self, chat_id, text: str, force: bool = False):
@@ -559,8 +560,8 @@ class TelegramBot(TelegramCommandsMixin):
             cb_user_id = str(cb.get("from", {}).get("id", ""))
             try:
                 self._api("answerCallbackQuery", {"callback_query_id": cb["id"]})
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
             # Multi-tenant: allow registered users; legacy: owner only
             from salmalm.features.users import user_manager as _um_cb
 
@@ -700,8 +701,8 @@ class TelegramBot(TelegramCommandsMixin):
                     try:
                         content = data.decode("utf-8", errors="replace")[:3000]
                         file_info += f"\n[File content preview]\n{content}"
-                    except Exception:
-                        pass
+                    except Exception as e:  # noqa: broad-except
+                        log.debug(f"Suppressed: {e}")
             except Exception as e:
                 file_info = f"[📎 File download failed: {e}]"
 

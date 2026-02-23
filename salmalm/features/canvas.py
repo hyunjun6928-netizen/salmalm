@@ -149,8 +149,8 @@ li{{margin:8px 0}}a{{color:#2563eb}}</style></head>
         if open_browser:
             try:
                 webbrowser.open(url)
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         # Cleanup old pages (keep last 30)
         if len(self._pages) > 30:
@@ -159,8 +159,8 @@ li{{margin:8px 0}}a{{color:#2563eb}}</style></head>
                 del self._pages[pid]
                 try:
                     (_CANVAS_DIR / f"{pid}.html").unlink(missing_ok=True)
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
         return {"url": url, "page_id": page_id}
 

@@ -52,7 +52,7 @@ class WebSessionsMixin:
                             title = m["content"][:60]
                             break
                     msg_count = len([m for m in msgs if m.get("role") in ("user", "assistant")])
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     title = sid
                     msg_count = 0
             entry = {

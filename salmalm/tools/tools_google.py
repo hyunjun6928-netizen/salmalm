@@ -161,7 +161,7 @@ def handle_gmail(args: dict) -> str:
                 lines.append(f"  📩 **{subj}** — {frm[:30]}")
                 lines.append(f"     {date} | {snippet}")
                 lines.append(f"     ID: `{msg_ref['id']}`")
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 lines.append(f"  📩 ID: {msg_ref['id']} (failed to fetch)")
         return "\n".join(lines)
 

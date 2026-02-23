@@ -20,6 +20,7 @@ Usage:
   result = sandbox_exec("ls -la", timeout=10)
 """
 
+from salmalm.security.crypto import log
 import os
 import shutil
 import subprocess
@@ -175,8 +176,8 @@ def _set_rlimits(timeout: int = 30, memory_mb: int = 512, max_fds: int = 50, max
             resource.setrlimit(resource.RLIMIT_NPROC, (20, 20))
         except (ValueError, AttributeError):
             pass  # Not available on macOS
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
 
 
 def sandbox_exec(

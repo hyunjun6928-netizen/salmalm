@@ -122,8 +122,8 @@ $bitmap.Dispose()
                     )
                     if result.returncode == 0 and os.path.exists(tmp_path):
                         return Path(tmp_path).read_bytes()
-                except Exception:
-                    continue
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
         log.warning("No screen capture tool found on Linux (tried gnome-screenshot, scrot, import)")
         return None
 
@@ -246,8 +246,8 @@ class ScreenHistory:
         for mp in metas:
             try:
                 result.append(json.loads(mp.read_text()))
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         return result
 
     def search(self, query: str) -> List[Dict]:
@@ -262,8 +262,8 @@ class ScreenHistory:
                     results.append(meta)
                     if len(results) >= 20:
                         break
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         return results
 
     def start_watching(self) -> None:

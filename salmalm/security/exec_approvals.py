@@ -209,8 +209,8 @@ class BackgroundSession:
                         _c._tg_bot._api(
                             "sendMessage", {"chat_id": _c._tg_bot.owner_id, "text": msg, "parse_mode": "Markdown"}
                         )
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
         self._thread = threading.Thread(target=_run, daemon=True, name=f"bg-exec-{self.session_id}")
         self._thread.start()
@@ -244,8 +244,8 @@ class BackgroundSession:
             try:
                 self.process.kill()
                 self.process.wait(timeout=5)
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         self.status = "killed"
         self.exit_code = -9
         return f"Killed background session {self.session_id}"

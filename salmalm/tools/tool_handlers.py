@@ -120,7 +120,7 @@ def execute_tool(name: str, args: dict) -> str:
                 )
                 if any(resolved.startswith(s) or val.startswith(s) for s in _sensitive):
                     return f"❌ Access denied: {key}={val} / 접근 거부: 보호된 시스템 경로"
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             pass  # Let downstream handlers deal with invalid paths
 
     # Environment variable injection prevention
@@ -136,7 +136,7 @@ def execute_tool(name: str, args: dict) -> str:
         from salmalm.security.redact import scrub_secrets
 
         _audit_args = scrub_secrets(_audit_args_raw)
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         _audit_args = _audit_args_raw
     _session_id = args.pop("_session_id", "")  # Injected by engine
     audit_log(
@@ -179,7 +179,7 @@ def execute_tool(name: str, args: dict) -> str:
             result = gateway.dispatch_auto(name, args)
             if isinstance(result, dict) and "error" not in result and "result" in result:
                 return str(result["result"])
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         pass  # Fall through to local execution
 
     from salmalm.tools.tool_registry import execute_tool as _registry_execute

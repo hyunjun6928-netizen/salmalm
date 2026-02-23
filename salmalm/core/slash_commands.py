@@ -322,7 +322,7 @@ def _cmd_compare(cmd, session, *, session_id="", **_):
                 results = pool.submit(lambda: asyncio.run(compare_models(session_id, compare_msg))).result()
         else:
             results = loop.run_until_complete(compare_models(session_id, compare_msg))
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         results = asyncio.run(compare_models(session_id, compare_msg))
     lines = ["🔀 **Model Comparison / 모델 비교**\n"]
     for r in results:
@@ -370,7 +370,7 @@ def _cmd_context(cmd, session, **_):
             ]
         )
         tool_tokens = estimate_tokens(tool_text)
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         TOOL_DEFINITIONS = []
 
     # Injected files breakdown
@@ -605,7 +605,7 @@ def _cmd_subagents(cmd, session, **_):
             from salmalm.features.subagents import subagent_manager
 
             return subagent_manager.steer(agent_id, message)
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return SubAgent.send_message(agent_id, message)
 
     elif sub == "log":
@@ -827,8 +827,8 @@ def _cmd_thought(cmd, session, **_):
             from salmalm.features.mood import mood_detector
 
             mood, _ = mood_detector.detect(thought_text)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         tid = thought_stream.add(thought_text, mood=mood)
         tags = ""
         import re as _re2

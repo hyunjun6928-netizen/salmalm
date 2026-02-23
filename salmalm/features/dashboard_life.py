@@ -54,7 +54,7 @@ class LifeDashboard:
                     "SELECT amount, category FROM expenses WHERE date >= ? AND date < ?", (month_start, month_end)
                 ).fetchall()
                 conn.close()
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return {"total_expense": 0, "by_category": {}, "count": 0}
 
         total = 0.0
@@ -94,7 +94,7 @@ class LifeDashboard:
                         }
                     )
             return pending[:20]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     # ── Routines ─────────────────────────────────────────────
@@ -111,7 +111,7 @@ class LifeDashboard:
                 "routines": list(routines.keys()),
                 "count": len(routines),
             }
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return {"routines": [], "count": 0}
 
     # ── Thoughts / Notes ─────────────────────────────────────
@@ -129,7 +129,7 @@ class LifeDashboard:
                 {"id": r["id"], "content": r["content"][:200], "tags": r["tags"], "created_at": r["created_at"]}
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     # ── Mood ─────────────────────────────────────────────────
@@ -146,7 +146,7 @@ class LifeDashboard:
                 ).fetchall()
                 conn.close()
             return [{"tags": r["tags"], "created_at": r["created_at"]} for r in rows]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     # ── Pomodoro ─────────────────────────────────────────────
@@ -165,7 +165,7 @@ class LifeDashboard:
                 ).fetchone()["c"]
                 conn.close()
             return {"total": total, "completed": completed, "rate": round(completed / total * 100, 1) if total else 0}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return {"total": 0, "completed": 0, "rate": 0}
 
     # ── Links ────────────────────────────────────────────────
@@ -180,7 +180,7 @@ class LifeDashboard:
                 ).fetchall()
                 conn.close()
             return [{"url": r["url"], "title": r["title"], "saved_at": r["saved_at"]} for r in rows]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     # ── Text Summary ─────────────────────────────────────────

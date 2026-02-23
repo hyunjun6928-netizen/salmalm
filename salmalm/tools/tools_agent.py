@@ -67,7 +67,7 @@ def handle_sub_agent(args: dict) -> str:
             from salmalm.features.subagents import subagent_manager
 
             return subagent_manager.steer(agent_id, message)
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return SubAgent.send_message(agent_id, message)
     return f"❌ Unknown action: {action}. Available: spawn, list, result, send, stop, log, info, steer"
 

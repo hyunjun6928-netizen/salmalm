@@ -179,8 +179,8 @@ class HealthMonitor:
             info["memory_mb"] = round(usage.ru_maxrss / 1024, 1)  # Linux: KB
             info["user_time"] = round(usage.ru_utime, 2)
             info["sys_time"] = round(usage.ru_stime, 2)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         try:
             # Check disk space for workspace
@@ -188,14 +188,14 @@ class HealthMonitor:
             info["disk_free_mb"] = round(stat.f_bavail * stat.f_frsize / (1024 * 1024), 1)
             info["disk_total_mb"] = round(stat.f_blocks * stat.f_frsize / (1024 * 1024), 1)
             info["disk_pct"] = round(100 * (1 - stat.f_bavail / stat.f_blocks), 1)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         try:
             info["pid"] = os.getpid()
             info["threads"] = threading.active_count()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         return info
 

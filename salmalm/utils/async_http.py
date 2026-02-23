@@ -5,6 +5,7 @@ optional SSE streaming support, suitable for replacing synchronous
 ``urllib.request`` calls inside async code paths.
 """
 
+from salmalm.security.crypto import log
 import asyncio
 import json
 import ssl
@@ -109,8 +110,8 @@ class AsyncHTTPResponse:
         try:
             if not self._writer.is_closing():
                 self._writer.close()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
 
 class AsyncHTTPClient:

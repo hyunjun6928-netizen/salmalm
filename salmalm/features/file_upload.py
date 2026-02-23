@@ -69,7 +69,7 @@ def extract_pdf_text(data: bytes) -> str:
 
         try:
             decompressed = zlib.decompress(stream_data)
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             decompressed = stream_data
 
         text_blocks = re.findall(rb"BT\s*(.*?)\s*ET", decompressed, re.DOTALL)

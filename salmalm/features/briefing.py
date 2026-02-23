@@ -3,6 +3,7 @@
 매일 아침 자동 요약: 날씨, 일정, 이메일, 미완료 작업.
 """
 
+from salmalm.security.crypto import log
 from datetime import datetime
 from salmalm.constants import KST
 
@@ -94,8 +95,8 @@ class DailyBriefing:
                 result = execute_tool("reminder", {"action": "list"})
                 if "⏰ No active" not in result:
                     parts.append(f"**⏰ 활성 리마인더**\n{result}\n")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         # Notes summary (recent)
         if "notes" in include:
@@ -105,8 +106,8 @@ class DailyBriefing:
                 result = execute_tool("note", {"action": "list", "count": 3})
                 if "📝 No notes" not in result:
                     parts.append(f"**📝 최근 메모**\n{result}\n")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         # Expenses today
         if "expenses" in include:
@@ -116,8 +117,8 @@ class DailyBriefing:
                 result = execute_tool("expense", {"action": "today"})
                 if "💰 No expenses" not in result:
                     parts.append(f"**💸 오늘 지출**\n{result}\n")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         if not parts:
             return "📋 브리핑 항목이 없습니다."

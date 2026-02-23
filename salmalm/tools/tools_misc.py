@@ -128,7 +128,7 @@ def _load_reminders():
     if fp.exists():
         try:
             _reminders = json.loads(fp.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             _reminders = []
 
 
@@ -230,7 +230,7 @@ def _reminder_check_loop():
                         due.append(r)
                     else:
                         remaining.append(r)
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     remaining.append(r)
             if due:
                 _reminders.clear()
@@ -250,8 +250,8 @@ def _reminder_check_loop():
                         with _reminder_lock:
                             _reminders.append(r)
                             _save_reminders()
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
 
 def _ensure_reminder_thread():
@@ -325,8 +325,8 @@ def _load_workflows() -> dict:
     if _workflows_file.exists():
         try:
             return json.loads(_workflows_file.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
     return {}
 
 
@@ -434,8 +434,8 @@ def handle_file_index(args: dict) -> str:
                             "preview": content[:200],
                         }
                         count += 1
-                    except Exception:
-                        pass
+                    except Exception as e:  # noqa: broad-except
+                        log.debug(f"Suppressed: {e}")
         if action == "status":
             return f"📂 File index: {len(_file_index)} files indexed"
         return f"📂 Indexed {count} files from {target_dir}"
@@ -568,8 +568,8 @@ def _load_feeds() -> dict:
     if _feeds_file.exists():
         try:
             return json.loads(_feeds_file.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
     return {}
 
 
@@ -674,8 +674,8 @@ def handle_rss_reader(args: dict) -> str:
                     for a in articles[:3]:
                         a["feed"] = name
                     all_articles.extend(articles[:3])
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
             if not all_articles:
                 return "📰 No articles fetched from subscribed feeds."
             lines = [f"📰 **Latest Articles ({len(all_articles)}):**"]

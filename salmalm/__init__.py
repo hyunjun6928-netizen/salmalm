@@ -3,7 +3,7 @@ import sys
 
 try:
     __version__ = "0.18.86"
-except Exception:
+except Exception as e:  # noqa: broad-except
     __version__ = "0.18.86"
 
 log = logging.getLogger("salmalm")
@@ -49,8 +49,8 @@ def init_logging() -> None:
         log.addHandler(_sh)
         for h in log.handlers:
             h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
 
 
 try:
@@ -58,6 +58,6 @@ try:
 
     app = Container()
     _register_services()
-except Exception:
+except Exception as e:  # noqa: broad-except
     # During pip build / isolated environments, constants may fail.
     pass

@@ -109,8 +109,8 @@ class CDPConnection:
         if self._writer:
             try:
                 self._writer.close()
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         for f in self._pending.values():
             if not f.done():
                 f.set_exception(ConnectionError("Disconnected"))
@@ -192,8 +192,8 @@ class CDPConnection:
                     for handler in self._event_handlers.get(method, []):
                         try:
                             handler(msg.get("params", {}))
-                        except Exception:
-                            pass
+                        except Exception as e:  # noqa: broad-except
+                            log.debug(f"Suppressed: {e}")
         except (asyncio.CancelledError, ConnectionError, OSError):
             pass
         self._connected = False
@@ -309,8 +309,8 @@ class BrowserController:
         if wait_load:
             try:
                 await asyncio.sleep(1)  # Simple wait; could listen for Page.loadEventFired
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         return result
 
     async def screenshot(self, full_page: bool = False, format: str = "png", quality: int = 80) -> str:
@@ -602,11 +602,11 @@ class BrowserManager:
             try:
                 self._process.terminate()
                 self._process.wait(timeout=5)
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 try:
                     self._process.kill()
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
             self._process = None
         if self._tmpdir:
             import shutil as _shutil

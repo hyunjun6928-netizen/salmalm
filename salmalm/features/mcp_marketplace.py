@@ -221,8 +221,8 @@ class MCPMarketplace:
 
             mgr = MCPManager()
             mgr.remove_server(name)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         del self._installed[name]
         self._save()
         return f"🗑️ `{name}` removed."
@@ -290,7 +290,7 @@ class MCPMarketplace:
                     self._connect_server(name)
                     if self._installed[name].get("status") == "connected":
                         break
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     if attempt < retries - 1:
                         time.sleep(1)
 

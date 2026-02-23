@@ -231,7 +231,7 @@ def build_system_prompt(full: bool = True, mode: str = "full") -> str:
         session_ctx = memory_manager.load_session_context()
         if session_ctx:
             parts.append(_truncate_file(session_ctx, MAX_SESSION_MEMORY_CHARS))
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         today = datetime.now(KST).strftime("%Y-%m-%d")
         today_log = MEMORY_DIR / f"{today}.md"
         if today_log.exists():

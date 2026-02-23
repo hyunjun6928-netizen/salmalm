@@ -12,23 +12,19 @@ import threading
 import time
 from collections import OrderedDict
 from datetime import datetime
-from typing import Callable, Optional
+from typing import Optional
 
 from salmalm.constants import (
     AUDIT_DB,
-    BASE_DIR,
     CACHE_TTL,
-    COMPACTION_THRESHOLD,
     COMPLEX_INDICATORS,
     DATA_DIR,
     KST,
     MEMORY_DIR,
-    MEMORY_FILE,
     MODEL_COSTS,
     MODEL_TIERS,
     SIMPLE_QUERY_MAX_CHARS,
     TOOL_HINT_KEYWORDS,
-    WORKSPACE_DIR,
 )
 from salmalm.security.crypto import vault, log
 
@@ -253,7 +249,7 @@ def audit_checkpoint() -> Optional[str]:
         with open(checkpoint_file, "a") as f:
             f.write(f"{ts} id={head_id} hash={head_hash}\n")
         return head_hash  # type: ignore[no-any-return]
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return None
 
 
@@ -715,6 +711,7 @@ def compact_session(session_id: str, force: bool = False) -> str:
         result = call_llm(summ_msgs, model=summary_model, max_tokens=1200)
     except Exception as e:
         # Compaction error: preserve original messages, skip compaction
+        # Compaction error: preserve original messages, skip compaction
         log.error(f"[COMPACT] LLM call failed during compaction: {e}")
         return f"❌ Compaction skipped — LLM error: {e}. Original messages preserved."
 
@@ -913,8 +910,8 @@ def search_messages(query: str, limit: int = 20) -> list:
         for sid, msgs_json, updated_at in rows:
             try:
                 msgs = json.loads(msgs_json)
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
             for msg in msgs:
                 role = msg.get("role", "")
                 if role not in ("user", "assistant"):

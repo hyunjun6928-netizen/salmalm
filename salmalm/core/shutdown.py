@@ -84,8 +84,8 @@ class ShutdownManager:
                     try:
                         session._persist()
                         count += 1
-                    except Exception:
-                        pass
+                    except Exception as e:  # noqa: broad-except
+                        log.debug(f"Suppressed: {e}")
                 log.info(f"[SHUTDOWN] Flushed {count} sessions to disk")
         except Exception as e:
             log.warning(f"[SHUTDOWN] Session flush error: {e}")

@@ -74,7 +74,7 @@ class ConversationFork:
             return [
                 {"id": r[0], "content": r[1], "model": r[2], "created_at": r[3], "is_active": bool(r[4])} for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def switch_alternative(self, session_id: str, message_index: int, alt_id: int) -> Optional[str]:
@@ -91,7 +91,7 @@ class ConversationFork:
             conn.commit()
             row = conn.execute("SELECT content FROM message_alternatives WHERE id=?", (alt_id,)).fetchone()
             return row[0] if row else None
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return None
 
     async def regenerate(self, session_id: str, message_index: int) -> Optional[str]:

@@ -53,7 +53,7 @@ class BookmarkManager:
             )
             conn.commit()
             return True
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def remove(self, session_id: str, message_index: int) -> bool:
@@ -65,7 +65,7 @@ class BookmarkManager:
             conn.execute("DELETE FROM bookmarks WHERE session_id=? AND message_index=?", (session_id, message_index))
             conn.commit()
             return True
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def list_all(self, limit: int = 50) -> List[Dict]:
@@ -91,7 +91,7 @@ class BookmarkManager:
                 }
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def list_session(self, session_id: str) -> List[Dict]:
@@ -109,7 +109,7 @@ class BookmarkManager:
                 {"id": r[0], "message_index": r[1], "role": r[2], "preview": r[3], "note": r[4], "created_at": r[5]}
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def is_bookmarked(self, session_id: str, message_index: int) -> bool:
@@ -122,7 +122,7 @@ class BookmarkManager:
                 "SELECT 1 FROM bookmarks WHERE session_id=? AND message_index=?", (session_id, message_index)
             ).fetchone()
             return row is not None
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
 

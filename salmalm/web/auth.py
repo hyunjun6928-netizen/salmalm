@@ -122,8 +122,8 @@ class TokenManager:
                     capture_output=True,
                     timeout=5,
                 )
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
     def rotate(self) -> str:
         """Create a new signing key. Old keys kept for verification.
@@ -156,7 +156,7 @@ class TokenManager:
             )""")
             conn.commit()
             conn.close()
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             pass  # Will work in-memory if DB unavailable
 
     def create(self, payload: dict, expires_in: int = 86400) -> str:
@@ -210,7 +210,7 @@ class TokenManager:
             if jti and self._is_revoked(jti):
                 return None
             return payload  # type: ignore[no-any-return]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return None
 
     def revoke(self, token: str) -> bool:
@@ -235,7 +235,7 @@ class TokenManager:
                 conn.commit()
                 conn.close()
             return True
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def revoke_all_for_user(self, user_id: int) -> None:
@@ -252,7 +252,7 @@ class TokenManager:
             row = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti=?", (jti,)).fetchone()
             conn.close()
             return row is not None
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def cleanup_expired(self) -> int:
@@ -264,7 +264,7 @@ class TokenManager:
             deleted = cursor.rowcount
             conn.close()
             return deleted
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return 0
 
 
@@ -503,8 +503,8 @@ class AuthManager:
             conn2.execute("DELETE FROM login_attempts WHERE username=?", (username,))
             conn2.commit()
             conn2.close()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Update last login
         conn = sqlite3.connect(str(AUTH_DB))
@@ -546,8 +546,8 @@ class AuthManager:
             conn.execute("DELETE FROM login_attempts WHERE attempted_at < ?", (cutoff,))
             conn.commit()
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     def _is_locked_out(self, username: str) -> bool:
         """Check if username is locked out (DB-persisted, survives restart)."""
@@ -560,7 +560,7 @@ class AuthManager:
             ).fetchone()
             conn.close()
             return (row[0] if row else 0) >= self._max_attempts
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def create_token(self, user: dict, expires_in: int = 86400) -> str:

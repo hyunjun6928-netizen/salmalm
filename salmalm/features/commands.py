@@ -390,7 +390,7 @@ class CommandRouter:
         _ensure_config_dir()
         try:
             cfg = json.loads(_CONFIG_PATH.read_text()) if _CONFIG_PATH.exists() else {}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             cfg = {}
 
         if sub == "show":
@@ -500,7 +500,7 @@ class CommandRouter:
         al_path = _CONFIG_DIR / "allowlist.json"
         try:
             al = json.loads(al_path.read_text()) if al_path.exists() else []
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             al = []
 
         if sub == "list":

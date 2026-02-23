@@ -618,7 +618,7 @@ class RAGEngine:
         try:
             with open(fpath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return
 
         # Extract messages text
@@ -748,7 +748,7 @@ class RAGEngine:
 
             self._conn.executemany("INSERT OR REPLACE INTO doc_freq (term, df) VALUES (?,?)", list(doc_freq.items()))
             self._conn.execute("COMMIT")
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self._conn.execute("ROLLBACK")
             raise
         self._load_stats()

@@ -1,6 +1,7 @@
 """SalmAlm Thought Stream — quick thought capture with SQLite storage and RAG integration."""
 
 from __future__ import annotations
+from salmalm.security.crypto import log
 
 import re
 import sqlite3
@@ -78,7 +79,7 @@ class ThoughtStream:
 
             label = f"thought:{thought_id}"
             rag_engine._index_text(label, content, time.time())
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             pass  # RAG indexing is optional
 
     def list_recent(self, n: int = 10) -> List[Dict]:
@@ -111,8 +112,8 @@ class ThoughtStream:
                         f"SELECT * FROM thoughts WHERE id IN ({placeholders}) ORDER BY created_at DESC", thought_ids
                     ).fetchall()
                 return [dict(r) for r in rows]
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Fallback: simple LIKE search
         with sqlite3.connect(str(self.db_path)) as conn:

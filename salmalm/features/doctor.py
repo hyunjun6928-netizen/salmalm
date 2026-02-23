@@ -58,7 +58,7 @@ class Doctor:
         import urllib.error
         try:
             from salmalm.security.crypto import vault
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return _status(True, "Channels: vault unavailable, skipped")
 
         results = []
@@ -70,7 +70,7 @@ class Doctor:
                 data = json.loads(resp.read())
                 bot_name = data.get("result", {}).get("username", "?")
                 results.append(f"Telegram: ✅ @{bot_name}")
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 results.append("Telegram: ❌ invalid token")
         dc_token = vault.get("discord_bot_token")
         if dc_token:
@@ -83,7 +83,7 @@ class Doctor:
                 data = json.loads(resp.read())
                 bot_name = data.get("username", "?")
                 results.append(f"Discord: ✅ {bot_name}")
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 results.append("Discord: ❌ invalid token")
         if not results:
             return _status(True, "Channels: none configured")
@@ -115,7 +115,7 @@ class Doctor:
                 try:
                     self.repair(result["issue_id"])
                     result["auto_fixed"] = True
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     result["auto_fixed"] = False
         return results
 
@@ -166,7 +166,7 @@ class Doctor:
                     data = json.loads(f.read_text(encoding="utf-8"))
                     if not isinstance(data, dict):
                         bad.append(f.name)
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     bad.append(f.name)
             if f.stat().st_size == 0:
                 bad.append(f"{f.name} (empty)")

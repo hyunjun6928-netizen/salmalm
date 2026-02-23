@@ -76,7 +76,7 @@ subprocess.run(["openssl", "version"], capture_output=True, check=True)
         log.warning("[LOCK] OpenSSL not available. TLS disabled.")
         log.warning("   Install OpenSSL or use a reverse proxy for HTTPS.")
         return False
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return False
 
 
@@ -139,7 +139,7 @@ def get_cert_info() -> dict:
                         info["not_after"] = line[9:]
                     elif "Fingerprint" in line:
                         info["fingerprint"] = line.split("=", 1)[1] if "=" in line else line
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         info["size_bytes"] = CERT_FILE.stat().st_size
     return info

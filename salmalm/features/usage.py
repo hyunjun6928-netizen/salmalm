@@ -72,7 +72,7 @@ class UsageTracker:
                 }
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def monthly_report(self, months: int = 3) -> List[Dict]:
@@ -99,7 +99,7 @@ class UsageTracker:
                 }
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def model_breakdown(self) -> Dict[str, float]:
@@ -108,7 +108,7 @@ class UsageTracker:
             conn = self._get_db()
             rows = conn.execute("SELECT model, SUM(cost) FROM usage_detail GROUP BY model").fetchall()
             return {r[0]: round(r[1], 6) for r in rows}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return {}
 
 

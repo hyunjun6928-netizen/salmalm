@@ -8,6 +8,7 @@ This is a lightweight adaptation of OpenClaw's browser control system,
 tailored for SalmAlm's pip-install-one-liner philosophy.
 """
 
+from salmalm.security.crypto import log
 import json
 import os
 import subprocess
@@ -155,8 +156,8 @@ def _run_playwright_script(script: str, args: list, timeout: int = 60) -> dict:
     finally:
         try:
             os.unlink(script_path)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
 
 def _is_internal_url(url: str) -> bool:
@@ -179,8 +180,8 @@ def _is_internal_url(url: str) -> bool:
         # Also check metadata endpoints
         if hostname in ("169.254.169.254", "metadata.google.internal"):
             return True
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
     return False
 
 

@@ -1,5 +1,6 @@
 """Brave Search API tools — web, news, images, LLM context."""
 
+import logging; log = logging.getLogger("salmalm")
 import json
 import os
 import urllib.request
@@ -18,8 +19,8 @@ def _get_api_key() -> str:
             from salmalm.security.crypto import vault
 
             key = vault.get("brave_api_key", "") or ""
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
     return key
 
 

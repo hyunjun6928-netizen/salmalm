@@ -301,7 +301,7 @@ def handle_save_link(args: dict) -> str:
                 text = re.sub(r"<[^>]+>", " ", html)
                 text = re.sub(r"\s+", " ", text).strip()
                 content = text[:5000]
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 title = url[:100]
 
         lid = secrets.token_hex(4)
@@ -543,8 +543,8 @@ def _load_routines() -> dict:
     if config_path.exists():
         try:
             return json.loads(config_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
     return dict(_DEFAULT_ROUTINES)
 
 
@@ -579,7 +579,7 @@ def handle_routine(args: dict) -> str:
             try:
                 result = handle_expense({"action": "today"})
                 parts.append(result)
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 parts.append(f"{label}: 조회 실패")
         elif step_type == "message":
             parts.append(f"{label}\n{step.get('content', '')}")

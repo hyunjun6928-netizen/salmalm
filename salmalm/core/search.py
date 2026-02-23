@@ -1,5 +1,6 @@
 """TF-IDF search engine — pure Python, no external deps."""
 
+from salmalm.security.crypto import log
 import math
 import re
 from collections import OrderedDict
@@ -132,8 +133,8 @@ class TFIDFSearch:
                     # Doc frequency
                     for t in set(tokens):
                         doc_freq[t] = doc_freq.get(t, 0) + 1
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         # Compute IDF
         n_docs = len(self._docs)

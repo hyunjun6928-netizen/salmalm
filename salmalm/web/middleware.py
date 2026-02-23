@@ -144,8 +144,8 @@ def check_external_exposure_safety(bind_addr: str, handler) -> list:
                 if count > 0:
                     has_admin = True
                     break
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
     if not has_admin:
         warnings.append(

@@ -60,7 +60,7 @@ def _check_for_updates() -> str:
                     f"   Download: https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
                 )
             return f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         pass  # silently skip if no network
     return ""
 
@@ -93,8 +93,8 @@ async def run_server():
         from .hooks import hook_manager
 
         hook_manager.fire("on_startup", {"message": f"{APP_NAME} v{VERSION} starting"})
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
     # Plugins: OFF by default (arbitrary code execution risk)
     # Enable with SALMALM_PLUGINS=1
     if os.environ.get("SALMALM_PLUGINS", "0") == "1":
@@ -428,8 +428,8 @@ async def run_server():
         import webbrowser
 
         webbrowser.open(f"http://127.0.0.1:{port}")
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
 
     # ── Graceful Shutdown ──
     _shutdown_count = [0]
@@ -483,8 +483,8 @@ async def run_server():
         from .hooks import hook_manager
 
         hook_manager.fire("on_shutdown", {"message": "Server shutting down"})
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
 
     # SLA: Graceful shutdown
     try:
@@ -500,10 +500,10 @@ async def run_server():
         from salmalm.features.audit_cron import stop_audit_cron
 
         stop_audit_cron()
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
     try:
         audit_log("shutdown", f"{APP_NAME} v{VERSION} graceful shutdown")
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         pass  # DB may already be closed
     log.info("[SHUTDOWN] Complete. Goodbye! 😈")

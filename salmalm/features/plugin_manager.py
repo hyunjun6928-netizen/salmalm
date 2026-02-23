@@ -69,7 +69,7 @@ class PluginManager:
         try:
             if PLUGINS_STATE_FILE.exists():
                 self._state = json.loads(PLUGINS_STATE_FILE.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self._state = {}
 
     def _save_state(self):
@@ -185,8 +185,8 @@ class PluginManager:
                 all_cbs.extend(plugin.hook_callbacks.values())
             if all_cbs:
                 hook_manager.unregister_plugin_hooks(all_cbs)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     def get_all_tools(self) -> List[dict]:
         """Return all tool definitions from enabled plugins."""

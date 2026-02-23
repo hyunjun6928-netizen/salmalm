@@ -315,8 +315,8 @@ class DiscordBot:
                     # Ack reaction (OpenClaw-style 👀)
                     try:
                         self.add_reaction(channel_id, message_id, "👀")
-                    except Exception:
-                        pass
+                    except Exception as e:  # noqa: broad-except
+                        log.debug(f"Suppressed: {e}")
 
                     # Start continuous typing indicator
                     typing_task = self.start_typing_loop(channel_id)
@@ -341,15 +341,15 @@ class DiscordBot:
                                             "message_reference": {"message_id": message_id},
                                         })
                                         _draft_msg_id[0] = resp.get("id")
-                                    except Exception:
-                                        pass
+                                    except Exception as e:  # noqa: broad-except
+                                        log.debug(f"Suppressed: {e}")
                                 elif _draft_msg_id[0] and len(full) % 150 < 10:
                                     try:
                                         self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}", {
                                             "content": full[:1900] + " ▍",
                                         })
-                                    except Exception:
-                                        pass
+                                    except Exception as e:  # noqa: broad-except
+                                        log.debug(f"Suppressed: {e}")
 
                     try:
                         response = await self._on_message(content, d, on_token=_on_stream_token)
@@ -361,7 +361,7 @@ class DiscordBot:
                                     self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}", {
                                         "content": chunks[0],
                                     })
-                                except Exception:
+                                except Exception as e:  # noqa: broad-except
                                     self.send_message(channel_id, chunks[0], reply_to=message_id)
                                 # Send remaining chunks
                                 for chunk in chunks[1:]:
@@ -380,8 +380,8 @@ class DiscordBot:
                         # Clear ack reaction
                         try:
                             self.remove_reaction(channel_id, message_id, "👀")
-                        except Exception:
-                            pass
+                        except Exception as e:  # noqa: broad-except
+                            log.debug(f"Suppressed: {e}")
 
     def _handle_command(self, text: str, channel_id: str) -> Optional[str]:
         """Handle built-in commands. Returns response text or None."""

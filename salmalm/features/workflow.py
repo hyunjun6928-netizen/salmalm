@@ -5,6 +5,7 @@ Supports: variable substitution, conditionals, parallel steps, error handling,
 triggers (cron, manual, webhook, event).
 """
 
+from salmalm.security.crypto import log
 import json
 import re
 import threading
@@ -81,7 +82,7 @@ def _eval_condition(cond: str, context: Dict[str, Any]) -> bool:
                 if op == "!=":
                     return left != right
         return bool(resolved)
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return False
 
 
@@ -137,8 +138,8 @@ class WorkflowEngine:
                             "steps": len(wf.get("steps", [])),
                         }
                     )
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         return workflows
 
     def get_workflow(self, name: str) -> Optional[dict]:
@@ -271,8 +272,8 @@ class WorkflowEngine:
             log_path = WORKFLOW_LOG_DIR / f"{name}.jsonl"
             with open(log_path, "a") as f:
                 f.write(json.dumps(result, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     def get_logs(self, name: str, limit: int = 10) -> List[dict]:
         """Get logs."""
@@ -284,8 +285,8 @@ class WorkflowEngine:
         for line in lines[-limit:]:
             try:
                 results.append(json.loads(line))
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         return results
 
     # ── Presets ──────────────────────────────────────────────

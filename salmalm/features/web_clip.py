@@ -119,8 +119,8 @@ def extract_readable(html_text: str) -> Dict[str, str]:
     parser = _TagStripper()
     try:
         parser.feed(html_text)
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
     text = parser.get_text()
     title = parser.get_title()
     return {"title": title, "text": text}
@@ -276,7 +276,7 @@ class ClipManager:
                 f"[WebClip] {clip.title}\n{clip.url}\n\n{clip.content[:2000]}",
                 source=f"clip:{clip.id}",
             )
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             pass  # RAG may not be available
 
     @property

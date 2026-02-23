@@ -50,7 +50,7 @@ class WebModelMixin:
                     local_models = [
                         {"name": m["name"], "full": m["id"]} for m in detected if m.get("provider") == "ollama"
                     ]
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     local_models = [{"name": m, "full": f"ollama/{m}"} for m in cfg["models"]]
                 providers.append(
                     {

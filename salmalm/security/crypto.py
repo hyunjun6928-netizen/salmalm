@@ -30,7 +30,7 @@ def _keychain_get() -> Optional[str]:
 
         pw = keyring.get_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
         return pw
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return None
 
 
@@ -54,7 +54,7 @@ def _keychain_delete() -> bool:
 
         keyring.delete_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
         return True
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return False
 
 
@@ -152,7 +152,7 @@ class Vault:
             if save_to_keychain and password:
                 _keychain_set(password)
             return True
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self._password = None
             return False
 

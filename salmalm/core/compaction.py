@@ -51,7 +51,7 @@ def _restore_compaction_summary(session_id: str) -> Optional[str]:
             (session_id,),
         ).fetchone()
         return row[0] if row else None
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return None
 
 

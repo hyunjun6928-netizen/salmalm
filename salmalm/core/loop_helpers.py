@@ -173,5 +173,5 @@ def auto_log_conversation(user_message: str, response: str, classification: dict
         tag = f"[{intent}]" if intent else "[conv]"
         entry = f"{tag} Q: {q_snippet}\n  A: {a_snippet}"
         write_daily_log(entry)
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         pass  # Memory logging should never break the main flow

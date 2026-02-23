@@ -106,8 +106,8 @@ class ModelDetector:
                 if models:
                     log.info(f"[MODEL-DETECT] Found {len(models)} local models via {url}")
                     return models
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         log.warning(f"[MODEL-DETECT] No local models found from {base_url}")
         return []

@@ -108,14 +108,14 @@ class UserManager:
         # Add user_id column to session_store if not exists
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Add user_id to usage_stats if not exists
         try:
             conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # multi_tenant_config table
         conn.execute("""CREATE TABLE IF NOT EXISTS multi_tenant_config (
@@ -138,7 +138,7 @@ class UserManager:
             row = conn.execute("SELECT value FROM multi_tenant_config WHERE key='enabled'").fetchone()
             conn.close()
             self._multi_tenant_enabled = row and row[0] == "true"
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self._multi_tenant_enabled = False
         return self._multi_tenant_enabled  # type: ignore
 
@@ -163,7 +163,7 @@ class UserManager:
             row = conn.execute("SELECT value FROM multi_tenant_config WHERE key=?", (key,)).fetchone()
             conn.close()
             return row[0] if row else default
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return default
 
     def set_config(self, key: str, value: str) -> None:
@@ -312,8 +312,8 @@ class UserManager:
                 if last_dt.date() < now.date():
                     updates.append(("current_daily", 0))
                     updates.append(("last_daily_reset", now.isoformat()))
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         # Monthly reset: if last reset was in a previous month
         if last_monthly:
@@ -322,8 +322,8 @@ class UserManager:
                 if (last_dt.year, last_dt.month) < (now.year, now.month):
                     updates.append(("current_monthly", 0))
                     updates.append(("last_monthly_reset", now.isoformat()))
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         if updates:
             for col, val in updates:
@@ -376,11 +376,11 @@ class UserManager:
             }
         try:
             routing = json.loads(row[2]) if row[2] else {}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             routing = {}
         try:
             extra = json.loads(row[5]) if row[5] else {}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             extra = {}
         return {
             "model_preference": row[0] or "auto",

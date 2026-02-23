@@ -422,11 +422,11 @@ class MCPClientConnection:
             try:
                 self._process.terminate()
                 self._process.wait(timeout=5)
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 try:
                     self._process.kill()
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
             self._process = None
 
     def _read_loop(self):

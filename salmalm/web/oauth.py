@@ -50,8 +50,8 @@ def _encrypt_tokens(data: dict) -> str:
         if vault.is_unlocked:
             vault.set("oauth_tokens", json.dumps(data))
             return "__VAULT__"
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
     # XOR fallback — warn loudly, this is NOT secure storage
     log.warning(
         "[OAUTH] ⚠️ Storing tokens with XOR obfuscation (NOT encryption). "
@@ -72,8 +72,8 @@ def _decrypt_tokens(encoded: str) -> dict:
                 stored = vault.get("oauth_tokens")
                 if stored:
                     return json.loads(stored)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         return {}
     raw = _xor_bytes(base64.b64decode(encoded), _OBFUSCATION_KEY)
     return json.loads(raw)
