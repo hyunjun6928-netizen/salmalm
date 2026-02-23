@@ -487,7 +487,7 @@ async def run_server():
 
         webbrowser.open(url)
 
-    await _setup_services(host, port, httpd, server_thread, url)
+    await _setup_services(bind_addr, port, server, web_thread, url)
 
     _print_banner(selftest=selftest, bind_addr=bind_addr, port=port, ws_port=ws_port)
 
