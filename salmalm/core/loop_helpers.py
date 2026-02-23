@@ -35,7 +35,7 @@ def select_model(model_override, user_message, tier, iteration, router):
     return model
 
 
-def trim_history(session, classification):
+def trim_history(session, classification) -> None:
     """Aggressive history trim for simple intents."""
     _INTENT_HISTORY_LIMIT = {"chat": 10, "memory": 10, "creative": 20}
     _hist_limit = _INTENT_HISTORY_LIMIT.get(classification["intent"])
@@ -45,7 +45,7 @@ def trim_history(session, classification):
         session.messages = _sys + _recent
 
 
-def prune_session_context(session, model):
+def prune_session_context(session, model: str):
     """Prune context if cache TTL expired."""
     from salmalm.core.engine import _should_prune_for_cache, estimate_context_window, prune_context
 
@@ -58,7 +58,7 @@ def prune_session_context(session, model):
     return session.messages
 
 
-def record_usage(session_id, model, result, classification, iteration):
+def record_usage(session_id: str, model: str, result, classification, iteration) -> None:
     """Record API usage and audit log."""
     from salmalm.core.engine import record_response_usage, estimate_cost, audit_log
 
@@ -133,7 +133,7 @@ def check_loop_detection(tool_calls: list, recent_calls: list) -> str | None:
     return None
 
 
-async def handle_empty_response(call_fn, pruned_messages, model, tools) -> str:
+async def handle_empty_response(call_fn, pruned_messages, model: str, tools: list) -> str:
     """Retry empty responses up to 2 times with backoff."""
     for _retry in range(2):
         log.warning(f"[LLM] Empty response, retry #{_retry + 1}")
@@ -155,7 +155,7 @@ def finalize_response(result: dict, response: str) -> str:
     return response
 
 
-def auto_log_conversation(user_message: str, response: str, classification: dict):
+def auto_log_conversation(user_message: str, response: str, classification: dict) -> None:
     """Auto-log significant conversations to daily memory."""
     try:
         # Skip trivial exchanges
@@ -173,5 +173,5 @@ def auto_log_conversation(user_message: str, response: str, classification: dict
         tag = f"[{intent}]" if intent else "[conv]"
         entry = f"{tag} Q: {q_snippet}\n  A: {a_snippet}"
         write_daily_log(entry)
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         pass  # Memory logging should never break the main flow

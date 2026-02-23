@@ -7,6 +7,7 @@ from salmalm.tools.tools_common import _resolve_path
 
 @register("read_file")
 def handle_read_file(args: dict) -> str:
+    """Handle read file."""
     p = _resolve_path(args["path"])
     if not p.exists():
         return f"File not found: {p}"
@@ -38,6 +39,7 @@ def handle_read_file(args: dict) -> str:
 
 @register("write_file")
 def handle_write_file(args: dict) -> str:
+    """Handle write file."""
     p = _resolve_path(args["path"], writing=True)
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -51,6 +53,7 @@ def handle_write_file(args: dict) -> str:
 
 @register("edit_file")
 def handle_edit_file(args: dict) -> str:
+    """Handle edit file."""
     p = _resolve_path(args["path"], writing=True)
     text = p.read_text(encoding="utf-8")
     if args["old_text"] not in text:
@@ -62,6 +65,7 @@ def handle_edit_file(args: dict) -> str:
 
 @register("diff_files")
 def handle_diff_files(args: dict) -> str:
+    """Handle diff files."""
     f1 = args.get("file1", "")
     f2 = args.get("file2", "")
     ctx = args.get("context_lines", 3)
@@ -69,14 +73,14 @@ def handle_diff_files(args: dict) -> str:
         p1 = _resolve_path(f1)
         text1 = p1.read_text(encoding="utf-8", errors="replace").splitlines()
         label1 = f1
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         text1 = f1.splitlines()
         label1 = "text1"
     try:
         p2 = _resolve_path(f2)
         text2 = p2.read_text(encoding="utf-8", errors="replace").splitlines()
         label2 = f2
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         text2 = f2.splitlines()
         label2 = "text2"
     diff = list(difflib.unified_diff(text1, text2, fromfile=label1, tofile=label2, n=ctx))

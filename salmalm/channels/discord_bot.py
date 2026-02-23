@@ -19,7 +19,8 @@ API_BASE = "https://discord.com/api/v10"
 class DiscordBot:
     """Minimal Discord bot using Gateway WebSocket + REST API."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self.token: Optional[str] = None
         self.owner_id: Optional[str] = None
         self._running = False
@@ -30,7 +31,7 @@ class DiscordBot:
         self._on_message: Optional[Callable] = None
         self._ws = None
 
-    def configure(self, token: str, owner_id: Optional[str] = None):
+    def configure(self, token: str, owner_id: Optional[str] = None) -> None:
         """Configure the Discord bot with token and channel settings."""
         self.token = token
         self.owner_id = owner_id
@@ -43,6 +44,7 @@ class DiscordBot:
     # ── REST API ──
 
     def _api(self, method: str, path: str, body: Optional[dict] = None) -> dict:
+        """Api."""
         url = f"{API_BASE}{path}"
         data = json.dumps(body).encode() if body else None
         req = urllib.request.Request(url, data=data, method=method)
@@ -88,7 +90,7 @@ class DiscordBot:
             text = text[cut:].lstrip("\n")
         return chunks
 
-    def send_typing(self, channel_id: str):
+    def send_typing(self, channel_id: str) -> None:
         """Send typing indicator."""
         self._api("POST", f"/channels/{channel_id}/typing")
 
@@ -100,6 +102,7 @@ class DiscordBot:
         """
 
         async def _loop():
+            """Loop."""
             try:
                 while True:
                     await asyncio.to_thread(self.send_typing, channel_id)
@@ -109,12 +112,12 @@ class DiscordBot:
 
         return asyncio.create_task(_loop())
 
-    def add_reaction(self, channel_id: str, message_id: str, emoji: str):
+    def add_reaction(self, channel_id: str, message_id: str, emoji: str) -> None:
         """Add an emoji reaction to a Discord message."""
         encoded = urllib.parse.quote(emoji)
         self._api("PUT", f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me")
 
-    def remove_reaction(self, channel_id: str, message_id: str, emoji: str):
+    def remove_reaction(self, channel_id: str, message_id: str, emoji: str) -> None:
         """Remove bot's own reaction from a Discord message."""
         encoded = urllib.parse.quote(emoji)
         self._api("DELETE", f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me")
@@ -250,145 +253,138 @@ class DiscordBot:
     async def _handle_event(self, data: dict):
         """Handle a gateway event."""
         op = data.get("op")
-        t = data.get("t")
         d = data.get("d", {})
         s = data.get("s")
-
         if s:
             self._seq = s
-
         if op == 10:  # Hello
             self._heartbeat_interval = d.get("heartbeat_interval", 41250)
             asyncio.create_task(self._heartbeat_loop())
             await self._identify()
+            return
+        if op != 0:  # Only process Dispatch (op=0)
+            return
+        t = data.get("t")
+        if t == "READY":
+            self._session_id = d.get("session_id")
+            self._bot_user = d.get("user", {})
+            log.info(f"[DISC] Discord ready: {self._bot_user.get('username')}#{self._bot_user.get('discriminator')}")
+            return
+        if t == "MESSAGE_CREATE":
+            await self._handle_discord_message(d)
 
-        elif op == 11:  # Heartbeat ACK
-            pass
+    async def _process_llm_message(self, channel_id: str, message_id: str, content: str, d: dict) -> None:
+        """Process message through LLM with streaming and draft editing."""
+        try:
+            self.add_reaction(channel_id, message_id, "👀")
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+        typing_task = self.start_typing_loop(channel_id)
+        _stream_buf = []
+        _draft_msg_id = [None]
 
-        elif op == 0:  # Dispatch
-            if t == "READY":
-                self._session_id = d.get("session_id")
-                self._bot_user = d.get("user", {})
-                log.info(
-                    f"[DISC] Discord ready: {self._bot_user.get('username')}#{self._bot_user.get('discriminator')}"
-                )
-
-            elif t == "MESSAGE_CREATE":
-                # Ignore own messages
-                author = d.get("author", {})
-                if author.get("id") == self._bot_user.get("id"):  # type: ignore[union-attr]
-                    return
-                if author.get("bot"):
-                    return
-
-                content = d.get("content", "").strip()
-                channel_id = d.get("channel_id")
-                message_id = d.get("id")
-
-                # Check if bot is mentioned or DM
-                is_dm = d.get("guild_id") is None
-                mentions = [m.get("id") for m in d.get("mentions", [])]
-                is_mentioned = self._bot_user and self._bot_user.get("id") in mentions
-
-                if not is_dm and not is_mentioned:
-                    return  # Only respond to DMs and mentions
-
-                # Strip bot mention from content
-                if self._bot_user:
-                    content = content.replace(f"<@{self._bot_user['id']}>", "").strip()
-                    content = content.replace(f"<@!{self._bot_user['id']}>", "").strip()
-
-                if not content:
-                    return
-
-                # Built-in slash commands
-                if content.startswith("/"):
-                    cmd_response = self._handle_command(content, channel_id)
-                    if cmd_response:
-                        self.send_message(channel_id, cmd_response, reply_to=message_id)
-                        return
-
-                if self._on_message:
-                    # Ack reaction (OpenClaw-style 👀)
+        def _on_stream_token(event):
+            """Handle streaming tokens for draft editing."""
+            if event.get("type") == "content_delta" and event.get("text"):
+                _stream_buf.append(event["text"])
+                full = "".join(_stream_buf)
+                if not _draft_msg_id[0] and len(full) >= 200:
                     try:
-                        self.add_reaction(channel_id, message_id, "👀")
+                        resp = self._api(
+                            "POST",
+                            f"/channels/{channel_id}/messages",
+                            {"content": full[:1900] + " ▍", "message_reference": {"message_id": message_id}},
+                        )
+                        _draft_msg_id[0] = resp.get("id")
+                    except Exception:
+                        pass
+                elif _draft_msg_id[0] and len(full) % 150 < 10:
+                    try:
+                        self._api(
+                            "PATCH",
+                            f"/channels/{channel_id}/messages/{_draft_msg_id[0]}",
+                            {"content": full[:1900] + " ▍"},
+                        )
                     except Exception:
                         pass
 
-                    # Start continuous typing indicator
-                    typing_task = self.start_typing_loop(channel_id)
+        try:
+            response = await self._on_message(content, d, on_token=_on_stream_token)
+            if response:
+                self._send_discord_response(channel_id, message_id, response, _draft_msg_id[0])
+        except Exception as e:
+            log.error(f"Discord message handler error: {e}")
+            self.send_message(channel_id, f"❌ Error: {str(e)[:200]}", reply_to=message_id)
+        finally:
+            typing_task.cancel()
+            try:
+                await typing_task
+            except asyncio.CancelledError:
+                pass
+            try:
+                self.remove_reaction(channel_id, message_id, "👀")
+            except Exception:
+                pass
 
-                    # Streaming preview: send draft message and edit it
-                    _stream_buf = []
-                    _draft_msg_id = [None]
-                    _STREAM_THRESHOLD = 200
+    def _send_discord_response(self, channel_id: str, message_id: str, response: str, draft_msg_id) -> None:
+        """Send or edit the final response message."""
+        if draft_msg_id:
+            chunks = self._smart_split(response, 2000)
+            try:
+                self._api("PATCH", f"/channels/{channel_id}/messages/{draft_msg_id}", {"content": chunks[0]})
+            except Exception:
+                self.send_message(channel_id, chunks[0], reply_to=message_id)
+            for chunk in chunks[1:]:
+                self.send_message(channel_id, chunk)
+        else:
+            self.send_message(channel_id, response, reply_to=message_id)
 
-                    def _on_stream_token(event):
-                        etype = event.get("type", "")
-                        if etype == "content_delta":
-                            delta = event.get("text", "")
-                            if delta:
-                                _stream_buf.append(delta)
-                                full = "".join(_stream_buf)
-                                if not _draft_msg_id[0] and len(full) >= _STREAM_THRESHOLD:
-                                    try:
-                                        resp = self._api("POST", f"/channels/{channel_id}/messages", {
-                                            "content": full[:1900] + " ▍",
-                                            "message_reference": {"message_id": message_id},
-                                        })
-                                        _draft_msg_id[0] = resp.get("id")
-                                    except Exception:
-                                        pass
-                                elif _draft_msg_id[0] and len(full) % 150 < 10:
-                                    try:
-                                        self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}", {
-                                            "content": full[:1900] + " ▍",
-                                        })
-                                    except Exception:
-                                        pass
+    async def _handle_discord_message(self, d: dict) -> None:
+        """Handle Discord MESSAGE_CREATE dispatch."""
+        author = d.get("author", {})
+        if author.get("id") == (self._bot_user or {}).get("id"):
+            return
+        if author.get("bot"):
+            return
 
-                    try:
-                        response = await self._on_message(content, d, on_token=_on_stream_token)
-                        if response:
-                            if _draft_msg_id[0]:
-                                # Edit final response into draft message
-                                chunks = self._smart_split(response, 2000)
-                                try:
-                                    self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}", {
-                                        "content": chunks[0],
-                                    })
-                                except Exception:
-                                    self.send_message(channel_id, chunks[0], reply_to=message_id)
-                                # Send remaining chunks
-                                for chunk in chunks[1:]:
-                                    self.send_message(channel_id, chunk)
-                            else:
-                                self.send_message(channel_id, response, reply_to=message_id)
-                    except Exception as e:
-                        log.error(f"Discord message handler error: {e}")
-                        self.send_message(channel_id, f"❌ Error: {str(e)[:200]}", reply_to=message_id)
-                    finally:
-                        typing_task.cancel()
-                        try:
-                            await typing_task
-                        except asyncio.CancelledError:
-                            pass
-                        # Clear ack reaction
-                        try:
-                            self.remove_reaction(channel_id, message_id, "👀")
-                        except Exception:
-                            pass
+        content = d.get("content", "").strip()
+        channel_id = d.get("channel_id")
+        message_id = d.get("id")
+
+        # Check if bot is mentioned or DM
+        is_dm = d.get("guild_id") is None
+        mentions = [m.get("id") for m in d.get("mentions", [])]
+        is_mentioned = self._bot_user and self._bot_user.get("id") in mentions
+
+        if not is_dm and not is_mentioned:
+            return  # Only respond to DMs and mentions
+
+        # Strip bot mention from content
+        if self._bot_user:
+            content = content.replace(f"<@{self._bot_user['id']}>", "").strip()
+            content = content.replace(f"<@!{self._bot_user['id']}>", "").strip()
+
+        if not content:
+            return
+
+        # Built-in slash commands
+        if content.startswith("/"):
+            cmd_response = self._handle_command(content, channel_id)
+            if cmd_response:
+                self.send_message(channel_id, cmd_response, reply_to=message_id)
+                return
+
+        if self._on_message:
+            await self._process_llm_message(channel_id, message_id, content, d)
 
     def _handle_command(self, text: str, channel_id: str) -> Optional[str]:
         """Handle built-in commands. Returns response text or None."""
         cmd = text.split()[0].lower()
         try:
-            if cmd == "/start" or cmd == "/hello":
-                from salmalm import __version__
-
-                return f"😈 SalmAlm v{__version__} ready!"
-            elif cmd == "/help":
-                return (
+            _SIMPLE_CMDS = {
+                "/start": lambda: f"😈 SalmAlm v{__import__('salmalm').__version__} ready!",
+                "/hello": lambda: f"😈 SalmAlm v{__import__('salmalm').__version__} ready!",
+                "/help": lambda: (
                     "😈 **SalmAlm Commands**\n\n"
                     "📋 `/help` — Show this help\n"
                     "📊 `/usage` — Token usage & cost\n"
@@ -397,7 +393,10 @@ class DiscordBot:
                     "📦 `/compact` — Compress conversation history\n"
                     "🔊 `/tts on|off` — Toggle voice responses\n"
                     "\nJust type normally to chat!"
-                )
+                ),
+            }
+            if cmd in _SIMPLE_CMDS:
+                return _SIMPLE_CMDS[cmd]()
             elif cmd == "/usage":
                 from salmalm.tools.tool_registry import execute_tool
 
@@ -441,7 +440,7 @@ class DiscordBot:
             return f"❌ Command error: {str(e)[:200]}"
         return None
 
-    async def poll(self):
+    async def poll(self) -> None:
         """Main gateway loop."""
         if not self.token:
             log.warning("Discord token not configured")
@@ -469,7 +468,7 @@ class DiscordBot:
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 60)
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the Discord bot."""
         self._running = False
         try:

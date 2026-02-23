@@ -12,6 +12,7 @@ from typing import Tuple
 
 from salmalm.constants import MODELS as _MODELS, DATA_DIR
 import logging
+
 log = logging.getLogger(__name__)
 # ── Complexity keywords ──
 _SIMPLE_PATTERNS = re.compile(
@@ -55,6 +56,7 @@ _COMPLEX_KEYWORDS = [
 # ── Model name corrections (from constants — single source of truth) ──
 from salmalm.constants import MODEL_NAME_FIXES as _MODEL_NAME_FIXES
 import logging
+
 log = logging.getLogger(__name__)
 
 # ── Routing config ──
@@ -184,6 +186,22 @@ def auto_optimize_and_save(available_keys: list[str]) -> dict:
     return config
 
 
+def _validate_tier_keys(rc: dict, prov_keys: dict) -> None:
+    """Strip tier models whose provider has no API key."""
+    try:
+        from salmalm.security.crypto import vault
+
+        for k in ("simple", "moderate", "complex"):
+            model = rc.get(k, "")
+            if model:
+                prov = model.split("/")[0] if "/" in model else ""
+                key_name = prov_keys.get(prov)
+                if key_name and not vault.get(key_name):
+                    rc[k] = ""
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
+
+
 def select_model(message: str, session) -> Tuple[str, str]:
     """Select optimal model based on message complexity.
 
@@ -192,14 +210,11 @@ def select_model(message: str, session) -> Tuple[str, str]:
     """
     override = getattr(session, "model_override", None)
     if override and override != "auto":
-        if override == "haiku":
-            return _MODELS["haiku"], "simple"
-        elif override == "sonnet":
-            return _MODELS["sonnet"], "moderate"
-        elif override == "opus":
-            return _MODELS["opus"], "complex"
-        else:
-            return override, "manual"
+        _OVERRIDE_MAP = {"haiku": ("simple", "haiku"), "sonnet": ("moderate", "sonnet"), "opus": ("complex", "opus")}
+        if override in _OVERRIDE_MAP:
+            level, key = _OVERRIDE_MAP[override]
+            return _MODELS[key], level
+        return override, "manual"
 
     rc = load_routing_config()
     # Smart defaults: simple→haiku (cheapest), moderate→sonnet, complex→sonnet
@@ -220,18 +235,7 @@ def select_model(message: str, session) -> Tuple[str, str]:
         "google": "google_api_key",
         "openrouter": "openrouter_api_key",
     }
-    try:
-        from salmalm.security.crypto import vault
-
-        for k in ("simple", "moderate", "complex"):
-            model = rc.get(k, "")
-            if model:
-                prov = model.split("/")[0] if "/" in model else ""
-                key_name = _prov_keys.get(prov)
-                if key_name and not vault.get(key_name):
-                    rc[k] = ""  # Force fallback to default
-    except Exception as e:
-        log.debug(f"Suppressed: {e}")
+    _validate_tier_keys(rc, _prov_keys)
     for k in ("simple", "moderate", "complex"):
         if not rc[k]:
             rc[k] = _tier_defaults.get(k, _MODELS.get("sonnet", ""))

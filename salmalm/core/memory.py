@@ -47,17 +47,20 @@ class MemoryManager:
     # Secret detection/redaction delegated to shared utility
     @staticmethod
     def _contains_secret(text: str) -> bool:
+        """Contains secret."""
         from salmalm.security.redact import contains_secret
 
         return contains_secret(text)
 
     @staticmethod
     def _scrub_secrets(text: str) -> str:
+        """Scrub secrets."""
         from salmalm.security.redact import scrub_secrets
 
         return scrub_secrets(text)
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._search = None  # Lazy — set after TFIDFSearch is ready
 
     def _get_search(self):

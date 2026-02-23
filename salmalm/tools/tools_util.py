@@ -17,6 +17,7 @@ import urllib.parse
 
 @register("hash_text")
 def handle_hash_text(args: dict) -> str:
+    """Handle hash text."""
     import uuid as _uuid_mod
 
     action = args.get("action", "hash")
@@ -53,6 +54,7 @@ def handle_hash_text(args: dict) -> str:
 
 @register("regex_test")
 def handle_regex_test(args: dict) -> str:
+    """Handle regex test."""
     pattern = args.get("pattern", "")
     text = args.get("text", "")
     action = args.get("action", "find")
@@ -71,7 +73,8 @@ def handle_regex_test(args: dict) -> str:
     except re.error as e:
         return f"❌ Regex error: {e}"
 
-    def _run_regex():
+    def _run_regex() -> str:
+        """Run regex."""
         if action == "match":
             m = compiled.fullmatch(text)
             if m:
@@ -121,6 +124,7 @@ def handle_regex_test(args: dict) -> str:
 
 @register("json_query")
 def handle_json_query(args: dict) -> str:
+    """Handle json query."""
     import subprocess
 
     data_str = args.get("data", "")
@@ -156,6 +160,7 @@ def handle_json_query(args: dict) -> str:
 
 @register("clipboard")
 def handle_clipboard(args: dict) -> str:
+    """Handle clipboard."""
     action = args.get("action", "list")
     slot = args.get("slot", "default")
 
@@ -167,7 +172,7 @@ def handle_clipboard(args: dict) -> str:
     with _clipboard_lock:
         try:
             clips = json.loads(clip_file.read_text()) if clip_file.exists() else {}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             clips = {}
 
         if action == "copy":
@@ -205,6 +210,7 @@ def handle_clipboard(args: dict) -> str:
 
 @register("translate")
 def handle_translate(args: dict) -> str:
+    """Handle translate."""
     text = args.get("text", "")
     target = args.get("target", "")
     source = args.get("source", "auto")
@@ -253,6 +259,7 @@ def handle_translate(args: dict) -> str:
 
 @register("qr_code")
 def handle_qr_code(args: dict) -> str:
+    """Handle qr code."""
     data = args.get("data", "")
     if not data:
         return "❌ data is required"

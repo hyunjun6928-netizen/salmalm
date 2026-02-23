@@ -11,6 +11,29 @@ import re
 from typing import Any, List, Optional
 
 
+def _validate_object(data: dict, schema: dict) -> list:
+    """Validate object properties against schema."""
+    errors = []
+    for req in schema.get("required", []):
+        if req not in data:
+            errors.append(f"Missing required field: {req}")
+    for key, prop_schema in schema.get("properties", {}).items():
+        if key in data:
+            errors.extend(_validate_schema(data[key], prop_schema))
+    return errors
+
+
+def _validate_array(data: list, schema: dict) -> list:
+    """Validate array items against schema."""
+    items_schema = schema.get("items")
+    if not items_schema:
+        return []
+    errors = []
+    for i, item in enumerate(data):
+        errors.extend(f"[{i}].{e}" for e in _validate_schema(item, items_schema))
+    return errors
+
+
 def _validate_schema(data: Any, schema: dict) -> List[str]:
     """Minimal JSON Schema validator (stdlib only).
 
@@ -38,20 +61,9 @@ def _validate_schema(data: Any, schema: dict) -> List[str]:
                 return errors
 
     if s_type == "object" and isinstance(data, dict):
-        for req in schema.get("required", []):
-            if req not in data:
-                errors.append(f"Missing required field: {req}")
-        props = schema.get("properties", {})
-        for key, prop_schema in props.items():
-            if key in data:
-                errors.extend(_validate_schema(data[key], prop_schema))
-
+        errors.extend(_validate_object(data, schema))
     if s_type == "array" and isinstance(data, list):
-        items_schema = schema.get("items")
-        if items_schema:
-            for i, item in enumerate(data):
-                sub_errors = _validate_schema(item, items_schema)
-                errors.extend(f"[{i}].{e}" for e in sub_errors)
+        errors.extend(_validate_array(data, schema))
 
     if "enum" in schema and data not in schema["enum"]:
         errors.append(f"Value {data!r} not in enum {schema['enum']}")

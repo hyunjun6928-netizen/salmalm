@@ -1,6 +1,7 @@
 """SalmAlm Thought Stream — quick thought capture with SQLite storage and RAG integration."""
 
 from __future__ import annotations
+from salmalm.security.crypto import log
 
 import re
 import sqlite3
@@ -10,11 +11,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from salmalm.constants import KST, DATA_DIR
+
 THOUGHTS_DIR = DATA_DIR
 THOUGHTS_DB = THOUGHTS_DIR / "thoughts.db"
 
 
 def _ensure_dir():
+    """Ensure dir."""
     THOUGHTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -27,12 +30,14 @@ def _extract_tags(content: str) -> str:
 class ThoughtStream:
     """Quick thought capture with SQLite storage."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None) -> None:
+        """Init  ."""
         _ensure_dir()
         self.db_path = db_path or THOUGHTS_DB
         self._ensure_db()
 
     def _ensure_db(self):
+        """Ensure db."""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS thoughts (
@@ -75,7 +80,7 @@ class ThoughtStream:
 
             label = f"thought:{thought_id}"
             rag_engine._index_text(label, content, time.time())
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             pass  # RAG indexing is optional
 
     def list_recent(self, n: int = 10) -> List[Dict]:
@@ -108,8 +113,8 @@ class ThoughtStream:
                         f"SELECT * FROM thoughts WHERE id IN ({placeholders}) ORDER BY created_at DESC", thought_ids
                     ).fetchall()
                 return [dict(r) for r in rows]
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Fallback: simple LIKE search
         with sqlite3.connect(str(self.db_path)) as conn:

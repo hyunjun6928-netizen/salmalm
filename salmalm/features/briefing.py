@@ -3,6 +3,7 @@
 매일 아침 자동 요약: 날씨, 일정, 이메일, 미완료 작업.
 """
 
+from salmalm.security.crypto import log
 from datetime import datetime
 from salmalm.constants import KST
 
@@ -26,13 +27,15 @@ def _load_config() -> dict:
 
 
 def _save_config(config: dict):
+    """Save config."""
     ConfigManager.save("briefing", config)
 
 
 class DailyBriefing:
     """Generate daily briefing summaries."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self.config = _load_config()
 
     def generate(self, sections: list = None) -> str:
@@ -44,13 +47,8 @@ class DailyBriefing:
 
         # Greeting
         if config.get("greeting", True):
-            hour = now.hour
-            if hour < 12:
-                greeting = "🌅 좋은 아침이에요!"
-            elif hour < 18:
-                greeting = "☀️ 좋은 오후예요!"
-            else:
-                greeting = "🌙 좋은 저녁이에요!"
+            _GREETINGS = [(12, "🌅 좋은 아침이에요!"), (18, "☀️ 좋은 오후예요!"), (24, "🌙 좋은 저녁이에요!")]
+            greeting = next(g for h, g in _GREETINGS if now.hour < h)
             parts.append(f"{greeting}\n📋 **{now.strftime('%Y년 %m월 %d일 %A')}** 브리핑\n")
 
         # Weather
@@ -92,8 +90,8 @@ class DailyBriefing:
                 result = execute_tool("reminder", {"action": "list"})
                 if "⏰ No active" not in result:
                     parts.append(f"**⏰ 활성 리마인더**\n{result}\n")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         # Notes summary (recent)
         if "notes" in include:
@@ -103,8 +101,8 @@ class DailyBriefing:
                 result = execute_tool("note", {"action": "list", "count": 3})
                 if "📝 No notes" not in result:
                     parts.append(f"**📝 최근 메모**\n{result}\n")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         # Expenses today
         if "expenses" in include:
@@ -114,15 +112,15 @@ class DailyBriefing:
                 result = execute_tool("expense", {"action": "today"})
                 if "💰 No expenses" not in result:
                     parts.append(f"**💸 오늘 지출**\n{result}\n")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         if not parts:
             return "📋 브리핑 항목이 없습니다."
 
         return "\n".join(parts)
 
-    def configure(self, key: str, value) -> str:
+    def configure(self, key: str, value: str) -> str:
         """Update briefing config."""
         config = _load_config()
         if key == "include" and isinstance(value, str):

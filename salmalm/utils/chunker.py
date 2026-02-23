@@ -58,18 +58,21 @@ class ChunkerConfig:
     maxLinesPerMessage: Optional[int] = None
 
     def effective_hard_cap(self) -> int:
+        """Effective hard cap."""
         if self.hardCap > 0:
             return self.hardCap
         ch = CHANNEL_DEFAULTS.get(self.channel, CHANNEL_DEFAULTS[CHANNEL_WEB])
         return ch["hardCap"] or 0
 
     def effective_max_lines(self) -> Optional[int]:
+        """Effective max lines."""
         if self.maxLinesPerMessage is not None:
             return self.maxLinesPerMessage
         ch = CHANNEL_DEFAULTS.get(self.channel, CHANNEL_DEFAULTS[CHANNEL_WEB])
         return ch.get("maxLinesPerMessage")
 
     def uses_plain_fallback(self) -> bool:
+        """Uses plain fallback."""
         ch = CHANNEL_DEFAULTS.get(self.channel, CHANNEL_DEFAULTS[CHANNEL_WEB])
         return ch.get("plainFallback", False)
 
@@ -198,7 +201,10 @@ class EmbeddedBlockChunker:
     The on_chunk callback receives (text: str, is_final: bool).
     """
 
-    def __init__(self, config: Optional[ChunkerConfig] = None, on_chunk: Optional[Callable[[str, bool], None]] = None):
+    def __init__(
+        self, config: Optional[ChunkerConfig] = None, on_chunk: Optional[Callable[[str, bool], None]] = None
+    ) -> None:
+        """Init  ."""
         self.config = config or ChunkerConfig()
         self.on_chunk = on_chunk
         self._buffer: str = ""
@@ -209,10 +215,12 @@ class EmbeddedBlockChunker:
 
     @property
     def buffer(self) -> str:
+        """Buffer."""
         return self._buffer
 
     @property
     def chunk_count(self) -> int:
+        """Chunk count."""
         return self._chunk_count
 
     def feed(self, text: str) -> Optional[str]:

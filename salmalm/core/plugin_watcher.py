@@ -18,7 +18,8 @@ from salmalm.features.plugin_manager import PLUGINS_DIR, plugin_manager
 class PluginWatcher:
     """Polling-based watcher for plugin hot-reload."""
 
-    def __init__(self, interval: int = 3):
+    def __init__(self, interval: int = 3) -> None:
+        """Init  ."""
         self._interval = interval
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -44,6 +45,7 @@ class PluginWatcher:
 
     @property
     def running(self) -> bool:
+        """Running."""
         return self._running
 
     def _initial_scan(self):
@@ -56,6 +58,7 @@ class PluginWatcher:
                 pass
 
     def _run(self):
+        """Run."""
         while self._running:
             try:
                 self._scan()

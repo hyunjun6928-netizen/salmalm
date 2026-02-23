@@ -31,30 +31,31 @@ def load_cache_config() -> dict:
             merged = dict(_DEFAULT_CONFIG)
             merged.update(cfg)
             return merged
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
     return dict(_DEFAULT_CONFIG)
 
 
-def save_cache_config(config: dict):
+def save_cache_config(config: dict) -> None:
     """Save cache config."""
     try:
         _CACHE_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
         _CACHE_CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
 
 
 class CacheWarmer:
     """Periodically warm Anthropic prompt cache to prevent TTL expiry."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._last_warm: float = 0.0
         self._warm_count: int = 0
 
-    def start(self):
+    def start(self) -> None:
         """Start the cache warming background thread."""
         config = load_cache_config()
         if not config.get("warmingEnabled", False):
@@ -68,7 +69,7 @@ class CacheWarmer:
         self._thread.start()
         log.info(f"[CACHE] Cache warmer started (interval={config['warmingIntervalMinutes']}min)")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the cache warming thread."""
         self._stop_event.set()
         if self._thread:
@@ -146,6 +147,7 @@ class CacheWarmer:
 
     @property
     def stats(self) -> dict:
+        """Stats."""
         return {
             "warm_count": self._warm_count,
             "last_warm": self._last_warm,
@@ -167,24 +169,28 @@ class HeartbeatManager:
         "timezone": "Asia/Seoul",
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._config = self._load_config()
 
     def _load_config(self) -> dict:
+        """Load config."""
         cfg = dict(self._DEFAULT_CONFIG)
         try:
             if self._CONFIG_FILE.exists():
                 data = json.loads(self._CONFIG_FILE.read_text(encoding="utf-8"))
                 cfg.update(data)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         return cfg
 
-    def reload(self):
+    def reload(self) -> None:
+        """Reload."""
         self._config = self._load_config()
 
     @property
     def config(self) -> dict:
+        """Config."""
         return dict(self._config)
 
     def is_active_hours(self) -> bool:

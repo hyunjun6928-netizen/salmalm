@@ -12,64 +12,59 @@ except ImportError:
 
 
 @register("system_monitor")
+def _collect_cpu() -> list:
+    """Collect CPU info."""
+    cpu_count = os.cpu_count() or 1
+    try:
+        load = os.getloadavg()
+        return [f"🖥️ CPU: {cpu_count}cores, load: {load[0]:.2f} / {load[1]:.2f} / {load[2]:.2f} (1/5/15min)"]
+    except (OSError, AttributeError):
+        return [f"🖥️ CPU: {cpu_count}cores"]
+
+
+def _collect_cmd(cmd: list, prefix: str, max_lines: int = 99) -> list:
+    """Run a command and return prefixed output lines."""
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        if result.stdout:
+            return [f"{prefix} {l}" for l in result.stdout.strip().split("\n")[:max_lines]]
+    except (FileNotFoundError, OSError):
+        pass
+    return []
+
+
+def _collect_salmalm_stats() -> list:
+    """Collect SalmAlm process stats."""
+    lines = _collect_cmd(["uptime", "-p"], "⏱️ Uptime:")
+    mem_mb = _resource_mod.getrusage(_resource_mod.RUSAGE_SELF).ru_maxrss / 1024 if _resource_mod else 0
+    lines.append(f"🐍 SalmAlm memory: {mem_mb:.1f}MB")
+    lines.append(f"📂 Sessions: {len(_sessions)}")
+    return lines
+
+
+_MONITOR_COLLECTORS = {
+    "cpu": _collect_cpu,
+    "memory": lambda: _collect_cmd(["free", "-h"], "💾"),
+    "disk": lambda: _collect_cmd(["df", "-h", "/"], "💿"),
+    "network": lambda: (
+        (["🌐 Network:"] + _collect_cmd(["ss", "-s"], "  ", 5)) if _collect_cmd(["ss", "-s"], "", 1) else []
+    ),
+}
+
+
 def handle_system_monitor(args: dict) -> str:
+    """Handle system monitor."""
     detail = args.get("detail", "overview")
     lines = []
     try:
-        if detail in ("overview", "cpu"):
-            cpu_count = os.cpu_count() or 1
-            try:
-                load = os.getloadavg()
-                lines.append(
-                    f"🖥️ CPU: {cpu_count}cores, load: {load[0]:.2f} / {load[1]:.2f} / {load[2]:.2f} (1/5/15min)"
-                )
-            except (OSError, AttributeError):
-                lines.append(f"🖥️ CPU: {cpu_count}cores")
-        if detail in ("overview", "memory"):
-            try:
-                mem = subprocess.run(["free", "-h"], capture_output=True, text=True, timeout=5)
-                if mem.stdout:
-                    for l in mem.stdout.strip().split("\n"):  # noqa: E741
-                        lines.append(f"💾 {l}")
-            except (FileNotFoundError, OSError):
-                pass
-        if detail in ("overview", "disk"):
-            try:
-                disk = subprocess.run(["df", "-h", "/"], capture_output=True, text=True, timeout=5)
-                if disk.stdout:
-                    for l in disk.stdout.strip().split("\n"):  # noqa: E741
-                        lines.append(f"💿 {l}")
-            except (FileNotFoundError, OSError):
-                pass
-        if detail in ("overview", "network"):
-            try:
-                net = subprocess.run(["ss", "-s"], capture_output=True, text=True, timeout=5)
-                if net.stdout:
-                    lines.append("🌐 Network:")
-                    for l in net.stdout.strip().split("\n")[:5]:  # noqa: E741
-                        lines.append(f"   {l}")
-            except (FileNotFoundError, OSError):
-                pass
         if detail == "processes":
-            try:
-                ps = subprocess.run(["ps", "aux", "--sort=-rss"], capture_output=True, text=True, timeout=5)
-            except (FileNotFoundError, OSError):
-                ps = None
-            if ps and ps.stdout:
-                for l in ps.stdout.strip().split("\n")[:20]:  # noqa: E741
-                    lines.append(l)
-        if detail in ("overview",):
-            try:
-                uptime = subprocess.run(["uptime", "-p"], capture_output=True, text=True, timeout=5)
-                if uptime.stdout:
-                    lines.append(f"⏱️ Uptime: {uptime.stdout.strip()}")
-            except (FileNotFoundError, OSError):
-                pass
-            mem_mb = 0
-            if _resource_mod:
-                mem_mb = _resource_mod.getrusage(_resource_mod.RUSAGE_SELF).ru_maxrss / 1024
-            lines.append(f"🐍 SalmAlm memory: {mem_mb:.1f}MB")
-            lines.append(f"📂 Sessions: {len(_sessions)}")
+            lines.extend(_collect_cmd(["ps", "aux", "--sort=-rss"], "", 20))
+        elif detail in _MONITOR_COLLECTORS:
+            lines.extend(_MONITOR_COLLECTORS[detail]())
+        else:  # overview
+            for collector in _MONITOR_COLLECTORS.values():
+                lines.extend(collector())
+            lines.extend(_collect_salmalm_stats())
     except Exception as e:
         lines.append(f"❌ Monitor error: {e}")
     return "\n".join(lines) or "No info"
@@ -77,6 +72,7 @@ def handle_system_monitor(args: dict) -> str:
 
 @register("health_check")
 def handle_health_check(args: dict) -> str:
+    """Handle health check."""
     from salmalm.features.stability import health_monitor
 
     action = args.get("action", "check")

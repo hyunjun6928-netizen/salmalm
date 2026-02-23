@@ -39,17 +39,18 @@ def _ensure_modules():
     _HANDLERS["apply_patch"] = lambda args: _apply_patch_fn(args.get("patch_text", ""), args.get("base_dir", "."))
 
 
-def register(name):
+def register(name: str):
     """Decorator to register a tool handler function."""
 
     def decorator(fn):
+        """Decorator."""
         _HANDLERS[name] = fn
         return fn
 
     return decorator
 
 
-def register_dynamic(name: str, handler, tool_def: dict = None):
+def register_dynamic(name: str, handler, tool_def: dict = None) -> None:
     """Dynamically register a tool at runtime (for plugins).
 
     플러그인에서 런타임에 도구를 동적으로 등록합니다.
@@ -62,7 +63,7 @@ def register_dynamic(name: str, handler, tool_def: dict = None):
     log.info(f"[TOOL] Dynamic tool registered: {name}")
 
 
-def unregister_dynamic(name: str):
+def unregister_dynamic(name: str) -> None:
     """Remove a dynamically registered tool."""
     _HANDLERS.pop(name, None)
     _DYNAMIC_TOOLS[:] = [t for t in _DYNAMIC_TOOLS if t.get("name") != name]
@@ -81,7 +82,7 @@ def execute_tool(name: str, args: dict) -> str:
         from salmalm.security.redact import scrub_secrets
 
         _audit_preview = scrub_secrets(json.dumps(args, ensure_ascii=False)[:200])
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         _audit_preview = json.dumps(args, ensure_ascii=False)[:200]
     audit_log("tool_exec", f"{name}: {_audit_preview}")
 
@@ -107,7 +108,7 @@ def execute_tool(name: str, args: dict) -> str:
             result = gateway.dispatch_auto(name, args)
             if result and "error" not in result:
                 return result.get("result", str(result))
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         pass  # Fall through to local execution
 
     _ensure_modules()
@@ -131,8 +132,8 @@ def execute_tool(name: str, args: dict) -> str:
             result = plugin_manager._execute_plugin_tool(name, args)
             if result is not None:
                 return result
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Try MCP tools as last fallback
         if name.startswith("mcp_"):

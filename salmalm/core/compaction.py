@@ -1,57 +1,335 @@
-"""Compaction facade — re-exports from core.py for clean import paths.
+"""Context compaction — auto-summarize long conversations to save tokens."""
 
-Actual implementation remains in core.py to avoid circular imports
-(compaction logic uses Session, router, _estimate_tokens, etc.).
-TODO(v0.18): Break the circular dependency and move implementation here.
-"""
+import hashlib
+import json
+import os
+import re
+import time
+from typing import Callable, Dict, List, Optional, Tuple
 
-from __future__ import annotations
+from salmalm.constants import (
+    COMPACTION_THRESHOLD,
+    COMPLEX_INDICATORS,
+    DATA_DIR,
+    MODEL_TIERS,
+    SIMPLE_QUERY_MAX_CHARS,
+    TOOL_HINT_KEYWORDS,
+)
+from salmalm.security.crypto import log
 
 
-from typing import Callable, List, Optional
+def _persist_compaction_summary(session_id: str, summary: str) -> None:
+    """Save compaction summary to DB for cross-session restoration.
+
+    OpenClaw-style: when a session is restored after restart, the last
+    compaction summary is injected so the AI retains prior context.
+    """
+    if not summary or not session_id:
+        return
+    try:
+        from salmalm.core.core import _get_db
+
+        conn = _get_db()
+        conn.execute("""CREATE TABLE IF NOT EXISTS compaction_summaries (
+            session_id TEXT PRIMARY KEY,
+            summary TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            message_count INTEGER DEFAULT 0
+        )""")
+        conn.execute(
+            "INSERT OR REPLACE INTO compaction_summaries (session_id, summary, created_at) VALUES (?,?,?)",
+            (session_id, summary[:10000], datetime.now(KST).isoformat()),
+        )
+        conn.commit()
+    except Exception as e:
+        log.warning(f"[PKG] Summary persist error: {e}")
+
+
+def _restore_compaction_summary(session_id: str) -> Optional[str]:
+    """Restore last compaction summary for a session (cross-session continuity)."""
+    try:
+        from salmalm.core.core import _get_db
+
+        conn = _get_db()
+        row = conn.execute(
+            "SELECT summary FROM compaction_summaries WHERE session_id=?",
+            (session_id,),
+        ).fetchone()
+        return row[0] if row else None
+    except Exception as e:  # noqa: broad-except
+        return None
+
+
+def _msg_content_str(msg: dict) -> str:
+    """Extract text content from a message (handles list content blocks)."""
+    c = msg.get("content", "")
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        return " ".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text")
+    return str(c)
+
+
+def _stage1_strip_images(messages: list) -> list:
+    """Stage 1: Strip binary/image data from old messages."""
+    trimmed = []
+    for m in messages:
+        if m["role"] == "user" and isinstance(m.get("content"), list):
+            new_content = []
+            for block in m["content"]:
+                if isinstance(block, dict) and block.get("type") in ("image", "image_url"):
+                    new_content.append({"type": "text", "text": "[Image attached]"})
+                else:
+                    new_content.append(block)
+            trimmed.append({**m, "content": new_content})
+        else:
+            trimmed.append(m)
+    return trimmed
+
+
+def _stage2_trim_tool_results(trimmed: list) -> list:
+    """Stage 2: Trim long tool results to 500 chars."""
+    for i, m in enumerate(trimmed):
+        if m["role"] == "tool" and len(_msg_content_str(m)) > 500:
+            trimmed[i] = {**m, "content": _msg_content_str(m)[:500] + "\n... [truncated]"}
+        elif m["role"] == "user" and isinstance(m.get("content"), list):
+            new_blocks = []
+            for block in m["content"]:
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    content = block.get("content", "")
+                    if isinstance(content, str) and len(content) > 500:
+                        new_blocks.append({**block, "content": content[:500] + "\n... [truncated]"})
+                    else:
+                        new_blocks.append(block)
+                else:
+                    new_blocks.append(block)
+            trimmed[i] = {**m, "content": new_blocks}
+    return trimmed
+
+
+def _stage3_split_messages(trimmed: list) -> tuple:
+    """Stage 3: Split into system, old important (user/assistant), and recent."""
+    system_msgs = [m for m in trimmed if m["role"] == "system"]
+    non_system = [m for m in trimmed if m["role"] != "system"]
+    recent = non_system[-10:]
+    old = non_system[:-10]
+    old_important = [m for m in old if m["role"] in ("user", "assistant")]
+    return system_msgs, old_important, recent
+
+
+def _stage4_truncate_old(old_important: list) -> list:
+    """Stage 4: Truncate verbose old messages."""
+    result = []
+    for m in old_important:
+        txt = _msg_content_str(m)
+        if m["role"] == "assistant" and len(txt) > 800:
+            result.append({**m, "content": txt[:800] + "\n... [compacted]"})
+        elif m["role"] == "user" and len(txt) > 500:
+            result.append({**m, "content": txt[:500] + "\n... [compacted]"})
+        else:
+            result.append(m)
+    return result
+
+
+def _stage5_llm_summarize(
+    to_summarize: list, system_msgs: list, recent: list, stage4: list, messages: list, total_chars: int, session
+) -> list:
+    """Stage 5: LLM summarization of old context."""
+    if not to_summarize:
+        return system_msgs + recent
+
+    summary_parts = []
+    for m in to_summarize[-30:]:
+        role = m["role"]
+        txt = _msg_content_str(m)[:400]
+        if txt.strip():
+            summary_parts.append(f"[{role}]: {txt}")
+
+    from salmalm.core.llm import call_llm
+    from salmalm.core.core import router
+
+    summary_model = router._pick_available(1)
+    _summ_msgs = [
+        {
+            "role": "system",
+            "content": (
+                "Summarize the following conversation concisely but thoroughly. "
+                "You MUST preserve:\n1. Key decisions and conclusions\n"
+                "2. Task progress and what was accomplished\n"
+                "3. Important facts, numbers, file paths, code context\n"
+                "4. User preferences and constraints mentioned\n"
+                "5. Any pending/blocked items\n"
+                "Write in the same language as the conversation. "
+                "Use 5-15 sentences. Do NOT start with 'The conversation...' — "
+                "write as a factual summary that can serve as context for continued work."
+            ),
+        },
+        {"role": "user", "content": "\n".join(summary_parts)},
+    ]
+    try:
+        summary_result = call_llm(_summ_msgs, model=summary_model, max_tokens=1200)
+    except Exception as e:
+        log.error(f"[PKG] Stage 5 LLM failed: {e} — using stage 4 result")
+        return stage4
+
+    summary_content = summary_result.get("content", "")
+    if not summary_content or len(summary_content) < 20:
+        log.warning("[PKG] Stage 5 produced empty/short summary — using stage 4 result")
+        return stage4
+
+    original_chars = sum(len(_msg_content_str(m)) for m in to_summarize)
+    if len(summary_content) > original_chars:
+        log.warning(f"[PKG] Summary ({len(summary_content)}) > original ({original_chars}) — using stage 4")
+        return stage4
+
+    compacted = (
+        system_msgs
+        + [
+            {
+                "role": "system",
+                "content": f"[Previous conversation summary — {len(to_summarize)} messages compacted]\n{summary_content}",
+            }
+        ]
+        + recent
+    )
+
+    if session:
+        try:
+            _persist_compaction_summary(getattr(session, "id", ""), summary_content)
+        except Exception as e:
+            log.warning(f"[PKG] Summary persistence error: {e}")
+
+    log.info(
+        f"[PKG] Stage 5 compacted: {len(messages)} -> {len(compacted)} messages, {total_chars} → {sum(len(_msg_content_str(m)) for m in compacted)} chars"
+    )
+
+    try:
+        result = memory_manager.auto_curate(days_back=3)
+        if "No new" not in result:
+            log.info(f"[MEM] Post-compaction auto-curate: {result}")
+    except Exception as e:
+        log.warning(f"[MEM] Auto-curate error: {e}")
+
+    return compacted
 
 
 def compact_messages(
-    messages: List[dict],
+    messages: list,
     model: Optional[str] = None,
-    session: Optional[object] = None,
+    session: Optional["Session"] = None,
     on_status: Optional[Callable] = None,
-) -> List[dict]:
-    """Multi-stage compaction. Delegates to core.compact_messages."""
-    from salmalm.core.core import compact_messages as _impl
+) -> list:
+    """Multi-stage compaction: trim tool results → drop old tools → summarize.
 
-    return _impl(messages, model=model, session=session, on_status=on_status)
+    OpenClaw-quality compaction with 5 stages:
+      1. Strip binary/image data from old messages
+      2. Trim long tool results (keep first 500 chars)
+      3. Drop old tool messages, keep user/assistant
+      4. Truncate verbose old assistant messages
+      5. LLM summarization of remaining old context
+
+    Hard limits: max 100 messages, max 500K chars (≈125K tokens).
+    Pre-compaction: flush memory to persistent store.
+    Post-compaction: inject summary as system message, not user message.
+    """
+    # Empty conversation guard
+    if not messages:
+        return messages
+
+    MAX_MESSAGES = 100
+    MAX_CHARS = 500_000
+
+    # OpenClaw-style: pre-compaction memory flush
+    total_chars_check = sum(len(_msg_content_str(m)) for m in messages)
+    if session and total_chars_check > COMPACTION_THRESHOLD * 0.8:  # noqa: F405
+        try:
+            memory_manager.flush_before_compaction(session)
+        except Exception as e:
+            log.warning(f"[MEM] Memory flush error: {e}")
+
+    # Hard message count limit
+    if len(messages) > MAX_MESSAGES:
+        system_msgs = [m for m in messages if m["role"] == "system"][:1]
+        recent = [m for m in messages if m["role"] != "system"][-40:]
+        messages = system_msgs + recent
+        log.warning(f"[CUT] Hard msg limit: truncated to {len(messages)} messages")
+
+    total_chars = sum(len(_msg_content_str(m)) for m in messages)
+
+    # Hard char limit — emergency truncation
+    if total_chars > MAX_CHARS:
+        system_msgs = [m for m in messages if m["role"] == "system"][:1]
+        recent = [m for m in messages if m["role"] != "system"][-20:]
+        messages = system_msgs + recent
+        total_chars = sum(len(_msg_content_str(m)) for m in messages)
+        log.warning(f"[CUT] Hard char limit: truncated to {len(messages)} msgs ({total_chars} chars)")
+
+    if total_chars < COMPACTION_THRESHOLD:  # noqa: F405
+        return messages
+
+    # Notify UI that compaction is in progress
+    if on_status:
+        try:
+            on_status("compacting", "✨ Compacting context...")
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
+
+    log.info(f"[PKG] Compacting {len(messages)} messages ({total_chars} chars)")
+
+    trimmed = _stage1_strip_images(messages)
+    trimmed = _stage2_trim_tool_results(trimmed)
+    total_after_trim = sum(len(_msg_content_str(m)) for m in trimmed)
+    if total_after_trim < COMPACTION_THRESHOLD:  # noqa: F405
+        log.info(f"[PKG] Stage 2 sufficient: {total_chars} -> {total_after_trim} chars")
+        return trimmed
+
+    system_msgs, old_important, recent = _stage3_split_messages(trimmed)
+    stage3 = system_msgs + old_important + recent
+    total_after_drop = sum(len(_msg_content_str(m)) for m in stage3)
+    if total_after_drop < COMPACTION_THRESHOLD:  # noqa: F405
+        log.info(f"[PKG] Stage 3 sufficient: {total_chars} -> {total_after_drop} chars")
+        return stage3
+
+    stage4_old = _stage4_truncate_old(old_important)
+    stage4 = system_msgs + stage4_old + recent
+    total_after_trunc = sum(len(_msg_content_str(m)) for m in stage4)
+    if total_after_trunc < COMPACTION_THRESHOLD:  # noqa: F405
+        log.info(f"[PKG] Stage 4 sufficient: {total_chars} -> {total_after_trunc} chars")
+        return stage4
+
+    return _stage5_llm_summarize(stage4_old, system_msgs, recent, stage4, messages, total_chars, session)
 
 
-def compact_session(session_id: str, force: bool = False) -> str:
-    """Compact a session's conversation. Delegates to core.compact_session."""
-    from salmalm.core.core import compact_session as _impl
-
-    return _impl(session_id, force=force)
+# ============================================================
+import math  # noqa: F811
 
 
-def auto_compact_if_needed(session_id: str) -> None:
-    """Auto-compact if over token threshold. Delegates to core."""
-    from salmalm.core.core import auto_compact_if_needed as _impl
+# TFIDFSearch extracted to salmalm/core/search.py
+from salmalm.core.search import TFIDFSearch  # noqa: E402
 
-    return _impl(session_id)
+_tfidf = TFIDFSearch()
 
-
-def persist_compaction_summary(session_id: str, summary: str) -> None:
-    """Save compaction summary. Delegates to core."""
-    from salmalm.core.core import _persist_compaction_summary as _impl
-
-    return _impl(session_id, summary)
+# ============================================================
+# LLM CRON MANAGER — Scheduled tasks with LLM execution
+# ============================================================
+# LLMCronManager extracted to salmalm/core/llm_cron.py
+from salmalm.core.llm_cron import LLMCronManager  # noqa: E402
 
 
-def restore_compaction_summary(session_id: str) -> Optional[str]:
-    """Restore last compaction summary. Delegates to core."""
-    from salmalm.core.core import _restore_compaction_summary as _impl
+def _estimate_tokens(messages: list) -> int:
+    """Estimate token count using chars/4 approximation (stdlib only)."""
+    total_chars = sum(len(_msg_content_str(m)) for m in messages)
+    return total_chars // 4
 
-    return _impl(session_id)
+
+def estimate_tokens(text_or_messages) -> int:
+    """Estimate tokens — accepts string or message list."""
+    if isinstance(text_or_messages, str):
+        return max(1, len(text_or_messages) // 4)
+    return _estimate_tokens(text_or_messages)
 
 
-# ── Re-exports for backward compatibility ──
+# ── Enhanced compaction helpers (from original compaction.py) ──
 from salmalm.core.cost import estimate_tokens  # noqa: F401
 
 

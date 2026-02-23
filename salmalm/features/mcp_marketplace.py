@@ -109,11 +109,13 @@ MCP_CATALOG: List[Dict[str, Any]] = [
 class MCPMarketplace:
     """Manage MCP server catalog, installation, and lifecycle."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._installed: Dict[str, Dict] = {}
         self._load()
 
     def _load(self):
+        """Load."""
         try:
             if _SERVERS_PATH.exists():
                 self._installed = json.loads(_SERVERS_PATH.read_text())
@@ -122,10 +124,12 @@ class MCPMarketplace:
             self._installed = {}
 
     def _save(self):
+        """Save."""
         _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         _SERVERS_PATH.write_text(json.dumps(self._installed, indent=2, ensure_ascii=False))
 
     def _find_catalog_entry(self, name: str) -> Optional[Dict]:
+        """Find catalog entry."""
         for entry in MCP_CATALOG:
             if entry["name"] == name:
                 return entry
@@ -209,6 +213,7 @@ class MCPMarketplace:
             self._save()
 
     def remove(self, name: str) -> str:
+        """Remove."""
         if name not in self._installed:
             return f"ℹ️ `{name}` is not installed."
         try:
@@ -216,13 +221,14 @@ class MCPMarketplace:
 
             mgr = MCPManager()
             mgr.remove_server(name)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
         del self._installed[name]
         self._save()
         return f"🗑️ `{name}` removed."
 
     def list_installed(self) -> str:
+        """List installed."""
         if not self._installed:
             return "📦 No MCP servers installed. Use `/mcp catalog` to browse."
         lines = ["📦 **Installed MCP servers:**"]
@@ -233,6 +239,7 @@ class MCPMarketplace:
         return "\n".join(lines)
 
     def catalog(self) -> str:
+        """Catalog."""
         lines = ["📚 **MCP Server Catalog:**"]
         by_cat: Dict[str, list] = {}
         for entry in MCP_CATALOG:
@@ -247,6 +254,7 @@ class MCPMarketplace:
         return "\n".join(lines)
 
     def status(self) -> str:
+        """Status."""
         total = len(self._installed)
         connected = sum(1 for i in self._installed.values() if i.get("status") == "connected")
         lines = [f"🔌 **MCP Status:** {connected}/{total} connected"]
@@ -255,6 +263,7 @@ class MCPMarketplace:
         return "\n".join(lines)
 
     def search(self, query: str) -> str:
+        """Search."""
         if not query:
             return "❓ Usage: /mcp search <query>"
         query_lower = query.lower()
@@ -273,7 +282,7 @@ class MCPMarketplace:
             lines.append(f"  {installed} `{e['name']}` — {e['description']}")
         return "\n".join(lines)
 
-    def auto_connect_all(self, retries: int = 3):
+    def auto_connect_all(self, retries: int = 3) -> None:
         """Connect all installed servers on startup."""
         for name in list(self._installed.keys()):
             for attempt in range(retries):
@@ -281,7 +290,7 @@ class MCPMarketplace:
                     self._connect_server(name)
                     if self._installed[name].get("status") == "connected":
                         break
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     if attempt < retries - 1:
                         time.sleep(1)
 

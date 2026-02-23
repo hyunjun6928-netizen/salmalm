@@ -196,7 +196,7 @@ def _run_node_mode():
         logger.info("[NET] Node stopped.")
 
 
-def setup_workdir():
+def setup_workdir() -> None:
     """Set working directory and load .env.
 
     Respects SALMALM_HOME env var; falls back to ~/SalmAlm.

@@ -39,7 +39,8 @@ WS_MAGIC = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 class WSClient:
     """Represents a single WebSocket connection."""
 
-    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, session_id: str = "web"):
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, session_id: str = "web") -> None:
+        """Init  ."""
         self.reader = reader
         self.writer = writer
         self.session_id = session_id
@@ -50,7 +51,7 @@ class WSClient:
         self._send_lock = asyncio.Lock()  # Serialize concurrent sends
         self._buffer: list = []  # Buffer messages during disconnect
 
-    async def send_json(self, data: dict):
+    async def send_json(self, data: dict) -> None:
         """Send a JSON message as a WebSocket text frame.
 
         Serializes concurrent sends to prevent frame interleaving.
@@ -65,16 +66,16 @@ class WSClient:
             async with self._send_lock:
                 payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
                 await self._send_frame(OP_TEXT, payload)
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self.connected = False
 
-    async def send_text(self, text: str):
+    async def send_text(self, text: str) -> None:
         """Send a text message to a connected WebSocket client."""
         if not self.connected:
             return
         try:
             await self._send_frame(OP_TEXT, text.encode("utf-8"))
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self.connected = False
 
     async def _send_frame(self, opcode: int, data: bytes):
@@ -122,7 +123,7 @@ class WSClient:
         except (asyncio.IncompleteReadError, ConnectionError, OSError):
             return None
 
-    async def close(self, code: int = 1000, reason: str = ""):
+    async def close(self, code: int = 1000, reason: str = "") -> None:
         """Send close frame and close connection."""
         if self.connected:
             self.connected = False
@@ -132,16 +133,17 @@ class WSClient:
                 self.writer.close()
                 try:
                     await self.writer.wait_closed()
-                except Exception:
-                    pass
-            except Exception:
-                pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
 
 class WebSocketServer:
     """Async WebSocket server that handles upgrade from raw TCP."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 18801):
+    def __init__(self, host: str = "127.0.0.1", port: int = 18801) -> None:
+        """Init  ."""
         self.host = host
         self.port = port
         self.clients: Dict[int, WSClient] = {}
@@ -166,22 +168,22 @@ class WebSocketServer:
         self._on_disconnect = fn
         return fn
 
-    async def start(self):
+    async def start(self) -> None:
         """Start listening for WebSocket connections."""
         self._running = True
         self._server = await asyncio.start_server(self._handle_connection, self.host, self.port)
         log.info(f"[FAST] WebSocket server: ws://{self.host}:{self.port}")
         asyncio.create_task(self._keepalive_loop())
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Graceful shutdown: notify clients with shutdown message, then close."""
         self._running = False
         # Send shutdown notification to all connected clients
         for client in list(self.clients.values()):
             try:
                 await client.send_json({"type": "shutdown", "message": "Server is shutting down..."})
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         # Brief pause so clients can process the message
         await asyncio.sleep(0.5)
         # Close all connections
@@ -193,11 +195,11 @@ class WebSocketServer:
             await self._server.wait_closed()
         log.info("[SHUTDOWN] WebSocket server stopped")
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Stop the WebSocket server (alias for shutdown)."""
         await self.shutdown()
 
-    async def broadcast(self, data: dict, session_id: Optional[str] = None):
+    async def broadcast(self, data: dict, session_id: Optional[str] = None) -> None:
         """Send to all connected clients (or filtered by session)."""
         for client in list(self.clients.values()):
             if session_id and client.session_id != session_id:
@@ -209,85 +211,9 @@ class WebSocketServer:
         """Get the number of connected WebSocket clients."""
         return len(self.clients)
 
-    async def _handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        """Handle incoming TCP connection — perform WS upgrade, then message loop."""
-        # Read HTTP upgrade request
-        try:
-            request_lines = []
-            while True:
-                line = await asyncio.wait_for(reader.readline(), timeout=10)
-                if line == b"\r\n" or line == b"\n" or not line:
-                    break
-                request_lines.append(line.decode("utf-8", errors="replace").strip())
-        except (asyncio.TimeoutError, ConnectionError):
-            writer.close()
-            return
-
-        if not request_lines:
-            writer.close()
-            return
-
-        # Parse headers
-        headers = {}
-        for line in request_lines[1:]:  # type: ignore[assignment]
-            if ":" in line:  # type: ignore[operator]
-                k, v = line.split(":", 1)  # type: ignore[arg-type]
-                headers[k.strip().lower()] = v.strip()
-
-        # Validate Origin (prevent cross-origin WS hijack when bound to 0.0.0.0)
-        origin = headers.get("origin", "")
-        if origin:
-            from urllib.parse import urlparse
-
-            o = urlparse(origin)
-            allowed_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
-            if o.hostname and o.hostname not in allowed_hosts:
-                log.warning("WS rejected: origin %s not in allowlist", origin)
-                writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
-                await writer.drain()
-                writer.close()
-                return
-
-        # Validate WebSocket upgrade
-        ws_key = headers.get("sec-websocket-key", "")  # type: ignore[call-overload]
-        if not ws_key or "upgrade" not in headers.get("connection", "").lower():  # type: ignore[call-overload]
-            # Not a WS request — send 400
-            response = b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n"
-            writer.write(response)
-            await writer.drain()
-            writer.close()
-            return
-
-        # Perform handshake
-        accept_val = base64.b64encode(hashlib.sha1(ws_key.encode() + WS_MAGIC).digest()).decode()
-        handshake = (
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            f"Sec-WebSocket-Accept: {accept_val}\r\n"
-            f"X-Server: SalmAlm/{VERSION}\r\n"
-            "\r\n"
-        )
-        writer.write(handshake.encode())
-        await writer.drain()
-
-        # Parse session from URL query if present
-        # e.g., GET /ws?session=web HTTP/1.1
-        session_id = "web"
-        if request_lines:
-            first_line = request_lines[0]
-            if "?session=" in first_line:
-                try:
-                    session_id = first_line.split("?session=")[1].split()[0].split("&")[0]
-                except Exception:
-                    pass
-
-        client = WSClient(reader, writer, session_id)
-        self.clients[client._id] = client
-        log.info(f"[FAST] WS client connected (session={session_id}, total={len(self.clients)})")
-
-        # SSE resume: flush buffered messages from previous connection
-        # Find any disconnected client with same session that has buffered messages
+    async def _resume_and_register(self, client, writer, headers: dict) -> None:
+        """Resume buffered messages from prior connection and register presence."""
+        session_id = client.session_id
         for old_id, old_client in list(self.clients.items()):
             if (
                 old_id != client._id
@@ -303,8 +229,6 @@ class WebSocketServer:
                         break
                 old_client._buffer.clear()
                 self.clients.pop(old_id, None)
-
-        # Auto-register presence
         try:
             from salmalm.features.presence import presence_manager
 
@@ -317,8 +241,124 @@ class WebSocketServer:
                 host=headers.get("host", ""),
                 user_agent=headers.get("user-agent", ""),
             )
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+
+    async def _cleanup_client(self, client, writer) -> None:
+        """Clean up disconnected WebSocket client."""
+        client.connected = False
+        self.clients.pop(client._id, None)
+        try:
+            from salmalm.features.presence import presence_manager
+
+            presence_manager.unregister(f"ws_{client._id}")
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+        if self._on_disconnect:
+            try:
+                await self._on_disconnect(client)
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
+        try:
+            writer.close()
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+        log.info(f"[FAST] WS client disconnected (total={len(self.clients)})")
+
+    async def _handle_text_frame(self, client, payload: bytes) -> None:
+        """Handle a WebSocket text frame (JSON message)."""
+        text = payload.decode("utf-8", errors="replace")
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            log.warning(f"[WS] Invalid JSON from client {client._id}")
+            await client.send_json({"type": "error", "error": "Invalid JSON format / 잘못된 JSON 형식"})
+            return
+        if data.get("type") == "abort":
+            try:
+                from salmalm.features.edge_cases import abort_controller
+
+                sid = data.get("session", client.session_id)
+                abort_controller.set_abort(sid)
+                await client.send_json({"type": "aborted", "session": sid})
+            except Exception as e:
+                log.warning(f"WS abort error: {e}")
+            return
+        if self._on_message:
+            try:
+                await self._on_message(client, data)
+            except Exception as e:
+                log.error(f"WS message handler error: {e}")
+                await client.send_json({"type": "error", "error": str(e)[:200]})
+
+    async def _ws_handshake(self, reader, writer) -> Optional[dict]:
+        """Perform WebSocket HTTP upgrade handshake. Returns headers dict or None on failure."""
+        try:
+            request_lines = []
+            while True:
+                line = await asyncio.wait_for(reader.readline(), timeout=10)
+                if line in (b"\r\n", b"\n", b""):
+                    break
+                request_lines.append(line.decode("utf-8", errors="replace").strip())
+        except (asyncio.TimeoutError, ConnectionError):
+            writer.close()
+            return None
+        if not request_lines:
+            writer.close()
+            return None
+        headers = {}
+        for line in request_lines[1:]:
+            if ":" in line:
+                k, v = line.split(":", 1)
+                headers[k.strip().lower()] = v.strip()
+        # Validate Origin
+        origin = headers.get("origin", "")
+        if origin:
+            from urllib.parse import urlparse
+
+            o = urlparse(origin)
+            if o.hostname and o.hostname not in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
+                log.warning("WS rejected: origin %s not in allowlist", origin)
+                writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+                await writer.drain()
+                writer.close()
+                return None
+        # Extract session from request line (GET /ws?session=xxx HTTP/1.1)
+        if request_lines and "?session=" in request_lines[0]:
+            try:
+                headers["_session_id"] = request_lines[0].split("?session=")[1].split()[0].split("&")[0]
+            except Exception:
+                pass
+        ws_key = headers.get("sec-websocket-key", "")
+        if not ws_key or "upgrade" not in headers.get("connection", "").lower():
+            writer.write(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n")
+            await writer.drain()
+            writer.close()
+            return None
+        accept_val = base64.b64encode(hashlib.sha1(ws_key.encode() + WS_MAGIC).digest()).decode()
+        handshake = (
+            "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n"
+            f"Connection: Upgrade\r\nSec-WebSocket-Accept: {accept_val}\r\n"
+            f"X-Server: SalmAlm/{VERSION}\r\n\r\n"
+        )
+        writer.write(handshake.encode())
+        await writer.drain()
+        return headers
+
+    async def _handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        """Handle incoming TCP connection — perform WS upgrade, then message loop."""
+        headers = await self._ws_handshake(reader, writer)
+        if headers is None:
+            return
+
+        # Parse session from headers (set by handshake)
+        session_id = headers.get("_session_id", "web")
+
+        client = WSClient(reader, writer, session_id)
+        self.clients[client._id] = client
+        log.info(f"[FAST] WS client connected (session={session_id}, total={len(self.clients)})")
+
+        await self._resume_and_register(client, writer, headers)
 
         if self._on_connect:
             try:
@@ -336,41 +376,12 @@ class WebSocketServer:
                 opcode, payload = frame
 
                 if opcode == OP_TEXT:
-                    text = payload.decode("utf-8", errors="replace")
-                    try:
-                        data = json.loads(text)
-                    except json.JSONDecodeError:
-                        # Invalid JSON — send error but keep connection alive
-                        log.warning(f"[WS] Invalid JSON from client {client._id}")
-                        await client.send_json({"type": "error", "error": "Invalid JSON format / 잘못된 JSON 형식"})
-                        continue
-
-                    # Abort handling — LibreChat style (생성 중지)
-                    if data.get("type") == "abort":
-                        try:
-                            from salmalm.features.edge_cases import abort_controller
-
-                            sid = data.get("session", client.session_id)
-                            abort_controller.set_abort(sid)
-                            await client.send_json({"type": "aborted", "session": sid})
-                        except Exception as e:
-                            log.warning(f"WS abort error: {e}")
-                        continue
-
-                    if self._on_message:
-                        try:
-                            await self._on_message(client, data)
-                        except Exception as e:
-                            log.error(f"WS message handler error: {e}")
-                            await client.send_json({"type": "error", "error": str(e)[:200]})
-
+                    await self._handle_text_frame(client, payload)
                 elif opcode == OP_PING:
                     await client._send_frame(OP_PONG, payload)
                     client.last_ping = time.time()
-
                 elif opcode == OP_PONG:
                     client.last_ping = time.time()
-
                 elif opcode == OP_CLOSE:
                     break
 
@@ -379,25 +390,7 @@ class WebSocketServer:
         except Exception as e:
             log.error(f"WS client error: {e}")
         finally:
-            client.connected = False
-            self.clients.pop(client._id, None)
-            # Unregister presence
-            try:
-                from salmalm.features.presence import presence_manager
-
-                presence_manager.unregister(f"ws_{client._id}")
-            except Exception:
-                pass
-            if self._on_disconnect:
-                try:
-                    await self._on_disconnect(client)
-                except Exception:
-                    pass
-            try:
-                writer.close()
-            except Exception:
-                pass
-            log.info(f"[FAST] WS client disconnected (total={len(self.clients)})")
+            await self._cleanup_client(client, writer)
 
     async def _keepalive_loop(self):
         """Ping clients every 30s, drop dead ones."""
@@ -411,7 +404,7 @@ class WebSocketServer:
                 else:
                     try:
                         await client._send_frame(OP_PING, b"")
-                    except Exception:
+                    except Exception as e:  # noqa: broad-except
                         dead.append(cid)
             for cid in dead:
                 c = self.clients.pop(cid, None)
@@ -426,12 +419,13 @@ class WebSocketServer:
 class StreamingResponse:
     """Helper to stream LLM response chunks to a WS client."""
 
-    def __init__(self, client: WSClient, request_id: Optional[str] = None):
+    def __init__(self, client: WSClient, request_id: Optional[str] = None) -> None:
+        """Init  ."""
         self.client = client
         self.request_id = request_id or str(int(time.time() * 1000))
         self._chunks: list = []
 
-    async def send_chunk(self, text: str):
+    async def send_chunk(self, text: str) -> None:
         """Send a text chunk (partial response)."""
         self._chunks.append(text)
         await self.client.send_json(
@@ -442,7 +436,7 @@ class StreamingResponse:
             }
         )
 
-    async def send_tool_call(self, tool_name: str, tool_input: dict, result: Optional[str] = None):
+    async def send_tool_call(self, tool_name: str, tool_input: dict, result: Optional[str] = None) -> None:
         """Notify client about a tool call."""
         await self.client.send_json(
             {
@@ -454,7 +448,7 @@ class StreamingResponse:
             }
         )
 
-    async def send_thinking(self, text: str):
+    async def send_thinking(self, text: str) -> None:
         """Send thinking/reasoning chunk."""
         await self.client.send_json(
             {
@@ -464,7 +458,7 @@ class StreamingResponse:
             }
         )
 
-    async def send_done(self, full_text: Optional[str] = None):
+    async def send_done(self, full_text: Optional[str] = None) -> None:
         """Signal completion."""
         if full_text is None:
             full_text = "".join(self._chunks)
@@ -476,7 +470,7 @@ class StreamingResponse:
             }
         )
 
-    async def send_error(self, error: str):
+    async def send_error(self, error: str) -> None:
         """Send an error message to a WebSocket client."""
         await self.client.send_json(
             {

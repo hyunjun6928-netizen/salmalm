@@ -15,6 +15,7 @@ from salmalm.core.llm import _http_get
 
 @register("web_search")
 def handle_web_search(args: dict) -> str:
+    """Handle web search."""
     api_key = vault.get("brave_api_key")
     if not api_key:
         return "Brave Search API key not found"
@@ -32,6 +33,7 @@ def handle_web_search(args: dict) -> str:
 
 @register("web_fetch")
 def handle_web_fetch(args: dict) -> str:
+    """Handle web fetch."""
     url = args["url"]
     max_chars = args.get("max_chars", 10000)
     blocked, reason, final_url = _is_private_url_follow_redirects(url)
@@ -41,6 +43,7 @@ def handle_web_fetch(args: dict) -> str:
     # DNS pinning: connect to the IP we already validated (anti-rebinding)
     try:
         from salmalm.tools.tools_common import _resolve_and_pin
+
         opener = _resolve_and_pin(final_url)
     except ValueError as e:
         return f"SSRF blocked: {e}"
@@ -50,27 +53,32 @@ def handle_web_fetch(args: dict) -> str:
     from html.parser import HTMLParser
 
     class _TextExtractor(HTMLParser):
-        def __init__(self):
+        def __init__(self) -> None:
+            """Init  ."""
             super().__init__()
             self._parts: list = []
             self._skip = False
             self._skip_tags = {"script", "style", "noscript", "svg"}
 
-        def handle_starttag(self, tag, attrs):
+        def handle_starttag(self, tag, attrs) -> None:
+            """Handle starttag."""
             if tag.lower() in self._skip_tags:
                 self._skip = True
             elif tag.lower() in ("br", "p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr"):
                 self._parts.append("\n")
 
-        def handle_endtag(self, tag):
+        def handle_endtag(self, tag) -> None:
+            """Handle endtag."""
             if tag.lower() in self._skip_tags:
                 self._skip = False
 
-        def handle_data(self, data):
+        def handle_data(self, data: dict) -> None:
+            """Handle data."""
             if not self._skip:
                 self._parts.append(data)
 
         def get_text(self) -> str:
+            """Get text."""
             return re.sub(r"\n{3,}", "\n\n", "".join(self._parts)).strip()
 
     extractor = _TextExtractor()
@@ -80,6 +88,7 @@ def handle_web_fetch(args: dict) -> str:
 
 @register("http_request")
 def handle_http_request(args: dict) -> str:
+    """Handle http request."""
     method = args.get("method", "GET").upper()
     url = args.get("url", "")
     headers = args.get("headers", {})
@@ -153,6 +162,7 @@ def handle_http_request(args: dict) -> str:
         # DNS pinning (anti-rebinding)
         try:
             from salmalm.tools.tools_common import _resolve_and_pin
+
             _opener = _resolve_and_pin(url)
         except ValueError as _ve:
             return f"SSRF blocked: {_ve}"

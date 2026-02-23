@@ -25,6 +25,7 @@ class Container:
     """Lightweight DI container with lazy initialization."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._services: Dict[str, Any] = {}
         self._factories: Dict[str, Callable[[], Any]] = {}
         self._lock = threading.Lock()

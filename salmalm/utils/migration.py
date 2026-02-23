@@ -51,10 +51,12 @@ _DATA_FILES_ALT = {
 
 
 def _sha256_bytes(data: bytes) -> str:
+    """Sha256 bytes."""
     return hashlib.sha256(data).hexdigest()
 
 
 def _now_kst() -> str:
+    """Now kst."""
     return datetime.now(KST).isoformat()
 
 
@@ -69,7 +71,7 @@ def _get_agent_name() -> str:
                 if line.startswith("#"):
                     return line.lstrip("#").strip()
         return "SalmAlm Agent"
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return "SalmAlm Agent"
 
 
@@ -81,7 +83,8 @@ def _get_agent_name() -> str:
 class AgentExporter:
     """Export agent state to a ZIP file."""
 
-    def __init__(self, include_vault: bool = False, include_sessions: bool = True, include_data: bool = True):
+    def __init__(self, include_vault: bool = False, include_sessions: bool = True, include_data: bool = True) -> None:
+        """Init  ."""
         self.include_vault = include_vault
         self.include_sessions = include_sessions
         self.include_data = include_data
@@ -175,8 +178,8 @@ class AgentExporter:
             try:
                 zf.writestr(f"personas/{f.name}", f.read_text(encoding="utf-8"))
                 count += 1
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         if count:
             self._includes.append("personas")
 
@@ -191,16 +194,16 @@ class AgentExporter:
                     rel = f.relative_to(mem_dir)
                     zf.writestr(f"memory/{rel}", f.read_text(encoding="utf-8"))
                     count += 1
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
         # Also export MEMORY.md from BASE_DIR
         mem_file = BASE_DIR / "MEMORY.md"
         if mem_file.exists():
             try:
                 zf.writestr("memory/MEMORY.md", mem_file.read_text(encoding="utf-8"))
                 count += 1
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         if count:
             self._includes.append("memory")
 
@@ -232,8 +235,8 @@ class AgentExporter:
                 try:
                     zf.writestr(f"config/{name}", path.read_text(encoding="utf-8"))
                     count += 1
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
         if count:
             self._includes.append("config")
 
@@ -248,8 +251,8 @@ class AgentExporter:
                 try:
                     zf.writestr(f"data/{name}", path.read_bytes())
                     count += 1
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
         if count:
             self._includes.append("data")
 
@@ -266,8 +269,8 @@ class AgentExporter:
                             rel = f.relative_to(_PLUGINS_DIR)
                             zf.writestr(f"plugins/{rel}", f.read_bytes())
                             count += 1
-                        except Exception:
-                            pass
+                        except Exception as e:  # noqa: broad-except
+                            log.debug(f"Suppressed: {e}")
         if count:
             self._includes.append("plugins")
 
@@ -284,8 +287,8 @@ class AgentExporter:
                             rel = f.relative_to(_SKILLS_DIR)
                             zf.writestr(f"skills/{rel}", f.read_bytes())
                             count += 1
-                        except Exception:
-                            pass
+                        except Exception as e:  # noqa: broad-except
+                            log.debug(f"Suppressed: {e}")
         if count:
             self._includes.append("skills")
 
@@ -295,8 +298,8 @@ class AgentExporter:
             try:
                 zf.writestr("vault/vault.enc", VAULT_FILE.read_bytes())
                 self._includes.append("vault")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
 
 # ============================================================
@@ -307,7 +310,8 @@ class AgentExporter:
 class ImportResult:
     """Result of an import operation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self.ok: bool = True
         self.imported: List[str] = []
         self.skipped: List[str] = []
@@ -316,6 +320,7 @@ class ImportResult:
         self.manifest: Dict[str, Any] = {}
 
     def to_dict(self) -> dict:
+        """To dict."""
         return {
             "ok": self.ok,
             "imported": self.imported,
@@ -343,7 +348,8 @@ class AgentImporter:
     """Import agent state from a ZIP file."""
 
     # conflict_mode: 'overwrite' | 'merge' | 'skip'
-    def __init__(self, conflict_mode: str = "overwrite"):
+    def __init__(self, conflict_mode: str = "overwrite") -> None:
+        """Init  ."""
         self.conflict_mode = conflict_mode
 
     def preview(self, zip_data: bytes) -> Dict[str, Any]:
@@ -358,8 +364,8 @@ class AgentImporter:
         if "manifest.json" in zf.namelist():
             try:
                 manifest = json.loads(zf.read("manifest.json"))
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         sections = set()
         files = []
@@ -394,7 +400,7 @@ class AgentImporter:
         if "manifest.json" in zf.namelist():
             try:
                 result.manifest = json.loads(zf.read("manifest.json"))
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 result.warnings.append("Could not parse manifest.json")
         else:
             result.warnings.append("No manifest.json found / manifest.json 없음")
@@ -406,7 +412,8 @@ class AgentImporter:
 
             if Version(export_ver) > Version(VERSION):
                 result.warnings.append(f"Export version ({export_ver}) is newer than current ({VERSION})")
-        except Exception:
+        except Exception as e:  # noqa: broad-except
+            # No packaging module — simple string comparison
             # No packaging module — simple string comparison
             if export_ver > VERSION:
                 result.warnings.append(f"Export version ({export_ver}) is newer than current ({VERSION})")
@@ -437,6 +444,7 @@ class AgentImporter:
         return result
 
     def _import_soul(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import soul."""
         try:
             soul_content = zf.read("soul/SOUL.md").decode("utf-8")
             from salmalm.core.prompt import set_user_soul
@@ -447,6 +455,7 @@ class AgentImporter:
             result.errors.append(f"soul: {e}")
 
     def _import_personas(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import personas."""
         try:
             _PERSONAS_DIR.mkdir(parents=True, exist_ok=True)
             count = 0
@@ -464,6 +473,7 @@ class AgentImporter:
             result.errors.append(f"personas: {e}")
 
     def _import_memory(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import memory."""
         try:
             count = 0
             for name in zf.namelist():
@@ -496,6 +506,7 @@ class AgentImporter:
             result.errors.append(f"memory: {e}")
 
     def _import_sessions(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import sessions."""
         try:
             from salmalm.core import _get_db
 
@@ -529,6 +540,7 @@ class AgentImporter:
             result.errors.append(f"sessions: {e}")
 
     def _import_config(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import config."""
         try:
             _HOME_DIR.mkdir(parents=True, exist_ok=True)
             count = 0
@@ -546,6 +558,7 @@ class AgentImporter:
             result.errors.append(f"config: {e}")
 
     def _import_data(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import data."""
         try:
             count = 0
             for name in zf.namelist():
@@ -566,6 +579,7 @@ class AgentImporter:
             result.errors.append(f"data: {e}")
 
     def _import_plugins(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import plugins."""
         try:
             _PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
             count = 0
@@ -583,6 +597,7 @@ class AgentImporter:
             result.errors.append(f"plugins: {e}")
 
     def _import_skills(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import skills."""
         try:
             _SKILLS_DIR.mkdir(parents=True, exist_ok=True)
             count = 0
@@ -600,6 +615,7 @@ class AgentImporter:
             result.errors.append(f"skills: {e}")
 
     def _import_vault(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import vault."""
         if "vault/vault.enc" not in zf.namelist():
             return
         if VAULT_FILE.exists() and self.conflict_mode == "skip":
@@ -631,7 +647,7 @@ def quick_sync_export() -> dict:
         from salmalm.core.prompt import get_user_soul, get_active_persona
 
         data["soul"] = get_user_soul() or ""
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         data["soul"] = ""
 
     # Routing config
@@ -639,7 +655,7 @@ def quick_sync_export() -> dict:
         from salmalm.core.engine import get_routing_config
 
         data["routing"] = get_routing_config()
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         data["routing"] = {}
 
     # Active persona
@@ -647,7 +663,7 @@ def quick_sync_export() -> dict:
         from salmalm.core.prompt import get_active_persona  # noqa: F811
 
         data["persona"] = get_active_persona("default")
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         data["persona"] = "default"
 
     # Model override
@@ -655,7 +671,7 @@ def quick_sync_export() -> dict:
         from salmalm.core import router
 
         data["model_override"] = router.force_model or "auto"
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         data["model_override"] = "auto"
 
     # Failover config
@@ -663,7 +679,7 @@ def quick_sync_export() -> dict:
         from salmalm.core.engine import get_failover_config
 
         data["failover"] = get_failover_config()
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         data["failover"] = {}
 
     data["version"] = VERSION
@@ -672,7 +688,7 @@ def quick_sync_export() -> dict:
     return data
 
 
-def quick_sync_import(data: dict):
+def quick_sync_import(data: dict) -> None:
     """Import core agent state from lightweight JSON.
     경량 JSON에서 핵심 에이전트 상태를 가져오기."""
     # SOUL.md
@@ -709,8 +725,8 @@ def quick_sync_import(data: dict):
 
             override = data["model_override"]
             router.set_force_model(override if override != "auto" else None)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     log.info(f"[SYNC] Quick sync imported: {list(data.keys())}")
 

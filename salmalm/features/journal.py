@@ -32,6 +32,7 @@ _MOOD_KEYWORDS = {
 
 
 def _get_db(db_path: Optional[Path] = None) -> sqlite3.Connection:
+    """Get db."""
     conn = _connect_db(db_path or JOURNAL_DB, wal=True)
     conn.execute("""CREATE TABLE IF NOT EXISTS journal_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,17 +78,20 @@ def _detect_mood(text: str) -> tuple:
 class JournalManager:
     """AI 일지 관리자."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None) -> None:
+        """Init  ."""
         self._db_path = db_path
         self._conn: Optional[sqlite3.Connection] = None
 
     @property
     def conn(self) -> sqlite3.Connection:
+        """Conn."""
         if self._conn is None:
             self._conn = _get_db(self._db_path)
         return self._conn
 
-    def close(self):
+    def close(self) -> None:
+        """Close."""
         if self._conn:
             self._conn.close()
             self._conn = None
@@ -258,6 +262,7 @@ _journal: Optional[JournalManager] = None
 
 
 def get_journal(db_path: Optional[Path] = None) -> JournalManager:
+    """Get journal."""
     global _journal
     if _journal is None:
         _journal = JournalManager(db_path)
@@ -309,7 +314,7 @@ async def handle_journal_command(cmd: str, session=None, **kw) -> Optional[str]:
 # ── Registration ──
 
 
-def register_journal_commands(command_router):
+def register_journal_commands(command_router) -> None:
     """Register /journal command."""
     from salmalm.features.commands import COMMAND_DEFS
 
@@ -323,6 +328,7 @@ def register_journal_tools():
     from salmalm.tools.tool_registry import register_dynamic
 
     async def _journal_tool(args):
+        """Journal tool."""
         sub = args.get("subcommand", "today")
         text = args.get("text", "")
         cmd = f"/journal {sub} {text}".strip()

@@ -1,19 +1,73 @@
 # Session Management
-# 세션 관리
 
-## Overview / 개요
+SalmAlm manages conversations as isolated sessions with automatic context window optimization.
 
-SalmAlm provides advanced session management with branching, rollback, groups, and bookmarks.
+## Session Lifecycle
 
-SalmAlm은 분기, 롤백, 그룹, 북마크를 포함한 고급 세션 관리를 제공합니다.
+```
+New Message → Get/Create Session → Build Context → LLM Call → Store Response → Auto-compact if needed
+```
 
-## Features / 기능
+Each session has:
 
-- **Multi-session** — switch between conversations / 대화 간 전환
-- **Branching** — fork a conversation at any point (`/branch`) / 대화 분기
-- **Rollback** — revert to a previous state (`/rollback`) / 이전 상태로 롤백
-- **Session groups** — organize sessions by topic / 주제별 세션 정리
-- **Bookmarks** — mark important sessions / 중요 세션 북마크
-- **Export** — JSON/Markdown export / JSON/Markdown 내보내기
-- **Auto-title** — sessions named from first message / 첫 메시지로 세션 자동 제목 설정
-- **Context compaction** — auto at 80K tokens / 80K 토큰에서 자동 압축
+- **Unique ID** — alphanumeric, auto-generated or named
+- **Message history** — stored in SQLite (`session_store`)
+- **Model override** — per-session model selection
+- **User binding** — sessions belong to authenticated users (multi-user mode)
+
+## Context Window Management
+
+| Feature | Value | Configurable |
+|---------|-------|-------------|
+| Compaction threshold | 30K tokens | ✅ `SALMALM_COMPACTION` |
+| History trim (chat) | Last 10 messages | ✅ via Engine Settings |
+| History trim (creative) | Last 20 messages | ✅ |
+| Tool result truncation | 20K chars max | ✅ |
+
+### Auto-Compaction
+
+When context exceeds the threshold, SalmAlm automatically:
+
+1. Sends history to LLM with a compaction prompt
+2. Replaces old messages with a compact summary
+3. Preserves recent messages (last 4) for continuity
+4. Triggers `auto_curate()` to update memory files
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `/context` | Show token usage breakdown |
+| `/context full` | Detailed per-message token counts |
+| `/clear` | Reset current session |
+| `/sessions` | List all sessions |
+| `/session <id>` | Switch to named session |
+| `/export` | Export session as JSON |
+
+## Web UI
+
+The **Sessions** panel shows:
+
+- Active sessions with titles and last activity
+- Token usage per session
+- One-click session switching
+- Session deletion and export
+
+## Session Store
+
+Sessions persist in `~/SalmAlm/sessions.db` (SQLite). Schema:
+
+```sql
+CREATE TABLE session_store (
+    session_id TEXT PRIMARY KEY,
+    messages TEXT,        -- JSON array
+    title TEXT,
+    user_id INTEGER,
+    created_at TEXT,
+    updated_at TEXT
+);
+```
+
+## Multi-User Sessions
+
+When authentication is enabled, sessions are scoped per user. Each user sees only their own sessions. Admin users can view all sessions via the API.

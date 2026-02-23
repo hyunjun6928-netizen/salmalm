@@ -1,54 +1,132 @@
-# Personal Assistant
-# 개인 비서
+# Personal Assistant Features
 
-## Overview / 개요
+SalmAlm is designed as a personal AI gateway — a single-user assistant with tools for everyday life management.
 
-SalmAlm includes a full personal assistant suite for daily life management.
+## Expense Tracking
 
-SalmAlm은 일상 생활 관리를 위한 완전한 개인 비서 기능을 포함합니다.
+Track daily expenses with automatic categorization:
 
-## Features / 기능
+```
+"커피 5500원" → Category: food, Amount: 5500 KRW
+```
 
-### Daily Briefing / 데일리 브리핑
-Get a morning briefing with weather, calendar events, and unread emails.
+- Daily/weekly/monthly summaries
+- Category breakdown
+- Budget alerts
+- Export to JSON
 
-날씨, 캘린더 이벤트, 읽지 않은 이메일을 포함한 아침 브리핑을 받으세요.
+**Tool**: `expense`
 
-### Smart Reminders / 스마트 리마인더
-Set reminders using natural language in Korean or English:
+## Habit Tracking
 
-한국어 또는 영어로 자연어를 사용하여 리마인더를 설정하세요:
+Monitor daily habits and streaks:
 
-- "내일 오전 9시에 회의 알려줘"
-- "Remind me in 30 minutes"
-- "다음주 월요일 미팅"
+- Check-in / check-out tracking
+- Streak counting
+- Weekly completion rates
+- Multiple habit support
 
-### Expense Tracker / 가계부
-Track expenses and income with categories and reports.
+**Tool**: `habit`
 
-카테고리와 보고서를 통해 지출 및 수입을 추적하세요.
+## Link Saving
 
-### Notes / 메모
-Create, search, and manage notes in the knowledge base.
+Save articles and URLs for later:
 
-지식 베이스에서 메모를 생성, 검색, 관리하세요.
+- Auto-fetches page title
+- Extracts text content for RAG indexing
+- Tag-based organization
+- Full-text search across saved links
 
-### Link Saver / 링크 저장
-Save URLs with automatic content extraction and summary.
+**Tool**: `save_link`
 
-자동 콘텐츠 추출 및 요약으로 URL을 저장하세요.
+## Note Taking
 
-### Pomodoro Timer / 포모도로 타이머
-Focus timer with work/break intervals.
+Quick notes with full-text search:
 
-작업/휴식 간격의 집중 타이머.
+```
+/note Meeting notes: discussed Q1 roadmap...
+```
 
-### Routines / 루틴
-Morning and evening routine management.
+- Auto-indexed for RAG retrieval
+- Date-stamped
+- Searchable via `rag_search`
 
-아침 및 저녁 루틴 관리.
+**Tool**: `note`
 
-### Quick Translate / 빠른 번역
-Instant translation between languages.
+## Reminders
 
-언어 간 즉시 번역.
+Natural language reminders in Korean and English:
+
+```
+"30분 후 알려줘"     → 30 minutes from now
+"내일 오전 9시"       → Tomorrow 9:00 AM
+"in 2 hours"         → 2 hours from now
+"next friday at 3pm" → Next Friday 15:00
+```
+
+- Cron-based scheduling
+- Auto-disable after 5 consecutive failures
+- Web notification support
+
+**Tool**: `reminder`
+
+## RSS Reader
+
+Subscribe to and read RSS feeds:
+
+```
+/rss subscribe https://example.com/feed
+/rss fetch
+/rss list
+```
+
+- Multi-feed aggregation
+- Article count limiting
+- Feed management (subscribe/unsubscribe)
+
+**Tool**: `rss_reader`
+
+## Journal
+
+Private journaling with mood tracking:
+
+- Auto mood detection from text
+- Date-organized entries
+- Searchable via RAG
+
+**Tool**: `journal`
+
+## Weather
+
+Quick weather checks:
+
+```
+"서울 날씨" → Current conditions + 3-day forecast
+```
+
+**Tool**: `weather`
+
+## QR Code Generation
+
+Generate QR codes from text or URLs:
+
+```
+"QR코드 만들어줘: https://example.com"
+```
+
+- SVG output (no external dependencies)
+- Configurable size and error correction
+
+**Tool**: `qr_code`
+
+## Translation
+
+Real-time translation between languages:
+
+```
+"이거 영어로 번역해줘: 안녕하세요"
+```
+
+Uses the configured LLM for high-quality translation.
+
+**Tool**: `translate`

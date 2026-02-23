@@ -119,39 +119,45 @@ class ContextChunk:
 
     __slots__ = ("source", "content", "relevance", "tokens", "timestamp")
 
-    def __init__(self, source: str, content: str, relevance: float = 0.0, timestamp: float = 0.0):
+    def __init__(self, source: str, content: str, relevance: float = 0.0, timestamp: float = 0.0) -> None:
+        """Init  ."""
         self.source = source
         self.content = content
         self.relevance = relevance
         self.tokens = estimate_tokens(content)
         self.timestamp = timestamp or time.time()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ContextChunk({self.source}, rel={self.relevance:.2f}, tok={self.tokens})"
 
 
 class SmartContextWindow:
     """Intelligent context window manager."""
 
-    def __init__(self, token_budget: int = _DEFAULT_BUDGET):
+    def __init__(self, token_budget: int = _DEFAULT_BUDGET) -> None:
+        """Init  ."""
         self._budget = token_budget
         self._injected: List[ContextChunk] = []
         self._recent_messages: List[Dict] = []
 
     @property
     def budget(self) -> int:
+        """Budget."""
         return self._budget
 
     @budget.setter
     def budget(self, tokens: int) -> None:
+        """Budget."""
         self._budget = max(100, tokens)
 
     @property
     def used_tokens(self) -> int:
+        """Used tokens."""
         return sum(c.tokens for c in self._injected)
 
     @property
     def remaining_tokens(self) -> int:
+        """Remaining tokens."""
         return max(0, self._budget - self.used_tokens)
 
     def set_recent_messages(self, messages: List[Dict]) -> None:

@@ -124,6 +124,7 @@ _CONFIG_PATH = _CONFIG_DIR / "config.json"
 
 
 def _ensure_config_dir():
+    """Ensure config dir."""
     _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -142,7 +143,7 @@ _runtime_overrides: Dict[str, Any] = {}
 class CommandRouter:
     """Central slash-command dispatcher."""
 
-    def __init__(self, engine_dispatch=None):
+    def __init__(self, engine_dispatch=None) -> None:
         """
         Args:
             engine_dispatch: async callable(cmd, session, **kw) -> str|None
@@ -155,15 +156,16 @@ class CommandRouter:
 
     # -- registration helpers --
 
-    def register(self, command: str, handler: Callable):
+    def register(self, command: str, handler: Callable) -> None:
         """Register exact-match command."""
         self._handlers[command] = handler
 
-    def register_prefix(self, prefix: str, handler: Callable):
+    def register_prefix(self, prefix: str, handler: Callable) -> None:
         """Register prefix-match command."""
         self._prefix_handlers.append((prefix, handler))
 
     def _register_builtins(self):
+        """Register builtins."""
         self._handlers["/help"] = self._cmd_help
         self._handlers["/commands"] = self._cmd_commands
         self._handlers["/whoami"] = self._cmd_whoami
@@ -273,7 +275,8 @@ class CommandRouter:
         return cmd
 
     @staticmethod
-    async def _call(handler, cmd, session, **kw):
+    async def _call(handler, cmd: str, session, **kw):
+        """Call."""
         result = handler(cmd, session, **kw)
         if asyncio.iscoroutine(result):
             result = await result
@@ -282,35 +285,42 @@ class CommandRouter:
     # -- built-in command handlers --
 
     @staticmethod
-    def _cmd_help(cmd, session, **_):
+    def _cmd_help(cmd: str, session, **_):
+        """Cmd help."""
         lines = ["**SalmAlm Commands**\n"]
         for c, desc in sorted(COMMAND_DEFS.items()):
             lines.append(f"`{c}` — {desc}")
         return "\n".join(lines)
 
     @staticmethod
-    def _cmd_commands(cmd, session, **_):
+    def _cmd_commands(cmd: str, session, **_):
+        """Cmd commands."""
         cmds = sorted(COMMAND_DEFS.keys())
         return "**All commands:**\n" + " ".join(f"`{c}`" for c in cmds)
 
     @staticmethod
-    def _cmd_whoami(cmd, session, **_):
+    def _cmd_whoami(cmd: str, session, **_) -> str:
+        """Cmd whoami."""
         uid = getattr(session, "user_id", None) or "unknown"
         sid = getattr(session, "session_id", None) or "unknown"
         return f"👤 User: `{uid}`\nSession: `{sid}`"
 
     @staticmethod
-    def _cmd_setup(cmd, session, **_):
+    def _cmd_setup(cmd: str, session, **_) -> str:
+        """Cmd setup."""
         from salmalm.constants import PORT
+
         return f"🔧 Setup Wizard: Open http://localhost:{PORT}/setup in your browser to re-run the setup wizard."
 
     @staticmethod
-    def _cmd_restart(cmd, session, **_):
+    def _cmd_restart(cmd: str, session, **_) -> str:
+        """Cmd restart."""
         log.info("Restart requested via /restart")
         # Schedule restart after response (skip in test environments)
         import threading
 
         def _do_restart():
+            """Do restart."""
             time.sleep(1)
             if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("SALMALM_NO_RESTART"):
                 log.info("Restart suppressed (test/no-restart mode)")
@@ -321,17 +331,20 @@ class CommandRouter:
         return "🔄 Restarting server..."
 
     @staticmethod
-    def _cmd_reset(cmd, session, **_):
+    def _cmd_reset(cmd: str, session, **_) -> str:
+        """Cmd reset."""
         if session and hasattr(session, "messages"):
             session.messages.clear()
         return "🗑️ Session reset."
 
     @staticmethod
-    def _cmd_stop(cmd, session, **_):
+    def _cmd_stop(cmd: str, session, **_) -> str:
+        """Cmd stop."""
         return "🛑 Stop signal sent."
 
     @staticmethod
-    def _cmd_new(cmd, session, **_):
+    def _cmd_new(cmd: str, session, **_):
+        """Cmd new."""
         parts = cmd.split(maxsplit=1)
         model_hint = parts[1] if len(parts) > 1 else None
         if session and hasattr(session, "messages"):
@@ -344,7 +357,8 @@ class CommandRouter:
     # -- debug --
 
     @staticmethod
-    def _cmd_debug(cmd, session, **_):
+    def _cmd_debug(cmd: str, session, **_) -> str:
+        """Cmd debug."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "show"
         if sub == "show":
@@ -370,13 +384,14 @@ class CommandRouter:
     # -- config --
 
     @staticmethod
-    def _cmd_config(cmd, session, **_):
+    def _cmd_config(cmd: str, session, **_) -> str:
+        """Cmd config."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "show"
         _ensure_config_dir()
         try:
             cfg = json.loads(_CONFIG_PATH.read_text()) if _CONFIG_PATH.exists() else {}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             cfg = {}
 
         if sub == "show":
@@ -412,7 +427,8 @@ class CommandRouter:
     # -- bash --
 
     @staticmethod
-    def _cmd_bash(cmd, session, **_):
+    def _cmd_bash(cmd: str, session, **_) -> str:
+        """Cmd bash."""
         shell_cmd = cmd[len("/bash ") :].strip()
         if not shell_cmd:
             return "❓ Usage: /bash <command>"
@@ -441,7 +457,8 @@ class CommandRouter:
     # -- channel --
 
     @staticmethod
-    def _cmd_dock(cmd, session, **_):
+    def _cmd_dock(cmd: str, session, **_) -> str:
+        """Cmd dock."""
         parts = cmd.split()
         channel = parts[1] if len(parts) > 1 else None
         valid = ("telegram", "discord", "slack", "web")
@@ -452,7 +469,8 @@ class CommandRouter:
         return f"📡 Response channel set to `{channel}`."
 
     @staticmethod
-    def _cmd_activation(cmd, session, **_):
+    def _cmd_activation(cmd: str, session, **_) -> str:
+        """Cmd activation."""
         parts = cmd.split()
         mode = parts[1] if len(parts) > 1 else None
         if mode not in ("mention", "always"):
@@ -462,7 +480,8 @@ class CommandRouter:
         return f"🔔 Activation mode: `{mode}`"
 
     @staticmethod
-    def _cmd_send(cmd, session, **_):
+    def _cmd_send(cmd: str, session, **_) -> str:
+        """Cmd send."""
         parts = cmd.split()
         toggle = parts[1] if len(parts) > 1 else None
         if toggle not in ("on", "off"):
@@ -474,14 +493,15 @@ class CommandRouter:
     # -- ACL --
 
     @staticmethod
-    def _cmd_allowlist(cmd, session, **_):
+    def _cmd_allowlist(cmd: str, session, **_) -> str:
+        """Cmd allowlist."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "list"
         _ensure_config_dir()
         al_path = _CONFIG_DIR / "allowlist.json"
         try:
             al = json.loads(al_path.read_text()) if al_path.exists() else []
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             al = []
 
         if sub == "list":
@@ -502,7 +522,8 @@ class CommandRouter:
         return "❓ Usage: /allowlist list|add|remove <id>"
 
     @staticmethod
-    def _cmd_approve(cmd, session, **_):
+    def _cmd_approve(cmd: str, session, **_) -> str:
+        """Cmd approve."""
         parts = cmd.split()
         if len(parts) < 3:
             return "❓ Usage: /approve <id> allow-once|allow-always|deny"
@@ -521,18 +542,26 @@ class CommandRouter:
     # -- thinking / verbose --
 
     @staticmethod
-    def _cmd_think(cmd, session, **_):
+    def _cmd_think(cmd: str, session, **_) -> str:
+        """Cmd think."""
         parts = cmd.replace("/t ", "/think ").split()
         level = parts[1] if len(parts) > 1 else None
-        valid = ("off", "low", "medium", "high")
+        valid = ("off", "low", "medium", "high", "xhigh")
         if level not in valid:
-            return f"❓ Usage: /think {'|'.join(valid)}"
+            return f"❓ Usage: /think {'|'.join(valid)}\n💡 low=4K, medium=10K, high=16K, xhigh=32K budget tokens"
         if session:
-            session.__dict__["thinking_level"] = level
-        return f"🧠 Thinking level: `{level}`"
+            if level == "off":
+                session.thinking_enabled = False
+                session.__dict__["thinking_level"] = "medium"
+            else:
+                session.thinking_enabled = True
+                session.thinking_level = level
+        _budgets = {"low": 4000, "medium": 10000, "high": 16000, "xhigh": 32000}
+        return f"🧠 Thinking: `{level}`" + (" (OFF)" if level == "off" else f" (budget: {_budgets[level]}tok)")
 
     @staticmethod
-    def _cmd_verbose(cmd, session, **_):
+    def _cmd_verbose(cmd: str, session, **_) -> str:
+        """Cmd verbose."""
         parts = cmd.replace("/v ", "/verbose ").split()
         level = parts[1] if len(parts) > 1 else None
         if level not in ("on", "full", "off"):
@@ -542,7 +571,8 @@ class CommandRouter:
         return f"📝 Verbose mode: `{level}`"
 
     @staticmethod
-    def _cmd_reasoning(cmd, session, **_):
+    def _cmd_reasoning(cmd: str, session, **_) -> str:
+        """Cmd reasoning."""
         parts = cmd.split()
         mode = parts[1] if len(parts) > 1 else None
         if mode not in ("on", "off", "stream"):
@@ -554,7 +584,8 @@ class CommandRouter:
     # -- skill --
 
     @staticmethod
-    def _cmd_skill(cmd, session, **_):
+    def _cmd_skill(cmd: str, session, **_) -> str:
+        """Cmd skill."""
         parts = cmd.split(maxsplit=2)
         if len(parts) < 2:
             return "❓ Usage: /skill <name> [input]"
@@ -565,7 +596,8 @@ class CommandRouter:
     # -- oauth (delegates to oauth module) --
 
     @staticmethod
-    def _cmd_oauth(cmd, session, **_):
+    def _cmd_oauth(cmd: str, session, **_) -> str:
+        """Cmd oauth."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "status"
         try:
@@ -589,7 +621,8 @@ class CommandRouter:
     # -- screen (delegates to screen_capture module) --
 
     @staticmethod
-    def _cmd_screen(cmd, session, **_):
+    def _cmd_screen(cmd: str, session, **_) -> str:
+        """Cmd screen."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "capture"
         try:
@@ -615,7 +648,8 @@ class CommandRouter:
     # -- mcp (delegates to mcp_marketplace module) --
 
     @staticmethod
-    def _cmd_mcp(cmd, session, **_):
+    def _cmd_mcp(cmd: str, session, **_) -> str:
+        """Cmd mcp."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "status"
         try:
@@ -640,7 +674,7 @@ class CommandRouter:
             return f"❌ MCP error: {e}"
         return "❓ Usage: /mcp install|list|catalog|remove|status|search"
 
-    def _cmd_brave(cmd, session, **_):
+    def _cmd_brave(cmd: str, session, **_) -> str:
         """Quick Brave web search."""
         query = cmd[len("/brave") :].strip()
         if not query:
@@ -653,7 +687,7 @@ class CommandRouter:
             return f"❌ Brave search error: {e}"
 
     @staticmethod
-    def _cmd_queue(cmd, session, **_):
+    def _cmd_queue(cmd: str, session, **_) -> str:
         """Message queue management."""
         from salmalm.features.queue import get_queue, set_queue_mode, queue_status, QueueMode
 
@@ -737,6 +771,7 @@ _router: Optional[CommandRouter] = None
 
 
 def get_router(engine_dispatch=None) -> CommandRouter:
+    """Get router."""
     global _router
     if _router is None:
         _router = CommandRouter(engine_dispatch=engine_dispatch)

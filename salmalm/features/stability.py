@@ -34,7 +34,8 @@ from salmalm.security.crypto import log
 class CircuitBreaker:
     """Track error rates per component. Trip after threshold."""
 
-    def __init__(self, threshold: int = 5, window_sec: int = 300, cooldown_sec: int = 60):
+    def __init__(self, threshold: int = 5, window_sec: int = 300, cooldown_sec: int = 60) -> None:
+        """Init  ."""
         self.threshold = threshold
         self.window_sec = window_sec
         self.cooldown_sec = cooldown_sec
@@ -42,7 +43,7 @@ class CircuitBreaker:
         self._tripped: Dict[str, float] = {}  # component -> trip time
         self._lock = threading.Lock()
 
-    def record_error(self, component: str, error: str = ""):
+    def record_error(self, component: str, error: str = "") -> None:
         """Record an error for a component."""
         with self._lock:
             if component not in self._errors:
@@ -54,7 +55,7 @@ class CircuitBreaker:
                 }
             )
 
-    def record_success(self, component: str):
+    def record_success(self, component: str) -> None:
         """Record successful operation — helps reset breaker."""
         with self._lock:
             if component in self._tripped:
@@ -102,7 +103,8 @@ class CircuitBreaker:
 class HealthMonitor:
     """Comprehensive health monitoring and auto-recovery."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self.circuit_breaker = CircuitBreaker()
         self._start_time = time.time()
         self._checks: Dict[str, dict] = {}
@@ -157,6 +159,7 @@ class HealthMonitor:
         return report
 
     def _format_uptime(self) -> str:
+        """Format uptime."""
         secs = int(time.time() - self._start_time)
         hours, remainder = divmod(secs, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -176,8 +179,8 @@ class HealthMonitor:
             info["memory_mb"] = round(usage.ru_maxrss / 1024, 1)  # Linux: KB
             info["user_time"] = round(usage.ru_utime, 2)
             info["sys_time"] = round(usage.ru_stime, 2)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         try:
             # Check disk space for workspace
@@ -185,18 +188,19 @@ class HealthMonitor:
             info["disk_free_mb"] = round(stat.f_bavail * stat.f_frsize / (1024 * 1024), 1)
             info["disk_total_mb"] = round(stat.f_blocks * stat.f_frsize / (1024 * 1024), 1)
             info["disk_pct"] = round(100 * (1 - stat.f_bavail / stat.f_blocks), 1)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         try:
             info["pid"] = os.getpid()
             info["threads"] = threading.active_count()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         return info
 
     def _check_vault(self) -> dict:
+        """Check vault."""
         from salmalm.security.crypto import vault
 
         return {
@@ -205,6 +209,7 @@ class HealthMonitor:
         }
 
     def _check_telegram(self) -> dict:
+        """Check telegram."""
         try:
             from salmalm.core import _tg_bot
 
@@ -215,6 +220,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_websocket(self) -> dict:
+        """Check websocket."""
         try:
             from salmalm.web.ws import ws_server
 
@@ -228,6 +234,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_rag(self) -> dict:
+        """Check rag."""
         try:
             from salmalm.features.rag import rag_engine
 
@@ -240,6 +247,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_mcp(self) -> dict:
+        """Check mcp."""
         try:
             from salmalm.features.mcp import mcp_manager
 
@@ -255,6 +263,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_cron(self) -> dict:
+        """Check cron."""
         try:
             from salmalm.core import cron
 
@@ -267,6 +276,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_database(self) -> dict:
+        """Check database."""
         import sqlite3
 
         try:
@@ -399,7 +409,7 @@ class HealthMonitor:
 # ── Watchdog async task ──────────────────────────────────────
 
 
-async def watchdog_tick(monitor: HealthMonitor):
+async def watchdog_tick(monitor: HealthMonitor) -> None:
     """Periodic watchdog check — run via cron every 5 minutes."""
     health = monitor.check_health()
 

@@ -119,7 +119,8 @@ class BackgroundSession:
     _counter = 0
     _lock = threading.Lock()
 
-    def __init__(self, command: str, timeout: int = 1800, notify_on_exit: bool = False, env: dict = None):
+    def __init__(self, command: str, timeout: int = 1800, notify_on_exit: bool = False, env: dict = None) -> None:
+        """Init  ."""
         with BackgroundSession._lock:
             BackgroundSession._counter += 1
             self.session_id = f"bg-{BackgroundSession._counter}"
@@ -162,6 +163,7 @@ class BackgroundSession:
         from salmalm.constants import WORKSPACE_DIR as _ws
 
         def _run():
+            """Run."""
             try:
                 if needs_shell:
                     popen_args = {"args": self.command, "shell": True}
@@ -207,8 +209,8 @@ class BackgroundSession:
                         _c._tg_bot._api(
                             "sendMessage", {"chat_id": _c._tg_bot.owner_id, "text": msg, "parse_mode": "Markdown"}
                         )
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
         self._thread = threading.Thread(target=_run, daemon=True, name=f"bg-exec-{self.session_id}")
         self._thread.start()
@@ -242,8 +244,8 @@ class BackgroundSession:
             try:
                 self.process.kill()
                 self.process.wait(timeout=5)
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         self.status = "killed"
         self.exit_code = -9
         return f"Killed background session {self.session_id}"

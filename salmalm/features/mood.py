@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
 from salmalm.constants import KST, DATA_DIR
+
 MOOD_DIR = DATA_DIR
 MOOD_CONFIG_FILE = MOOD_DIR / "mood.json"
 MOOD_HISTORY_FILE = MOOD_DIR / "mood_history.json"
@@ -190,22 +191,34 @@ MOOD_TONE_MAP: Dict[str, Dict[str, str]] = {
 
 
 def _ensure_dir():
+    """Ensure dir."""
     MOOD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _match_keywords(text_lower: str, keyword_map: dict, scores: dict) -> None:
+    """Match keywords from a mood keyword map and update scores."""
+    for mood, keywords in keyword_map.items():
+        for kw in keywords:
+            if kw in text_lower:
+                scores[mood] += 1
 
 
 class MoodDetector:
     """Detects user mood from text using keywords, patterns, and emoji."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         _ensure_dir()
         self.config = self._load_config()
 
     def _load_config(self) -> Dict[str, Any]:
+        """Load config."""
         from salmalm.config_manager import ConfigManager
 
         return ConfigManager.load("mood", defaults={"enabled": True, "sensitivity": "normal"})
 
     def _save_config(self):
+        """Save config."""
         from salmalm.config_manager import ConfigManager
 
         _ensure_dir()
@@ -213,10 +226,12 @@ class MoodDetector:
 
     @property
     def enabled(self) -> bool:
+        """Enabled."""
         return self.config.get("enabled", True)
 
     @property
     def sensitivity(self) -> str:
+        """Sensitivity."""
         return self.config.get("sensitivity", "normal")
 
     def set_mode(self, mode: str) -> str:
@@ -245,12 +260,8 @@ class MoodDetector:
         text_lower = text.lower()
         scores: Counter = Counter()
 
-        # Keyword matching - Korean
-        for mood, keywords in _KR_MOOD_KEYWORDS.items():
-            for kw in keywords:
-                if kw in text_lower:
-                    scores[mood] += 1
-
+        # Keyword matching
+        _match_keywords(text_lower, _KR_MOOD_KEYWORDS, scores)
         # Keyword matching - English
         for mood, keywords in _EN_MOOD_KEYWORDS.items():
             for kw in keywords:
@@ -315,7 +326,7 @@ class MoodDetector:
         tone = MOOD_TONE_MAP.get(mood, {})
         return tone.get("inject", "")
 
-    def record_mood(self, mood: str, confidence: float):
+    def record_mood(self, mood: str, confidence: float) -> None:
         """Record mood to history."""
         _ensure_dir()
         history = []

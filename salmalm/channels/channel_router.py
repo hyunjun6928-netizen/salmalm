@@ -30,6 +30,7 @@ def _load_config() -> Dict[str, Any]:
 
 
 def _save_config(cfg: Dict[str, Any]) -> None:
+    """Save config."""
     ConfigManager.save("channels", cfg)
 
 
@@ -79,7 +80,8 @@ def format_for_channel(text: str, channel: str) -> str:
 class ChannelRouter:
     """Routes messages between multiple channels and the agent engine."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._channels: Dict[str, Dict[str, Any]] = {}
         self._handlers: Dict[str, Callable] = {}
         self._config = _load_config()
@@ -98,6 +100,7 @@ class ChannelRouter:
         log.info(f"Channel registered: {name}")
 
     def unregister(self, name: str) -> bool:
+        """Unregister."""
         if name in self._channels:
             del self._channels[name]
             return True
@@ -108,13 +111,16 @@ class ChannelRouter:
         self._handlers[channel] = handler
 
     def get_handler(self, channel: str) -> Optional[Callable]:
+        """Get handler."""
         return self._handlers.get(channel)
 
     @property
     def channels(self) -> Dict[str, Dict[str, Any]]:
+        """Channels."""
         return {k: {kk: vv for kk, vv in v.items() if kk != "send_fn"} for k, v in self._channels.items()}
 
     def is_enabled(self, name: str) -> bool:
+        """Is enabled."""
         ch = self._channels.get(name)
         return ch["enabled"] if ch else False
 

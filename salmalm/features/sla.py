@@ -51,13 +51,14 @@ _DEFAULT_SLA_CONFIG = {
 class SLAConfig:
     """Runtime-reloadable SLA configuration from ~/.salmalm/sla.json."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._config: dict = dict(_DEFAULT_SLA_CONFIG)
         self._lock = threading.Lock()
         self._mtime: float = 0.0
         self.load()
 
-    def load(self):
+    def load(self) -> None:
         """Load config from disk. Creates default if missing."""
         _SALMALM_DIR.mkdir(parents=True, exist_ok=True)
         try:
@@ -81,7 +82,7 @@ class SLAConfig:
         except Exception as e:
             log.warning(f"[SLA] Config load error: {e}")
 
-    def save(self):
+    def save(self) -> None:
         """Write current config to disk."""
         _SALMALM_DIR.mkdir(parents=True, exist_ok=True)
         try:
@@ -93,21 +94,25 @@ class SLAConfig:
             log.warning(f"[SLA] Config save error: {e}")
 
     def get(self, key: str, default=None):
+        """Get."""
         self._maybe_reload()
         with self._lock:
             return self._config.get(key, default)
 
-    def set(self, key: str, value):
+    def set(self, key: str, value: str) -> None:
+        """Set."""
         with self._lock:
             self._config[key] = value
         self.save()
 
     def get_all(self) -> dict:
+        """Get all."""
         self._maybe_reload()
         with self._lock:
             return dict(self._config)
 
-    def update(self, data: dict):
+    def update(self, data: dict) -> None:
+        """Update."""
         with self._lock:
             self._config.update(data)
         self.save()
@@ -123,8 +128,8 @@ class SLAConfig:
                     else:
                         return
                 self.load()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
 
 # Global config instance
@@ -142,18 +147,20 @@ class UptimeMonitor:
     서버 업타임 추적, 비정상 종료 감지, 다운타임 이벤트 DB 기록.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._start_time = time.time()
         self._start_dt = datetime.now(KST)
         self._lock = threading.Lock()
 
     def _get_db(self) -> sqlite3.Connection:
+        """Get db."""
         conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=True)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
 
-    def init_db(self):
+    def init_db(self) -> None:
         """Create uptime_log table if not exists."""
         conn = self._get_db()
         conn.execute("""CREATE TABLE IF NOT EXISTS uptime_log (
@@ -166,7 +173,7 @@ class UptimeMonitor:
         conn.commit()
         conn.close()
 
-    def on_startup(self):
+    def on_startup(self) -> None:
         """Called at server startup: check lockfile, record crash if needed."""
         _SALMALM_DIR.mkdir(parents=True, exist_ok=True)
         self.init_db()
@@ -178,7 +185,7 @@ class UptimeMonitor:
                 prev_data = json.loads(_RUNNING_FILE.read_text(encoding="utf-8"))
                 prev_start = prev_data.get("start_time", "")
                 prev_pid = prev_data.get("pid", "?")
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 prev_start = ""
                 prev_pid = "?"
 
@@ -189,8 +196,8 @@ class UptimeMonitor:
                 try:
                     prev_dt = datetime.fromisoformat(prev_start)
                     duration = (datetime.now(KST) - prev_dt).total_seconds()
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
             conn = self._get_db()
             conn.execute(
@@ -213,7 +220,7 @@ class UptimeMonitor:
         _RUNNING_FILE.write_text(json.dumps(lockdata), encoding="utf-8")
         log.info(f"[SLA] Lockfile created: {_RUNNING_FILE}")
 
-    def on_shutdown(self):
+    def on_shutdown(self) -> None:
         """Called on graceful shutdown: remove lockfile."""
         try:
             if _RUNNING_FILE.exists():
@@ -222,7 +229,7 @@ class UptimeMonitor:
         except Exception as e:
             log.warning(f"[SLA] Lockfile removal error: {e}")
 
-    def record_downtime(self, start: str, end: str, duration: float, reason: str):
+    def record_downtime(self, start: str, end: str, duration: float, reason: str) -> None:
         """Manually record a downtime event."""
         try:
             conn = self._get_db()
@@ -236,9 +243,11 @@ class UptimeMonitor:
             log.error(f"[SLA] Record downtime error: {e}")
 
     def get_uptime_seconds(self) -> float:
+        """Get uptime seconds."""
         return time.time() - self._start_time
 
     def get_uptime_human(self) -> str:
+        """Get uptime human."""
         secs = int(self.get_uptime_seconds())
         days, rem = divmod(secs, 86400)
         hours, rem = divmod(rem, 3600)
@@ -283,7 +292,7 @@ class UptimeMonitor:
             )
             downtime = cur.fetchone()[0] or 0.0
             conn.close()
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             downtime = 0.0
 
         uptime_pct = max(0.0, 100.0 * (1.0 - downtime / total_secs))
@@ -312,7 +321,7 @@ class UptimeMonitor:
             )
             downtime = cur.fetchone()[0] or 0.0
             conn.close()
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             downtime = 0.0
 
         return round(max(0.0, 100.0 * (1.0 - downtime / total_secs)), 4)
@@ -327,7 +336,7 @@ class UptimeMonitor:
             rows = cur.fetchall()
             conn.close()
             return [{"start": r[0], "end": r[1], "duration_sec": r[2], "reason": r[3]} for r in rows]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def get_stats(self) -> dict:
@@ -360,14 +369,17 @@ class LatencyTracker:
     P50/P95/P99 계산 + SLA 경고.
     """
 
-    def __init__(self, max_size: int = 100):
+    def __init__(self, max_size: int = 100) -> None:
+        """Init  ."""
         self._max_size = max_size
         self._records: deque = deque(maxlen=max_size)
         self._lock = threading.Lock()
         self._consecutive_timeouts = 0
         self._timeout_threshold = 3  # Trigger failover after N consecutive timeouts
 
-    def record(self, ttft_ms: float, total_ms: float, model: str = "", timed_out: bool = False, session_id: str = ""):
+    def record(
+        self, ttft_ms: float, total_ms: float, model: str = "", timed_out: bool = False, session_id: str = ""
+    ) -> None:
         """Record a single request's latency.
 
         요청의 레이턴시 기록.
@@ -401,11 +413,13 @@ class LatencyTracker:
         with self._lock:
             return self._consecutive_timeouts >= self._timeout_threshold
 
-    def reset_timeout_counter(self):
+    def reset_timeout_counter(self) -> None:
+        """Reset timeout counter."""
         with self._lock:
             self._consecutive_timeouts = 0
 
     def _percentile(self, values: list, p: float) -> float:
+        """Percentile."""
         if not values:
             return 0.0
         sorted_vals = sorted(values)
@@ -490,7 +504,8 @@ class Watchdog:
     이상 감지 시 로그 + 알림 + 자동 복구 시도.
     """
 
-    def __init__(self, uptime_monitor: UptimeMonitor, latency_tracker: LatencyTracker):
+    def __init__(self, uptime_monitor: UptimeMonitor, latency_tracker: LatencyTracker) -> None:
+        """Init  ."""
         self._uptime = uptime_monitor
         self._latency = latency_tracker
         self._thread: Optional[threading.Thread] = None
@@ -498,7 +513,7 @@ class Watchdog:
         self._last_report: dict = {}
         self._lock = threading.Lock()
 
-    def start(self):
+    def start(self) -> None:
         """Start watchdog background thread."""
         if self._thread and self._thread.is_alive():
             return
@@ -507,7 +522,7 @@ class Watchdog:
         self._thread.start()
         log.info("[SLA] Watchdog started")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop watchdog."""
         self._stop_event.set()
         if self._thread:
@@ -516,6 +531,7 @@ class Watchdog:
 
     def _run(self):
         # Wait a bit after startup before first check
+        """Run."""
         time.sleep(10)
         while not self._stop_event.is_set():
             interval = sla_config.get("watchdog_interval_sec", 30)
@@ -626,8 +642,8 @@ class Watchdog:
                     from salmalm.core import audit_log
 
                     audit_log("sla_health_issue", f"{name}: {detail}")
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
         # Auto-recovery attempts (자동 복구)
         if not sla_config.get("auto_recovery", True):
@@ -653,8 +669,8 @@ class Watchdog:
             if hasattr(_thread_local, "audit_conn"):
                 try:
                     _thread_local.audit_conn.close()
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
                 del _thread_local.audit_conn
             # Test new connection
             conn = sqlite3.connect(str(AUDIT_DB), timeout=5)

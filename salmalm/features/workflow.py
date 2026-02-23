@@ -5,6 +5,7 @@ Supports: variable substitution, conditionals, parallel steps, error handling,
 triggers (cron, manual, webhook, event).
 """
 
+from salmalm.security.crypto import log
 import json
 import re
 import threading
@@ -12,11 +13,13 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from salmalm.constants import KST, DATA_DIR
+
 WORKFLOWS_DIR = DATA_DIR / "workflows"
 WORKFLOW_LOG_DIR = WORKFLOWS_DIR / "logs"
 
 
 def _ensure_dirs():
+    """Ensure dirs."""
     WORKFLOWS_DIR.mkdir(parents=True, exist_ok=True)
     WORKFLOW_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -29,7 +32,8 @@ _VAR_RE = re.compile(r"\{\{(\w+)\.(\w+)\}\}")
 def _substitute(template: str, context: Dict[str, Any]) -> str:
     """Replace {{step_id.field}} with values from context."""
 
-    def _repl(m):
+    def _repl(m) -> str:
+        """Repl."""
         step_id, field = m.group(1), m.group(2)
         step_data = context.get(step_id, {})
         if isinstance(step_data, dict):
@@ -79,11 +83,12 @@ def _eval_condition(cond: str, context: Dict[str, Any]) -> bool:
                 if op == "!=":
                     return left != right
         return bool(resolved)
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return False
 
 
-def _to_num(s: str):
+def _to_num(s: str) -> float:
+    """To num."""
     try:
         return float(s)
     except (ValueError, TypeError):
@@ -94,20 +99,23 @@ def _to_num(s: str):
 
 
 class StepResult:
-    def __init__(self, step_id: str, success: bool, result: Any = None, error: str = ""):
+    def __init__(self, step_id: str, success: bool, result: Any = None, error: str = "") -> None:
+        """Init  ."""
         self.step_id = step_id
         self.success = success
         self.result = result
         self.error = error
 
     def to_dict(self) -> dict:
+        """To dict."""
         return {"step_id": self.step_id, "success": self.success, "result": self.result, "error": self.error}
 
 
 class WorkflowEngine:
     """Execute multi-step workflows with variable substitution."""
 
-    def __init__(self, tool_executor=None):
+    def __init__(self, tool_executor=None) -> None:
+        """Init  ."""
         _ensure_dirs()
         self._tool_executor = tool_executor  # callable(tool_name, params) -> result
         self._lock = threading.Lock()
@@ -115,6 +123,7 @@ class WorkflowEngine:
     # ── Workflow CRUD ────────────────────────────────────────
 
     def list_workflows(self) -> List[dict]:
+        """List workflows."""
         _ensure_dirs()
         workflows = []
         for f in WORKFLOWS_DIR.glob("*.json"):
@@ -130,11 +139,12 @@ class WorkflowEngine:
                             "steps": len(wf.get("steps", [])),
                         }
                     )
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         return workflows
 
     def get_workflow(self, name: str) -> Optional[dict]:
+        """Get workflow."""
         path = WORKFLOWS_DIR / f"{name}.json"
         if not path.exists():
             return None
@@ -142,6 +152,7 @@ class WorkflowEngine:
             return json.load(f)
 
     def save_workflow(self, workflow: dict) -> str:
+        """Save workflow."""
         _ensure_dirs()
         name = workflow.get("name", "")
         if not name:
@@ -152,6 +163,7 @@ class WorkflowEngine:
         return f"✅ 워크플로우 저장됨: {name}"
 
     def delete_workflow(self, name: str) -> str:
+        """Delete workflow."""
         path = WORKFLOWS_DIR / f"{name}.json"
         if not path.exists():
             return f"❌ 워크플로우 없음: {name}"
@@ -161,12 +173,14 @@ class WorkflowEngine:
     # ── Execution ────────────────────────────────────────────
 
     def run(self, name: str) -> dict:
+        """Run."""
         wf = self.get_workflow(name)
         if not wf:
             return {"success": False, "error": f"Workflow not found: {name}"}
         return self.execute(wf)
 
     def execute(self, workflow: dict) -> dict:
+        """Execute."""
         steps = workflow.get("steps", [])
         on_error = workflow.get("on_error", "stop")
         context: Dict[str, Any] = {}
@@ -215,6 +229,7 @@ class WorkflowEngine:
         return run_result
 
     def _execute_step(self, step: dict, context: Dict[str, Any]) -> StepResult:
+        """Execute step."""
         step_id = step.get("id", "unknown")
         tool = step.get("tool", "")
         params = _substitute_params(step.get("params", {}), context)
@@ -228,11 +243,13 @@ class WorkflowEngine:
             return StepResult(step_id, False, error=str(e))
 
     def _run_parallel(self, steps: list, context: Dict[str, Any]) -> List[dict]:
+        """Run parallel."""
         results = []
         threads = []
         result_map = {}
 
         def _run(s):
+            """Run."""
             sr = self._execute_step(s, context)
             result_map[s.get("id", "unknown")] = sr.to_dict()
 
@@ -250,15 +267,17 @@ class WorkflowEngine:
     # ── Logging ──────────────────────────────────────────────
 
     def _log_run(self, name: str, result: dict):
+        """Log run."""
         try:
             _ensure_dirs()
             log_path = WORKFLOW_LOG_DIR / f"{name}.jsonl"
             with open(log_path, "a") as f:
                 f.write(json.dumps(result, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     def get_logs(self, name: str, limit: int = 10) -> List[dict]:
+        """Get logs."""
         log_path = WORKFLOW_LOG_DIR / f"{name}.jsonl"
         if not log_path.exists():
             return []
@@ -267,13 +286,14 @@ class WorkflowEngine:
         for line in lines[-limit:]:
             try:
                 results.append(json.loads(line))
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         return results
 
     # ── Presets ──────────────────────────────────────────────
 
     def get_presets(self) -> List[dict]:
+        """Get presets."""
         return [
             {
                 "name": "morning_briefing",
@@ -315,6 +335,7 @@ class WorkflowEngine:
         ]
 
     def install_preset(self, name: str) -> str:
+        """Install preset."""
         for p in self.get_presets():
             if p["name"] == name:
                 return self.save_workflow(p)
@@ -325,6 +346,7 @@ class WorkflowEngine:
 
 
 def handle_workflow_command(text: str) -> str:
+    """Handle workflow command."""
     engine = WorkflowEngine()
     parts = text.strip().split(None, 2)
     sub = parts[1] if len(parts) > 1 else "list"

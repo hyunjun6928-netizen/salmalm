@@ -4,6 +4,8 @@ Shared utilities live in tools_common.py (single source of truth).
 This module re-exports them for backward compatibility.
 """
 
+from typing import Optional
+
 import os
 import subprocess
 import re
@@ -60,6 +62,63 @@ telegram_bot = None
 # ── Main Entry Point (thin shim) ────────────────────────────
 
 
+_PATH_KEYS = ("path", "file_path", "image_path", "audio_path", "file1", "file2")
+_WRITE_TOOLS = frozenset(
+    {
+        "write_file",
+        "create_file",
+        "append_file",
+        "save_file",
+        "move_file",
+        "copy_file",
+        "rename_file",
+        "patch_file",
+        "download_file",
+        "write_note",
+        "save_note",
+    }
+)
+_SENSITIVE_DIRS = ("/etc/", "/var/", "/root/", "/proc/", "/sys/", "/boot/", "/dev/", "C:\\Windows", "C:\\System")
+
+
+def _check_path_safety(tool_name: str, args: dict) -> Optional[str]:
+    """Check path arguments for traversal and access violations. Returns error string or None."""
+    from salmalm.constants import WORKSPACE_DIR, DATA_DIR
+    from pathlib import Path as _P
+
+    _allowed_roots = (str(WORKSPACE_DIR), str(DATA_DIR), "/tmp")
+    for key in _PATH_KEYS:
+        val = args.get(key, "")
+        if not isinstance(val, str) or not val:
+            continue
+        if ".." in val:
+            return f'❌ Path traversal blocked: ".." not allowed in {key} / 경로 탈출 차단'
+        try:
+            resolved = str(_P(val).resolve())
+            if not _P(val).is_absolute():
+                resolved = str((WORKSPACE_DIR / val).resolve())
+            resolved_path = _P(resolved)
+            in_allowed = any(resolved_path == _P(r) or resolved_path.is_relative_to(_P(r)) for r in _allowed_roots)
+            home_read_ok = os.environ.get("SALMALM_ALLOW_HOME_READ") and resolved_path.is_relative_to(_P.home())
+            if not in_allowed and not home_read_ok:
+                if tool_name in _WRITE_TOOLS or _P(resolved).exists() or _P(val).exists():
+                    return f"❌ Path outside allowed directories: {key}={val} / 허용 디렉토리 외부 경로 차단: denied"
+                if any(resolved.startswith(s) or val.startswith(s) for s in _SENSITIVE_DIRS):
+                    return f"❌ Access denied: {key}={val} / 접근 거부: 보호된 시스템 경로"
+        except Exception:  # noqa: broad-except
+            pass
+    return None
+
+
+def _sanitize_env_vars(args: dict) -> None:
+    """Strip environment variable references from non-command arguments."""
+    for key, val in args.items():
+        if isinstance(val, str) and re.search(r"\$\{?\w+\}?", val):
+            if key in ("command",):
+                continue
+            args[key] = re.sub(r"\$\{?\w+\}?", "", val)
+
+
 def execute_tool(name: str, args: dict) -> str:
     """Execute a tool — delegates to tool_registry.
 
@@ -68,75 +127,17 @@ def execute_tool(name: str, args: dict) -> str:
     - Environment variable injection ($VAR in args): sanitized
     - All exceptions caught and returned as error strings
     """
-    # Path traversal prevention — primary: resolve + subpath check; secondary: string filter
-    from salmalm.constants import WORKSPACE_DIR, DATA_DIR
-
-    _allowed_roots = (str(WORKSPACE_DIR), str(DATA_DIR), "/tmp")
-    for key in ("path", "file_path", "image_path", "audio_path", "file1", "file2"):
-        val = args.get(key, "")
-        if not isinstance(val, str) or not val:
-            continue
-        # Quick string filter (secondary defense)
-        if ".." in val:
-            return f'❌ Path traversal blocked: ".." not allowed in {key} / 경로 탈출 차단'
-        # Primary defense: resolve symlinks and check against allowed roots
-        try:
-            from pathlib import Path as _P
-
-            resolved = str(_P(val).resolve())
-            # Also resolve relative to WORKSPACE_DIR
-            if not _P(val).is_absolute():
-                resolved = str((WORKSPACE_DIR / val).resolve())
-            resolved_path = _P(resolved)
-            in_allowed = any(
-                resolved_path == _P(root) or resolved_path.is_relative_to(_P(root))
-                for root in _allowed_roots
-            )
-            # Home read requires opt-in
-            home_read_ok = os.environ.get("SALMALM_ALLOW_HOME_READ") and resolved_path.is_relative_to(_P.home())
-            if not in_allowed and not home_read_ok:
-                # Write-capable tools: always block outside allowed roots
-                # (prevents creating files in arbitrary locations)
-                _WRITE_TOOLS = {
-                    "write_file", "create_file", "append_file", "save_file",
-                    "move_file", "copy_file", "rename_file", "patch_file",
-                    "download_file", "write_note", "save_note",
-                }
-                is_write = name in _WRITE_TOOLS
-                if is_write or _P(resolved).exists() or _P(val).exists():
-                    return f"❌ Path outside allowed directories: {key}={val} / 허용 디렉토리 외부 경로 차단: denied"
-                # For non-existent read paths outside allowed dirs, still block
-                # absolute paths that clearly target sensitive dirs
-                _sensitive = (
-                    "/etc/",
-                    "/var/",
-                    "/root/",
-                    "/proc/",
-                    "/sys/",
-                    "/boot/",
-                    "/dev/",
-                    "C:\\Windows",
-                    "C:\\System",
-                )
-                if any(resolved.startswith(s) or val.startswith(s) for s in _sensitive):
-                    return f"❌ Access denied: {key}={val} / 접근 거부: 보호된 시스템 경로"
-        except Exception:
-            pass  # Let downstream handlers deal with invalid paths
-
-    # Environment variable injection prevention
-    for key, val in args.items():
-        if isinstance(val, str) and re.search(r"\$\{?\w+\}?", val):
-            # Allow $HOME-style only in non-sensitive contexts
-            if key in ("command",):
-                continue  # exec tool handles its own safety
-            args[key] = re.sub(r"\$\{?\w+\}?", "", val)
+    path_err = _check_path_safety(name, args)
+    if path_err:
+        return path_err
+    _sanitize_env_vars(args)
 
     _audit_args_raw = json.dumps(args, ensure_ascii=False)[:300]
     try:
         from salmalm.security.redact import scrub_secrets
 
         _audit_args = scrub_secrets(_audit_args_raw)
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         _audit_args = _audit_args_raw
     _session_id = args.pop("_session_id", "")  # Injected by engine
     audit_log(
@@ -179,7 +180,7 @@ def execute_tool(name: str, args: dict) -> str:
             result = gateway.dispatch_auto(name, args)
             if isinstance(result, dict) and "error" not in result and "result" in result:
                 return str(result["result"])
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         pass  # Fall through to local execution
 
     from salmalm.tools.tool_registry import execute_tool as _registry_execute
@@ -195,216 +196,235 @@ def _legacy_execute(name: str, args: dict) -> str:
     return _execute_inner(name, args)
 
 
+def _exec_image_generate(args: dict) -> str:
+    """Execute image_generate tool."""
+    prompt = args["prompt"]
+    provider = args.get("provider", "xai")
+    size = args.get("size", "1024x1024")
+    save_dir = WORKSPACE_DIR / "uploads"
+    save_dir.mkdir(exist_ok=True)
+    fname = f"gen_{int(time.time())}.png"
+    save_path = save_dir / fname
+
+    if provider == "xai":
+        api_key = vault.get("xai_api_key")
+        if not api_key:
+            return "❌ xAI API key not found"
+        resp = _http_post(
+            "https://api.x.ai/v1/images/generations",
+            {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            {"model": "aurora", "prompt": prompt, "n": 1, "size": size, "response_format": "b64_json"},
+        )
+        import base64 as b64mod
+
+        img_data = b64mod.b64decode(resp["data"][0]["b64_json"])
+        save_path.write_bytes(img_data)
+    else:
+        api_key = vault.get("openai_api_key")
+        if not api_key:
+            return "❌ OpenAI API key not found"
+        resp = _http_post(
+            "https://api.openai.com/v1/images/generations",
+            {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            {"model": "gpt-image-1", "prompt": prompt, "n": 1, "size": size, "output_format": "b64_json"},
+        )
+        import base64 as b64mod
+
+        img_data = b64mod.b64decode(resp["data"][0]["b64_json"])
+        save_path.write_bytes(img_data)
+
+    size_kb = len(img_data) / 1024
+    log.info(f"[ART] Image generated: {fname} ({size_kb:.1f}KB)")
+    return f"✅ Image generated: uploads/{fname} ({size_kb:.1f}KB)\nPrompt: {prompt}"
+
+
+def _exec_image_analyze(args: dict) -> str:
+    """Execute image_analyze tool."""
+    image_path = args["image_path"]
+    question = args.get("question", "Describe this image in detail.")
+    import base64 as b64mod
+
+    if image_path.startswith("http://") or image_path.startswith("https://"):
+        image_url = image_path
+        content_parts = [
+            {"type": "image_url", "image_url": {"url": image_url}},
+            {"type": "text", "text": question},
+        ]
+    else:
+        img_path = Path(image_path)
+        if not img_path.is_absolute():
+            img_path = WORKSPACE_DIR / img_path
+        if not img_path.exists():
+            return f"❌ Image not found: {image_path}"
+        _MAX_IMG_MB = 20
+        if img_path.stat().st_size > _MAX_IMG_MB * 1024 * 1024:
+            return f"❌ Image too large (max {_MAX_IMG_MB}MB)"
+        ext = img_path.suffix.lower()
+        mime_map = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+        }
+        mime = mime_map.get(ext, "image/png")
+        img_b64 = b64mod.b64encode(img_path.read_bytes()).decode()
+        content_parts = [
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img_b64}"}},
+            {"type": "text", "text": question},
+        ]
+    api_key = vault.get("openai_api_key")
+    if api_key:
+        resp = _http_post(
+            "https://api.openai.com/v1/chat/completions",
+            {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            {
+                "model": "gpt-4.1-nano",
+                "messages": [{"role": "user", "content": content_parts}],
+                "max_tokens": 1000,
+            },
+        )
+        return resp["choices"][0]["message"]["content"]  # type: ignore[no-any-return]
+    api_key = vault.get("anthropic_api_key")
+    if api_key:
+        img_source = content_parts[0]["image_url"]["url"]
+        if img_source.startswith("data:"):
+            media_type = img_source.split(";")[0].split(":")[1]
+            data = img_source.split(",")[1]
+            img_block = {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}}
+        else:
+            img_block = {"type": "image", "source": {"type": "url", "url": img_source}}
+        resp = _http_post(
+            "https://api.anthropic.com/v1/messages",
+            {"x-api-key": api_key, "Content-Type": "application/json", "anthropic-version": "2023-06-01"},
+            {
+                "model": "claude-sonnet-4-6",
+                "max_tokens": 1000,
+                "messages": [{"role": "user", "content": [img_block, {"type": "text", "text": question}]}],
+            },
+        )
+        return resp["content"][0]["text"]  # type: ignore[no-any-return]
+    return "❌ No vision API key found (need OpenAI or Anthropic)"
+
+
+def _exec_tts(args: dict) -> str:
+    """Execute tts tool."""
+    text = args["text"]
+    voice = args.get("voice", "nova")
+    api_key = vault.get("openai_api_key")
+    if not api_key:
+        return "❌ OpenAI API key not found"
+    save_dir = WORKSPACE_DIR / "uploads"
+    save_dir.mkdir(exist_ok=True)
+    fname = f"tts_{int(time.time())}.mp3"
+    save_path = save_dir / fname
+    data = json.dumps({"model": "tts-1", "input": text, "voice": voice}).encode()
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/audio/speech",
+        data=data,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        audio = resp.read()
+    save_path.write_bytes(audio)
+    size_kb = len(audio) / 1024
+    log.info(f"[AUDIO] TTS generated: {fname} ({size_kb:.1f}KB)")
+    return f"✅ TTS generated: uploads/{fname} ({size_kb:.1f}KB)\nText: {text[:100]}"
+
+
+def _exec_stt(args: dict) -> str:
+    """Execute stt tool."""
+    api_key = vault.get("openai_api_key")
+    if not api_key:
+        return "❌ OpenAI API key not found"
+    audio_path = args.get("audio_path", "")
+    audio_b64 = args.get("audio_base64", "")
+    lang = args.get("language", "ko")
+    _MAX_AUDIO_MB = 25  # Whisper API limit
+    if audio_path:
+        fpath = Path(audio_path).expanduser()
+        if not fpath.exists():
+            return f"❌ File not found: {audio_path}"
+        if fpath.stat().st_size > _MAX_AUDIO_MB * 1024 * 1024:
+            return f"❌ Audio file too large (max {_MAX_AUDIO_MB}MB)"
+        audio_data = fpath.read_bytes()
+        fname = fpath.name
+    elif audio_b64:
+        if len(audio_b64) > _MAX_AUDIO_MB * 1024 * 1024 * 4 // 3:
+            return f"❌ Audio base64 too large (max ~{_MAX_AUDIO_MB}MB decoded)"
+        audio_data = base64.b64decode(audio_b64)
+        fname = "audio.webm"
+    else:
+        return "❌ Provide audio_path or audio_base64"
+    boundary = secrets.token_hex(16)
+    body = b""
+    body += f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{fname}"\r\nContent-Type: application/octet-stream\r\n\r\n'.encode()
+    body += audio_data
+    body += f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1'.encode()
+    body += f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n{lang}'.encode()
+    body += f"\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/audio/transcriptions",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        result = json.loads(resp.read())
+    text = result.get("text", "")
+    log.info(f"[MIC] STT transcribed: {len(text)} chars")
+    return f"🎤 Transcription:\n{text}"
+
+
+def _exec_screenshot(args: dict) -> str:
+    """Execute screenshot tool."""
+    region = args.get("region", "full")
+    fname = f"screenshot_{int(time.time())}.png"
+    fpath = WORKSPACE_DIR / "uploads" / fname
+    fpath.parent.mkdir(exist_ok=True)
+    try:
+        cmd = (
+            ["import", "-window", "root", str(fpath)]
+            if region == "full"
+            else ["import", "-crop", region, "-window", "root", str(fpath)]
+        )
+        try:
+            if region == "full":
+                subprocess.run(["scrot", str(fpath)], timeout=10, check=True)
+            else:
+                subprocess.run(["scrot", "-a", region, str(fpath)], timeout=10, check=True)
+        except FileNotFoundError:
+            subprocess.run(cmd, timeout=10, check=True)
+        size_kb = fpath.stat().st_size / 1024
+        return f"✅ Screenshot saved: uploads/{fname} ({size_kb:.1f}KB)"
+    except Exception as e:
+        return f"❌ Screenshot failed: {e}"
+
+
+def _exec_tts_generate(args: dict) -> str:
+    """Execute tts_generate tool."""
+    return _handle_tts_generate(args)
+
+
 def _execute_inner(name: str, args: dict) -> str:
     """Inner dispatch — ONLY media tools that tools_media.py delegates back here."""
+    _MEDIA_DISPATCH = {
+        "image_generate": _exec_image_generate,
+        "image_analyze": _exec_image_analyze,
+        "tts": _exec_tts,
+        "stt": _exec_stt,
+        "screenshot": _exec_screenshot,
+        "tts_generate": _exec_tts_generate,
+    }
+    handler = _MEDIA_DISPATCH.get(name)
+    if not handler:
+        return f"❌ Unknown media tool: {name}"
     try:
-        if name == "image_generate":
-            prompt = args["prompt"]
-            provider = args.get("provider", "xai")
-            size = args.get("size", "1024x1024")
-            save_dir = WORKSPACE_DIR / "uploads"
-            save_dir.mkdir(exist_ok=True)
-            fname = f"gen_{int(time.time())}.png"
-            save_path = save_dir / fname
-
-            if provider == "xai":
-                api_key = vault.get("xai_api_key")
-                if not api_key:
-                    return "❌ xAI API key not found"
-                resp = _http_post(
-                    "https://api.x.ai/v1/images/generations",
-                    {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    {"model": "aurora", "prompt": prompt, "n": 1, "size": size, "response_format": "b64_json"},
-                )
-                import base64 as b64mod
-
-                img_data = b64mod.b64decode(resp["data"][0]["b64_json"])
-                save_path.write_bytes(img_data)
-            else:
-                api_key = vault.get("openai_api_key")
-                if not api_key:
-                    return "❌ OpenAI API key not found"
-                resp = _http_post(
-                    "https://api.openai.com/v1/images/generations",
-                    {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    {"model": "gpt-image-1", "prompt": prompt, "n": 1, "size": size, "output_format": "b64_json"},
-                )
-                import base64 as b64mod
-
-                img_data = b64mod.b64decode(resp["data"][0]["b64_json"])
-                save_path.write_bytes(img_data)
-
-            size_kb = len(img_data) / 1024
-            log.info(f"[ART] Image generated: {fname} ({size_kb:.1f}KB)")
-            return f"✅ Image generated: uploads/{fname} ({size_kb:.1f}KB)\nPrompt: {prompt}"
-
-        elif name == "image_analyze":
-            image_path = args["image_path"]
-            question = args.get("question", "Describe this image in detail.")
-            import base64 as b64mod
-
-            if image_path.startswith("http://") or image_path.startswith("https://"):
-                image_url = image_path
-                content_parts = [
-                    {"type": "image_url", "image_url": {"url": image_url}},
-                    {"type": "text", "text": question},
-                ]
-            else:
-                img_path = Path(image_path)
-                if not img_path.is_absolute():
-                    img_path = WORKSPACE_DIR / img_path
-                if not img_path.exists():
-                    return f"❌ Image not found: {image_path}"
-                _MAX_IMG_MB = 20
-                if img_path.stat().st_size > _MAX_IMG_MB * 1024 * 1024:
-                    return f"❌ Image too large (max {_MAX_IMG_MB}MB)"
-                ext = img_path.suffix.lower()
-                mime_map = {
-                    ".png": "image/png",
-                    ".jpg": "image/jpeg",
-                    ".jpeg": "image/jpeg",
-                    ".gif": "image/gif",
-                    ".webp": "image/webp",
-                }
-                mime = mime_map.get(ext, "image/png")
-                img_b64 = b64mod.b64encode(img_path.read_bytes()).decode()
-                content_parts = [
-                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img_b64}"}},
-                    {"type": "text", "text": question},
-                ]
-            api_key = vault.get("openai_api_key")
-            if api_key:
-                resp = _http_post(
-                    "https://api.openai.com/v1/chat/completions",
-                    {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    {
-                        "model": "gpt-4.1-nano",
-                        "messages": [{"role": "user", "content": content_parts}],
-                        "max_tokens": 1000,
-                    },
-                )
-                return resp["choices"][0]["message"]["content"]  # type: ignore[no-any-return]
-            api_key = vault.get("anthropic_api_key")
-            if api_key:
-                img_source = content_parts[0]["image_url"]["url"]
-                if img_source.startswith("data:"):
-                    media_type = img_source.split(";")[0].split(":")[1]
-                    data = img_source.split(",")[1]
-                    img_block = {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}}
-                else:
-                    img_block = {"type": "image", "source": {"type": "url", "url": img_source}}
-                resp = _http_post(
-                    "https://api.anthropic.com/v1/messages",
-                    {"x-api-key": api_key, "Content-Type": "application/json", "anthropic-version": "2023-06-01"},
-                    {
-                        "model": "claude-sonnet-4-6",
-                        "max_tokens": 1000,
-                        "messages": [{"role": "user", "content": [img_block, {"type": "text", "text": question}]}],
-                    },
-                )
-                return resp["content"][0]["text"]  # type: ignore[no-any-return]
-            return "❌ No vision API key found (need OpenAI or Anthropic)"
-
-        elif name == "tts":
-            text = args["text"]
-            voice = args.get("voice", "nova")
-            api_key = vault.get("openai_api_key")
-            if not api_key:
-                return "❌ OpenAI API key not found"
-            save_dir = WORKSPACE_DIR / "uploads"
-            save_dir.mkdir(exist_ok=True)
-            fname = f"tts_{int(time.time())}.mp3"
-            save_path = save_dir / fname
-            data = json.dumps({"model": "tts-1", "input": text, "voice": voice}).encode()
-            req = urllib.request.Request(
-                "https://api.openai.com/v1/audio/speech",
-                data=data,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                audio = resp.read()
-            save_path.write_bytes(audio)
-            size_kb = len(audio) / 1024
-            log.info(f"[AUDIO] TTS generated: {fname} ({size_kb:.1f}KB)")
-            return f"✅ TTS generated: uploads/{fname} ({size_kb:.1f}KB)\nText: {text[:100]}"
-
-        elif name == "stt":
-            api_key = vault.get("openai_api_key")
-            if not api_key:
-                return "❌ OpenAI API key not found"
-            audio_path = args.get("audio_path", "")
-            audio_b64 = args.get("audio_base64", "")
-            lang = args.get("language", "ko")
-            _MAX_AUDIO_MB = 25  # Whisper API limit
-            if audio_path:
-                fpath = Path(audio_path).expanduser()
-                if not fpath.exists():
-                    return f"❌ File not found: {audio_path}"
-                if fpath.stat().st_size > _MAX_AUDIO_MB * 1024 * 1024:
-                    return f"❌ Audio file too large (max {_MAX_AUDIO_MB}MB)"
-                audio_data = fpath.read_bytes()
-                fname = fpath.name
-            elif audio_b64:
-                if len(audio_b64) > _MAX_AUDIO_MB * 1024 * 1024 * 4 // 3:
-                    return f"❌ Audio base64 too large (max ~{_MAX_AUDIO_MB}MB decoded)"
-                audio_data = base64.b64decode(audio_b64)
-                fname = "audio.webm"
-            else:
-                return "❌ Provide audio_path or audio_base64"
-            boundary = secrets.token_hex(16)
-            body = b""
-            body += f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{fname}"\r\nContent-Type: application/octet-stream\r\n\r\n'.encode()
-            body += audio_data
-            body += f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1'.encode()
-            body += f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\n{lang}'.encode()
-            body += f"\r\n--{boundary}--\r\n".encode()
-            req = urllib.request.Request(
-                "https://api.openai.com/v1/audio/transcriptions",
-                data=body,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": f"multipart/form-data; boundary={boundary}",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                result = json.loads(resp.read())
-            text = result.get("text", "")
-            log.info(f"[MIC] STT transcribed: {len(text)} chars")
-            return f"🎤 Transcription:\n{text}"
-
-        elif name == "screenshot":
-            region = args.get("region", "full")
-            fname = f"screenshot_{int(time.time())}.png"
-            fpath = WORKSPACE_DIR / "uploads" / fname
-            fpath.parent.mkdir(exist_ok=True)
-            try:
-                cmd = (
-                    ["import", "-window", "root", str(fpath)]
-                    if region == "full"
-                    else ["import", "-crop", region, "-window", "root", str(fpath)]
-                )
-                try:
-                    if region == "full":
-                        subprocess.run(["scrot", str(fpath)], timeout=10, check=True)
-                    else:
-                        subprocess.run(["scrot", "-a", region, str(fpath)], timeout=10, check=True)
-                except FileNotFoundError:
-                    subprocess.run(cmd, timeout=10, check=True)
-                size_kb = fpath.stat().st_size / 1024
-                return f"✅ Screenshot saved: uploads/{fname} ({size_kb:.1f}KB)"
-            except Exception as e:
-                return f"❌ Screenshot failed: {e}"
-
-        elif name == "tts_generate":
-            return _handle_tts_generate(args)
-
-        else:
-            return f"❌ Unknown legacy tool: {name}"
-
-    except PermissionError as e:
-        return f"❌ Permission denied: {e}"
+        return handler(args)
     except Exception as e:
         log.error(f"Tool error ({name}): {e}")
         return f"❌ Tool error: {str(e)[:200]}"

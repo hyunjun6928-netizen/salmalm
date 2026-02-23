@@ -27,7 +27,8 @@ PLUGINS_STATE_FILE = DATA_DIR / "plugins.json"
 class PluginInfo:
     """Metadata and runtime state for a loaded plugin."""
 
-    def __init__(self, name: str, path: Path, metadata: dict):
+    def __init__(self, name: str, path: Path, metadata: dict) -> None:
+        """Init  ."""
         self.name = name
         self.path = path
         self.metadata = metadata
@@ -40,6 +41,7 @@ class PluginInfo:
         self.error: Optional[str] = None
 
     def to_dict(self) -> dict:
+        """To dict."""
         return {
             "name": self.name,
             "version": self.version,
@@ -55,7 +57,8 @@ class PluginInfo:
 class PluginManager:
     """Manages directory-based plugins with tool registration and hook integration."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._plugins: Dict[str, PluginInfo] = {}
         self._state: Dict[str, bool] = {}  # name -> enabled
         self._lock = threading.Lock()
@@ -66,7 +69,7 @@ class PluginManager:
         try:
             if PLUGINS_STATE_FILE.exists():
                 self._state = json.loads(PLUGINS_STATE_FILE.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self._state = {}
 
     def _save_state(self):
@@ -182,8 +185,8 @@ class PluginManager:
                 all_cbs.extend(plugin.hook_callbacks.values())
             if all_cbs:
                 hook_manager.unregister_plugin_hooks(all_cbs)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     def get_all_tools(self) -> List[dict]:
         """Return all tool definitions from enabled plugins."""

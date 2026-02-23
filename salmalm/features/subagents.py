@@ -37,12 +37,14 @@ class SubAgentTask:
 
     @property
     def elapsed_s(self) -> float:
+        """Elapsed s."""
         if self.started_at == 0:
             return 0
         end = self.completed_at if self.completed_at else time.time()
         return round(end - self.started_at, 1)
 
     def to_dict(self) -> dict:
+        """To dict."""
         return {
             "task_id": self.task_id,
             "description": self.description[:100],
@@ -63,7 +65,8 @@ class SubAgentManager:
     _MAX_CONCURRENT = 5
     _MAX_HISTORY = 50
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._tasks: Dict[str, SubAgentTask] = {}
         self._lock = threading.Lock()
 

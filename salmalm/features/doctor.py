@@ -22,6 +22,7 @@ _SALMALM_DIR = DATA_DIR
 
 
 def _status(ok: bool, msg: str, fixable: bool = False, issue_id: str = "") -> dict:
+    """Status."""
     return {
         "status": "ok" if ok else "issue",
         "message": msg,
@@ -36,6 +37,7 @@ class Doctor:
     def check_python_version(self) -> dict:
         """Python 버전 확인 (3.9+ 필수)."""
         import sys
+
         v = sys.version_info
         if v >= (3, 9):
             return _status(True, f"Python {v.major}.{v.minor}.{v.micro}")
@@ -45,6 +47,7 @@ class Doctor:
         """cryptography 패키지 설치 여부."""
         try:
             from salmalm.security.crypto import HAS_CRYPTO
+
             if HAS_CRYPTO:
                 return _status(True, "Vault: AES-256-GCM (cryptography installed)")
             return _status(False, "⚠️ Vault: HMAC-CTR fallback (weaker). Run: pip install salmalm[crypto]")
@@ -55,9 +58,10 @@ class Doctor:
         """Telegram/Discord 봇 토큰 유효성."""
         import urllib.request
         import urllib.error
+
         try:
             from salmalm.security.crypto import vault
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return _status(True, "Channels: vault unavailable, skipped")
 
         results = []
@@ -69,7 +73,7 @@ class Doctor:
                 data = json.loads(resp.read())
                 bot_name = data.get("result", {}).get("username", "?")
                 results.append(f"Telegram: ✅ @{bot_name}")
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 results.append("Telegram: ❌ invalid token")
         dc_token = vault.get("discord_bot_token")
         if dc_token:
@@ -82,7 +86,7 @@ class Doctor:
                 data = json.loads(resp.read())
                 bot_name = data.get("username", "?")
                 results.append(f"Discord: ✅ {bot_name}")
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 results.append("Discord: ❌ invalid token")
         if not results:
             return _status(True, "Channels: none configured")
@@ -114,7 +118,7 @@ class Doctor:
                 try:
                     self.repair(result["issue_id"])
                     result["auto_fixed"] = True
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     result["auto_fixed"] = False
         return results
 
@@ -165,7 +169,7 @@ class Doctor:
                     data = json.loads(f.read_text(encoding="utf-8"))
                     if not isinstance(data, dict):
                         bad.append(f.name)
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     bad.append(f.name)
             if f.stat().st_size == 0:
                 bad.append(f"{f.name} (empty)")

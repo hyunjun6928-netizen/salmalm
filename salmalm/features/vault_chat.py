@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from salmalm.constants import KST, DATA_DIR
+
 VAULT_CHAT_DIR = DATA_DIR
 VAULT_CHAT_DB = VAULT_CHAT_DIR / "vault_chat.db"
 VAULT_CHAT_META = VAULT_CHAT_DIR / "vault_chat_meta.json"
@@ -72,7 +73,8 @@ class VaultChat:
     only when unlocked, and re-encrypted on every write and on close.
     """
 
-    def __init__(self, db_path: Optional[Path] = None, meta_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None, meta_path: Optional[Path] = None) -> None:
+        """Init  ."""
         self.db_path = db_path or VAULT_CHAT_DB
         self.meta_path = meta_path or VAULT_CHAT_META
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -201,6 +203,7 @@ class VaultChat:
         return "🔒 볼트가 잠겼습니다."
 
     def is_open(self) -> bool:
+        """Is open."""
         return self._key is not None and self._conn is not None
 
     def _check_auto_lock(self) -> bool:

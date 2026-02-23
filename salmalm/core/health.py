@@ -18,6 +18,7 @@ except ImportError:
 
 from salmalm.constants import VERSION, BASE_DIR
 import logging
+
 log = logging.getLogger(__name__)
 
 _start_time = time.time()
@@ -59,7 +60,7 @@ def get_health_report() -> dict:
         from salmalm.core.core import _sessions
 
         report["active_sessions"] = len(_sessions)
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         report["active_sessions"] = 0
 
     # Disk
@@ -84,6 +85,7 @@ def get_health_report() -> dict:
 
 
 def _format_uptime() -> str:
+    """Format uptime."""
     secs = int(time.time() - _start_time)
     days, rem = divmod(secs, 86400)
     hours, rem = divmod(rem, 3600)
@@ -121,7 +123,7 @@ def _get_disk_info() -> dict:
             "total_mb": round(stat.f_blocks * stat.f_frsize / (1024 * 1024), 1),
             "usage_pct": round(100 * (1 - stat.f_bavail / max(stat.f_blocks, 1)), 1),
         }
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         return {}
 
 

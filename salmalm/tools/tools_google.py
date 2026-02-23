@@ -54,6 +54,7 @@ def _google_oauth_headers() -> dict:
 
 @register("google_calendar")
 def handle_google_calendar(args: dict) -> str:
+    """Handle google calendar."""
     action = args.get("action", "list")
     cal_id = args.get("calendar_id", "primary")
     base_url = f"https://www.googleapis.com/calendar/v3/calendars/{cal_id}"
@@ -120,48 +121,46 @@ def handle_google_calendar(args: dict) -> str:
 
 
 @register("gmail")
+def _gmail_list(args: dict, base_url: str, headers: dict) -> str:
+    """List/search Gmail messages."""
+    count = min(args.get("count", 10), 50)
+    query, label = args.get("query", ""), args.get("label", "INBOX")
+    params = f"maxResults={count}"
+    if query:
+        import urllib.parse
+
+        params += f"&q={urllib.parse.quote(query)}"
+    elif label:
+        params += f"&labelIds={label}"
+    req = urllib.request.Request(f"{base_url}/messages?{params}", headers=headers)
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read())
+    messages = data.get("messages", [])
+    if not messages:
+        return "📧 No messages found."
+    lines = [f"📧 **Messages ({len(messages)}):**"]
+    for msg_ref in messages[:count]:
+        msg_url = f"{base_url}/messages/{msg_ref['id']}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date"
+        try:
+            with urllib.request.urlopen(urllib.request.Request(msg_url, headers=headers), timeout=10) as resp:
+                msg = json.loads(resp.read())
+            hdrs = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+            lines.append(f"  📩 **{hdrs.get('Subject', '(no subject)')}** — {hdrs.get('From', '?')[:30]}")
+            lines.append(f"     {hdrs.get('Date', '')[:22]} | {msg.get('snippet', '')[:80]}")
+            lines.append(f"     ID: `{msg_ref['id']}`")
+        except Exception:
+            lines.append(f"  📩 ID: {msg_ref['id']} (failed to fetch)")
+    return "\n".join(lines)
+
+
 def handle_gmail(args: dict) -> str:
+    """Handle gmail."""
     action = args.get("action", "list")
     base_url = "https://www.googleapis.com/gmail/v1/users/me"
     headers = _google_oauth_headers()
 
-    if action == "list" or action == "search":
-        count = min(args.get("count", 10), 50)
-        query = args.get("query", "")
-        label = args.get("label", "INBOX")
-        params = f"maxResults={count}"
-        if query:
-            import urllib.parse
-
-            params += f"&q={urllib.parse.quote(query)}"
-        elif label:
-            params += f"&labelIds={label}"
-        url = f"{base_url}/messages?{params}"
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-        messages = data.get("messages", [])
-        if not messages:
-            return "📧 No messages found."
-
-        lines = [f"📧 **Messages ({len(messages)}):**"]
-        for msg_ref in messages[:count]:
-            msg_url = f"{base_url}/messages/{msg_ref['id']}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date"
-            req = urllib.request.Request(msg_url, headers=headers)
-            try:
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    msg = json.loads(resp.read())
-                hdrs = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
-                subj = hdrs.get("Subject", "(no subject)")
-                frm = hdrs.get("From", "?")
-                date = hdrs.get("Date", "")[:22]
-                snippet = msg.get("snippet", "")[:80]
-                lines.append(f"  📩 **{subj}** — {frm[:30]}")
-                lines.append(f"     {date} | {snippet}")
-                lines.append(f"     ID: `{msg_ref['id']}`")
-            except Exception:
-                lines.append(f"  📩 ID: {msg_ref['id']} (failed to fetch)")
-        return "\n".join(lines)
+    if action in ("list", "search"):
+        return _gmail_list(args, base_url, headers)
 
     elif action == "read":
         msg_id = args.get("message_id", "")
@@ -178,6 +177,7 @@ def handle_gmail(args: dict) -> str:
         payload = msg.get("payload", {})
 
         def _extract_body(part: dict) -> str:
+            """Extract body."""
             if part.get("mimeType", "").startswith("text/plain"):
                 data = part.get("body", {}).get("data", "")
                 if data:

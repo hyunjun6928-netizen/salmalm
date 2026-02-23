@@ -25,7 +25,8 @@ class MessageQueue:
     MAX_RETRIES = 3
     RETRY_BACKOFF = [5, 30, 120]  # seconds between retries
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._queue: List[dict] = []
         self._dead_letter: List[dict] = []
         self._lock = threading.Lock()
@@ -97,7 +98,7 @@ class MessageQueue:
             entry["last_attempt"] = time.time()
             return entry
 
-    def complete(self, entry_id: str, result: str = ""):
+    def complete(self, entry_id: str, result: str = "") -> None:
         """Mark a queued message as completed."""
         with self._lock:
             for i, m in enumerate(self._queue):
@@ -108,7 +109,7 @@ class MessageQueue:
                     log.info(f"[QUEUE] Completed: {entry_id}")
                     return
 
-    def fail(self, entry_id: str, error: str = ""):
+    def fail(self, entry_id: str, error: str = "") -> None:
         """Mark a message as failed. Retry or move to dead letter."""
         with self._lock:
             for m in self._queue:
@@ -127,14 +128,14 @@ class MessageQueue:
                         log.info(f"[QUEUE] Retry {m['retries']}/{self.MAX_RETRIES}: {entry_id}")
                     return
 
-    def set_drain_callback(self, callback: Callable):
+    def set_drain_callback(self, callback: Callable) -> None:
         """Set the callback for draining queued messages.
 
         callback(session_id, message, model_override, image_data) -> str
         """
         self._drain_callback = callback
 
-    async def drain(self):
+    async def drain(self) -> None:
         """Process all queued messages (called when service recovers)."""
         if self._draining or not self._drain_callback:
             return

@@ -65,6 +65,90 @@ def _find_context_match(lines: List[str], old_lines: List[str], start: int = 0) 
     return -1
 
 
+def _skip_to_next_op(lines: list, i: int) -> int:
+    """Skip lines until the next *** operation marker."""
+    while i < len(lines) and not lines[i].strip().startswith("***"):
+        i += 1
+    return i
+
+
+def _apply_add_file(filepath: str, lines: list, i: int, base_dir: str, results: list) -> int:
+    """Apply *** Add File operation. Returns updated line index."""
+    safe, reason = _is_safe_path(filepath, base_dir)
+    if not safe:
+        results.append(f"❌ {filepath}: {reason}")
+        return _skip_to_next_op(lines, i)
+    content_lines = []
+    while i < len(lines) and not lines[i].strip().startswith("***"):
+        if lines[i].startswith("+"):
+            content_lines.append(lines[i][1:])
+        i += 1
+    full_path = Path(base_dir) / filepath
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+    full_path.write_text("\n".join(content_lines) + ("\n" if content_lines else ""), encoding="utf-8")
+    results.append(f"✅ Added {filepath} ({len(content_lines)} lines)")
+    return i
+
+
+def _apply_update_file(filepath: str, lines: list, i: int, base_dir: str, results: list) -> int:
+    """Apply *** Update File operation. Returns updated line index."""
+    safe, reason = _is_safe_path(filepath, base_dir)
+    if not safe:
+        results.append(f"❌ {filepath}: {reason}")
+        return _skip_to_next_op(lines, i)
+    full_path = Path(base_dir) / filepath
+    if not full_path.exists():
+        results.append(f"❌ {filepath}: file not found")
+        return _skip_to_next_op(lines, i)
+    file_lines = full_path.read_text(encoding="utf-8").split("\n")
+    hunks_applied = 0
+    pos = 0
+    while i < len(lines) and not lines[i].strip().startswith("***"):
+        if lines[i].strip() == "@@":
+            i += 1
+            old_h: List[str] = []
+            new_h: List[str] = []
+            while i < len(lines) and not lines[i].strip().startswith("***") and lines[i].strip() != "@@":
+                hl = lines[i]
+                if hl.startswith("-"):
+                    old_h.append(hl[1:])
+                elif hl.startswith("+"):
+                    new_h.append(hl[1:])
+                elif hl.startswith(" "):
+                    old_h.append(hl[1:])
+                    new_h.append(hl[1:])
+                else:
+                    old_h.append(hl)
+                    new_h.append(hl)
+                i += 1
+            match_idx = _find_context_match(file_lines, old_h, pos)
+            if match_idx >= 0:
+                file_lines[match_idx : match_idx + len(old_h)] = new_h
+                pos = match_idx + len(new_h)
+                hunks_applied += 1
+            else:
+                results.append(f"⚠️ {filepath}: hunk failed to match")
+        else:
+            i += 1
+    full_path.write_text("\n".join(file_lines), encoding="utf-8")
+    results.append(f"✅ Updated {filepath} ({hunks_applied} hunks)")
+    return i
+
+
+def _apply_delete_file(filepath: str, base_dir: str, results: list) -> None:
+    """Apply *** Delete File operation."""
+    safe, reason = _is_safe_path(filepath, base_dir)
+    if not safe:
+        results.append(f"❌ {filepath}: {reason}")
+        return
+    full_path = Path(base_dir) / filepath
+    if full_path.exists():
+        full_path.unlink()
+        results.append(f"✅ Deleted {filepath}")
+    else:
+        results.append(f"⚠️ {filepath}: already absent")
+
+
 def apply_patch(patch_text: str, base_dir: str = ".") -> str:
     """Apply a multi-file patch.
 
@@ -102,98 +186,15 @@ def apply_patch(patch_text: str, base_dir: str = ".") -> str:
 
         if line.startswith("*** Add File:"):
             filepath = line[len("*** Add File:") :].strip()
-            safe, reason = _is_safe_path(filepath, base_dir)
-            if not safe:
-                results.append(f"❌ {filepath}: {reason}")
-                i += 1
-                while i < len(lines) and not lines[i].strip().startswith("***"):
-                    i += 1
-                continue
-            content_lines = []
-            i += 1
-            while i < len(lines) and not lines[i].strip().startswith("***"):
-                l = lines[i]  # noqa: E741
-                if l.startswith("+"):
-                    content_lines.append(l[1:])
-                i += 1
-            full_path = Path(base_dir) / filepath
-            full_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path.write_text("\n".join(content_lines) + ("\n" if content_lines else ""), encoding="utf-8")
-            results.append(f"✅ Added {filepath} ({len(content_lines)} lines)")
+            i = _apply_add_file(filepath, lines, i + 1, base_dir, results)
 
         elif line.startswith("*** Update File:"):
             filepath = line[len("*** Update File:") :].strip()
-            safe, reason = _is_safe_path(filepath, base_dir)
-            if not safe:
-                results.append(f"❌ {filepath}: {reason}")
-                i += 1
-                while i < len(lines) and not lines[i].strip().startswith("***"):
-                    i += 1
-                continue
-            full_path = Path(base_dir) / filepath
-            if not full_path.exists():
-                results.append(f"❌ {filepath}: file not found")
-                i += 1
-                while i < len(lines) and not lines[i].strip().startswith("***"):
-                    i += 1
-                continue
-            file_lines = full_path.read_text(encoding="utf-8").split("\n")
-            i += 1
-            hunks_applied = 0
-            pos = 0  # current position in file
-
-            while i < len(lines) and not lines[i].strip().startswith("***"):
-                l = lines[i]  # noqa: E741
-                if l.strip() == "@@":
-                    # New hunk
-                    i += 1
-                    old_lines_hunk: List[str] = []
-                    new_lines_hunk: List[str] = []
-                    _context_before: List[str] = []  # noqa: F841
-
-                    while i < len(lines) and not lines[i].strip().startswith("***") and lines[i].strip() != "@@":
-                        hl = lines[i]
-                        if hl.startswith("-"):
-                            old_lines_hunk.append(hl[1:])
-                        elif hl.startswith("+"):
-                            new_lines_hunk.append(hl[1:])
-                        elif hl.startswith(" "):
-                            # Context line — belongs to both old and new
-                            old_lines_hunk.append(hl[1:])
-                            new_lines_hunk.append(hl[1:])
-                        else:
-                            # Bare line = context
-                            old_lines_hunk.append(hl)
-                            new_lines_hunk.append(hl)
-                        i += 1
-
-                    # Find and apply
-                    match_idx = _find_context_match(file_lines, old_lines_hunk, pos)
-                    if match_idx >= 0:
-                        file_lines[match_idx : match_idx + len(old_lines_hunk)] = new_lines_hunk
-                        pos = match_idx + len(new_lines_hunk)
-                        hunks_applied += 1
-                    else:
-                        results.append(f"⚠️ {filepath}: hunk failed to match")
-                else:
-                    i += 1
-
-            full_path.write_text("\n".join(file_lines), encoding="utf-8")
-            results.append(f"✅ Updated {filepath} ({hunks_applied} hunks)")
+            i = _apply_update_file(filepath, lines, i + 1, base_dir, results)
 
         elif line.startswith("*** Delete File:"):
             filepath = line[len("*** Delete File:") :].strip()
-            safe, reason = _is_safe_path(filepath, base_dir)
-            if not safe:
-                results.append(f"❌ {filepath}: {reason}")
-                i += 1
-                continue
-            full_path = Path(base_dir) / filepath
-            if full_path.exists():
-                full_path.unlink()
-                results.append(f"✅ Deleted {filepath}")
-            else:
-                results.append(f"⚠️ {filepath}: already absent")
+            _apply_delete_file(filepath, base_dir, results)
             i += 1
         else:
             i += 1

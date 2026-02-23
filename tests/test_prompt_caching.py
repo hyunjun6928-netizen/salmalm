@@ -299,7 +299,7 @@ def test_streaming_has_cache_headers():
         raise Exception("stop here")
 
     with patch('urllib.request.urlopen', fake_urlopen):
-        with patch('salmalm.llm.vault') as mock_vault:
+        with patch('salmalm.core.llm_stream.vault') as mock_vault:
             mock_vault.get.return_value = 'fake-key'
             try:
                 for _ in stream_anthropic(

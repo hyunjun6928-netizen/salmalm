@@ -20,6 +20,7 @@ Usage:
   result = sandbox_exec("ls -la", timeout=10)
 """
 
+from salmalm.security.crypto import log
 import os
 import shutil
 import subprocess
@@ -38,6 +39,7 @@ class SandboxCapabilities:
 
     @classmethod
     def detect(cls) -> dict:
+        """Detect."""
         if cls._cache is not None:
             return cls._cache
 
@@ -174,8 +176,8 @@ def _set_rlimits(timeout: int = 30, memory_mb: int = 512, max_fds: int = 50, max
             resource.setrlimit(resource.RLIMIT_NPROC, (20, 20))
         except (ValueError, AttributeError):
             pass  # Not available on macOS
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
 
 
 def sandbox_exec(
@@ -293,6 +295,7 @@ class SandboxConfig:
     def __init__(
         self, timeout_s: int = 30, allow_network: bool = False, max_memory_mb: int = 512, isolate_temp: bool = False
     ):
+        """Init  ."""
         self.timeout_s = timeout_s
         self.allow_network = allow_network
         self.max_memory_mb = max_memory_mb
@@ -300,21 +303,25 @@ class SandboxConfig:
 
     @classmethod
     def strict(cls) -> "SandboxConfig":
+        """Strict."""
         return cls(timeout_s=15, allow_network=False, max_memory_mb=256)
 
     @classmethod
     def standard(cls) -> "SandboxConfig":
+        """Standard."""
         return cls(timeout_s=120, allow_network=True, max_memory_mb=1024)
 
     @classmethod
     def permissive(cls) -> "SandboxConfig":
+        """Permissive."""
         return cls(timeout_s=1800, allow_network=True, max_memory_mb=2048)
 
 
 class SandboxResult:
     """Result of a sandboxed execution."""
 
-    def __init__(self, stdout: str = "", stderr: str = "", exit_code: int = -1, timed_out: bool = False):
+    def __init__(self, stdout: str = "", stderr: str = "", exit_code: int = -1, timed_out: bool = False) -> None:
+        """Init  ."""
         self.stdout = stdout
         self.stderr = stderr
         self.exit_code = exit_code
@@ -322,9 +329,11 @@ class SandboxResult:
 
     @property
     def success(self) -> bool:
+        """Success."""
         return self.exit_code == 0 and not self.timed_out
 
     def format_output(self) -> str:
+        """Format output."""
         parts = []
         if self.stdout:
             parts.append(self.stdout)
@@ -335,7 +344,7 @@ class SandboxResult:
         return "\n".join(parts) if parts else "(no output)"
 
 
-def sandboxed_exec(command, config: Optional[SandboxConfig] = None, shell: bool = False) -> SandboxResult:
+def sandboxed_exec(command: str, config: Optional[SandboxConfig] = None, shell: bool = False) -> SandboxResult:
     """Execute a command in sandbox (backward-compatible wrapper)."""
     cfg = config or SandboxConfig()
     if isinstance(command, list):

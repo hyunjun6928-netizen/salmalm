@@ -94,7 +94,7 @@ def get_correlation_id() -> str:
     return cid
 
 
-def set_correlation_id(cid: str):
+def set_correlation_id(cid: str) -> None:
     """Set the correlation ID for the current thread context."""
     _request_context.correlation_id = cid
 
@@ -102,7 +102,8 @@ def set_correlation_id(cid: str):
 class RequestLogger:
     """Middleware-style request/response logger."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._logger = logging.getLogger("salmalm.requests")
         self._metrics: dict = {
             "total_requests": 0,

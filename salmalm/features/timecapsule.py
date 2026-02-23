@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from salmalm.constants import KST, DATA_DIR
+
 CAPSULE_DB = DATA_DIR / "capsules.db"
 
 _SCHEMA = """
@@ -80,16 +81,19 @@ def _parse_capsule_date(text: str) -> datetime:
 class TimeCapsule:
     """Manages time capsules stored in SQLite."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None) -> None:
+        """Init  ."""
         self.db_path = db_path or CAPSULE_DB
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _init_db(self) -> None:
+        """Init db."""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.execute(_SCHEMA)
 
     def _conn(self) -> sqlite3.Connection:
+        """Conn."""
         return sqlite3.connect(str(self.db_path))
 
     # -- CRUD -----------------------------------------------------------------

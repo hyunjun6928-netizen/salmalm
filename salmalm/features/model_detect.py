@@ -17,6 +17,7 @@ class ModelDetector:
     _CACHE_TTL = 600
 
     def detect_all(self, force: bool = False) -> List[Dict]:
+        """Detect all."""
         now = time.time()
         if not force and self._cache and (now - self._cache_ts) < self._CACHE_TTL:
             return self._cache
@@ -105,8 +106,8 @@ class ModelDetector:
                 if models:
                     log.info(f"[MODEL-DETECT] Found {len(models)} local models via {url}")
                     return models
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         log.warning(f"[MODEL-DETECT] No local models found from {base_url}")
         return []

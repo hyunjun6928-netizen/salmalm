@@ -29,17 +29,43 @@ _cooldown_lock = _threading.Lock()
 # Default fallback chains (no config needed)
 _DEFAULT_FALLBACKS = {
     # Same-provider fallbacks + cross-provider fallbacks
-    "anthropic/claude-opus-4-6": ["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-4-5-20251001", "google/gemini-2.5-pro", "openai/gpt-4.1"],
-    "anthropic/claude-sonnet-4-6": ["anthropic/claude-haiku-4-5-20251001", "anthropic/claude-opus-4-6", "google/gemini-2.5-flash", "openai/gpt-4.1-mini"],
-    "anthropic/claude-haiku-4-5-20251001": ["anthropic/claude-sonnet-4-6", "google/gemini-2.0-flash", "openai/gpt-4.1-mini"],
+    "anthropic/claude-opus-4-6": [
+        "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-haiku-4-5-20251001",
+        "google/gemini-2.5-pro",
+        "openai/gpt-4.1",
+    ],
+    "anthropic/claude-sonnet-4-6": [
+        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-opus-4-6",
+        "google/gemini-2.5-flash",
+        "openai/gpt-4.1-mini",
+    ],
+    "anthropic/claude-haiku-4-5-20251001": [
+        "anthropic/claude-sonnet-4-6",
+        "google/gemini-2.0-flash",
+        "openai/gpt-4.1-mini",
+    ],
     "openai/gpt-5.2": ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
     "openai/gpt-4.1": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
     "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"],
     "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.0-flash", "anthropic/claude-sonnet-4-6"],
-    "google/gemini-2.5-flash": ["google/gemini-2.0-flash", "google/gemini-2.5-pro", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.5-flash": [
+        "google/gemini-2.0-flash",
+        "google/gemini-2.5-pro",
+        "anthropic/claude-haiku-4-5-20251001",
+    ],
     "google/gemini-2.0-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
-    "google/gemini-3-pro-preview": ["google/gemini-2.5-pro", "google/gemini-3-flash-preview", "anthropic/claude-sonnet-4-6"],
-    "google/gemini-3-flash-preview": ["google/gemini-2.0-flash", "google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-3-pro-preview": [
+        "google/gemini-2.5-pro",
+        "google/gemini-3-flash-preview",
+        "anthropic/claude-sonnet-4-6",
+    ],
+    "google/gemini-3-flash-preview": [
+        "google/gemini-2.0-flash",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4-5-20251001",
+    ],
     "xai/grok-4": ["xai/grok-3", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
     "xai/grok-3": ["xai/grok-4", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
 }
@@ -72,7 +98,8 @@ def _load_cooldowns() -> dict:
     return {}
 
 
-def _save_cooldowns(cd: dict):
+def _save_cooldowns(cd: dict) -> None:
+    """Save cooldowns."""
     try:
         _COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
         _COOLDOWN_FILE.write_text(json.dumps(cd), encoding="utf-8")
@@ -90,7 +117,7 @@ def _is_model_cooled_down(model: str) -> bool:
         return _time.time() < entry.get("until", 0)
 
 
-def _cooldown_provider(model: str, cooldown_seconds: int = 3600):
+def _cooldown_provider(model: str, cooldown_seconds: int = 3600) -> None:
     """Cooldown all models from the same provider (e.g., invalid API key)."""
     provider = model.split("/")[0] if "/" in model else model
     with _cooldown_lock:
@@ -107,7 +134,7 @@ def _cooldown_provider(model: str, cooldown_seconds: int = 3600):
     log.warning(f"[AUTH] Provider {provider} cooled down for {cooldown_seconds}s ({len(all_models)} models)")
 
 
-def reset_cooldowns():
+def reset_cooldowns() -> None:
     """Clear all model/provider cooldowns."""
     with _cooldown_lock:
         _save_cooldowns({})
@@ -127,7 +154,7 @@ def get_cooldown_status() -> dict:
     return result
 
 
-def _record_model_failure(model: str, cooldown_seconds: int = 0):
+def _record_model_failure(model: str, cooldown_seconds: int = 0) -> None:
     """Record a model failure and set cooldown."""
     with _cooldown_lock:
         cd = _load_cooldowns()
@@ -146,7 +173,7 @@ def _record_model_failure(model: str, cooldown_seconds: int = 0):
         log.warning(f"[FAILOVER] {model} cooled down for {cooldown_secs}s (failure #{failures + 1})")
 
 
-def _clear_model_cooldown(model: str):
+def _clear_model_cooldown(model: str) -> None:
     """Clear cooldown on successful call."""
     with _cooldown_lock:
         cd = _load_cooldowns()
@@ -188,13 +215,14 @@ async def _call_llm_async(*args, **kwargs):
     return await asyncio.to_thread(_call_llm_sync, *args, **kwargs)
 
 
-async def _call_google_streaming(messages, model=None, tools=None, max_tokens=4096, on_token=None):
+async def _call_google_streaming(messages: list, model=None, tools=None, max_tokens=4096, on_token=None) -> dict:
     """Streaming Google Gemini call — yields tokens via on_token callback, returns final result.
 
     Handles streaming interruptions gracefully — preserves partial content.
     """
 
-    def _run():
+    def _run() -> dict:
+        """Run."""
         final_result = None
         accumulated_text = []
         try:
@@ -235,7 +263,9 @@ async def _call_google_streaming(messages, model=None, tools=None, max_tokens=40
     return await asyncio.to_thread(_run)
 
 
-async def _call_llm_streaming(messages, model=None, tools=None, max_tokens=4096, thinking=False, on_token=None):
+async def _call_llm_streaming(
+    messages: list, model=None, tools=None, max_tokens=4096, thinking=False, on_token=None
+) -> dict:
     """Streaming LLM call — yields tokens via on_token callback, returns final result.
 
     on_token: callback(event_dict) called for each streaming event.
@@ -243,7 +273,8 @@ async def _call_llm_streaming(messages, model=None, tools=None, max_tokens=4096,
     Handles streaming interruptions gracefully — preserves partial content.
     """
 
-    def _run():
+    def _run() -> dict:
+        """Run."""
         import os as _os
 
         _early_stop = _os.environ.get("SALMALM_EARLY_STOP", "0") == "1"

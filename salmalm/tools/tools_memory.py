@@ -7,6 +7,7 @@ from salmalm.core import _tfidf, get_usage_report
 
 @register("memory_read")
 def handle_memory_read(args: dict) -> str:
+    """Handle memory read."""
     fname = args["file"]
     if fname == "MEMORY.md":
         p = MEMORY_FILE
@@ -19,6 +20,7 @@ def handle_memory_read(args: dict) -> str:
 
 @register("memory_write")
 def handle_memory_write(args: dict) -> str:
+    """Handle memory write."""
     fname = args["file"]
     if fname == "MEMORY.md":
         p = MEMORY_FILE
@@ -31,6 +33,7 @@ def handle_memory_write(args: dict) -> str:
 
 @register("memory_search")
 def handle_memory_search(args: dict) -> str:
+    """Handle memory search."""
     query = args["query"]
     max_results = args.get("max_results", 5)
     results = _tfidf.search(query, max_results)
@@ -44,6 +47,7 @@ def handle_memory_search(args: dict) -> str:
 
 @register("usage_report")
 def handle_usage_report(args: dict) -> str:
+    """Handle usage report."""
     report = get_usage_report()
     lines = [
         "SalmAlm Usage Report",

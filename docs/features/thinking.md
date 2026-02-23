@@ -1,30 +1,68 @@
 # Extended Thinking
-# 확장 사고
 
-## Overview / 개요
+SalmAlm supports extended thinking (chain-of-thought) for complex reasoning tasks, compatible with both Anthropic and OpenAI providers.
 
-Extended thinking enables the AI to reason deeply before responding, improving accuracy for complex problems.
+## How It Works
 
-확장 사고는 AI가 응답 전에 깊이 추론하도록 하여 복잡한 문제의 정확도를 향상시킵니다.
-
-## Usage / 사용법
+Extended thinking gives the LLM a dedicated "thinking" phase before responding. The model reasons step-by-step internally, then produces a final answer.
 
 ```
-/think high What is the optimal algorithm for this problem?
-/think off Just answer quickly
+User Message → [Thinking Phase: budget_tokens of reasoning] → Final Response
 ```
 
-## Levels / 레벨
+## Thinking Levels
 
-| Level / 레벨 | Description / 설명 |
-|---|---|
-| `off` | No thinking / 사고 없음 |
-| `low` | Brief reasoning / 간단한 추론 |
-| `medium` | Moderate depth / 중간 수준 |
-| `high` | Deep multi-step reasoning / 깊은 다단계 추론 |
+| Level | Budget Tokens | Use Case |
+|-------|--------------|----------|
+| `low` | 2,048 | Quick reasoning, simple logic |
+| `medium` | 8,192 | Multi-step problems, analysis |
+| `high` | 16,384 | Complex code, architecture |
+| `xhigh` | 32,768 | Deep research, proofs |
 
-## How It Works / 작동 방식
+## Provider Mapping
 
-When thinking is enabled, the AI generates an internal reasoning chain before producing the final response. This is visible when `/reasoning on` or `/reasoning stream` is set.
+| Level | Anthropic | OpenAI |
+|-------|-----------|--------|
+| `low` | `budget_tokens: 2048` | `reasoning_effort: low` |
+| `medium` | `budget_tokens: 8192` | `reasoning_effort: medium` |
+| `high` | `budget_tokens: 16384` | `reasoning_effort: high` |
+| `xhigh` | `budget_tokens: 32768` | — |
 
-사고가 활성화되면 AI는 최종 응답을 생성하기 전에 내부 추론 체인을 생성합니다. `/reasoning on` 또는 `/reasoning stream`이 설정되면 이를 볼 수 있습니다.
+## Usage
+
+### Commands
+
+```
+/think low      → Enable low thinking
+/think high     → Enable high thinking
+/think off      → Disable thinking
+```
+
+### Web UI
+
+**Settings → Engine Optimization → Thinking Level** dropdown.
+
+### Programmatic
+
+```bash
+curl -X POST http://localhost:18800/api/engine/settings \
+  -H "Content-Type: application/json" \
+  -d '{"thinking_level": "medium"}'
+```
+
+## Cost Considerations
+
+Thinking tokens count toward usage. A `high` level request may use 16K+ additional tokens. Use `low` for everyday tasks and `high`/`xhigh` only when needed.
+
+## How It Differs from OpenClaw
+
+| Feature | SalmAlm | OpenClaw |
+|---------|---------|----------|
+| User control | Manual level selection | Auto-suggested |
+| Levels | 4 (low/medium/high/xhigh) | 3 (low/medium/high) |
+| Provider support | Anthropic + OpenAI | Anthropic only |
+| Default | Off | Off |
+
+## Temperature Interaction
+
+When thinking is enabled, temperature is automatically set to 1.0 (Anthropic requirement). Your configured temperature applies to non-thinking requests.

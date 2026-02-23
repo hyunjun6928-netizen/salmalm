@@ -12,10 +12,12 @@ from salmalm.security.crypto import log
 class ConversationFork:
     """Manage alternative responses at the same message index."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._ensure_table()
 
     def _ensure_table(self):
+        """Ensure table."""
         try:
             from salmalm.core import _get_db
 
@@ -35,7 +37,10 @@ class ConversationFork:
         except Exception as e:
             log.warning(f"Alternatives table init: {e}")
 
-    def save_alternative(self, session_id: str, message_index: int, content: str, model: str = "", active: bool = True):
+    def save_alternative(
+        self, session_id: str, message_index: int, content: str, model: str = "", active: bool = True
+    ) -> None:
+        """Save alternative."""
         try:
             from salmalm.core import _get_db
 
@@ -57,6 +62,7 @@ class ConversationFork:
             log.warning(f"Save alternative error: {e}")
 
     def get_alternatives(self, session_id: str, message_index: int) -> List[Dict]:
+        """Get alternatives."""
         try:
             from salmalm.core import _get_db
 
@@ -70,10 +76,11 @@ class ConversationFork:
             return [
                 {"id": r[0], "content": r[1], "model": r[2], "created_at": r[3], "is_active": bool(r[4])} for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def switch_alternative(self, session_id: str, message_index: int, alt_id: int) -> Optional[str]:
+        """Switch alternative."""
         try:
             from salmalm.core import _get_db
 
@@ -86,10 +93,11 @@ class ConversationFork:
             conn.commit()
             row = conn.execute("SELECT content FROM message_alternatives WHERE id=?", (alt_id,)).fetchone()
             return row[0] if row else None
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return None
 
     async def regenerate(self, session_id: str, message_index: int) -> Optional[str]:
+        """Regenerate."""
         from salmalm.core import get_session
 
         session = get_session(session_id)

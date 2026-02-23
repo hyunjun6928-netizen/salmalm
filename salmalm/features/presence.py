@@ -29,6 +29,7 @@ class PresenceEntry:
         user_agent: str = "",
         extra: Optional[Dict] = None,
     ):
+        """Init  ."""
         self.instance_id = instance_id
         self.host = host
         self.ip = ip
@@ -40,6 +41,7 @@ class PresenceEntry:
 
     @property
     def state(self) -> str:
+        """State."""
         elapsed = time.time() - self.last_activity
         if elapsed < ACTIVE_THRESHOLD:
             return "active"
@@ -49,6 +51,7 @@ class PresenceEntry:
 
     @property
     def is_expired(self) -> bool:
+        """Is expired."""
         return (time.time() - self.last_activity) > DEFAULT_TTL
 
     def touch(self, **kwargs) -> None:
@@ -59,6 +62,7 @@ class PresenceEntry:
                 setattr(self, k, v)
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
         return {
             "instanceId": self.instance_id,
             "host": self.host,
@@ -74,7 +78,8 @@ class PresenceEntry:
 class PresenceManager:
     """Track connected client instances with TTL-based expiry."""
 
-    def __init__(self, ttl: int = DEFAULT_TTL, max_entries: int = MAX_ENTRIES):
+    def __init__(self, ttl: int = DEFAULT_TTL, max_entries: int = MAX_ENTRIES) -> None:
+        """Init  ."""
         self._entries: Dict[str, PresenceEntry] = {}
         self._lock = threading.Lock()
         self._ttl = ttl
@@ -105,6 +110,7 @@ class PresenceManager:
         return None
 
     def unregister(self, instance_id: str) -> bool:
+        """Unregister."""
         with self._lock:
             if instance_id in self._entries:
                 del self._entries[instance_id]
@@ -112,6 +118,7 @@ class PresenceManager:
         return False
 
     def get(self, instance_id: str) -> Optional[PresenceEntry]:
+        """Get."""
         entry = self._entries.get(instance_id)
         if entry and (time.time() - entry.last_activity) <= self._ttl:
             return entry
@@ -125,11 +132,13 @@ class PresenceManager:
             return [e.to_dict() for e in self._entries.values()]
 
     def count(self) -> int:
+        """Count."""
         with self._lock:
             self._evict_expired()
             return len(self._entries)
 
     def count_by_state(self) -> Dict[str, int]:
+        """Count by state."""
         with self._lock:
             self._evict_expired()
             counts = {"active": 0, "idle": 0, "stale": 0}
@@ -153,6 +162,7 @@ class PresenceManager:
         del self._entries[oldest_id]
 
     def clear(self) -> None:
+        """Clear."""
         with self._lock:
             self._entries.clear()
 

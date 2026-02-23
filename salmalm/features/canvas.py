@@ -36,14 +36,15 @@ _CANVAS_HOST = "127.0.0.1"
 class CanvasServer:
     """Lightweight HTTP server for previewing generated content."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._server: Optional[socketserver.TCPServer] = None
         self._thread: Optional[threading.Thread] = None
         self._pages: Dict[str, dict] = {}  # page_id -> {html, title, created}
         self._running = False
         _CANVAS_DIR.mkdir(parents=True, exist_ok=True)
 
-    def start(self, port: int = _CANVAS_PORT, host: str = _CANVAS_HOST):
+    def start(self, port: int = _CANVAS_PORT, host: str = _CANVAS_HOST) -> None:
         """Start the canvas preview server."""
         if self._running:
             return
@@ -51,10 +52,12 @@ class CanvasServer:
         canvas = self
 
         class Handler(http.server.SimpleHTTPRequestHandler):
-            def __init__(self, *args, **kwargs):
+            def __init__(self, *args, **kwargs) -> None:
+                """Init  ."""
                 super().__init__(*args, directory=str(_CANVAS_DIR), **kwargs)
 
-            def do_GET(self):
+            def do_GET(self) -> None:
+                """Do get."""
                 path = self.path.strip("/")
                 if not path or path == "index":
                     self._serve_index()
@@ -93,7 +96,8 @@ li{{margin:8px 0}}a{{color:#2563eb}}</style></head>
                 self.end_headers()
                 self.wfile.write(page["html"].encode())
 
-            def log_message(self, format, *args):
+            def log_message(self, format: str, *args) -> None:
+                """Log message."""
                 pass  # Suppress request logs
 
         try:
@@ -106,7 +110,7 @@ li{{margin:8px 0}}a{{color:#2563eb}}</style></head>
         except Exception as e:
             log.error(f"[CANVAS] Failed to start: {e}")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the canvas server."""
         if self._server:
             self._server.shutdown()
@@ -145,8 +149,8 @@ li{{margin:8px 0}}a{{color:#2563eb}}</style></head>
         if open_browser:
             try:
                 webbrowser.open(url)
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         # Cleanup old pages (keep last 30)
         if len(self._pages) > 30:
@@ -155,8 +159,8 @@ li{{margin:8px 0}}a{{color:#2563eb}}</style></head>
                 del self._pages[pid]
                 try:
                     (_CANVAS_DIR / f"{pid}.html").unlink(missing_ok=True)
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
         return {"url": url, "page_id": page_id}
 

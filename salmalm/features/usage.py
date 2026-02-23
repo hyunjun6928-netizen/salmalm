@@ -12,10 +12,12 @@ from salmalm.security.crypto import log
 class UsageTracker:
     """Per-user, per-model token usage tracking with daily/monthly reports."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._db_path = DATA_DIR / "salmalm.db"
 
     def _get_db(self):
+        """Get db."""
         from salmalm.core import _get_db
 
         conn = _get_db()
@@ -32,7 +34,10 @@ class UsageTracker:
         conn.commit()
         return conn
 
-    def record(self, session_id: str, model: str, input_tokens: int, output_tokens: int, cost: float, intent: str = ""):
+    def record(
+        self, session_id: str, model: str, input_tokens: int, output_tokens: int, cost: float, intent: str = ""
+    ) -> None:
+        """Record."""
         try:
             conn = self._get_db()
             now = datetime.now(KST).isoformat()
@@ -46,6 +51,7 @@ class UsageTracker:
             log.warning(f"Usage tracking error: {e}")
 
     def daily_report(self, days: int = 7) -> List[Dict]:
+        """Daily report."""
         try:
             conn = self._get_db()
             cutoff = (datetime.now(KST) - timedelta(days=days)).isoformat()
@@ -68,10 +74,11 @@ class UsageTracker:
                 }
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def monthly_report(self, months: int = 3) -> List[Dict]:
+        """Monthly report."""
         try:
             conn = self._get_db()
             cutoff = (datetime.now(KST) - timedelta(days=months * 30)).isoformat()
@@ -94,15 +101,16 @@ class UsageTracker:
                 }
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def model_breakdown(self) -> Dict[str, float]:
+        """Model breakdown."""
         try:
             conn = self._get_db()
             rows = conn.execute("SELECT model, SUM(cost) FROM usage_detail GROUP BY model").fetchall()
             return {r[0]: round(r[1], 6) for r in rows}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return {}
 
 

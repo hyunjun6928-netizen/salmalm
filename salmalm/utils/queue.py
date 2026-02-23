@@ -133,7 +133,8 @@ class QueueLane:
     Global concurrency is controlled by the parent MessageQueue semaphores.
     """
 
-    def __init__(self, session_id: str, global_semaphore: asyncio.Semaphore):
+    def __init__(self, session_id: str, global_semaphore: asyncio.Semaphore) -> None:
+        """Init  ."""
         self.session_id = session_id
         self._global_sem = global_semaphore
         self._session_sem = asyncio.Semaphore(1)  # serial per session
@@ -190,7 +191,7 @@ class QueueLane:
 
     # ── Mode handlers ──
 
-    async def _handle_collect(self, message, processor, cap, drop, debounce_s, **kwargs) -> str:
+    async def _handle_collect(self, message: str, processor, cap, drop, debounce_s, **kwargs) -> str:
         """Collect mode: debounce, merge, process as single turn."""
         self._pending.append(QueuedMessage(text=message))
         self._pending, _ = apply_overflow(self._pending, cap, drop)
@@ -202,6 +203,7 @@ class QueueLane:
         self._collect_futures.append(future)
 
         async def _debounce():
+            """Debounce."""
             await asyncio.sleep(debounce_s)
             async with self._session_sem:
                 async with _SemaphoreContext(self._global_sem):
@@ -229,7 +231,7 @@ class QueueLane:
         self._debounce_task = asyncio.ensure_future(_debounce())
         return await future
 
-    async def _handle_followup(self, message, processor, cap, drop, debounce_s, **kwargs) -> str:
+    async def _handle_followup(self, message: str, processor, cap, drop, debounce_s, **kwargs) -> str:
         """Followup mode: wait for current task to finish, then queue as next turn."""
         self._pending.append(QueuedMessage(text=message))
         self._pending, _ = apply_overflow(self._pending, cap, drop)
@@ -245,7 +247,7 @@ class QueueLane:
                 log.info(f"[QUEUE] followup {self.session_id}: processing {len(collected)} msgs")
                 return await processor(self.session_id, merged, **kwargs)
 
-    async def _handle_steer(self, message, processor, cap, drop, debounce_s, followup=False, **kwargs) -> str:
+    async def _handle_steer(self, message: str, processor, cap, drop, debounce_s, followup=False, **kwargs) -> str:
         """Steer mode: inject into running agent. If followup=True (steer-backlog), also queue remainder."""
         # If something is currently running, steer into it
         if self._session_sem.locked():
@@ -263,7 +265,7 @@ class QueueLane:
         # Nothing running — treat as collect
         return await self._handle_collect(message, processor, cap, drop, debounce_s, **kwargs)
 
-    async def _handle_interrupt(self, message, processor, cap, drop, **kwargs) -> str:
+    async def _handle_interrupt(self, message: str, processor, cap, drop, **kwargs) -> str:
         """Interrupt mode: cancel current, start fresh with latest message."""
         # Cancel current task
         if self._current_task and not self._current_task.done():
@@ -298,7 +300,7 @@ class QueueLane:
             self._steer_event.clear()
         return msg
 
-    def reset_options(self):
+    def reset_options(self) -> None:
         """Reset per-session overrides to defaults."""
         self.options = SessionOptions()
 
@@ -306,7 +308,8 @@ class QueueLane:
 class _SemaphoreContext:
     """Async context manager for semaphore."""
 
-    def __init__(self, sem: asyncio.Semaphore):
+    def __init__(self, sem: asyncio.Semaphore) -> None:
+        """Init  ."""
         self._sem = sem
 
     async def __aenter__(self):
@@ -318,6 +321,7 @@ class _SemaphoreContext:
 
 
 def _merge_messages(messages: List[QueuedMessage]) -> str:
+    """Merge messages."""
     if len(messages) == 1:
         return messages[0].text
     return "\n".join(m.text for m in messages)
@@ -334,7 +338,8 @@ class MessageQueue:
     - Runtime config from ~/.salmalm/queue.json
     """
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: Optional[dict] = None) -> None:
+        """Init  ."""
         self._config = config or load_config()
         self._lanes: Dict[str, QueueLane] = {}
         self._lock = threading.Lock()
@@ -346,17 +351,21 @@ class MessageQueue:
 
     @property
     def config(self) -> dict:
+        """Config."""
         return self._config
 
-    def reload_config(self):
+    def reload_config(self) -> None:
+        """Reload config."""
         self._config = load_config()
 
     def _get_semaphore(self, session_id: str) -> asyncio.Semaphore:
+        """Get semaphore."""
         if "subagent" in session_id:
             return self._subagent_sem
         return self._main_sem
 
     def _get_lane(self, session_id: str) -> QueueLane:
+        """Get lane."""
         with self._lock:
             if session_id not in self._lanes:
                 sem = self._get_semaphore(session_id)
@@ -445,6 +454,7 @@ class MessageQueue:
         return f"✅ Queue updated: {', '.join(changes)}"
 
     def _show_status(self, lane: QueueLane) -> str:
+        """Show status."""
         cfg = self._config
         mode = lane.options.mode.value if lane.options.mode else cfg.get("mode", "collect")
         debounce = lane.options.debounce_ms if lane.options.debounce_ms is not None else cfg.get("debounceMs", 1000)
@@ -462,7 +472,7 @@ class MessageQueue:
             f"  sessions: {self.active_sessions}"
         )
 
-    def cleanup(self, max_idle: float = 3600):
+    def cleanup(self, max_idle: float = 3600) -> None:
         """Remove idle session lanes."""
         now = time.time()
         if now - self._cleanup_ts < 600:
@@ -477,14 +487,17 @@ class MessageQueue:
 
     @property
     def active_sessions(self) -> int:
+        """Active sessions."""
         return len(self._lanes)
 
     @property
     def main_semaphore(self) -> asyncio.Semaphore:
+        """Main semaphore."""
         return self._main_sem
 
     @property
     def subagent_semaphore(self) -> asyncio.Semaphore:
+        """Subagent semaphore."""
         return self._subagent_sem
 
 

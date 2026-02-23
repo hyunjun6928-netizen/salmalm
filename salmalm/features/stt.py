@@ -29,25 +29,30 @@ _STT_DEFAULTS = {
 
 
 def _load_config() -> dict:
+    """Load config."""
     return ConfigManager.load("stt", defaults=_STT_DEFAULTS)
 
 
 class STTManager:
     """Speech-to-text manager supporting Web Speech API and OpenAI Whisper."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: Optional[dict] = None) -> None:
+        """Init  ."""
         self.config = config or _load_config()
 
     @property
     def enabled(self) -> bool:
+        """Enabled."""
         return self.config.get("enabled", True)
 
     @property
     def web_enabled(self) -> bool:
+        """Web enabled."""
         return self.config.get("web_enabled", True)
 
     @property
     def telegram_voice(self) -> bool:
+        """Telegram voice."""
         return self.config.get("telegram_voice", True)
 
     # ── Web Speech API JavaScript ────────────────────────────

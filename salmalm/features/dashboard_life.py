@@ -19,6 +19,7 @@ _db_lock = threading.Lock()
 
 
 def _get_db() -> sqlite3.Connection:
+    """Get db."""
     return _connect_db(_DB_PATH, wal=False, row_factory=True, check_same_thread=False)
 
 
@@ -26,6 +27,7 @@ class LifeDashboard:
     """Aggregates data from personal tools into a unified dashboard."""
 
     def generate_dashboard(self) -> dict:
+        """Generate dashboard."""
         return {
             "finance": self._get_finance_summary(),
             "calendar": self._get_upcoming_events(),
@@ -41,6 +43,7 @@ class LifeDashboard:
     # ── Finance ──────────────────────────────────────────────
 
     def _get_finance_summary(self) -> dict:
+        """Get finance summary."""
         now = datetime.now(KST)
         month_start = now.replace(day=1).strftime("%Y-%m-%d")
         month_end = (now.replace(day=28) + timedelta(days=4)).replace(day=1).strftime("%Y-%m-%d")
@@ -51,7 +54,7 @@ class LifeDashboard:
                     "SELECT amount, category FROM expenses WHERE date >= ? AND date < ?", (month_start, month_end)
                 ).fetchall()
                 conn.close()
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return {"total_expense": 0, "by_category": {}, "count": 0}
 
         total = 0.0
@@ -73,6 +76,7 @@ class LifeDashboard:
     # ── Reminders ────────────────────────────────────────────
 
     def _get_pending_reminders(self) -> list:
+        """Get pending reminders."""
         try:
             reminders_path = BASE_DIR / "reminders.json"
             if not reminders_path.exists():
@@ -90,12 +94,13 @@ class LifeDashboard:
                         }
                     )
             return pending[:20]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     # ── Routines ─────────────────────────────────────────────
 
     def _get_routine_stats(self) -> dict:
+        """Get routine stats."""
         try:
             config_path = DATA_DIR / "routines.json"
             if not config_path.exists():
@@ -106,12 +111,13 @@ class LifeDashboard:
                 "routines": list(routines.keys()),
                 "count": len(routines),
             }
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return {"routines": [], "count": 0}
 
     # ── Thoughts / Notes ─────────────────────────────────────
 
     def _get_recent_thoughts(self, limit: int = 5) -> list:
+        """Get recent thoughts."""
         try:
             with _db_lock:
                 conn = _get_db()
@@ -123,7 +129,7 @@ class LifeDashboard:
                 {"id": r["id"], "content": r["content"][:200], "tags": r["tags"], "created_at": r["created_at"]}
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     # ── Mood ─────────────────────────────────────────────────
@@ -140,12 +146,13 @@ class LifeDashboard:
                 ).fetchall()
                 conn.close()
             return [{"tags": r["tags"], "created_at": r["created_at"]} for r in rows]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     # ── Pomodoro ─────────────────────────────────────────────
 
     def _get_pomodoro_stats(self) -> dict:
+        """Get pomodoro stats."""
         try:
             with _db_lock:
                 conn = _get_db()
@@ -158,12 +165,13 @@ class LifeDashboard:
                 ).fetchone()["c"]
                 conn.close()
             return {"total": total, "completed": completed, "rate": round(completed / total * 100, 1) if total else 0}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return {"total": 0, "completed": 0, "rate": 0}
 
     # ── Links ────────────────────────────────────────────────
 
     def _get_saved_links(self, limit: int = 5) -> list:
+        """Get saved links."""
         try:
             with _db_lock:
                 conn = _get_db()
@@ -172,12 +180,13 @@ class LifeDashboard:
                 ).fetchall()
                 conn.close()
             return [{"url": r["url"], "title": r["title"], "saved_at": r["saved_at"]} for r in rows]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     # ── Text Summary ─────────────────────────────────────────
 
     def text_summary(self, section: Optional[str] = None) -> str:
+        """Text summary."""
         data = self.generate_dashboard()
         if section == "finance":
             return self._format_finance(data["finance"])
@@ -186,6 +195,7 @@ class LifeDashboard:
         return self._format_full(data)
 
     def _format_finance(self, fin: dict) -> str:
+        """Format finance."""
         lines = ["💰 **이번 달 재정 현황**"]
         lines.append(f"총 지출: {fin['total_expense']:,.0f}원 ({fin['count']}건)")
         for cat, amt in sorted(fin.get("by_category", {}).items(), key=lambda x: -x[1]):
@@ -193,6 +203,7 @@ class LifeDashboard:
         return "\n".join(lines) if fin["count"] else "💰 이번 달 지출 기록이 없습니다."
 
     def _format_week(self, data: dict) -> str:
+        """Format week."""
         lines = ["📊 **주간 종합 리포트**", ""]
         lines.append(self._format_finance(data["finance"]))
         lines.append("")
@@ -204,6 +215,7 @@ class LifeDashboard:
         return "\n".join(lines)
 
     def _format_full(self, data: dict) -> str:
+        """Format full."""
         lines = ["🏠 **Life Dashboard**", ""]
         # Finance
         fin = data["finance"]
@@ -228,6 +240,7 @@ class LifeDashboard:
     # ── HTML Dashboard ───────────────────────────────────────
 
     def render_html(self) -> str:
+        """Render html."""
         data = self.generate_dashboard()
         fin = data["finance"]
         pomo = data["productivity"]
@@ -286,6 +299,7 @@ a{{color:#0f3460;text-decoration:none}}
 
 
 def _esc(s: str) -> str:
+    """Esc."""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
@@ -295,16 +309,19 @@ def _esc(s: str) -> str:
 class ProactiveDigest:
     """Generates morning/evening digest messages."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self.dashboard = LifeDashboard()
         self._config = self._load_config()
 
     def _load_config(self) -> dict:
+        """Load config."""
         from salmalm.config_manager import ConfigManager
 
         return ConfigManager.load("digest", defaults={"enabled": True, "morning": "08:00", "evening": "20:00"})
 
     def morning_digest(self) -> str:
+        """Morning digest."""
         data = self.dashboard.generate_dashboard()
         lines = ["☀️ **좋은 아침! 오늘의 브리핑**", ""]
         tasks = data["tasks"]
@@ -317,6 +334,7 @@ class ProactiveDigest:
         return "\n".join(lines)
 
     def evening_digest(self) -> str:
+        """Evening digest."""
         data = self.dashboard.generate_dashboard()
         lines = ["🌙 **오늘 하루 정리**", ""]
         fin = data["finance"]
@@ -326,6 +344,7 @@ class ProactiveDigest:
         return "\n".join(lines)
 
     def should_send(self, hour: int) -> Optional[str]:
+        """Should send."""
         if not self._config.get("enabled", True):
             return None
         morning_h = int(self._config.get("morning", "08:00").split(":")[0])
@@ -344,8 +363,10 @@ _digest = ProactiveDigest()
 
 
 def get_dashboard() -> LifeDashboard:
+    """Get dashboard."""
     return _dashboard
 
 
 def get_digest() -> ProactiveDigest:
+    """Get digest."""
     return _digest

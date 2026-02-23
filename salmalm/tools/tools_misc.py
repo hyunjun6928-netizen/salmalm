@@ -23,6 +23,58 @@ _reminder_lock = threading.Lock()
 _reminder_thread_started = False
 
 
+def _resolve_next_weekday(s_orig: str, s_stripped: str, now) -> int:
+    """Resolve 'next week' + optional weekday name to day offset."""
+    _WEEKDAYS = {
+        "월": 0,
+        "화": 1,
+        "수": 2,
+        "목": 3,
+        "금": 4,
+        "토": 5,
+        "일": 6,
+        "mon": 0,
+        "tue": 1,
+        "wed": 2,
+        "thu": 3,
+        "fri": 4,
+        "sat": 5,
+        "sun": 6,
+    }
+    for wd, idx in _WEEKDAYS.items():
+        if wd in s_orig or wd in s_stripped:
+            days_ahead = (idx - now.weekday() + 7) % 7
+            return days_ahead if days_ahead > 0 else 7
+    return 7
+
+
+def _parse_kr_time(s_orig: str, m_kr) -> tuple:
+    """Parse Korean time expression. Returns (hour, minute)."""
+    hour = int(m_kr.group(2))
+    minute = int(m_kr.group(3) or 0)
+    period = m_kr.group(1)
+    if period in ("오후", "PM") and hour < 12:
+        hour += 12
+    elif period in ("오전", "AM") and hour == 12:
+        hour = 0
+    elif not period:
+        if any(k in s_orig for k in ("저녁", "밤", "오후")) and hour < 12:
+            hour += 12
+    return hour, minute
+
+
+def _parse_en_time(m_en) -> tuple:
+    """Parse English time expression. Returns (hour, minute)."""
+    hour = int(m_en.group(1))
+    minute = int(m_en.group(2) or 0)
+    period = m_en.group(3)
+    if period == "pm" and hour < 12:
+        hour += 12
+    elif period == "am" and hour == 12:
+        hour = 0
+    return hour, minute
+
+
 def _parse_relative_time(s: str) -> datetime:
     """Parse time string into datetime."""
     now = datetime.now()
@@ -50,60 +102,32 @@ def _parse_relative_time(s: str) -> datetime:
     hour = None
     minute = 0
 
-    if "오늘" in s_orig:
-        day_offset = 0
-    elif "내일" in s_orig:
-        day_offset = 1
-    elif "모레" in s_orig:
-        day_offset = 2
-    elif "다음주" in s_orig or "next week" in s_stripped:
-        day_offset = 7
-        weekdays_kr = {"월": 0, "화": 1, "수": 2, "목": 3, "금": 4, "토": 5, "일": 6}
-        weekdays_en = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
-        for wd, idx in {**weekdays_kr, **weekdays_en}.items():
-            if wd in s_orig or wd in s_stripped:
-                current_wd = now.weekday()
-                days_ahead = (idx - current_wd + 7) % 7
-                if days_ahead == 0:
-                    days_ahead = 7
-                day_offset = days_ahead
-                break
-    elif "tomorrow" in s_stripped:
-        day_offset = 1
+    _DAY_KEYWORDS = {"오늘": 0, "내일": 1, "모레": 2, "tomorrow": 1}
+    for kw, off in _DAY_KEYWORDS.items():
+        if kw in s_orig or kw in s_stripped:
+            day_offset = off
+            break
+    if "다음주" in s_orig or "next week" in s_stripped:
+        day_offset = _resolve_next_weekday(s_orig, s_stripped, now)
 
-    if "아침" in s_orig or "morning" in s_stripped:
-        hour = 8
-    elif "점심" in s_orig or "noon" in s_stripped or "lunch" in s_stripped:
-        hour = 12
-    elif "저녁" in s_orig or "evening" in s_stripped:
-        hour = 18
-    elif "밤" in s_orig or "night" in s_stripped:
-        hour = 21
+    _TIME_KEYWORDS = [
+        (("아침", "morning"), 8),
+        (("점심", "noon", "lunch"), 12),
+        (("저녁", "evening"), 18),
+        (("밤", "night"), 21),
+    ]
+    for keywords, h in _TIME_KEYWORDS:
+        if any(k in s_orig or k in s_stripped for k in keywords):
+            hour = h
+            break
 
     m_kr = re.search(r"(오전|오후|AM|PM)?\s*(\d{1,2})\s*시\s*(\d{1,2})?\s*분?", s_orig)
     if m_kr:
-        period = m_kr.group(1)
-        hour = int(m_kr.group(2))
-        minute = int(m_kr.group(3) or 0)
-        if period in ("오후", "PM") and hour < 12:
-            hour += 12
-        elif period in ("오전", "AM") and hour == 12:
-            hour = 0
-        elif not period:
-            if ("저녁" in s_orig or "밤" in s_orig) and hour < 12:
-                hour += 12
-            elif ("오후" in s_orig) and hour < 12:
-                hour += 12
+        hour, minute = _parse_kr_time(s_orig, m_kr)
 
     m_en = re.search(r"(\d{1,2}):?(\d{2})?\s*(am|pm)?", s_stripped)
     if m_en and hour is None:
-        hour = int(m_en.group(1))
-        minute = int(m_en.group(2) or 0)
-        period = m_en.group(3)
-        if period == "pm" and hour < 12:
-            hour += 12
-        elif period == "am" and hour == 12:
-            hour = 0
+        hour, minute = _parse_en_time(m_en)
 
     if day_offset > 0 or hour is not None:
         target = now + timedelta(days=day_offset)
@@ -117,20 +141,23 @@ def _parse_relative_time(s: str) -> datetime:
 
 
 def _reminders_file() -> Path:
+    """Reminders file."""
     return WORKSPACE_DIR / "reminders.json"
 
 
 def _load_reminders():
+    """Load reminders."""
     global _reminders
     fp = _reminders_file()
     if fp.exists():
         try:
             _reminders = json.loads(fp.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             _reminders = []
 
 
 def _save_reminders():
+    """Save reminders."""
     fp = _reminders_file()
     fp.write_text(json.dumps(_reminders, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 
@@ -144,6 +171,7 @@ def _send_notification_impl(
     if channel in ("telegram", "all"):
         try:
             from salmalm.core import _tg_bot
+
             tg = _tg_bot
             if tg:
                 owner = vault.get("telegram_owner_id") or ""
@@ -213,6 +241,7 @@ def _send_notification_impl(
 
 
 def _reminder_check_loop():
+    """Reminder check loop."""
     while True:
         time.sleep(30)
         now = datetime.now()
@@ -226,7 +255,7 @@ def _reminder_check_loop():
                         due.append(r)
                     else:
                         remaining.append(r)
-                except Exception:
+                except Exception as e:  # noqa: broad-except
                     remaining.append(r)
             if due:
                 _reminders.clear()
@@ -246,11 +275,12 @@ def _reminder_check_loop():
                         with _reminder_lock:
                             _reminders.append(r)
                             _save_reminders()
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
 
 
 def _ensure_reminder_thread():
+    """Ensure reminder thread."""
     global _reminder_thread_started
     if not _reminder_thread_started:
         _reminder_thread_started = True
@@ -261,6 +291,7 @@ def _ensure_reminder_thread():
 
 @register("reminder")
 def handle_reminder(args: dict) -> str:
+    """Handle reminder."""
     _ensure_reminder_thread()
     action = args.get("action", "set")
 
@@ -315,20 +346,23 @@ _workflows_file = WORKSPACE_DIR / "workflows.json"
 
 
 def _load_workflows() -> dict:
+    """Load workflows."""
     if _workflows_file.exists():
         try:
             return json.loads(_workflows_file.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
     return {}
 
 
 def _save_workflows(wf: dict):
+    """Save workflows."""
     _workflows_file.write_text(json.dumps(wf, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 @register("workflow")
 def handle_workflow(args: dict) -> str:
+    """Handle workflow."""
     from salmalm.tools.tool_registry import execute_tool
 
     action = args.get("action", "list")
@@ -400,6 +434,7 @@ _file_index_lock = threading.Lock()
 
 @register("file_index")
 def handle_file_index(args: dict) -> str:
+    """Handle file index."""
     action = args.get("action", "search")
 
     if action == "index" or action == "status":
@@ -424,8 +459,8 @@ def handle_file_index(args: dict) -> str:
                             "preview": content[:200],
                         }
                         count += 1
-                    except Exception:
-                        pass
+                    except Exception as e:  # noqa: broad-except
+                        log.debug(f"Suppressed: {e}")
         if action == "status":
             return f"📂 File index: {len(_file_index)} files indexed"
         return f"📂 Indexed {count} files from {target_dir}"
@@ -463,6 +498,7 @@ def handle_file_index(args: dict) -> str:
 
 @register("notification")
 def handle_notification(args: dict) -> str:
+    """Handle notification."""
     message = args.get("message", "")
     if not message:
         return "❌ message is required"
@@ -476,6 +512,7 @@ def handle_notification(args: dict) -> str:
 
 @register("weather")
 def handle_weather(args: dict) -> str:
+    """Handle weather."""
     location = args.get("location", "")
     if not location:
         return "❌ location is required"
@@ -552,19 +589,22 @@ _feeds_file = WORKSPACE_DIR / "rss_feeds.json"
 
 
 def _load_feeds() -> dict:
+    """Load feeds."""
     if _feeds_file.exists():
         try:
             return json.loads(_feeds_file.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
     return {}
 
 
 def _save_feeds(feeds: dict):
+    """Save feeds."""
     _feeds_file.write_text(json.dumps(feeds, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _parse_rss(xml_text: str) -> list:
+    """Parse rss."""
     from xml.etree import ElementTree as ET
 
     articles = []
@@ -606,94 +646,112 @@ def _parse_rss(xml_text: str) -> list:
     return articles
 
 
-@register("rss_reader")
-def handle_rss_reader(args: dict) -> str:
-    action = args.get("action", "fetch")
+def _rss_list(args: dict) -> str:
+    """List subscribed RSS feeds."""
+    feeds = _load_feeds()
+    if not feeds:
+        return "📰 No subscribed feeds."
+    lines = ["📰 **Subscribed Feeds:**"]
+    for name, info in feeds.items():
+        lines.append(f"  • **{name}** — {info['url']}")
+    return "\n".join(lines)
 
-    if action == "list":
-        feeds = _load_feeds()
-        if not feeds:
-            return "📰 No subscribed feeds."
-        lines = ["📰 **Subscribed Feeds:**"]
-        for name, info in feeds.items():
-            lines.append(f"  • **{name}** — {info['url']}")
-        return "\n".join(lines)
 
-    elif action == "subscribe":
-        url = args.get("url", "")
-        name = args.get("name", "")
-        if not url:
-            return "❌ url is required for subscribe"
-        if not name:
-            name = url.split("/")[2] if "/" in url else url[:30]
-        feeds = _load_feeds()
-        feeds[name] = {"url": url, "added": datetime.now().isoformat()}
+def _rss_subscribe(args: dict) -> str:
+    """Subscribe to an RSS feed."""
+    url = args.get("url", "")
+    name = args.get("name", "")
+    if not url:
+        return "❌ url is required for subscribe"
+    if not name:
+        name = url.split("/")[2] if "/" in url else url[:30]
+    feeds = _load_feeds()
+    feeds[name] = {"url": url, "added": datetime.now().isoformat()}
+    _save_feeds(feeds)
+    return f"📰 Subscribed: **{name}** ({url})"
+
+
+def _rss_unsubscribe(args: dict) -> str:
+    """Unsubscribe from an RSS feed."""
+    name = args.get("name", "")
+    feeds = _load_feeds()
+    if name in feeds:
+        del feeds[name]
         _save_feeds(feeds)
-        return f"📰 Subscribed: **{name}** ({url})"
+        return f"📰 Unsubscribed: {name}"
+    return f"❌ Feed not found: {name}"
 
-    elif action == "unsubscribe":
-        name = args.get("name", "")
-        feeds = _load_feeds()
-        if name in feeds:
-            del feeds[name]
-            _save_feeds(feeds)
-            return f"📰 Unsubscribed: {name}"
-        return f"❌ Feed not found: {name}"
 
-    elif action == "fetch":
-        url = args.get("url", "")
-        count = args.get("count", 5)
+_RSS_DISPATCH = {
+    "list": _rss_list,
+    "subscribe": _rss_subscribe,
+    "unsubscribe": _rss_unsubscribe,
+}
 
-        if not url:
-            feeds = _load_feeds()
-            if not feeds:
-                return "❌ No URL provided and no subscribed feeds."
-            all_articles = []
-            for name, info in feeds.items():
-                try:
-                    req = urllib.request.Request(info["url"], headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
-                    with urllib.request.urlopen(req, timeout=10) as resp:
-                        xml = resp.read().decode("utf-8", errors="replace")
-                    articles = _parse_rss(xml)
-                    for a in articles[:3]:
-                        a["feed"] = name
-                    all_articles.extend(articles[:3])
-                except Exception:
-                    pass
-            if not all_articles:
-                return "📰 No articles fetched from subscribed feeds."
-            lines = [f"📰 **Latest Articles ({len(all_articles)}):**"]
-            for a in all_articles[:count]:
-                feed_tag = f" [{a.get('feed', '')}]" if a.get("feed") else ""
-                lines.append(f"  📄 **{a['title']}**{feed_tag}")
-                if a["date"]:
-                    lines.append(f"     {a['date']}")
-                if a["summary"]:
-                    lines.append(f"     {a['summary'][:100]}")
-                if a["link"]:
-                    lines.append(f"     🔗 {a['link']}")
-            return "\n".join(lines)
 
-        req = urllib.request.Request(url, headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
+def _rss_fetch(args: dict) -> str:
+    """Fetch RSS articles from URL or subscribed feeds."""
+    url = args.get("url", "")
+    count = args.get("count", 5)
+    if not url:
+        return _rss_fetch_all_feeds(count)
+    req = urllib.request.Request(url, headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            xml = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        return f"❌ RSS fetch failed: {e}"
+    articles = _parse_rss(xml)
+    if not articles:
+        return f"📰 No articles found in feed: {url}"
+    return _format_articles(articles[:count])
+
+
+def _rss_fetch_all_feeds(count: int) -> str:
+    """Fetch articles from all subscribed feeds."""
+    feeds = _load_feeds()
+    if not feeds:
+        return "❌ No URL provided and no subscribed feeds."
+    all_articles = []
+    for name, info in feeds.items():
         try:
+            req = urllib.request.Request(info["url"], headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 xml = resp.read().decode("utf-8", errors="replace")
-        except Exception as e:
-            return f"❌ RSS fetch failed: {e}"
+            articles = _parse_rss(xml)
+            for a in articles[:3]:
+                a["feed"] = name
+            all_articles.extend(articles[:3])
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+    if not all_articles:
+        return "📰 No articles fetched from subscribed feeds."
+    return _format_articles(all_articles[:count])
 
-        articles = _parse_rss(xml)
-        if not articles:
-            return f"📰 No articles found in feed: {url}"
 
-        lines = [f"📰 **Articles ({min(count, len(articles))}):**"]
-        for a in articles[:count]:
-            lines.append(f"  📄 **{a['title']}**")
-            if a["date"]:
-                lines.append(f"     {a['date']}")
-            if a["summary"]:
-                lines.append(f"     {a['summary'][:100]}")
-            if a["link"]:
-                lines.append(f"     🔗 {a['link']}")
-        return "\n".join(lines)
+def _format_articles(articles: list) -> str:
+    """Format articles list for display."""
+    lines = [f"📰 **Articles ({len(articles)}):**"]
+    for a in articles:
+        feed_tag = f" [{a.get('feed', '')}]" if a.get("feed") else ""
+        lines.append(f"  📄 **{a['title']}**{feed_tag}")
+        if a.get("date"):
+            lines.append(f"     {a['date']}")
+        if a.get("summary"):
+            lines.append(f"     {a['summary'][:100]}")
+        if a.get("link"):
+            lines.append(f"     🔗 {a['link']}")
+    return "\n".join(lines)
 
+
+@register("rss_reader")
+def handle_rss_reader(args: dict) -> str:
+    """Handle rss reader."""
+    action = args.get("action", "fetch")
+    handler = _RSS_DISPATCH.get(action)
+    if handler:
+        return handler(args)
+
+    if action == "fetch":
+        return _rss_fetch(args)
     return f"❌ Unknown rss_reader action: {action}"

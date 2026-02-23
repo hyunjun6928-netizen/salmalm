@@ -35,6 +35,7 @@ DEFAULT_CONFIG = {
 
 
 def _ensure_dirs():
+    """Ensure dirs."""
     _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     _HISTORY_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -68,6 +69,7 @@ class ScreenCapture:
 
     @staticmethod
     def _capture_macos(tmp_path: str) -> Optional[bytes]:
+        """Capture macos."""
         result = subprocess.run(
             ["screencapture", "-x", tmp_path],
             capture_output=True,
@@ -79,6 +81,7 @@ class ScreenCapture:
 
     @staticmethod
     def _capture_windows(tmp_path: str) -> Optional[bytes]:
+        """Capture windows."""
         ps_script = f'''
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -103,6 +106,7 @@ $bitmap.Dispose()
     @staticmethod
     def _capture_linux(tmp_path: str) -> Optional[bytes]:
         # Try multiple tools
+        """Capture linux."""
         tools = [
             (["gnome-screenshot", "-f", tmp_path], "gnome-screenshot"),
             (["scrot", tmp_path], "scrot"),
@@ -118,8 +122,8 @@ $bitmap.Dispose()
                     )
                     if result.returncode == 0 and os.path.exists(tmp_path):
                         return Path(tmp_path).read_bytes()
-                except Exception:
-                    continue
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
         log.warning("No screen capture tool found on Linux (tried gnome-screenshot, scrot, import)")
         return None
 
@@ -143,6 +147,7 @@ $bitmap.Dispose()
 
     @staticmethod
     def image_to_base64(png_bytes: bytes) -> str:
+        """Image to base64."""
         return base64.b64encode(png_bytes).decode()
 
     def capture_and_analyze(self, llm_func=None) -> str:
@@ -181,17 +186,20 @@ $bitmap.Dispose()
 class ScreenHistory:
     """Manages periodic capture history (Rewind-style)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._config = self._load_config()
         self._watcher_thread: Optional[threading.Thread] = None
         self._watching = False
 
     def _load_config(self) -> dict:
+        """Load config."""
         from salmalm.config_manager import ConfigManager
 
         return ConfigManager.load("screen_config", defaults=DEFAULT_CONFIG)
 
     def _save_config(self):
+        """Save config."""
         from salmalm.config_manager import ConfigManager
 
         _ensure_dirs()
@@ -238,8 +246,8 @@ class ScreenHistory:
         for mp in metas:
             try:
                 result.append(json.loads(mp.read_text()))
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         return result
 
     def search(self, query: str) -> List[Dict]:
@@ -254,11 +262,11 @@ class ScreenHistory:
                     results.append(meta)
                     if len(results) >= 20:
                         break
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         return results
 
-    def start_watching(self):
+    def start_watching(self) -> None:
         """Start periodic capture."""
         if self._watching:
             return
@@ -267,6 +275,7 @@ class ScreenHistory:
         capturer = ScreenCapture()
 
         def _loop():
+            """Loop."""
             while self._watching:
                 try:
                     png = capturer.capture_screen()
@@ -288,21 +297,25 @@ class ScreenHistory:
         self._watcher_thread = threading.Thread(target=_loop, daemon=True)
         self._watcher_thread.start()
 
-    def stop_watching(self):
+    def stop_watching(self) -> None:
+        """Stop watching."""
         self._watching = False
 
 
 class ScreenManager:
     """High-level interface for /screen commands."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self.capturer = ScreenCapture()
         self.history_mgr = ScreenHistory()
 
     def capture(self, llm_func=None) -> str:
+        """Capture."""
         return self.capturer.capture_and_analyze(llm_func)
 
     def watch(self, toggle: str) -> str:
+        """Watch."""
         if toggle == "on":
             self.history_mgr.start_watching()
             interval = self.history_mgr._config.get("captureIntervalMinutes", 5)
@@ -313,6 +326,7 @@ class ScreenManager:
         return "❓ Usage: /screen watch on|off"
 
     def history(self, n: int = 5) -> str:
+        """History."""
         entries = self.history_mgr.get_history(n)
         if not entries:
             return "📸 No screen captures in history."
@@ -325,6 +339,7 @@ class ScreenManager:
         return "\n".join(lines)
 
     def search(self, query: str) -> str:
+        """Search."""
         if not query:
             return "❓ Usage: /screen search <query>"
         results = self.history_mgr.search(query)

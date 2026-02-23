@@ -49,10 +49,20 @@ jobs:
         run: |
           find salmalm/ -name '*.py' -print0 | xargs -0 python -m py_compile
 
+      - name: Format check (ruff)
+        run: |
+          pip install ruff
+          ruff format --check salmalm/
+          ruff check salmalm/ --select=I --fix --diff  # import sorting
+
       - name: Lint (flake8)
         run: |
           pip install flake8
           flake8 salmalm/ --max-line-length=120 --ignore=E501,W503,E402,E203,F405
+
+      - name: Security tests (P0/P1)
+        run: |
+          python -m pytest tests/test_security_p0p1.py tests/test_security.py -q --timeout=30 -x
 
       - name: Test
         run: |

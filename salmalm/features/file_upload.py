@@ -33,6 +33,7 @@ ALLOWED_UPLOAD_EXTENSIONS = {
 
 
 def validate_upload(filename: str, size_bytes: int) -> Tuple[bool, str]:
+    """Validate upload."""
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in ALLOWED_UPLOAD_EXTENSIONS:
         return False, f"File type .{ext} not allowed. Allowed: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}"
@@ -44,6 +45,7 @@ def validate_upload(filename: str, size_bytes: int) -> Tuple[bool, str]:
 
 
 def extract_pdf_text(data: bytes) -> str:
+    """Extract pdf text."""
     import zlib
 
     text_parts = []
@@ -67,7 +69,7 @@ def extract_pdf_text(data: bytes) -> str:
 
         try:
             decompressed = zlib.decompress(stream_data)
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             decompressed = stream_data
 
         text_blocks = re.findall(rb"BT\s*(.*?)\s*ET", decompressed, re.DOTALL)
@@ -88,6 +90,7 @@ def extract_pdf_text(data: bytes) -> str:
 
 
 def process_uploaded_file(filename: str, data: bytes) -> str:
+    """Process uploaded file."""
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
     if ext == "pdf":

@@ -33,7 +33,8 @@ _USERS_DIR = DATA_DIR / "users"
 class QuotaExceeded(Exception):
     """Raised when a user exceeds their daily or monthly cost quota."""
 
-    def __init__(self, message: str = "사용량 한도를 초과했습니다 / Quota exceeded"):
+    def __init__(self, message: str = "사용량 한도를 초과했습니다 / Quota exceeded") -> None:
+        """Init  ."""
         super().__init__(message)
         self.message = message
 
@@ -51,6 +52,7 @@ class UserManager:
     DEFAULT_MONTHLY_LIMIT = 50.0
 
     def _ensure_db(self):
+        """Ensure db."""
         if self._initialized:
             return
         conn = sqlite3.connect(str(USERS_DB))
@@ -106,14 +108,14 @@ class UserManager:
         # Add user_id column to session_store if not exists
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Add user_id to usage_stats if not exists
         try:
             conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL")
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # multi_tenant_config table
         conn.execute("""CREATE TABLE IF NOT EXISTS multi_tenant_config (
@@ -136,11 +138,11 @@ class UserManager:
             row = conn.execute("SELECT value FROM multi_tenant_config WHERE key='enabled'").fetchone()
             conn.close()
             self._multi_tenant_enabled = row and row[0] == "true"
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             self._multi_tenant_enabled = False
         return self._multi_tenant_enabled  # type: ignore
 
-    def enable_multi_tenant(self, enabled: bool = True):
+    def enable_multi_tenant(self, enabled: bool = True) -> None:
         """Enable or disable multi-tenant mode."""
         self._ensure_db()
         conn = sqlite3.connect(str(USERS_DB))
@@ -161,10 +163,10 @@ class UserManager:
             row = conn.execute("SELECT value FROM multi_tenant_config WHERE key=?", (key,)).fetchone()
             conn.close()
             return row[0] if row else default
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return default
 
-    def set_config(self, key: str, value: str):
+    def set_config(self, key: str, value: str) -> None:
         """Set a multi-tenant config value."""
         self._ensure_db()
         conn = sqlite3.connect(str(USERS_DB))
@@ -174,7 +176,7 @@ class UserManager:
 
     # ── Quota Management ─────────────────────────────────────
 
-    def ensure_quota(self, user_id: int):
+    def ensure_quota(self, user_id: int) -> None:
         """Create quota record for user if it doesn't exist."""
         self._ensure_db()
         conn = sqlite3.connect(str(USERS_DB))
@@ -236,7 +238,7 @@ class UserManager:
             "monthly_remaining": monthly_remaining,
         }
 
-    def record_cost(self, user_id: int, cost: float):
+    def record_cost(self, user_id: int, cost: float) -> None:
         """Record cost against user quota."""
         if not self.multi_tenant_enabled or cost <= 0:
             return
@@ -250,7 +252,9 @@ class UserManager:
         conn.commit()
         conn.close()
 
-    def set_quota(self, user_id: int, daily_limit: Optional[float] = None, monthly_limit: Optional[float] = None):
+    def set_quota(
+        self, user_id: int, daily_limit: Optional[float] = None, monthly_limit: Optional[float] = None
+    ) -> None:
         """Set quota limits for a user (admin only)."""
         self._ensure_db()
         self.ensure_quota(user_id)
@@ -310,8 +314,8 @@ class UserManager:
                 if last_dt.date() < now.date():
                     updates.append(("current_daily", 0))
                     updates.append(("last_daily_reset", now.isoformat()))
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         # Monthly reset: if last reset was in a previous month
         if last_monthly:
@@ -320,8 +324,8 @@ class UserManager:
                 if (last_dt.year, last_dt.month) < (now.year, now.month):
                     updates.append(("current_monthly", 0))
                     updates.append(("last_monthly_reset", now.isoformat()))
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
         if updates:
             for col, val in updates:
@@ -330,7 +334,7 @@ class UserManager:
             log.info(f"[QUOTA] Reset quotas for user {user_id}: {[u[0] for u in updates]}")
         conn.close()
 
-    def reset_all_daily_quotas(self):
+    def reset_all_daily_quotas(self) -> None:
         """Reset all users' daily quotas. Called at midnight."""
         self._ensure_db()
         now = datetime.now(KST).isoformat()
@@ -341,7 +345,7 @@ class UserManager:
         if count:
             log.info(f"[QUOTA] Daily quota reset for {count} users")
 
-    def reset_all_monthly_quotas(self):
+    def reset_all_monthly_quotas(self) -> None:
         """Reset all users' monthly quotas. Called on 1st of month."""
         self._ensure_db()
         now = datetime.now(KST).isoformat()
@@ -374,11 +378,11 @@ class UserManager:
             }
         try:
             routing = json.loads(row[2]) if row[2] else {}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             routing = {}
         try:
             extra = json.loads(row[5]) if row[5] else {}
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             extra = {}
         return {
             "model_preference": row[0] or "auto",
@@ -389,7 +393,7 @@ class UserManager:
             "extra": extra,
         }
 
-    def set_user_settings(self, user_id: int, **kwargs):
+    def set_user_settings(self, user_id: int, **kwargs) -> None:
         """Update per-user settings."""
         self._ensure_db()
         conn = sqlite3.connect(str(USERS_DB))
@@ -444,7 +448,7 @@ class UserManager:
             return None
         return {"id": row[0], "username": row[1], "role": row[2], "enabled": bool(row[3]), "tg_username": row[4]}
 
-    def link_telegram(self, chat_id: str, user_id: int, tg_username: str = ""):
+    def link_telegram(self, chat_id: str, user_id: int, tg_username: str = "") -> None:
         """Link a Telegram chat_id to a user account."""
         self._ensure_db()
         now = datetime.now(KST).isoformat()
@@ -457,7 +461,7 @@ class UserManager:
         conn.close()
         log.info(f"[TENANT] Telegram {chat_id} linked to user {user_id}")
 
-    def unlink_telegram(self, chat_id: str):
+    def unlink_telegram(self, chat_id: str) -> None:
         """Unlink a Telegram chat_id."""
         self._ensure_db()
         conn = sqlite3.connect(str(USERS_DB))
@@ -578,7 +582,7 @@ class UserManager:
         """Get registration mode: 'open' or 'admin_only' (default)."""
         return self.get_config("registration_mode", "admin_only")
 
-    def set_registration_mode(self, mode: str):
+    def set_registration_mode(self, mode: str) -> None:
         """Set registration mode."""
         if mode not in ("open", "admin_only"):
             raise ValueError("Mode must be 'open' or 'admin_only'")
@@ -588,7 +592,7 @@ class UserManager:
         """Check if Telegram allowlist mode is enabled."""
         return self.get_config("telegram_allowlist", "false") == "true"
 
-    def set_telegram_allowlist_mode(self, enabled: bool):
+    def set_telegram_allowlist_mode(self, enabled: bool) -> None:
         """Enable/disable Telegram allowlist mode."""
         self.set_config("telegram_allowlist", "true" if enabled else "false")
 

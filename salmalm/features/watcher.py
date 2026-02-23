@@ -33,6 +33,7 @@ _WATCHER_DEFAULTS = {
 
 
 def _load_config() -> dict:
+    """Load config."""
     return ConfigManager.load("watcher", defaults=_WATCHER_DEFAULTS)
 
 
@@ -47,6 +48,7 @@ class FileWatcher:
         exclude_patterns: Optional[Set[str]] = None,
         on_change: Optional[Callable] = None,
     ):
+        """Init  ."""
         config = _load_config()
         self._paths = [Path(os.path.expanduser(p)) for p in (paths or config.get("paths", []))]
         self._interval = interval or config.get("interval", 5)
@@ -61,7 +63,7 @@ class FileWatcher:
         self._pending_changes: List[dict] = []
         self._lock = threading.Lock()
 
-    def start(self):
+    def start(self) -> None:
         """Start watching in a background thread."""
         if self._running:
             return
@@ -72,7 +74,7 @@ class FileWatcher:
         self._thread.start()
         log.info("FileWatcher started")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the watcher."""
         self._running = False
         if self._debounce_timer:
@@ -83,9 +85,11 @@ class FileWatcher:
 
     @property
     def running(self) -> bool:
+        """Running."""
         return self._running
 
     def _run(self):
+        """Run."""
         while self._running:
             try:
                 self._scan()
@@ -192,11 +196,13 @@ class FileWatcher:
 class RAGFileWatcher(FileWatcher):
     """FileWatcher that triggers RAG re-indexing on file changes."""
 
-    def __init__(self, rag_engine=None, **kwargs):
+    def __init__(self, rag_engine=None, **kwargs) -> None:
+        """Init  ."""
         self._rag = rag_engine
         super().__init__(on_change=self._on_file_change, **kwargs)
 
     def _on_file_change(self, path: str, event: str):
+        """On file change."""
         if not self._rag:
             return
         try:

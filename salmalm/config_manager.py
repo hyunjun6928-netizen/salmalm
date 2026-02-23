@@ -89,7 +89,7 @@ class ConfigManager:
         return cls.resolve(name, key, default)
 
     @classmethod
-    def set(cls, name: str, key: str, value) -> None:
+    def set(cls, name: str, key: str, value: str) -> None:
         """단일 키 설정."""
         config = cls.load(name)
         config[key] = value
@@ -97,10 +97,12 @@ class ConfigManager:
 
     @classmethod
     def exists(cls, name: str) -> bool:
+        """Exists."""
         return (cls.BASE_DIR / f"{name}.json").exists()
 
     @classmethod
     def delete(cls, name: str) -> bool:
+        """Delete."""
         path = cls.BASE_DIR / f"{name}.json"
         if path.exists():
             path.unlink()

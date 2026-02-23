@@ -45,6 +45,7 @@ def _hash_password(password: str, salt: Optional[bytes] = None) -> Tuple[bytes, 
 
 
 def _verify_password(password: str, stored_hash: bytes, salt: bytes) -> bool:
+    """Verify password."""
     dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PBKDF2_ITER)
     return hmac.compare_digest(dk, stored_hash)
 
@@ -63,7 +64,8 @@ class TokenManager:
     _SECRET_DIR = DATA_DIR / ".token_keys"
     _SECRET_FILE = DATA_DIR / ".token_secret"  # Legacy location
 
-    def __init__(self, secret: Optional[bytes] = None):
+    def __init__(self, secret: Optional[bytes] = None) -> None:
+        """Init  ."""
         self._keys: Dict[str, bytes] = {}  # kid -> secret
         self._current_kid: str = ""
         if secret:
@@ -120,8 +122,8 @@ class TokenManager:
                     capture_output=True,
                     timeout=5,
                 )
-            except Exception:
-                pass
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
     def rotate(self) -> str:
         """Create a new signing key. Old keys kept for verification.
@@ -154,7 +156,7 @@ class TokenManager:
             )""")
             conn.commit()
             conn.close()
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             pass  # Will work in-memory if DB unavailable
 
     def create(self, payload: dict, expires_in: int = 86400) -> str:
@@ -208,7 +210,7 @@ class TokenManager:
             if jti and self._is_revoked(jti):
                 return None
             return payload  # type: ignore[no-any-return]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return None
 
     def revoke(self, token: str) -> bool:
@@ -233,7 +235,7 @@ class TokenManager:
                 conn.commit()
                 conn.close()
             return True
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def revoke_all_for_user(self, user_id: int) -> None:
@@ -250,7 +252,7 @@ class TokenManager:
             row = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti=?", (jti,)).fetchone()
             conn.close()
             return row is not None
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def cleanup_expired(self) -> int:
@@ -262,7 +264,7 @@ class TokenManager:
             deleted = cursor.rowcount
             conn.close()
             return deleted
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return 0
 
 
@@ -270,7 +272,8 @@ class TokenManager:
 
 
 class RateLimitExceeded(Exception):
-    def __init__(self, retry_after: float = 0):
+    def __init__(self, retry_after: float = 0) -> None:
+        """Init  ."""
         self.retry_after = retry_after
         super().__init__(f"Rate limit exceeded. Retry after {retry_after:.0f}s")
 
@@ -278,7 +281,8 @@ class RateLimitExceeded(Exception):
 class RateLimiter:
     """Token bucket rate limiter per key (user_id or IP)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._buckets: Dict[str, dict] = {}
         self._lock = threading.Lock()
         # Default limits
@@ -337,7 +341,7 @@ class RateLimiter:
             bucket = self._buckets.get(key)
             return int(bucket["tokens"]) if bucket else -1
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Remove stale buckets (>1h inactive)."""
         with self._lock:
             now = time.time()
@@ -354,7 +358,8 @@ class AuthManager:
 
     ROLES = ("admin", "user", "readonly")
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._token_mgr = TokenManager()
         self._lock = threading.Lock()
         self._lockout_duration = 300  # 5 min lockout
@@ -362,6 +367,7 @@ class AuthManager:
         self._initialized = False
 
     def _ensure_db(self):
+        """Ensure db."""
         if self._initialized:
             return
         conn = sqlite3.connect(str(AUTH_DB))
@@ -497,8 +503,8 @@ class AuthManager:
             conn2.execute("DELETE FROM login_attempts WHERE username=?", (username,))
             conn2.commit()
             conn2.close()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
         # Update last login
         conn = sqlite3.connect(str(AUTH_DB))
@@ -540,8 +546,8 @@ class AuthManager:
             conn.execute("DELETE FROM login_attempts WHERE attempted_at < ?", (cutoff,))
             conn.commit()
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
     def _is_locked_out(self, username: str) -> bool:
         """Check if username is locked out (DB-persisted, survives restart)."""
@@ -554,7 +560,7 @@ class AuthManager:
             ).fetchone()
             conn.close()
             return (row[0] if row else 0) >= self._max_attempts
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def create_token(self, user: dict, expires_in: int = 86400) -> str:
@@ -636,7 +642,7 @@ class AuthManager:
 # ── Request authentication middleware ────────────────────────
 
 
-def extract_auth(headers) -> Optional[dict]:
+def extract_auth(headers: dict) -> Optional[dict]:
     """Extract user from headers. Accepts dict (case-sensitive) or HTTPMessage (case-insensitive)."""
     # Normalize dict to lowercase keys for reliable lookup
     if isinstance(headers, dict):

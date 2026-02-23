@@ -36,7 +36,8 @@ PROVIDER_RULES: Dict[str, dict] = {
 class TranscriptHygiene:
     """Clean conversation history per provider rules before LLM API calls."""
 
-    def __init__(self, provider: str = "anthropic"):
+    def __init__(self, provider: str = "anthropic") -> None:
+        """Init  ."""
         self.provider = provider.lower()
         self.rules = PROVIDER_RULES.get(self.provider, {})
 
@@ -239,7 +240,8 @@ class TranscriptHygiene:
                     prev["content"] = pc + "\n" + nc
                 else:
                     # Convert to list and merge
-                    def _to_list(c):
+                    def _to_list(c) -> list:
+                        """To list."""
                         if isinstance(c, list):
                             return c
                         return [{"type": "text", "text": str(c)}]

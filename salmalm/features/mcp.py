@@ -39,12 +39,14 @@ _rpc_id = 0
 
 
 def _next_id() -> int:
+    """Next id."""
     global _rpc_id
     _rpc_id += 1
     return _rpc_id
 
 
 def _rpc_request(method: str, params: Optional[dict] = None, id: Optional[int] = None) -> dict:
+    """Rpc request."""
     msg = {"jsonrpc": "2.0", "method": method}
     if params:
         msg["params"] = params  # type: ignore[assignment]
@@ -54,6 +56,7 @@ def _rpc_request(method: str, params: Optional[dict] = None, id: Optional[int] =
 
 
 def _rpc_response(id: int, result: Optional[Any] = None, error: Optional[dict] = None) -> dict:
+    """Rpc response."""
     msg = {"jsonrpc": "2.0", "id": id}
     if error:
         msg["error"] = error
@@ -80,13 +83,14 @@ class MCPServer:
         "prompts": {"listChanged": False},
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._tools: List[dict] = []
         self._tool_executor = None  # async fn(name, args) -> result
         self._resources: List[dict] = []
         self._initialized = False
 
-    def set_tools(self, tools: list, executor):
+    def set_tools(self, tools: list, executor) -> None:
         """Register tools and their executor function."""
         self._tools = tools
         self._tool_executor = executor
@@ -98,6 +102,30 @@ class MCPServer:
             "description": tool.get("description", ""),
             "inputSchema": tool.get("input_schema", {"type": "object", "properties": {}}),
         }
+
+    def _list_resources(self) -> list:
+        """List available MCP resources (memory files)."""
+        resources = []
+        mem_dir = BASE_DIR / "memory"
+        if mem_dir.exists():
+            for f in sorted(mem_dir.glob("*.md"))[-10:]:
+                resources.append({"uri": f"file://memory/{f.name}", "name": f.name, "mimeType": "text/markdown"})
+        mem_file = BASE_DIR / "MEMORY.md"
+        if mem_file.exists():
+            resources.append({"uri": "file://MEMORY.md", "name": "MEMORY.md", "mimeType": "text/markdown"})
+        return resources
+
+    async def _handle_tool_call(self, msg_id, params: dict):
+        """Handle tools/call MCP request."""
+        name = params.get("name", "")
+        args = params.get("arguments", {})
+        if not self._tool_executor:
+            return _rpc_response(msg_id, error={"code": -32603, "message": "No tool executor configured"})
+        try:
+            result = await self._tool_executor(name, args)
+            return _rpc_response(msg_id, {"content": [{"type": "text", "text": str(result)}], "isError": False})
+        except Exception as e:
+            return _rpc_response(msg_id, {"content": [{"type": "text", "text": f"Error: {e}"}], "isError": True})
 
     async def handle_message(self, msg: dict) -> Optional[dict]:
         """Handle a single JSON-RPC message. Returns response or None for notifications."""
@@ -131,59 +159,11 @@ class MCPServer:
             return _rpc_response(msg_id, {"tools": tools})  # type: ignore[arg-type]
 
         if method == "tools/call":
-            name = params.get("name", "")
-            args = params.get("arguments", {})
-            if not self._tool_executor:
-                return _rpc_response(
-                    msg_id,
-                    error={  # type: ignore[arg-type]
-                        "code": -32603,
-                        "message": "No tool executor configured",
-                    },
-                )
-            try:
-                result = await self._tool_executor(name, args)
-                return _rpc_response(
-                    msg_id,
-                    {  # type: ignore[arg-type]
-                        "content": [{"type": "text", "text": str(result)}],
-                        "isError": False,
-                    },
-                )
-            except Exception as e:
-                return _rpc_response(
-                    msg_id,
-                    {  # type: ignore[arg-type]
-                        "content": [{"type": "text", "text": f"Error: {e}"}],
-                        "isError": True,
-                    },
-                )
+            return await self._handle_tool_call(msg_id, params)
 
         # ── Resources ──
         if method == "resources/list":
-            resources = []
-            # Expose memory files as resources
-            mem_dir = BASE_DIR / "memory"
-            if mem_dir.exists():
-                for f in sorted(mem_dir.glob("*.md"))[-10:]:
-                    resources.append(
-                        {
-                            "uri": f"file://memory/{f.name}",
-                            "name": f.name,
-                            "mimeType": "text/markdown",
-                        }
-                    )
-            # MEMORY.md
-            mem_file = BASE_DIR / "MEMORY.md"
-            if mem_file.exists():
-                resources.append(
-                    {
-                        "uri": "file://MEMORY.md",
-                        "name": "MEMORY.md",
-                        "mimeType": "text/markdown",
-                    }
-                )
-            return _rpc_response(msg_id, {"resources": resources})  # type: ignore[arg-type]
+            return _rpc_response(msg_id, {"resources": self._list_resources()})  # type: ignore[arg-type]
 
         if method == "resources/read":
             uri = params.get("uri", "")
@@ -298,7 +278,7 @@ class MCPServer:
             return _rpc_response(msg_id, error={"code": -32601, "message": f"Method not found: {method}"})
         return None
 
-    async def run_stdio(self):
+    async def run_stdio(self) -> None:
         """Run MCP server on stdin/stdout (for subprocess transport)."""
         log.info("[CONN] MCP Server starting (stdio transport)")
         loop = asyncio.get_event_loop()
@@ -341,7 +321,10 @@ class MCPServer:
 class MCPClientConnection:
     """A connection to a single external MCP server (stdio transport)."""
 
-    def __init__(self, name: str, command: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None):
+    def __init__(
+        self, name: str, command: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None
+    ) -> None:
+        """Init  ."""
         self.name = name
         self.command = command
         self.env = env or {}
@@ -410,18 +393,18 @@ class MCPClientConnection:
             self.disconnect()
             return False
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Disconnect from an MCP server."""
         self._connected = False
         if self._process:
             try:
                 self._process.terminate()
                 self._process.wait(timeout=5)
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 try:
                     self._process.kill()
-                except Exception:
-                    pass
+                except Exception as e:  # noqa: broad-except
+                    log.debug(f"Suppressed: {e}")
             self._process = None
 
     def _read_loop(self):
@@ -520,7 +503,8 @@ class MCPClientConnection:
 class MCPManager:
     """Manages multiple MCP client connections + the server instance."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._clients: Dict[str, MCPClientConnection] = {}
         self._server = MCPServer()
         self._config_path = BASE_DIR / "mcp_servers.json"
@@ -549,7 +533,7 @@ class MCPManager:
             return client.connect()
         return True
 
-    def remove_server(self, name: str):
+    def remove_server(self, name: str) -> None:
         """Disconnect and remove an MCP server."""
         if name in self._clients:
             self._clients[name].disconnect()
@@ -599,7 +583,7 @@ class MCPManager:
                 return client.call_tool(tool_name, arguments)
         return f"Unknown MCP tool: {prefixed_name}"
 
-    def save_config(self):
+    def save_config(self) -> None:
         """Save server configurations to JSON."""
         config = {}
         for name, client in self._clients.items():
@@ -611,7 +595,7 @@ class MCPManager:
         self._config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
         log.info(f"[CONN] MCP config saved ({len(config)} servers)")
 
-    def load_config(self):
+    def load_config(self) -> None:
         """Load and auto-connect configured MCP servers."""
         if not self._config_path.exists():
             return
@@ -624,7 +608,7 @@ class MCPManager:
         except Exception as e:
             log.error(f"MCP config load error: {e}")
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Disconnect all clients."""
         for client in self._clients.values():
             client.disconnect()
@@ -652,7 +636,7 @@ async def _run_server_stdio():
 
     server = MCPServer()
 
-    async def executor(name, args):
+    async def executor(name: str, args):
         """Get the tool executor callable for MCP tools."""
         return execute_tool(name, args)
 

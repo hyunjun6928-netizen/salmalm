@@ -15,12 +15,14 @@ log = logging.getLogger("salmalm")
 class ShutdownManager:
     """Coordinates graceful shutdown across all subsystems."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._shutting_down = False
         self._lock = threading.Lock()
 
     @property
     def is_shutting_down(self) -> bool:
+        """Is shutting down."""
         return self._shutting_down
 
     async def execute(self, timeout: float = 30.0) -> None:
@@ -82,8 +84,8 @@ class ShutdownManager:
                     try:
                         session._persist()
                         count += 1
-                    except Exception:
-                        pass
+                    except Exception as e:  # noqa: broad-except
+                        log.debug(f"Suppressed: {e}")
                 log.info(f"[SHUTDOWN] Flushed {count} sessions to disk")
         except Exception as e:
             log.warning(f"[SHUTDOWN] Session flush error: {e}")

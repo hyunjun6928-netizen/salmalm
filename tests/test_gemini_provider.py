@@ -183,7 +183,7 @@ class TestGeminiStreamGoogle(unittest.TestCase):
 
     def test_stream_no_api_key(self):
         from salmalm.core.llm import stream_google
-        with patch('salmalm.core.llm.vault') as mock_vault:
+        with patch('salmalm.core.llm_stream.vault') as mock_vault:
             mock_vault.get.return_value = None
             events = list(stream_google([{'role': 'user', 'content': 'hi'}],
                                          model='google/gemini-2.5-flash'))
@@ -191,10 +191,10 @@ class TestGeminiStreamGoogle(unittest.TestCase):
             self.assertEqual(events[0]['type'], 'error')
             self.assertIn('API key', events[0]['error'])
 
-    @patch('salmalm.core.llm.check_cost_cap')
-    @patch('salmalm.core.llm.vault')
-    @patch('salmalm.core.llm.urllib.request.urlopen')
-    @patch('salmalm.core.llm.track_usage')
+    @patch('salmalm.core.llm_stream.check_cost_cap')
+    @patch('salmalm.core.llm_stream.vault')
+    @patch('urllib.request.urlopen')
+    @patch('salmalm.core.llm_stream._lazy_track_usage')
     def test_stream_success(self, mock_track, mock_urlopen, mock_vault, mock_cap):
         from salmalm.core.llm import stream_google
         mock_vault.get.return_value = 'test-key'

@@ -24,7 +24,10 @@ class RoutePolicy:
 
     __slots__ = ("auth", "audit", "csrf", "rate")
 
-    def __init__(self, auth: str = "required", audit: bool = True, csrf: bool = False, rate: Optional[str] = None):
+    def __init__(
+        self, auth: str = "required", audit: bool = True, csrf: bool = False, rate: Optional[str] = None
+    ) -> None:
+        """Init  ."""
         self.auth = auth  # "none" | "optional" | "required"
         self.audit = audit  # log to audit trail
         self.csrf = csrf  # require CSRF token (POST)
@@ -143,8 +146,8 @@ def check_external_exposure_safety(bind_addr: str, handler) -> list:
                 if count > 0:
                     has_admin = True
                     break
-            except Exception:
-                continue
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
 
     if not has_admin:
         warnings.append(

@@ -17,7 +17,8 @@ class MessageDeduplicator:
     TTL: 60 seconds (default).
     """
 
-    def __init__(self, ttl: float = 60.0):
+    def __init__(self, ttl: float = 60.0) -> None:
+        """Init  ."""
         self._cache: Dict[str, float] = {}
         self._lock = threading.Lock()
         self._ttl = ttl
@@ -45,10 +46,12 @@ class MessageDeduplicator:
 
     @property
     def size(self) -> int:
+        """Size."""
         with self._lock:
             return len(self._cache)
 
     def clear(self) -> None:
+        """Clear."""
         with self._lock:
             self._cache.clear()
 

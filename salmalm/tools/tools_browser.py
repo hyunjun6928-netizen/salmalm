@@ -8,6 +8,7 @@ This is a lightweight adaptation of OpenClaw's browser control system,
 tailored for SalmAlm's pip-install-one-liner philosophy.
 """
 
+from salmalm.security.crypto import log
 import json
 import os
 import subprocess
@@ -155,8 +156,8 @@ def _run_playwright_script(script: str, args: list, timeout: int = 60) -> dict:
     finally:
         try:
             os.unlink(script_path)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
 
 
 def _is_internal_url(url: str) -> bool:
@@ -179,12 +180,62 @@ def _is_internal_url(url: str) -> bool:
         # Also check metadata endpoints
         if hostname in ("169.254.169.254", "metadata.google.internal"):
             return True
-    except Exception:
-        pass
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
     return False
 
 
 @register("browser")
+def _browser_act(args: dict) -> str:
+    """Execute a browser action (click, type, etc)."""
+    act_args = {
+        "url": args.get("url", "about:blank"),
+        "kind": args.get("kind", "click"),
+        "selector": args.get("selector", ""),
+        "text": args.get("text", ""),
+        "screenshot_path": str(_SCREENSHOT_DIR / f"act_{int(time.time())}.png"),
+        "timeout": args.get("timeout", 30000),
+    }
+    if not act_args["url"].startswith(("http://", "https://", "about:")):
+        act_args["url"] = "https://" + act_args["url"]
+    err = _check_url_safe(act_args["url"])
+    if err:
+        return err
+    result = _run_playwright_script(_ACT_SCRIPT, [json.dumps(act_args)])
+    if "error" in result:
+        return f"❌ Browser error: {result['error']}"
+    lines = [f"🌐 {result.get('action', 'done')}", f"URL: {result.get('url', act_args['url'])}"]
+    if result.get("screenshot"):
+        lines.append(f"📸 Screenshot: {result['screenshot']}")
+    if result.get("eval_result"):
+        lines.append(f"📊 Result: {result['eval_result'][:2000]}")
+    text = result.get("text", "")
+    if text:
+        lines.append(f"\n{text[:2000]}")
+    return "\n".join(lines)
+
+
+def _browser_screenshot(args: dict) -> str:
+    """Take a browser screenshot."""
+    url = args.get("url", "about:blank")
+    if not url.startswith(("http://", "https://", "about:")):
+        url = "https://" + url
+    err = _check_url_safe(url)
+    if err:
+        return err
+    screenshot_path = str(_SCREENSHOT_DIR / f"screenshot_{int(time.time())}.png")
+    act_args = {
+        "url": url,
+        "kind": "screenshot",
+        "screenshot_path": screenshot_path,
+        "timeout": args.get("timeout", 30000),
+    }
+    result = _run_playwright_script(_ACT_SCRIPT, [json.dumps(act_args)])
+    if "error" in result:
+        return f"❌ Browser error: {result['error']}"
+    return f"📸 Screenshot saved: {result.get('screenshot', screenshot_path)}"
+
+
 def handle_browser(args: dict) -> str:
     """Browser automation — OpenClaw snapshot/act pattern.
 
@@ -207,7 +258,8 @@ def handle_browser(args: dict) -> str:
         )
 
     # SSRF: block internal/private URLs when externally bound
-    def _check_url_safe(url: str):
+    def _check_url_safe(url: str) -> Optional[str]:
+        """Check url safe."""
         if url.startswith("about:"):
             return None
         if _is_internal_url(url):
@@ -237,49 +289,7 @@ def handle_browser(args: dict) -> str:
         return "\n".join(lines)
 
     if action == "act":
-        act_args = {
-            "url": args.get("url", "about:blank"),
-            "kind": args.get("kind", "click"),
-            "selector": args.get("selector", ""),
-            "text": args.get("text", ""),
-            "screenshot_path": str(_SCREENSHOT_DIR / f"act_{int(time.time())}.png"),
-            "timeout": args.get("timeout", 30000),
-        }
-        if not act_args["url"].startswith(("http://", "https://", "about:")):
-            act_args["url"] = "https://" + act_args["url"]
-        err = _check_url_safe(act_args["url"])
-        if err:
-            return err
-        result = _run_playwright_script(_ACT_SCRIPT, [json.dumps(act_args)])
-        if "error" in result:
-            return f"❌ Browser error: {result['error']}"
-        lines = [f"🌐 {result.get('action', 'done')}", f"URL: {result.get('url', act_args['url'])}"]
-        if result.get("screenshot"):
-            lines.append(f"📸 Screenshot: {result['screenshot']}")
-        if result.get("eval_result"):
-            lines.append(f"📊 Result: {result['eval_result'][:2000]}")
-        text = result.get("text", "")
-        if text:
-            lines.append(f"\n{text[:2000]}")
-        return "\n".join(lines)
-
+        return _browser_act(args)
     if action == "screenshot":
-        url = args.get("url", "about:blank")
-        if not url.startswith(("http://", "https://", "about:")):
-            url = "https://" + url
-        err = _check_url_safe(url)
-        if err:
-            return err
-        screenshot_path = str(_SCREENSHOT_DIR / f"screenshot_{int(time.time())}.png")
-        act_args = {
-            "url": url,
-            "kind": "screenshot",
-            "screenshot_path": screenshot_path,
-            "timeout": args.get("timeout", 30000),
-        }
-        result = _run_playwright_script(_ACT_SCRIPT, [json.dumps(act_args)])
-        if "error" in result:
-            return f"❌ Browser error: {result['error']}"
-        return f"📸 Screenshot saved: {result.get('screenshot', screenshot_path)}"
-
-    return f"❌ Unknown browser action / 알 수 없는 액션: {action}. Use: status, snapshot, act, screenshot"
+        return _browser_screenshot(args)
+    return f"❌ Unknown browser action: {action}. Use: status, snapshot, act, screenshot"

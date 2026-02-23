@@ -54,6 +54,6 @@ def resize_image_b64(b64_data: str, mime: str, max_dim: int = MAX_DIMENSION) -> 
         img.save(buf, format=out_format, quality=85)
         resized_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
         return resized_b64, out_mime
-    except Exception:
+    except Exception as e:  # noqa: broad-except
         # Any error → return original
         return b64_data, mime

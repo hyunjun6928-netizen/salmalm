@@ -36,12 +36,13 @@ VALID_EVENTS = (
 class HookManager:
     """Manages event hooks — loads config, fires hooks asynchronously."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._hooks: Dict[str, List[str]] = {}
         self._plugin_hooks: Dict[str, List[callable]] = {}  # from plugins
         self.reload()
 
-    def reload(self):
+    def reload(self) -> None:
         """Reload hooks from ~/.salmalm/hooks.json."""
         self._hooks = {}
         try:
@@ -56,7 +57,7 @@ class HookManager:
         except Exception as e:
             log.error(f"[HOOK] Failed to load hooks.json: {e}")
 
-    def save(self):
+    def save(self) -> None:
         """Save current hooks config."""
         try:
             HOOKS_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -64,18 +65,18 @@ class HookManager:
         except Exception as e:
             log.error(f"[HOOK] Failed to save hooks.json: {e}")
 
-    def register_plugin_hook(self, event: str, callback: callable):
+    def register_plugin_hook(self, event: str, callback: callable) -> None:
         """Register a plugin callback for an event."""
         if event not in VALID_EVENTS:
             return
         self._plugin_hooks.setdefault(event, []).append(callback)
 
-    def unregister_plugin_hooks(self, callbacks: list):
+    def unregister_plugin_hooks(self, callbacks: list) -> None:
         """Remove specific plugin callbacks."""
         for event in list(self._plugin_hooks.keys()):
             self._plugin_hooks[event] = [cb for cb in self._plugin_hooks[event] if cb not in callbacks]
 
-    def fire(self, event: str, context: Optional[Dict] = None):
+    def fire(self, event: str, context: Optional[Dict] = None) -> None:
         """Fire an event — runs all registered hooks asynchronously (non-blocking).
 
         Context is passed via environment variables:

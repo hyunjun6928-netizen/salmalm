@@ -24,10 +24,12 @@ _db_lock = threading.Lock()
 
 
 def _get_db() -> sqlite3.Connection:
+    """Get db."""
     return _connect_db(_DB_PATH, wal=True, row_factory=True, check_same_thread=False)
 
 
 def _init_db():
+    """Init db."""
     conn = _get_db()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS notes (
@@ -176,6 +178,7 @@ _EXPENSE_CATEGORIES = {
 
 
 def _auto_categorize(description: str) -> str:
+    """Auto categorize."""
     desc_lower = description.lower()
     for category, keywords in _EXPENSE_CATEGORIES.items():
         for kw in keywords:
@@ -272,46 +275,43 @@ def handle_expense(args: dict) -> str:
 
 
 @register("save_link")
+def _save_link_impl(args: dict) -> str:
+    """Save a link with auto-fetched title."""
+    url = args.get("url", "")
+    if not url:
+        return "❌ url is required"
+    title = args.get("title", "")
+    summary, tags, content = args.get("summary", ""), args.get("tags", ""), ""
+    if not title:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "SalmAlm/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                html = resp.read().decode("utf-8", errors="replace")[:50000]
+            m = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+            if m:
+                title = re.sub(r"\s+", " ", m.group(1)).strip()[:200]
+            content = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()[:5000]
+        except Exception:
+            title = url[:100]
+    lid = secrets.token_hex(4)
+    now = datetime.now(KST).isoformat()
+    with _db_lock:
+        conn = _get_db()
+        conn.execute(
+            "INSERT INTO saved_links (id, url, title, summary, tags, content, saved_at) VALUES (?,?,?,?,?,?,?)",
+            (lid, url, title, summary, tags, content, now),
+        )
+        conn.commit()
+        conn.close()
+    return f"🔖 링크 저장됨 [{lid}]\n  **{title}**\n  {url}"
+
+
 def handle_save_link(args: dict) -> str:
     """Save a link/article for later reading."""
     action = args.get("action", "save")
 
     if action == "save":
-        url = args.get("url", "")
-        if not url:
-            return "❌ url is required"
-        title = args.get("title", "")
-        summary = args.get("summary", "")
-        tags = args.get("tags", "")
-        content = ""
-
-        # Auto-fetch title if not provided
-        if not title:
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent": "SalmAlm/1.0"})
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    html = resp.read().decode("utf-8", errors="replace")[:50000]
-                m = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
-                if m:
-                    title = re.sub(r"\s+", " ", m.group(1)).strip()[:200]
-                # Extract text content for search
-                text = re.sub(r"<[^>]+>", " ", html)
-                text = re.sub(r"\s+", " ", text).strip()
-                content = text[:5000]
-            except Exception:
-                title = url[:100]
-
-        lid = secrets.token_hex(4)
-        now = datetime.now(KST).isoformat()
-        with _db_lock:
-            conn = _get_db()
-            conn.execute(
-                "INSERT INTO saved_links (id, url, title, summary, tags, content, saved_at) VALUES (?,?,?,?,?,?,?)",
-                (lid, url, title, summary, tags, content, now),
-            )
-            conn.commit()
-            conn.close()
-        return f"🔖 링크 저장됨 [{lid}]\n  **{title}**\n  {url}"
+        return _save_link_impl(args)
 
     elif action == "list":
         count = int(args.get("count", 10))
@@ -535,12 +535,13 @@ _DEFAULT_ROUTINES = {
 
 
 def _load_routines() -> dict:
+    """Load routines."""
     config_path = DATA_DIR / "routines.json"
     if config_path.exists():
         try:
             return json.loads(config_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
     return dict(_DEFAULT_ROUTINES)
 
 
@@ -575,7 +576,7 @@ def handle_routine(args: dict) -> str:
             try:
                 result = handle_expense({"action": "today"})
                 parts.append(result)
-            except Exception:
+            except Exception as e:  # noqa: broad-except
                 parts.append(f"{label}: 조회 실패")
         elif step_type == "message":
             parts.append(f"{label}\n{step.get('content', '')}")

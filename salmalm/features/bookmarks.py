@@ -12,10 +12,12 @@ from salmalm.security.crypto import log
 class BookmarkManager:
     """Manage message bookmarks across sessions."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Init  ."""
         self._ensure_table()
 
     def _ensure_table(self):
+        """Ensure table."""
         try:
             from salmalm.core import _get_db
 
@@ -37,6 +39,7 @@ class BookmarkManager:
     def add(
         self, session_id: str, message_index: int, content_preview: str = "", note: str = "", role: str = "assistant"
     ) -> bool:
+        """Add."""
         try:
             from salmalm.core import _get_db
 
@@ -50,10 +53,11 @@ class BookmarkManager:
             )
             conn.commit()
             return True
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def remove(self, session_id: str, message_index: int) -> bool:
+        """Remove."""
         try:
             from salmalm.core import _get_db
 
@@ -61,10 +65,11 @@ class BookmarkManager:
             conn.execute("DELETE FROM bookmarks WHERE session_id=? AND message_index=?", (session_id, message_index))
             conn.commit()
             return True
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
     def list_all(self, limit: int = 50) -> List[Dict]:
+        """List all."""
         try:
             from salmalm.core import _get_db
 
@@ -86,10 +91,11 @@ class BookmarkManager:
                 }
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def list_session(self, session_id: str) -> List[Dict]:
+        """List session."""
         try:
             from salmalm.core import _get_db
 
@@ -103,10 +109,11 @@ class BookmarkManager:
                 {"id": r[0], "message_index": r[1], "role": r[2], "preview": r[3], "note": r[4], "created_at": r[5]}
                 for r in rows
             ]
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return []
 
     def is_bookmarked(self, session_id: str, message_index: int) -> bool:
+        """Is bookmarked."""
         try:
             from salmalm.core import _get_db
 
@@ -115,7 +122,7 @@ class BookmarkManager:
                 "SELECT 1 FROM bookmarks WHERE session_id=? AND message_index=?", (session_id, message_index)
             ).fetchone()
             return row is not None
-        except Exception:
+        except Exception as e:  # noqa: broad-except
             return False
 
 

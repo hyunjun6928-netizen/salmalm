@@ -1,0 +1,565 @@
+"""Web Manage routes mixin."""
+
+import json
+import logging
+import os
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+from typing import Optional
+
+from salmalm.constants import DATA_DIR, VERSION, WORKSPACE_DIR, BASE_DIR  # noqa: F401
+from salmalm.security.crypto import vault  # noqa: F401
+from salmalm.web.auth import extract_auth, auth_manager  # noqa: F401
+
+log = logging.getLogger(__name__)
+
+
+class ManageMixin:
+    def _post_api_cooldowns_reset(self):
+        """POST /api/cooldowns/reset — Clear all model cooldowns."""
+        if not self._require_auth("user"):
+            return
+        from salmalm.core.llm_loop import reset_cooldowns
+
+        reset_cooldowns()
+        self._json({"ok": True, "message": "All cooldowns cleared"})
+
+    def _get_backup(self):
+        """GET /api/backup — download ~/SalmAlm as zip."""
+        if not self._require_auth("admin"):
+            return
+        import zipfile
+        import io
+        import time as _time
+
+        buf = io.BytesIO()
+        skip_ext = {".pyc"}
+        skip_dirs = {"__pycache__", ".git", "node_modules"}
+        max_file_size = 50 * 1024 * 1024  # 50MB
+
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(str(DATA_DIR)):
+                dirs[:] = [d for d in dirs if d not in skip_dirs]
+                for fname in files:
+                    fpath = os.path.join(root, fname)
+                    if any(fname.endswith(e) for e in skip_ext):
+                        continue
+                    try:
+                        if os.path.getsize(fpath) > max_file_size:
+                            continue
+                    except OSError:
+                        continue
+                    arcname = os.path.relpath(fpath, str(DATA_DIR))
+                    zf.write(fpath, arcname)
+
+        body = buf.getvalue()
+        ts = _time.strftime("%Y%m%d_%H%M%S")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/zip")
+        self.send_header("Content-Disposition", f'attachment; filename="salmalm_backup_{ts}.zip"')
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _post_api_backup_restore(self):
+        """POST /api/backup/restore — restore from uploaded zip."""
+        if not self._require_auth("admin"):
+            return
+        import zipfile
+        import io
+
+        content_length = int(self.headers.get("Content-Length", 0))
+        if content_length > 100 * 1024 * 1024:  # 100MB limit
+            self._json({"ok": False, "error": "File too large (max 100MB)"}, 400)
+            return
+        body = self.rfile.read(content_length)
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(body))
+        except zipfile.BadZipFile:
+            self._json({"ok": False, "error": "Invalid zip file"}, 400)
+            return
+
+        # Safety: check for path traversal
+        for name in zf.namelist():
+            if name.startswith("/") or ".." in name:
+                self._json({"ok": False, "error": f"Unsafe path in zip: {name}"}, 400)
+                return
+
+        zf.extractall(str(DATA_DIR))
+        zf.close()
+        self._json({"ok": True, "message": f"Restored {len(zf.namelist())} files to {DATA_DIR}"})
+
+    def _post_api_vault(self):
+        """Post api vault."""
+        body = self._body
+        if not vault.is_unlocked:
+            self._json({"error": "Vault locked"}, 403)
+            return
+        # Vault ops require admin
+        user = extract_auth(dict(self.headers))
+        ip = self._get_client_ip()
+        if not user and ip not in ("127.0.0.1", "::1", "localhost"):
+            self._json({"error": "Admin access required"}, 403)
+            return
+        action = body.get("action")
+        if action == "set":
+            key = body.get("key")
+            value = body.get("value")
+            if not key:
+                self._json({"error": "key required"}, 400)
+                return
+            try:
+                vault.set(key, value)
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"error": f"Vault error: {type(e).__name__}: {e}"}, 500)
+        elif action == "get":
+            key = body.get("key")
+            if not key:
+                self._json({"error": "key required"}, 400)
+                return
+            val = vault.get(key)
+            self._json({"value": val})
+        elif action == "keys":
+            self._json({"keys": vault.keys()})
+        elif action == "delete":
+            key = body.get("key")
+            if not key:
+                self._json({"error": "key required"}, 400)
+                return
+            vault.delete(key)
+            self._json({"ok": True})
+        elif action == "change_password":
+            old_pw = body.get("old_password", "")
+            new_pw = body.get("new_password", "")
+            if new_pw and len(new_pw) < 4:
+                self._json({"error": "Password must be at least 4 characters"}, 400)
+            elif vault.change_password(old_pw, new_pw):
+                audit_log("vault", "master password changed")
+                self._json({"ok": True})
+            else:
+                self._json({"error": "Current password is incorrect"}, 403)
+        else:
+            self._json({"error": "Unknown action"}, 400)
+
+    def _post_api_do_update(self):
+        """Post api do update."""
+        if not self._require_auth("admin"):
+            return
+        if self._get_client_ip() not in ("127.0.0.1", "::1", "localhost"):
+            self._json({"error": "Update only allowed from localhost"}, 403)
+            return
+        try:
+            import subprocess
+            import sys
+
+            # Try pipx first (common install method), fallback to pip
+            import shutil
+
+            _use_pipx = shutil.which("pipx") is not None
+            if _use_pipx:
+                _update_cmd = ["pipx", "install", "salmalm", "--force"]
+            else:
+                _update_cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "salmalm"]
+            result = subprocess.run(
+                _update_cmd,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode == 0:
+                # Get installed version
+                ver_result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-c",
+                        "from salmalm.constants import VERSION; print(VERSION)",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                new_ver = ver_result.stdout.strip() or "?"
+                audit_log("update", f"upgraded to v{new_ver}")
+                self._json({"ok": True, "version": new_ver, "output": result.stdout[-200:]})
+            else:
+                self._json({"ok": False, "error": result.stderr[-200:]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)[:200]})
+        return
+
+    def _post_api_restart(self):
+        """Post api restart."""
+        if not self._require_auth("admin"):
+            return
+        if self._get_client_ip() not in ("127.0.0.1", "::1", "localhost"):
+            self._json({"error": "Restart only allowed from localhost"}, 403)
+            return
+        import sys
+
+        audit_log("restart", "user-initiated restart")
+        self._json({"ok": True, "message": "Restarting..."})
+        # Graceful restart: flush response, then replace process after a short delay
+        import threading
+        import sys as _sys
+
+        def _do_restart():
+            """Do restart."""
+            import time
+
+            time.sleep(0.5)  # Let HTTP response flush
+            os.execv(_sys.executable, [_sys.executable] + _sys.argv)
+
+        threading.Thread(target=_do_restart, daemon=True).start()
+        return
+
+    def _post_api_update(self):
+        # Alias for /api/do-update with WebSocket progress
+        """Post api update."""
+        if not self._require_auth("admin"):
+            return
+        if self._get_client_ip() not in ("127.0.0.1", "::1", "localhost"):
+            self._json({"error": "Update only allowed from localhost"}, 403)
+            return
+        try:
+            import subprocess
+
+            # Broadcast update start via WebSocket
+            try:
+                from salmalm.web.ws import ws_server
+                import asyncio
+
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(ws_server.broadcast({"type": "update_status", "status": "installing"}))
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "--upgrade",
+                    "--no-cache-dir",
+                    "salmalm",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if result.returncode == 0:
+                ver_result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-c",
+                        "from salmalm.constants import VERSION; print(VERSION)",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                new_ver = ver_result.stdout.strip() or "?"
+                audit_log("update", f"upgraded to v{new_ver}")
+                self._json({"ok": True, "version": new_ver, "output": result.stdout[-200:]})
+            else:
+                self._json({"ok": False, "error": result.stderr[-200:]})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)[:200]})
+        return
+
+    def _post_api_persona_switch(self):
+        """Post api persona switch."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        session_id = body.get("session_id", self.headers.get("X-Session-Id", "web"))
+        name = body.get("name", "")
+        if not name:
+            self._json({"error": "name required"}, 400)
+            return
+        from salmalm.core.prompt import switch_persona
+
+        content = switch_persona(session_id, name)
+        if content is None:
+            self._json({"error": f'Persona "{name}" not found'}, 404)
+            return
+        self._json({"ok": True, "name": name, "content": content})
+        return
+
+    def _post_api_persona_create(self):
+        """Post api persona create."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        name = body.get("name", "")
+        content = body.get("content", "")
+        if not name or not content:
+            self._json({"error": "name and content required"}, 400)
+            return
+        from salmalm.core.prompt import create_persona
+
+        ok = create_persona(name, content)
+        if ok:
+            self._json({"ok": True})
+        else:
+            self._json({"error": "Invalid persona name"}, 400)
+        return
+
+    def _post_api_persona_delete(self):
+        """Post api persona delete."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        name = body.get("name", "")
+        if not name:
+            self._json({"error": "name required"}, 400)
+            return
+        from salmalm.core.prompt import delete_persona
+
+        ok = delete_persona(name)
+        if ok:
+            self._json({"ok": True})
+        else:
+            self._json({"error": "Cannot delete built-in persona or not found"}, 400)
+        return
+
+    def _post_api_stt(self):
+        """Post api stt."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        audio_b64 = body.get("audio_base64", "")
+        lang = body.get("language", "ko")
+        if not audio_b64:
+            self._json({"error": "No audio data"}, 400)
+            return
+        try:
+            from salmalm.tools.tool_handlers import execute_tool
+
+            result = execute_tool("stt", {"audio_base64": audio_b64, "language": lang})  # type: ignore[assignment]
+            text = result.replace("🎤 Transcription:\n", "") if isinstance(result, str) else ""
+            self._json({"ok": True, "text": text})
+        except Exception as e:
+            self._json({"ok": False, "error": str(e)}, 500)
+
+    def _post_api_agent_sync(self):
+        """Post api agent sync."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        action = body.get("action", "export")
+        if action == "export":
+            import json as _json
+
+            export_data = {}
+            # Quick sync: lightweight JSON export (no ZIP)
+            soul_path = DATA_DIR / "soul.md"
+            if soul_path.exists():
+                export_data["soul"] = soul_path.read_text(encoding="utf-8")
+            config_path = DATA_DIR / "config.json"
+            if config_path.exists():
+                export_data["config"] = _json.loads(config_path.read_text(encoding="utf-8"))
+            routing_path = DATA_DIR / "routing.json"
+            if routing_path.exists():
+                export_data["routing"] = _json.loads(routing_path.read_text(encoding="utf-8"))
+            memory_dir = BASE_DIR / "memory"
+            if memory_dir.exists():
+                export_data["memory"] = {}
+                for f in memory_dir.glob("*"):
+                    if f.is_file():
+                        export_data["memory"][f.name] = f.read_text(encoding="utf-8")
+            self._json({"ok": True, "data": export_data})
+        else:
+            self._json({"ok": False, "error": "Unknown action"}, 400)
+
+    def _post_api_queue_mode(self):
+        """Post api queue mode."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        from salmalm.features.queue import set_queue_mode
+
+        mode = body.get("mode", "collect")
+        session_id = body.get("session_id", "web")
+        try:
+            result = set_queue_mode(session_id, mode)
+            self._json({"ok": True, "message": result})
+        except ValueError as e:
+            self._json({"ok": False, "error": str(e)}, 400)
+
+    def _post_api_soul(self):
+        """Post api soul."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        content = body.get("content", "")
+        from salmalm.core.prompt import set_user_soul, reset_user_soul
+
+        if content.strip():
+            set_user_soul(content)
+            self._json({"ok": True, "message": "SOUL.md saved"})
+        else:
+            reset_user_soul()
+            self._json({"ok": True, "message": "SOUL.md reset to default"})
+        return
+
+    def _post_api_agents(self):
+        """Post api agents."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        from salmalm.features.agents import agent_manager
+
+        action = body.get("action", "")
+        if action == "create":
+            result = agent_manager.create(body.get("id", ""), body.get("display_name", ""))
+            self._json({"ok": "✅" in result, "message": result})
+        elif action == "delete":
+            result = agent_manager.delete(body.get("id", ""))
+            self._json({"ok": True, "message": result})
+        elif action == "bind":
+            result = agent_manager.bind(body.get("chat_key", ""), body.get("agent_id", ""))
+            self._json({"ok": True, "message": result})
+        elif action == "switch":
+            result = agent_manager.switch(body.get("chat_key", ""), body.get("agent_id", ""))
+            self._json({"ok": True, "message": result})
+        else:
+            self._json({"error": "Unknown action. Use: create, delete, bind, switch"}, 400)
+
+    def _post_api_hooks(self):
+        """Post api hooks."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        from salmalm.features.hooks import hook_manager
+
+        action = body.get("action", "")
+        if action == "add":
+            result = hook_manager.add_hook(body.get("event", ""), body.get("command", ""))
+            self._json({"ok": True, "message": result})
+        elif action == "remove":
+            result = hook_manager.remove_hook(body.get("event", ""), body.get("index", 0))
+            self._json({"ok": True, "message": result})
+        elif action == "test":
+            result = hook_manager.test_hook(body.get("event", ""))
+            self._json({"ok": True, "message": result})
+        elif action == "reload":
+            hook_manager.reload()
+            self._json({"ok": True, "message": "🔄 Hooks reloaded"})
+        else:
+            self._json({"error": "Unknown action"}, 400)
+
+    def _post_api_plugins_manage(self):
+        """Post api plugins manage."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        from salmalm.features.plugin_manager import plugin_manager
+
+        action = body.get("action", "")
+        if action == "reload":
+            result = plugin_manager.reload_all()
+            self._json({"ok": True, "message": result})
+        elif action == "enable":
+            result = plugin_manager.enable(body.get("name", ""))
+            self._json({"ok": True, "message": result})
+        elif action == "disable":
+            result = plugin_manager.disable(body.get("name", ""))
+            self._json({"ok": True, "message": result})
+        else:
+            self._json({"error": "Unknown action"}, 400)
+
+    def _post_api_groups(self):
+        """Post api groups."""
+        body = self._body
+        # Session group CRUD — LobeChat style (그룹 관리)
+        if not self._require_auth("user"):
+            return
+        action = body.get("action", "create")
+        from salmalm.features.edge_cases import session_groups
+
+        if action == "create":
+            name = body.get("name", "").strip()
+            if not name:
+                self._json({"error": "Missing name"}, 400)
+                return
+            result = session_groups.create_group(name, body.get("color", "#6366f1"))
+            self._json(result)
+        elif action == "update":
+            gid = body.get("id")
+            if not gid:
+                self._json({"error": "Missing id"}, 400)
+                return
+            kwargs = {k: v for k, v in body.items() if k in ("name", "color", "sort_order", "collapsed")}
+            ok = session_groups.update_group(int(gid), **kwargs)
+            self._json({"ok": ok})
+        elif action == "delete":
+            gid = body.get("id")
+            if not gid:
+                self._json({"error": "Missing id"}, 400)
+                return
+            ok = session_groups.delete_group(int(gid))
+            self._json({"ok": ok})
+        elif action == "move":
+            sid = body.get("session_id", "")
+            gid = body.get("group_id")
+            ok = session_groups.move_session(sid, int(gid) if gid else None)
+            self._json({"ok": ok})
+        else:
+            self._json({"error": "Unknown action"}, 400)
+        return
+
+    def _post_api_paste_detect(self):
+        """Post api paste detect."""
+        body = self._body
+        # Smart paste detection — BIG-AGI style (스마트 붙여넣기 감지)
+        if not self._require_auth("user"):
+            return
+        text = body.get("text", "")
+        if not text:
+            self._json({"error": "Missing text"}, 400)
+            return
+        from salmalm.features.edge_cases import detect_paste_type
+
+        self._json(detect_paste_type(text))
+        return
+
+    def _post_api_presence(self):
+        """Post api presence."""
+        body = self._body
+        # Register/heartbeat presence
+        instance_id = body.get("instanceId", "")
+        if not instance_id:
+            self._json({"error": "instanceId required"}, 400)
+            return
+        from salmalm.features.presence import presence_manager
+
+        entry = presence_manager.register(
+            instance_id,
+            host=body.get("host", ""),
+            ip=self._get_client_ip(),
+            mode=body.get("mode", "web"),
+            user_agent=body.get("userAgent", ""),
+        )
+        self._json({"ok": True, "state": entry.state})
+
+    def _post_api_node_execute(self):
+        """Post api node execute."""
+        body = self._body
+        # Node endpoint: execute a tool locally (called by gateway)
+        from salmalm.tools.tool_handlers import execute_tool
+
+        tool = body.get("tool", "")
+        args = body.get("args", {})
+        if not tool:
+            self._json({"error": "tool name required"}, 400)
+            return
+        try:
+            result = execute_tool(tool, args)  # type: ignore[assignment]
+            self._json({"ok": True, "result": result[:50000]})  # type: ignore[index]
+        except Exception as e:
+            self._json({"error": str(e)[:500]}, 500)
