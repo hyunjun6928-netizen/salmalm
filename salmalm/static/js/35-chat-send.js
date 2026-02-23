@@ -54,7 +54,7 @@
             var _cIcons={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
             var _cLabel=edata.complexity&&edata.complexity!=='auto'?(_cIcons[edata.complexity]||'')+edata.complexity+' → ':'';
             var _mShort=(edata.model||'').split('/').pop();
-            addMsg('assistant',edata.response||'',_cLabel+_mShort+' · ⏱️'+_secs+'s');
+            var _sMeta=(_cLabel||'')+(_mShort||'');if(_sMeta)_sMeta+=' · ';_sMeta+='⏱️'+_secs+'s';addMsg('assistant',edata.response||'',_sMeta);
             modelBadge.textContent=_mShort||'auto routing';
             fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
           }
@@ -71,7 +71,7 @@
       var d=await r2.json();
       if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
       var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
-      if(d.response){var _fcI={simple:'⚡',moderate:'🔧',complex:'💎'};var _fcL=d.complexity&&d.complexity!=='auto'?(_fcI[d.complexity]||'')+d.complexity+' → ':'';var _fmS=(d.model||'').split('/').pop();addMsg('assistant',d.response,_fcL+_fmS+' · ⏱️'+_secs2+'s');if(_fmS)modelBadge.textContent=_fmS;}
+      if(d.response){var _fcI={simple:'⚡',moderate:'🔧',complex:'💎'};var _fcL=d.complexity&&d.complexity!=='auto'?(_fcI[d.complexity]||'')+d.complexity+' → ':'';var _fmS=(d.model||'').split('/').pop();var _meta=(_fcL||'')+(_fmS||'');if(_meta)_meta+=' · ';_meta+='⏱️'+_secs2+'s';addMsg('assistant',d.response,_meta);if(_fmS)modelBadge.textContent=_fmS;}
       else if(d.error)addMsg('assistant','❌ '+d.error);
       fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
     }
