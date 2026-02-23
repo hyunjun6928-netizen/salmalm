@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
 [![Tests](https://img.shields.io/badge/tests-1%2C877%20passed-brightgreen)]()
-[![Tools](https://img.shields.io/badge/tools-67-blueviolet)]()
+[![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
 [![Coverage](https://img.shields.io/badge/docstrings-99%25-blue)]()
 
 **[한국어 README](README_KR.md)** · **[Documentation](https://hyunjun6928-netizen.github.io/salmalm/)**
@@ -20,7 +20,7 @@
 
 ## What is SalmAlm?
 
-SalmAlm is a **personal AI gateway** — one Python package that gives you a full-featured AI assistant with a web UI, Telegram/Discord bots, 67 tools, browser automation, sub-agents, and memory system.
+SalmAlm is a **personal AI gateway** — one Python package that gives you a full-featured AI assistant with a web UI, Telegram/Discord bots, 62 tools, browser automation, sub-agents, and memory system.
 
 No Docker. No Node.js. No config files. Just:
 
@@ -68,6 +68,9 @@ pip install salmalm
 ```bash
 salmalm --open
 # → 브라우저가 자동으로 열립니다 (http://localhost:18800)
+
+# 또는 (editable install에서 console_script가 안 될 때):
+python3 -m salmalm --open
 ```
 
 ### Step 3: API 키 입력 (2분)
@@ -86,7 +89,7 @@ salmalm --open
 "/help"                    → 전체 명령어 보기
 ```
 
-> 💡 **자연어로 말하면 됩니다.** 67개 도구를 AI가 알아서 선택합니다.
+> 💡 **자연어로 말하면 됩니다.** 62개 도구를 AI가 알아서 선택합니다.
 > 명령어를 외울 필요 없이, 하고 싶은 걸 그냥 말하세요.
 
 ### 고급 옵션
@@ -119,7 +122,7 @@ Browser ──WebSocket──► SalmAlm ──► Anthropic / OpenAI / Google /
                          ├── Engine Pipeline (classify → route → context → execute)
 Telegram ──►             ├── Memory System (2-layer + auto-recall + TF-IDF RAG)
 Discord  ──►             ├── Sub-Agent Manager (spawn/steer/kill/notify)
-                         ├── Tool Registry (67 tools, risk-tiered)
+                         ├── Tool Registry (62 tools, risk-tiered)
                          ├── Browser Automation (Playwright subprocess)
                          ├── Security Middleware (auth/CSRF/CSP/rate-limit/audit)
                          ├── Vault (PBKDF2-200K + AES-256-GCM)
@@ -130,9 +133,9 @@ Discord  ──►             ├── Sub-Agent Manager (spawn/steer/kill/not
 
 | Metric | Value |
 |---|---|
-| Python files | 266 |
-| Total lines | 51,377 |
-| Functions | 2,162 |
+| Python files | 190 |
+| Total lines | ~40,000 |
+| Functions | ~1,800 |
 | Max cyclomatic complexity | 20 (all functions) |
 | Largest file | 778 lines |
 | Files > 800 lines | 0 |
@@ -176,7 +179,7 @@ Discord  ──►             ├── Sub-Agent Manager (spawn/steer/kill/not
 /subagents collect
 ```
 
-### 67 Built-in Tools
+### 62 Built-in Tools
 Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Python eval (opt-in), image generation (DALL-E/Aurora), TTS/STT, **browser automation (Playwright)**, RAG search, QR codes, system monitor, OS-native sandbox, mesh networking, and more.
 
 ### Web UI
@@ -215,7 +218,7 @@ SalmAlm is designed to minimize API costs without sacrificing quality:
 
 | Feature | Effect |
 |---|---|
-| Dynamic tool loading | 67 tools → 0 (chat) or 7-12 (actions) per request |
+| Dynamic tool loading | 62 tools → 0 (chat) or 7-12 (actions) per request |
 | 3-tier auto-routing | Simple→$1/M, Moderate→$3/M, Complex→$3/M (no Opus needed) |
 | Tool schema compression | 7,749 → 693 tokens (91% reduction) |
 | System prompt compression | 762 → 310 tokens |

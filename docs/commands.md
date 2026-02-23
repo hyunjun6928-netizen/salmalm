@@ -1,9 +1,9 @@
 # Commands Reference
 # 명령어 레퍼런스
 
-SalmAlm provides 30+ slash commands for controlling the AI assistant directly from chat.
+SalmAlm provides 35+ slash commands for controlling the AI assistant directly from chat.
 
-SalmAlm은 채팅에서 직접 AI 비서를 제어할 수 있는 30개 이상의 슬래시 명령어를 제공합니다.
+SalmAlm은 채팅에서 직접 AI 비서를 제어할 수 있는 35개 이상의 슬래시 명령어를 제공합니다.
 
 ## Thinking & Output / 사고 및 출력
 

@@ -2,6 +2,54 @@
 
 > **Note:** Versions v0.10.x through v0.18.x were rapid iteration releases during initial development (2026-02-19 ~ 2026-02-23). Daily version bumps reflect active development, not production releases. Stable releases begin from v0.19.x.
 
+## v0.19.39 (2026-02-24)
+- Detailed explanations for temperature & max tokens settings
+
+## v0.19.38 (2026-02-24)
+- Fix slider labels not updating (duplicate id EN/KR)
+
+## v0.19.37 (2026-02-24)
+- Fix cross-thread SQLite crash in weakref cleanup
+
+## v0.19.36 (2026-02-24)
+- P0-P3 second review round — 15 fixes
+
+## v0.19.35 (2026-02-24)
+- Revert max_tokens to cost-efficient defaults — users configure via Settings
+
+## v0.19.34 (2026-02-24)
+- Token budget hint injection — LLM self-structures to fit max_tokens
+
+## v0.19.33 (2026-02-24)
+- Increase max_tokens defaults — chat 512→4096, code 4096→8192
+
+## v0.19.32 (2026-02-24)
+- Auto-continuation for truncated responses
+
+## v0.19.31 (2026-02-24)
+- Fix stop button stuck after WS response completes
+
+## v0.19.30 (2026-02-24)
+- P1-P3 code review fixes — security, quality, documentation
+
+## v0.19.29 (2026-02-24)
+- Fix P0 bootstrap bugs + import paths + SO_REUSEADDR
+
+## v0.19.28 (2026-02-24)
+- Fix logging (init_logging skipped due to NullHandler)
+- Fix model_override persistence — session meta DB column
+- Telegram model pass-through
+- Weakref DB connections
+
+## v0.19.27 (2026-02-24)
+- Discord WebSocket — websockets lib with raw SSL fallback
+
+## v0.19.26 (2026-02-24)
+- Complete 13-point review — all issues addressed
+
+## v0.19.25 (2026-02-24)
+- 13-point review fixes — audit atexit, compaction imports, docs cleanup
+
 ## v0.19.24 (2026-02-24)
 ### ✨ Features
 - **PWA Service Worker** — offline cache + install prompt for mobile

@@ -1,9 +1,9 @@
 # Tools Catalog
 # 도구 카탈로그
 
-SalmAlm includes 66 built-in tools that the AI can use autonomously. No plugins required.
+SalmAlm includes 62 built-in tools that the AI can use autonomously. No plugins required.
 
-SalmAlm은 AI가 자율적으로 사용할 수 있는 66개의 내장 도구를 포함합니다. 플러그인이 필요 없습니다.
+SalmAlm은 AI가 자율적으로 사용할 수 있는 62개의 내장 도구를 포함합니다. 플러그인이 필요 없습니다.
 
 ## Execution / 실행
 

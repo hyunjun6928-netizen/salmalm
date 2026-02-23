@@ -38,7 +38,7 @@
 ## v0.18.63
 
 ### Security
-- Tool tier names aligned to 67 registered tools (CRITICAL 14, HIGH 9)
+- Tool tier names aligned to 62 registered tools (CRITICAL 14, HIGH 9)
 - Irreversible action gate: email_send, gmail send, calendar_delete require `_confirmed=true`
 - Browser SSRF defense: `_is_internal_url()` blocks private/loopback on external bind
 - Exec bypass test vectors (find -exec, tar --to-command, etc.)
@@ -80,7 +80,7 @@
 ## v0.18.30
 
 ### Cost Optimization
-- Dynamic tool selection: 67→0 (chat) / 7-12 (actions)
+- Dynamic tool selection: 62→0 (chat) / 7-12 (actions)
 - Tool schema compression: 7,749→693 tokens (91%)
 - Smart model routing: simple→Haiku, moderate→Sonnet, complex→Opus
 - Intent-based max_tokens and history trim

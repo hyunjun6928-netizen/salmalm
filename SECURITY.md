@@ -92,6 +92,6 @@ Please report security issues to: https://github.com/hyunjun6928-netizen/salmalm
 
 ## Test Coverage
 
-- 142+ security regression tests (`test_security_regression.py`, `test_security_p0p1.py`, `test_security.py`)
+- 150+ security regression tests (`test_security_regression.py`, `test_security_p0p1.py`, `test_security.py`)
 - Tool tier alignment verified against registry in CI
 - Exec bypass vectors (find -exec, tar --to-command, awk system(), xargs bash, curl metadata) pinned in tests

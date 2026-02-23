@@ -13,7 +13,6 @@ salmalm/
 ├── __main__.py          # Entry point (python -m salmalm)
 ├── cli.py               # CLI argument parser
 ├── constants.py         # Global constants
-├── engine.py            # Main engine (legacy shim)
 │
 ├── core/                # Core engine modules / 코어 엔진 모듈
 │   ├── core.py          # Central SalmAlm class

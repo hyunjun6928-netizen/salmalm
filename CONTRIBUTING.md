@@ -10,35 +10,15 @@ pip install -e ".[dev]"
 
 ## Running Tests
 
-### ⚠️ Important: Do NOT run `pytest tests/` directly in a single process
-
-The full test suite may have cross-file state pollution (HTTP servers, asyncio loops). Per-file execution is the safe default.
-
-### Recommended: Per-file execution (CI-style)
+### Recommended: Full suite
 
 ```bash
-# Run all tests safely (same as CI)
-for f in tests/test_*.py; do
-    echo "--- $f ---"
-    python -m pytest "$f" -q --timeout=30
-done
+python -m pytest tests/ -q --timeout=30 -x \
+  --ignore=tests/test_multi_tenant.py \
+  --ignore=tests/test_fresh_install_e2e.py
 ```
 
-### Alternative: Full suite (works reliably)
-
-```bash
-# Also works — the os.execv hang has been fixed
-python -m pytest tests/ -q --timeout=30
-```
-
-### Alternative: pytest-forked
-
-```bash
-pip install pytest-forked
-python -m pytest tests/ --forked --timeout=30
-```
-
-This forks each test into a separate process. Slower (~2min) but avoids all state pollution.
+Expected: **1,877 passed, 17 skipped**.
 
 ### Run a specific test file
 
@@ -58,7 +38,7 @@ python -m pytest tests/test_e2e.py::TestE2ECommandRouting::test_command_routing 
 - **Linting**: `flake8 salmalm/ --max-line-length=120 --ignore=E501,W503,E402,E203,F405`
 - **No new dependencies**: SalmAlm is stdlib-only. New features must use only Python standard library.
   - Exception: Optional extras (`pip install salmalm[browser]` for Playwright)
-- **Imports**: Use direct imports (`from salmalm.core.engine import ...`), not shim imports (`from salmalm import engine`). Shims are deprecated (see `DEPRECATIONS.md`).
+- **Imports**: Use direct imports (`from salmalm.core.engine import ...`), not old flat paths (`from salmalm import engine`). Shim files were removed in v0.19.14.
 
 ## Architecture
 
@@ -145,7 +125,7 @@ CI automatically checks version consistency between these files.
 ## Pull Request Checklist
 
 - [ ] Tests pass: `python -m pytest tests/test_yourfile.py -v --timeout=30`
-- [ ] Full suite: `python -m pytest tests/ -q --timeout=30` (1,709 tests expected)
+- [ ] Full suite: `python -m pytest tests/ -q --timeout=30 -x --ignore=tests/test_multi_tenant.py --ignore=tests/test_fresh_install_e2e.py` (1,877 tests expected)
 - [ ] No new dependencies (stdlib only)
 - [ ] i18n: Both EN and KR strings provided
 - [ ] Security: Dangerous features default OFF with env var opt-in

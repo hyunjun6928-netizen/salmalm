@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
 [![Tests](https://img.shields.io/badge/tests-1%2C877%20passed-brightgreen)]()
-[![Tools](https://img.shields.io/badge/tools-67-blueviolet)]()
+[![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
 
 **[English README](README.md)**
 
@@ -19,7 +19,7 @@
 
 ## 삶앎이 뭔가요?
 
-**개인 AI 게이트웨이**입니다. 파이썬 패키지 하나로 웹 UI, 텔레그램/디스코드 봇, 67개 도구를 갖춘 AI 비서가 설치됩니다.
+**개인 AI 게이트웨이**입니다. 파이썬 패키지 하나로 웹 UI, 텔레그램/디스코드 봇, 62개 도구를 갖춘 AI 비서가 설치됩니다.
 
 Docker 없음. Node.js 없음. 설정 파일 없음.
 
@@ -67,6 +67,9 @@ pip install salmalm
 ```bash
 salmalm --open
 # → 브라우저가 자동으로 열립니다 (http://localhost:18800)
+
+# 또는 (editable install에서 console_script가 안 될 때):
+python3 -m salmalm --open
 ```
 
 ### Step 3: API 키 입력 (2분)
@@ -85,7 +88,7 @@ salmalm --open
 "/help"                    → 전체 명령어 보기
 ```
 
-> 💡 **자연어로 말하면 됩니다.** 67개 도구를 AI가 알아서 선택합니다.
+> 💡 **자연어로 말하면 됩니다.** 62개 도구를 AI가 알아서 선택합니다.
 > 명령어를 외울 필요 없이, 하고 싶은 걸 그냥 말하세요.
 
 ### 고급 옵션
@@ -122,7 +125,7 @@ SALMALM_PORT=8080 salmalm   # 포트 변경
 - **무한 루프 감지** — 최근 6회 중 동일 (도구, 인자해시) 3회 반복 시 자동 중단
 - **되돌릴 수 없는 액션 게이트** — 이메일 전송, 캘린더 삭제/생성 시 명시적 확인 필요
 
-### 67개 내장 도구
+### 62개 내장 도구
 웹 검색(Brave), 이메일(Gmail), 캘린더(Google), 파일 읽기/쓰기, 셸 실행, Python eval, 이미지 생성(DALL-E/Aurora), TTS/STT, 브라우저 자동화(Playwright), RAG 검색, QR 코드, 시스템 모니터, OS 네이티브 샌드박스, 메시 네트워킹, 캔버스 미리보기 등.
 
 ### 웹 UI
@@ -167,7 +170,7 @@ API 비용을 최소화하면서 품질을 유지하는 설계:
 
 | 기능 | 효과 |
 |---|---|
-| 동적 도구 로딩 | 66개 → 대화 시 0개, 작업 시 7-12개만 전송 |
+| 동적 도구 로딩 | 62개 → 대화 시 0개, 작업 시 7-12개만 전송 |
 | 스마트 모델 라우팅 | 간단→Haiku($1), 보통→Sonnet($3), 복잡→Opus($15) |
 | 도구 스키마 압축 | 7,749 → 693 토큰 (91% 감소) |
 | 시스템 프롬프트 압축 | 762 → 310 토큰 |
@@ -239,7 +242,7 @@ Settings → Auto Routing 패널에서 각 티어별 모델 변경 가능.
 - **CSRF 방어** — Origin 검증 + `X-Requested-With` 커스텀 헤더
 - **중앙 인증 게이트** — 모든 `/api/` 경로는 인증 필수 (공개 경로 제외)
 - **노드 디스패치** — HMAC-SHA256 서명 페이로드 + 타임스탬프 + 논스
-- **142+ 보안 회귀 테스트** CI에서 실행
+- **150+ 보안 회귀 테스트** CI에서 실행
 
 자세한 내용은 [`SECURITY.md`](SECURITY.md) 참조.
 
@@ -331,7 +334,7 @@ SALMALM_VAULT_FALLBACK=1    # cryptography 없이 HMAC-CTR 볼트
    │                     │
    └──HTTP/SSE──►       ├── SQLite (세션, 사용량, 메모리, 감사)
                          ├── 스마트 모델 라우팅 (복잡도 기반)
-텔레그램 ──►             ├── 도구 레지스트리 (66개, 위험 등급별)
+텔레그램 ──►             ├── 도구 레지스트리 (62개, 위험 등급별)
 디스코드 ──►             ├── 보안 미들웨어 (인증/CSRF/감사/속도제한)
                          ├── 서브에이전트 매니저
 메시 피어 ──►           ├── 메시지 큐 (오프라인 + 재시도)
@@ -342,7 +345,7 @@ SALMALM_VAULT_FALLBACK=1    # cryptography 없이 HMAC-CTR 볼트
                          └── 볼트 (PBKDF2 + AES-256-GCM / HMAC-CTR)
 ```
 
-- **233개 모듈**, **49K+ 줄**, **82 테스트 파일**, **1,817개 테스트**
+- **190개 모듈, ~40K 줄, 1,877개 테스트**
 - 순수 Python 3.10+ 표준 라이브러리 — 프레임워크 없음, 무거운 의존성 없음
 - 데이터는 `~/SalmAlm`에 저장 (`SALMALM_HOME`으로 변경 가능)
 
