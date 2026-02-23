@@ -5,7 +5,7 @@ try:
     from importlib.metadata import version as _pkg_version
     __version__ = _pkg_version("salmalm")
 except Exception:
-    __version__ = "0.19.18"  # fallback for editable/dev installs
+    __version__ = "0.19.29"  # fallback for editable/dev installs
 
 log = logging.getLogger("salmalm")
 log.addHandler(logging.NullHandler())  # Prevent "No handlers" warning at import
@@ -16,7 +16,7 @@ def _register_services() -> None:
     """Register all service factories. Called once at import time."""
     if app is None:
         return
-    app.register("vault", lambda: __import__("salmalm.crypto", fromlist=["vault"]).vault)
+    app.register("vault", lambda: __import__("salmalm.security.crypto", fromlist=["vault"]).vault)
     app.register("router", lambda: __import__("salmalm.core", fromlist=["router"]).router)
     app.register("auth_manager", lambda: __import__("salmalm.auth", fromlist=["auth_manager"]).auth_manager)
     app.register("rate_limiter", lambda: __import__("salmalm.auth", fromlist=["rate_limiter"]).rate_limiter)

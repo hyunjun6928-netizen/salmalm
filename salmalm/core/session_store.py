@@ -90,15 +90,6 @@ class Session:
                 elif isinstance(m.get("content"), str):
                     saveable.append(m)
             conn = _get_db()
-            # Ensure columns exist
-            for _col_sql in [
-                "ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL",
-                "ALTER TABLE session_store ADD COLUMN session_meta TEXT DEFAULT '{}'",
-            ]:
-                try:
-                    conn.execute(_col_sql)
-                except Exception as e:
-                    log.debug(f"Suppressed: {e}")
             # Persist session metadata (model_override, thinking, tts)
             _meta = json.dumps({
                 "model_override": self.model_override,

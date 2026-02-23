@@ -67,11 +67,9 @@ def _check_for_updates() -> str:
 
 async def _start_telegram_bot() -> None:
     """Phase 11: Start Telegram bot polling."""
-
-
-if not vault.is_unlocked:
-    log.warning("[TELEGRAM] Skipped — vault is locked. Unlock vault to enable Telegram.")
-if vault.is_unlocked:
+    if not vault.is_unlocked:
+        log.warning("[TELEGRAM] Skipped — vault is locked. Unlock vault to enable Telegram.")
+        return
     tg_token = vault.get("telegram_token")
     tg_owner = vault.get("telegram_owner_id")
     log.info(
@@ -79,6 +77,7 @@ if vault.is_unlocked:
     )
     if tg_token and tg_owner:
         telegram_bot.configure(tg_token, tg_owner)
+        _core.set_telegram_bot(telegram_bot)
         log.info("[TELEGRAM] Bot configured, starting polling...")
         import os as _os2
 
@@ -93,11 +92,9 @@ if vault.is_unlocked:
 
 async def _start_discord_bot() -> None:
     """Phase 12: Start Discord bot polling."""
-
-
-if not vault.is_unlocked:
-    log.warning("[DISCORD] Skipped — vault is locked. Unlock vault to enable Discord.")
-if vault.is_unlocked:
+    if not vault.is_unlocked:
+        log.warning("[DISCORD] Skipped — vault is locked. Unlock vault to enable Discord.")
+        return
     dc_token = vault.get("discord_token")
     dc_guild = vault.get("discord_guild_id")
     log.info(f"[DISCORD] token={'YES' if dc_token else 'NO'}, guild={'YES' if dc_guild else 'NO'}")
@@ -144,14 +141,6 @@ def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=1880
     )
     if update_msg:
         log.info(f"  {update_msg}")
-
-
-def _auto_unlock_vault() -> None:
-    """Phase 5: Vault auto-unlock with cascade fallbacks."""
-
-
-_auto_unlock_vault()
-_core.set_telegram_bot(telegram_bot)
 
 
 def _auto_unlock_vault() -> None:
@@ -418,7 +407,7 @@ def _init_extensions() -> None:
     else:
         log.info("[PLUGINS] Disabled (set SALMALM_PLUGINS=1 to enable)")
     try:
-        from .agents import agent_manager
+        from .features.agents import agent_manager
 
         agent_manager.scan()
     except Exception as e:
@@ -490,7 +479,7 @@ async def run_server():
 
     # ── Phase 2: SLA Monitoring ──
     try:
-        from .sla import uptime_monitor, watchdog
+        from .features.sla import uptime_monitor, watchdog
 
         uptime_monitor.on_startup()
         watchdog.start()
@@ -516,6 +505,7 @@ async def run_server():
         exposure_warnings = check_external_exposure_safety(bind_addr, WebHandler)
         for w in exposure_warnings:
             log.warning(w)
+    http.server.ThreadingHTTPServer.allow_reuse_address = True
     server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
 
     # Auto-generate self-signed cert for HTTPS (enables microphone, camera, etc.)
@@ -599,7 +589,7 @@ async def run_server():
 
     # SLA: Graceful shutdown
     try:
-        from .sla import uptime_monitor, watchdog
+        from .features.sla import uptime_monitor, watchdog
 
         watchdog.stop()
         uptime_monitor.on_shutdown()

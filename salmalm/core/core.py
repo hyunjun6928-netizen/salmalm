@@ -3,6 +3,7 @@ subagent, skills, session, cron, daily."""
 
 import asyncio
 import hashlib
+import weakref
 import json
 import math
 import os
@@ -54,15 +55,13 @@ def _get_db() -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
-        # Track for shutdown cleanup (cap to prevent unbounded growth)
-        import weakref as _weakref
+        # Track for shutdown cleanup
         with _db_connections_lock:
-            # Prune dead weak refs
-            _all_db_connections[:] = [r for r in _all_db_connections if (not isinstance(r, _weakref.ref)) or r() is not None]
+            _all_db_connections[:] = [r for r in _all_db_connections if r() is not None]
             try:
-                _all_db_connections.append(_weakref.ref(conn))
+                _all_db_connections.append(weakref.ref(conn))
             except TypeError:
-                _all_db_connections.append(conn)
+                pass  # sqlite3.Connection doesn't support weakref on some platforms
         # Auto-create tables on first connection per thread
         conn.execute("""CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,11 +133,10 @@ def audit_log_cleanup(days: int = 30) -> None:
 
 def close_all_db_connections() -> None:
     """Close all tracked SQLite connections (for graceful shutdown)."""
-    import weakref as _weakref
     with _db_connections_lock:
         for ref in _all_db_connections:
             try:
-                conn = ref() if isinstance(ref, _weakref.ref) else ref
+                conn = ref() if callable(ref) else ref
                 if conn is not None:
                     conn.close()
             except Exception as e:
