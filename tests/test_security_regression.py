@@ -195,9 +195,17 @@ class TestToolTiers(unittest.TestCase):
         from salmalm.web.middleware import is_tool_allowed_external
         self.assertFalse(is_tool_allowed_external('exec', False, '0.0.0.0'))
 
-    def test_critical_tool_allowed_external_authed(self):
+    def test_exec_blocked_external_even_authed(self):
+        """exec/python_eval/browser always blocked on external bind."""
         from salmalm.web.middleware import is_tool_allowed_external
-        self.assertTrue(is_tool_allowed_external('exec', True, '0.0.0.0'))
+        self.assertFalse(is_tool_allowed_external('exec', True, '0.0.0.0'))
+        self.assertFalse(is_tool_allowed_external('python_eval', True, '0.0.0.0'))
+        self.assertFalse(is_tool_allowed_external('browser', True, '0.0.0.0'))
+
+    def test_non_exec_critical_allowed_external_authed(self):
+        """Non-exec critical tools (e.g. write_file) allowed with auth on external."""
+        from salmalm.web.middleware import is_tool_allowed_external
+        self.assertTrue(is_tool_allowed_external('write_file', True, '0.0.0.0'))
 
 
 class TestRoutePolicy(unittest.TestCase):

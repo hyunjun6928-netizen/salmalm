@@ -208,11 +208,18 @@ def get_tool_tier(tool_name: str) -> str:
     return "normal"
 
 
+_EXTERNAL_BLOCKED_ALWAYS = {"exec", "exec_session", "python_eval", "sandbox_exec", "browser"}
+
+
 def is_tool_allowed_external(tool_name: str, is_authenticated: bool, bind_addr: str) -> bool:
     """Check if a tool can be used given current context.
-    Critical tools require auth when externally exposed."""
+    Critical tools require auth when externally exposed.
+    exec/python_eval/browser are ALWAYS blocked on external bind (even with auth)."""
     if bind_addr == "127.0.0.1":
         return True  # Loopback = trusted
+    # Hard block: these tools are too dangerous for any external access
+    if tool_name in _EXTERNAL_BLOCKED_ALWAYS:
+        return False
     tier = get_tool_tier(tool_name)
     if tier == "critical" and not is_authenticated:
         return False

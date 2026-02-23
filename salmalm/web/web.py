@@ -518,6 +518,14 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         session_id = self.headers.get("X-Session-Id", "web")
         self._json(queue_status(session_id))
 
+    @staticmethod
+    def _vault_type_label():
+        try:
+            from salmalm.security.crypto import HAS_CRYPTO
+            return "AES-256-GCM" if HAS_CRYPTO else "HMAC-CTR (obfuscation only)"
+        except Exception:
+            return "unknown"
+
     def _get_status(self):
         channels = {}
         if vault.is_unlocked:
@@ -528,6 +536,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 "app": APP_NAME,
                 "version": VERSION,  # noqa: F405
                 "unlocked": vault.is_unlocked,
+                "vault_type": self._vault_type_label(),
                 "usage": get_usage_report(),
                 "model": router.force_model or "auto",
                 "channels": channels,
