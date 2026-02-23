@@ -2697,6 +2697,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_persona_switch(self):
         body = self._body
+        if not self._require_auth("user"):
+            return
         session_id = body.get("session_id", self.headers.get("X-Session-Id", "web"))
         name = body.get("name", "")
         if not name:
@@ -2713,6 +2715,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_persona_create(self):
         body = self._body
+        if not self._require_auth("user"):
+            return
         name = body.get("name", "")
         content = body.get("content", "")
         if not name or not content:
@@ -2729,6 +2733,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_persona_delete(self):
         body = self._body
+        if not self._require_auth("user"):
+            return
         name = body.get("name", "")
         if not name:
             self._json({"error": "name required"}, 400)
@@ -2744,6 +2750,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_test_key(self):
         body = self._body
+        if not self._require_auth("user"):
+            return
         provider = body.get("provider", "")
         from salmalm.core.llm import _http_post
 
@@ -2924,6 +2932,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_queue_mode(self):
         body = self._body
+        if not self._require_auth("user"):
+            return
         from salmalm.features.queue import set_queue_mode
 
         mode = body.get("mode", "collect")
@@ -3515,6 +3525,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
     def _post_api_thoughts_search(self):
         """Handle /api/thoughts/search."""
         body = self._body
+        if not self._require_auth("user"):
+            return
         from salmalm.features.thoughts import thought_stream
 
         q = body.get("q", body.get("query", ""))
