@@ -278,6 +278,8 @@ def _call_anthropic(
     else:
         body["max_tokens"] = max_tokens  # type: ignore[assignment]
 
+    if not use_thinking:
+        body["temperature"] = 0.3 if tools else 0.7
     if system_msgs:
         # Prompt caching: split static/dynamic blocks for better cache hits
         sys_text = "\n".join(system_msgs)
@@ -360,7 +362,7 @@ def _call_openai(
             converted_msgs.append({**m, "content": new_content})
         else:
             converted_msgs.append(m)
-    body = {"model": model_id, "max_tokens": max_tokens, "messages": converted_msgs}
+    body = {"model": model_id, "max_tokens": max_tokens, "messages": converted_msgs, "temperature": 0.3 if tools else 0.7}
     if tools:
         body["tools"] = [{"type": "function", "function": t} for t in tools]
     headers = {"Content-Type": "application/json"}
@@ -386,7 +388,7 @@ def _call_google(
 ) -> Dict[str, Any]:
     # Gemini API — with optional tool support
     merged = _build_gemini_contents(messages)
-    body: dict = {"contents": merged, "generationConfig": {"maxOutputTokens": max_tokens}}
+    body: dict = {"contents": merged, "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.3 if tools else 0.7}}
     gemini_tools = _build_gemini_tools(tools)
     if gemini_tools:
         body["tools"] = gemini_tools
@@ -485,7 +487,7 @@ def stream_google(
     contents = _build_gemini_contents(messages)
     body: dict = {
         "contents": contents,
-        "generationConfig": {"maxOutputTokens": max_tokens},
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.3 if tools else 0.7},
     }
     gemini_tools = _build_gemini_tools(tools)
     if gemini_tools:

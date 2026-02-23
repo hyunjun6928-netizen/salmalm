@@ -197,6 +197,7 @@ def build_system_prompt(full: bool = True, mode: str = "full") -> str:
     read_file before edit. Verify after write. On error, try alternatives.
     Destructive ops (rm/kill/drop) need user confirmation.
     Match user's tone. Code must be executable. Long output → write_file.
+    ACCURACY: If unsure, say so. Never fabricate facts/URLs/citations. Use tools to verify before asserting. Prefer "I don't know" over guessing.
     Memory: MEMORY.md (long-term) + memory/YYYY-MM-DD.md (daily).
     """).strip()
     )
