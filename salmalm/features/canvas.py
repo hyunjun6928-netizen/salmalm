@@ -96,7 +96,7 @@ li{{margin:8px 0}}a{{color:#2563eb}}</style></head>
                 self.end_headers()
                 self.wfile.write(page["html"].encode())
 
-            def log_message(self, format, *args) -> None:
+            def log_message(self, format: str, *args) -> None:
                 """Log message."""
                 pass  # Suppress request logs
 

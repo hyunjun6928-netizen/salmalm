@@ -109,7 +109,7 @@ def _get_tool_thresholds(tool_name: str, context_window_chars: Optional[int] = N
     return soft, hard
 
 
-def _has_image_block(content) -> bool:
+def _has_image_block(content: str) -> bool:
     """Check if a content block list contains image data."""
     if not isinstance(content, list):
         return False

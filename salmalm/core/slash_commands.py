@@ -76,13 +76,13 @@ def record_response_usage(session_id: str, model: str, usage: dict) -> None:
     su["total_cost"] += cost
 
 
-def _cmd_clear(cmd, session, **_) -> str:
+def _cmd_clear(cmd: str, session, **_) -> str:
     """Cmd clear."""
     session.messages = [m for m in session.messages if m["role"] == "system"][:1]
     return "Conversation cleared."
 
 
-def _cmd_help(cmd, session, **_) -> str:
+def _cmd_help(cmd: str, session, **_) -> str:
     """Cmd help."""
     from salmalm.tools import TOOL_DEFINITIONS
 
@@ -121,14 +121,14 @@ Auto intent classification (7 levels) → Model routing → Parallel tools → S
 💡 **Tip**: Just speak naturally. Read a file, search the web, write code, etc."""
 
 
-def _cmd_status(cmd, session, **_):
+def _cmd_status(cmd: str, session, **_):
     """Cmd status."""
     from salmalm.tools.tool_handlers import execute_tool
 
     return execute_tool("usage_report", {})
 
 
-def _cmd_tools(cmd, session, **_):
+def _cmd_tools(cmd: str, session, **_):
     """Cmd tools."""
     from salmalm.tools import TOOL_DEFINITIONS
 
@@ -138,7 +138,7 @@ def _cmd_tools(cmd, session, **_):
     return "\n".join(lines)
 
 
-async def _cmd_think(cmd, session, *, on_tool=None, **_) -> str:
+async def _cmd_think(cmd: str, session, *, on_tool=None, **_) -> str:
     """Cmd think."""
     think_msg = cmd[7:].strip()
     if not think_msg:
@@ -160,7 +160,7 @@ async def _cmd_think(cmd, session, *, on_tool=None, **_) -> str:
     )  # noqa: E128
 
 
-async def _cmd_plan(cmd, session, *, model_override=None, on_tool=None, **_) -> str:
+async def _cmd_plan(cmd: str, session, *, model_override=None, on_tool=None, **_) -> str:
     """Cmd plan."""
     plan_msg = cmd[6:].strip()
     if not plan_msg:
@@ -173,7 +173,7 @@ async def _cmd_plan(cmd, session, *, model_override=None, on_tool=None, **_) -> 
     )  # noqa: E128
 
 
-def _cmd_uptime(cmd, session, **_):
+def _cmd_uptime(cmd: str, session, **_):
     """Cmd uptime."""
     from salmalm.features.sla import uptime_monitor, sla_config  # noqa: F401
 
@@ -197,7 +197,7 @@ def _cmd_uptime(cmd, session, **_):
     return "\n".join(lines)
 
 
-def _cmd_latency(cmd, session, **_) -> str:
+def _cmd_latency(cmd: str, session, **_) -> str:
     """Cmd latency."""
     from salmalm.features.sla import latency_tracker
 
@@ -221,7 +221,7 @@ def _cmd_latency(cmd, session, **_) -> str:
     return "\n".join(lines)
 
 
-def _cmd_health_detail(cmd, session, **_):
+def _cmd_health_detail(cmd: str, session, **_):
     """Cmd health detail."""
     from salmalm.features.sla import watchdog
 
@@ -243,7 +243,7 @@ def _cmd_health_detail(cmd, session, **_):
     return "\n".join(lines)
 
 
-def _cmd_prune(cmd, session, **_) -> str:
+def _cmd_prune(cmd: str, session, **_) -> str:
     """Cmd prune."""
     _, stats = _lazy_prune_context()(session.messages)
     total = stats["soft_trimmed"] + stats["hard_cleared"] + stats["unchanged"]
@@ -256,7 +256,7 @@ def _cmd_prune(cmd, session, **_) -> str:
     )
 
 
-def _cmd_usage_daily(cmd, session, **_) -> str:
+def _cmd_usage_daily(cmd: str, session, **_) -> str:
     """Cmd usage daily."""
     from salmalm.features.edge_cases import usage_tracker
 
@@ -273,7 +273,7 @@ def _cmd_usage_daily(cmd, session, **_) -> str:
     return "\n".join(lines)
 
 
-def _cmd_usage_monthly(cmd, session, **_) -> str:
+def _cmd_usage_monthly(cmd: str, session, **_) -> str:
     """Cmd usage monthly."""
     from salmalm.features.edge_cases import usage_tracker
 
@@ -290,7 +290,7 @@ def _cmd_usage_monthly(cmd, session, **_) -> str:
     return "\n".join(lines)
 
 
-def _cmd_bookmarks(cmd, session, **_) -> str:
+def _cmd_bookmarks(cmd: str, session, **_) -> str:
     """Cmd bookmarks."""
     from salmalm.features.edge_cases import bookmark_manager
 
@@ -306,7 +306,7 @@ def _cmd_bookmarks(cmd, session, **_) -> str:
     return "\n".join(lines)
 
 
-def _cmd_compare(cmd, session, *, session_id="", **_) -> str:
+def _cmd_compare(cmd: str, session, *, session_id="", **_) -> str:
     """Cmd compare."""
     compare_msg = cmd[9:].strip()
     if not compare_msg:
@@ -334,14 +334,14 @@ def _cmd_compare(cmd, session, *, session_id="", **_) -> str:
     return "\n".join(lines)
 
 
-def _cmd_security(cmd, session, **_):
+def _cmd_security(cmd: str, session, **_):
     """Cmd security."""
     from salmalm.security import security_auditor
 
     return security_auditor.format_report()
 
 
-def _cmd_context(cmd, session, **_):
+def _cmd_context(cmd: str, session, **_):
     """Show context window token usage breakdown."""
     sub = cmd.strip().split()
     detail_mode = len(sub) > 1 and sub[1] == "detail"
@@ -429,7 +429,7 @@ def _cmd_context(cmd, session, **_):
     return "\n".join(lines)
 
 
-def _cmd_usage(cmd, session, *, session_id="", **_) -> str:
+def _cmd_usage(cmd: str, session, *, session_id="", **_) -> str:
     """Handle /usage tokens|full|cost|off commands."""
     parts = cmd.strip().split()
     sub = parts[1] if len(parts) > 1 else "tokens"
@@ -483,7 +483,7 @@ def _cmd_usage(cmd, session, *, session_id="", **_) -> str:
         return "📊 `/usage tokens|full|cost|off`"
 
 
-def _cmd_soul(cmd, session, **_) -> str:
+def _cmd_soul(cmd: str, session, **_) -> str:
     """Cmd soul."""
     from salmalm.core.prompt import get_user_soul, USER_SOUL_FILE
 
@@ -493,7 +493,7 @@ def _cmd_soul(cmd, session, **_) -> str:
     return f"📜 SOUL.md is not set. Create `{USER_SOUL_FILE}` or edit via Settings."
 
 
-def _cmd_soul_reset(cmd, session, **_) -> str:
+def _cmd_soul_reset(cmd: str, session, **_) -> str:
     """Cmd soul reset."""
     from salmalm.core.prompt import reset_user_soul, build_system_prompt
 
@@ -502,7 +502,7 @@ def _cmd_soul_reset(cmd, session, **_) -> str:
     return "📜 SOUL.md reset to default."
 
 
-def _cmd_model(cmd, session, **_) -> str:
+def _cmd_model(cmd: str, session, **_) -> str:
     """Cmd model."""
     model_name = cmd[7:].strip() if len(cmd) > 7 else ""
     if not model_name:
@@ -529,7 +529,7 @@ def _cmd_model(cmd, session, **_) -> str:
     )
 
 
-def _cmd_tts(cmd, session, **_) -> str:
+def _cmd_tts(cmd: str, session, **_) -> str:
     """Cmd tts."""
     arg = cmd[4:].strip()
     if arg == "on":
@@ -544,7 +544,7 @@ def _cmd_tts(cmd, session, **_) -> str:
         return f"🔊 TTS: **{status}** (voice: {voice})\n`/tts on` · `/tts off` · `/voice alloy|nova|echo|fable|onyx|shimmer`"
 
 
-def _cmd_voice(cmd, session, **_) -> str:
+def _cmd_voice(cmd: str, session, **_) -> str:
     """Cmd voice."""
     arg = cmd[6:].strip()
     valid_voices = ("alloy", "nova", "echo", "fable", "onyx", "shimmer")
@@ -554,7 +554,7 @@ def _cmd_voice(cmd, session, **_) -> str:
     return f"Available voices: {', '.join(valid_voices)}"
 
 
-def _cmd_subagents(cmd, session, **_) -> str:
+def _cmd_subagents(cmd: str, session, **_) -> str:
     """Handle /subagents commands: list, spawn, stop, steer, log, info, collect."""
     from salmalm.features.agents import SubAgent
 
@@ -639,7 +639,7 @@ def _cmd_subagents(cmd, session, **_) -> str:
     return "❌ Usage: /subagents spawn|list|stop|steer|log|info|collect <args>"
 
 
-def _cmd_agent(cmd, session, *, session_id="", **_) -> str:
+def _cmd_agent(cmd: str, session, *, session_id="", **_) -> str:
     """Cmd agent."""
     from salmalm.features.agents import agent_manager
 
@@ -671,7 +671,7 @@ def _cmd_agent(cmd, session, *, session_id="", **_) -> str:
     return "❌ Usage: /agent list|create|switch|delete|bind <args>"
 
 
-def _cmd_hooks(cmd, session, **_) -> str:
+def _cmd_hooks(cmd: str, session, **_) -> str:
     """Cmd hooks."""
     from salmalm.features.hooks import hook_manager
 
@@ -702,7 +702,7 @@ def _cmd_hooks(cmd, session, **_) -> str:
     return "❌ Usage: /hooks list|test|add|reload"
 
 
-def _cmd_plugins(cmd, session, **_) -> str:
+def _cmd_plugins(cmd: str, session, **_) -> str:
     """Cmd plugins."""
     from salmalm.features.plugin_manager import plugin_manager
 
@@ -730,7 +730,7 @@ def _cmd_plugins(cmd, session, **_) -> str:
 
 
 # ── Self-Evolving Prompt commands ──
-def _cmd_evolve(cmd, session, **_) -> str:
+def _cmd_evolve(cmd: str, session, **_) -> str:
     """Cmd evolve."""
     parts = cmd.strip().split(None, 2)
     sub = parts[1] if len(parts) > 1 else "status"
@@ -752,7 +752,7 @@ def _cmd_evolve(cmd, session, **_) -> str:
 # ── Mood-Aware commands ──
 
 
-def _cmd_mood(cmd, session, **_) -> str:
+def _cmd_mood(cmd: str, session, **_) -> str:
     """Cmd mood."""
     parts = cmd.strip().split(None, 2)
     sub = parts[1] if len(parts) > 1 else "status"
@@ -777,7 +777,7 @@ def _cmd_mood(cmd, session, **_) -> str:
 # ── Thought Stream commands ──
 
 
-def _cmd_thought(cmd, session, **_) -> str:
+def _cmd_thought(cmd: str, session, **_) -> str:
     """Cmd thought."""
     from salmalm.features.thoughts import thought_stream, _format_thoughts, _format_stats
 
@@ -839,7 +839,7 @@ def _cmd_thought(cmd, session, **_) -> str:
         return f"💭 생각 #{tid} 기록됨{tags}"
 
 
-def _cmd_export_fn(cmd, session, **_) -> str:
+def _cmd_export_fn(cmd: str, session, **_) -> str:
     """Handle /export [md|json|html] command."""
     from salmalm.core.export import export_session
 
@@ -905,7 +905,7 @@ _SLASH_PREFIX_COMMANDS = [
 ]
 
 
-async def _dispatch_slash_command(cmd, session, session_id, model_override, on_tool):
+async def _dispatch_slash_command(cmd: str, session, session_id: str, model_override, on_tool):
     """Dispatch slash commands. Returns response string or None if not a command."""
     # Exact match first
     handler = _SLASH_COMMANDS.get(cmd)

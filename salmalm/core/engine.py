@@ -370,7 +370,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         log.info(f"[FAST] Parallel: {len(tool_calls)} tools completed")
         return outputs
 
-    def _append_tool_results(self, session, provider, result, tool_calls, tool_outputs) -> None:
+    def _append_tool_results(self, session, provider: str, result, tool_calls, tool_outputs) -> None:
         """Append tool call + results to session messages."""
         if provider == "anthropic":
             content_blocks = []
@@ -423,7 +423,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             on_status=on_status,
         )
 
-    async def _try_llm_call(self, messages, model, tools, max_tokens, thinking, on_token):
+    async def _try_llm_call(self, messages: list, model: str, tools: list, max_tokens: int, thinking, on_token):
         """Single LLM call attempt. Delegates to llm_loop."""
         model = _fix_model_name(model)
         return await _try_llm_call_fn(messages, model, tools, max_tokens, thinking, on_token)
@@ -498,7 +498,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     MAX_TOOL_ITERATIONS = 15
     MAX_CONSECUTIVE_ERRORS = 3
 
-    async def _handle_token_overflow(self, session, model, tools, max_tokens, thinking, on_status) -> tuple:
+    async def _handle_token_overflow(self, session, model: str, tools: list, max_tokens: int, thinking, on_status) -> tuple:
         """Handle token overflow with 3-stage recovery. Returns (result, error_msg_or_None)."""
         log.warning(f"[CUT] Token overflow with {len(session.messages)} messages — running compaction")
 

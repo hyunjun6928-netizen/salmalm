@@ -26,16 +26,16 @@ def install_shim(package_name: str, real_module: str, submodules: set) -> None:
         return _real_mod
 
     class _PkgProxy(types.ModuleType):
-        def __getattr__(self, name):
+        def __getattr__(self, name: str):
             return getattr(_get_real(), name)
 
-        def __setattr__(self, name, value):
+        def __setattr__(self, name: str, value: str):
             if name.startswith("_") or name in submodules:
                 super().__setattr__(name, value)
             else:
                 setattr(_get_real(), name, value)
 
-        def __delattr__(self, name):
+        def __delattr__(self, name: str):
             delattr(_get_real(), name)
 
     old = sys.modules[package_name]

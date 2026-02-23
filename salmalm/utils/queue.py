@@ -191,7 +191,7 @@ class QueueLane:
 
     # ── Mode handlers ──
 
-    async def _handle_collect(self, message, processor, cap, drop, debounce_s, **kwargs) -> str:
+    async def _handle_collect(self, message: str, processor, cap, drop, debounce_s, **kwargs) -> str:
         """Collect mode: debounce, merge, process as single turn."""
         self._pending.append(QueuedMessage(text=message))
         self._pending, _ = apply_overflow(self._pending, cap, drop)
@@ -231,7 +231,7 @@ class QueueLane:
         self._debounce_task = asyncio.ensure_future(_debounce())
         return await future
 
-    async def _handle_followup(self, message, processor, cap, drop, debounce_s, **kwargs) -> str:
+    async def _handle_followup(self, message: str, processor, cap, drop, debounce_s, **kwargs) -> str:
         """Followup mode: wait for current task to finish, then queue as next turn."""
         self._pending.append(QueuedMessage(text=message))
         self._pending, _ = apply_overflow(self._pending, cap, drop)
@@ -247,7 +247,7 @@ class QueueLane:
                 log.info(f"[QUEUE] followup {self.session_id}: processing {len(collected)} msgs")
                 return await processor(self.session_id, merged, **kwargs)
 
-    async def _handle_steer(self, message, processor, cap, drop, debounce_s, followup=False, **kwargs) -> str:
+    async def _handle_steer(self, message: str, processor, cap, drop, debounce_s, followup=False, **kwargs) -> str:
         """Steer mode: inject into running agent. If followup=True (steer-backlog), also queue remainder."""
         # If something is currently running, steer into it
         if self._session_sem.locked():
@@ -265,7 +265,7 @@ class QueueLane:
         # Nothing running — treat as collect
         return await self._handle_collect(message, processor, cap, drop, debounce_s, **kwargs)
 
-    async def _handle_interrupt(self, message, processor, cap, drop, **kwargs) -> str:
+    async def _handle_interrupt(self, message: str, processor, cap, drop, **kwargs) -> str:
         """Interrupt mode: cancel current, start fresh with latest message."""
         # Cancel current task
         if self._current_task and not self._current_task.done():

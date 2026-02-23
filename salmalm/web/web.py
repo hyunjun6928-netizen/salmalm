@@ -60,7 +60,7 @@ class WebHandler(
 ):
     """HTTP handler for web UI and API."""
 
-    def log_message(self, format, *args) -> None:
+    def log_message(self, format: str, *args) -> None:
         """Suppress default HTTP request logging."""
         pass  # Suppress default logging
 

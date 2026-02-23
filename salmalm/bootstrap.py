@@ -257,7 +257,7 @@ async def run_server():
         log.error(f"WebSocket server failed: {e}")
 
     @ws_server.on_message
-    async def handle_ws_message(client, data) -> None:
+    async def handle_ws_message(client, data: dict) -> None:
         """Handle ws message."""
         msg_type = data.get("type", "message")
         if msg_type == "ping":
@@ -275,7 +275,7 @@ async def run_server():
             # Send typing indicator immediately
             await client.send_json({"type": "typing", "status": "typing"})
 
-            async def on_tool(name, args) -> None:
+            async def on_tool(name: str, args) -> None:
                 """On tool."""
                 await stream.send_tool_call(name, args)
 
@@ -328,7 +328,7 @@ async def run_server():
         mcp_manager.load_config()
         from salmalm.tools import TOOL_DEFINITIONS, execute_tool
 
-        async def mcp_tool_executor(name, args):
+        async def mcp_tool_executor(name: str, args):
             """Mcp tool executor."""
             return execute_tool(name, args)
 
@@ -388,7 +388,7 @@ async def run_server():
                 discord_bot.configure(dc_token, dc_guild)
 
                 # Register message handler → core engine
-                async def _discord_message_handler(content, raw_data, on_token=None):
+                async def _discord_message_handler(content: str, raw_data, on_token=None):
                     """Discord message handler."""
                     import time as _t
 

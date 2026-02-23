@@ -29,7 +29,7 @@ _TEMPLATE_MAP = {
 }
 
 
-def __getattr__(name):
+def __getattr__(name: str):
     if name in _TEMPLATE_MAP:
         return _load(_TEMPLATE_MAP[name])
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

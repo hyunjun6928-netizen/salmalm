@@ -7,7 +7,7 @@ These will be fully extracted in a future refactor.
 from salmalm.tools.tool_registry import register
 
 
-def _legacy(name, args):
+def _legacy(name: str, args):
     """Call legacy tool_handlers implementation."""
     from salmalm import tool_handlers as _th
 

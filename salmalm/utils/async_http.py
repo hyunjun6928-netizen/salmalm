@@ -199,7 +199,7 @@ class AsyncHTTPClient:
         """Post."""
         return await self.request("POST", url, **kw)
 
-    async def post_json(self, url: str, data, *, headers: Optional[Dict[str, str]] = None, **kw) -> AsyncHTTPResponse:
+    async def post_json(self, url: str, data: dict, *, headers: Optional[Dict[str, str]] = None, **kw) -> AsyncHTTPResponse:
         """Post json."""
         body = json.dumps(data).encode("utf-8")
         h = dict(headers) if headers else {}

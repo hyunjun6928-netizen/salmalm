@@ -658,7 +658,7 @@ async def _run_server_stdio():
 
     server = MCPServer()
 
-    async def executor(name, args):
+    async def executor(name: str, args):
         """Get the tool executor callable for MCP tools."""
         return execute_tool(name, args)
 

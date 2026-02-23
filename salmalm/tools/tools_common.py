@@ -249,7 +249,7 @@ def _is_private_url_follow_redirects(url: str, max_redirects: int = 5) -> tuple:
             # Use a custom opener that doesn't follow redirects
 
             class _NoRedirect(urllib.request.HTTPRedirectHandler):
-                def redirect_request(self, req, fp, code, msg, headers, newurl) -> None:
+                def redirect_request(self, req, fp, code, msg, headers: dict, newurl) -> None:
                     """Redirect request."""
                     raise urllib.error.HTTPError(newurl, code, msg, headers, fp)
 

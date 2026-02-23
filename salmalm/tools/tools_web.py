@@ -71,7 +71,7 @@ def handle_web_fetch(args: dict) -> str:
             if tag.lower() in self._skip_tags:
                 self._skip = False
 
-        def handle_data(self, data) -> None:
+        def handle_data(self, data: dict) -> None:
             """Handle data."""
             if not self._skip:
                 self._parts.append(data)

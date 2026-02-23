@@ -125,7 +125,7 @@ class DailyBriefing:
 
         return "\n".join(parts)
 
-    def configure(self, key: str, value) -> str:
+    def configure(self, key: str, value: str) -> str:
         """Update briefing config."""
         config = _load_config()
         if key == "include" and isinstance(value, str):

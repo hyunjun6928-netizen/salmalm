@@ -642,7 +642,7 @@ class AuthManager:
 # ── Request authentication middleware ────────────────────────
 
 
-def extract_auth(headers) -> Optional[dict]:
+def extract_auth(headers: dict) -> Optional[dict]:
     """Extract user from headers. Accepts dict (case-sensitive) or HTTPMessage (case-insensitive)."""
     # Normalize dict to lowercase keys for reliable lookup
     if isinstance(headers, dict):

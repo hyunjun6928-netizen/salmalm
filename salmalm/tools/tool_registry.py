@@ -39,7 +39,7 @@ def _ensure_modules():
     _HANDLERS["apply_patch"] = lambda args: _apply_patch_fn(args.get("patch_text", ""), args.get("base_dir", "."))
 
 
-def register(name):
+def register(name: str):
     """Decorator to register a tool handler function."""
 
     def decorator(fn):

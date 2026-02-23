@@ -344,7 +344,7 @@ class SandboxResult:
         return "\n".join(parts) if parts else "(no output)"
 
 
-def sandboxed_exec(command, config: Optional[SandboxConfig] = None, shell: bool = False) -> SandboxResult:
+def sandboxed_exec(command: str, config: Optional[SandboxConfig] = None, shell: bool = False) -> SandboxResult:
     """Execute a command in sandbox (backward-compatible wrapper)."""
     cfg = config or SandboxConfig()
     if isinstance(command, list):

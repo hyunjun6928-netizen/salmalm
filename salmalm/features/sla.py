@@ -99,7 +99,7 @@ class SLAConfig:
         with self._lock:
             return self._config.get(key, default)
 
-    def set(self, key: str, value) -> None:
+    def set(self, key: str, value: str) -> None:
         """Set."""
         with self._lock:
             self._config[key] = value

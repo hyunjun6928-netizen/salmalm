@@ -89,7 +89,7 @@ class ConfigManager:
         return cls.resolve(name, key, default)
 
     @classmethod
-    def set(cls, name: str, key: str, value) -> None:
+    def set(cls, name: str, key: str, value: str) -> None:
         """단일 키 설정."""
         config = cls.load(name)
         config[key] = value
