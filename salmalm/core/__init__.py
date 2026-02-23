@@ -1,36 +1,56 @@
-# Subpackage proxy for backward compatibility
-import importlib as _importlib
-import sys as _sys
-import types as _types
-
-_real_mod = None
-_SUBMODULES = {"core", "engine", "llm", "llm_loop", "llm_task", "session_manager", "memory", "prompt"}
-
-
-def _get_real():
-    global _real_mod
-    if _real_mod is None:
-        _real_mod = _importlib.import_module("salmalm.core.core")
-    return _real_mod
-
-
-class _PkgProxy(_types.ModuleType):
-    def __getattr__(self, name):
-        return getattr(_get_real(), name)
-
-    def __setattr__(self, name, value):
-        if name.startswith("_") or name in _SUBMODULES:
-            super().__setattr__(name, value)
-        else:
-            setattr(_get_real(), name, value)
-
-    def __delattr__(self, name):
-        delattr(_get_real(), name)
-
-
-_proxy = _PkgProxy(__name__)
-_proxy.__path__ = __path__
-_proxy.__file__ = __file__
-_proxy.__package__ = __package__
-_proxy.__spec__ = __spec__
-_sys.modules[__name__] = _proxy
+# Explicit re-exports from salmalm.core.core for backward compatibility.
+# No sys.modules proxy — IDE/type-checker friendly.
+from salmalm.core.core import (  # noqa: F401
+    COST_CAP,
+    CostCapExceeded,
+    CronScheduler,
+    HeartbeatManager,
+    LLMCronManager,
+    ModelRouter,
+    ResponseCache,
+    Session,
+    TFIDFSearch,
+    _get_db,
+    _init_audit_db,
+    _restore_usage,
+    _llm_cron,
+    _metrics,
+    _session_lock,
+    _sessions,
+    _tfidf,
+    _tg_bot,
+    _thread_local,
+    _usage,
+    _usage_lock,
+    audit_checkpoint,
+    auto_compact_if_needed,
+    audit_log,
+    audit_log_cleanup,
+    auto_title_session,
+    branch_session,
+    compact_session,
+    check_cost_cap,
+    close_all_db_connections,
+    compact_messages,
+    cron,
+    delete_message,
+    edit_message,
+    get_session,
+    get_telegram_bot,
+    get_usage_report,
+    heartbeat,
+    query_audit_log,
+    response_cache,
+    rollback_session,
+    router,
+    save_session_to_disk,
+    search_messages,
+    set_current_user_id,
+    set_telegram_bot,
+    track_usage,
+    write_daily_log,
+    # Re-exported from salmalm.features.agents via core.py
+    PluginLoader,
+    SkillLoader,
+    SubAgent,
+)

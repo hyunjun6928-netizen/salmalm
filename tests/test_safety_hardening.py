@@ -21,7 +21,7 @@ class TestCostCap(unittest.TestCase):
 
     def test_cost_cap_exceeded_raises(self):
         """CostCapExceeded should be raised when cost >= COST_CAP."""
-        import salmalm.core as _core
+        import salmalm.core.core as _core
         from salmalm.core import CostCapExceeded, _usage, _usage_lock, check_cost_cap
         original_cost = _usage['total_cost']
         original_cap = _core.COST_CAP
@@ -59,7 +59,7 @@ class TestCostCap(unittest.TestCase):
 
     def test_cost_cap_exact_boundary(self):
         """Cost exactly at cap should trigger."""
-        import salmalm.core as _core
+        import salmalm.core.core as _core
         from salmalm.core import CostCapExceeded, _usage, _usage_lock, check_cost_cap
         original_cost = _usage['total_cost']
         original_cap = _core.COST_CAP

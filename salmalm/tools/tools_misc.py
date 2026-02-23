@@ -13,7 +13,7 @@ from pathlib import Path
 from salmalm.tools.tool_registry import register
 from salmalm.constants import WORKSPACE_DIR
 from salmalm.security.crypto import vault, log
-from salmalm.core import _tg_bot
+# _tg_bot imported lazily inside functions (mutable global — module-level import captures stale None)
 
 
 # ── Reminder System ──────────────────────────────────────────
@@ -143,6 +143,7 @@ def _send_notification_impl(
 
     if channel in ("telegram", "all"):
         try:
+            from salmalm.core import _tg_bot
             tg = _tg_bot
             if tg:
                 owner = vault.get("telegram_owner_id") or ""

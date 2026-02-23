@@ -47,7 +47,7 @@ class Doctor:
             from salmalm.security.crypto import HAS_CRYPTO
             if HAS_CRYPTO:
                 return _status(True, "Vault: AES-256-GCM (cryptography installed)")
-            return _status(True, "Vault: HMAC-CTR fallback (install 'salmalm[crypto]' for AES-256-GCM)")
+            return _status(False, "⚠️ Vault: HMAC-CTR fallback (weaker). Run: pip install salmalm[crypto]")
         except Exception as e:
             return _status(False, f"Vault check failed: {e}")
 

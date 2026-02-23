@@ -35,92 +35,51 @@ PBKDF2_ITER = 200_000
 SESSION_TIMEOUT = 3600 * 8
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION = 60
-EXEC_ALLOWLIST = {
+# ── Exec Allowlist Tiers ──────────────────────────────────────
+# Tier 1 (BASIC): Always allowed — read-only utils, dev tools, file ops, system info
+_EXEC_TIER_BASIC = {
     # Core utils (read-only / safe)
-    "ls",
-    "cat",
-    "head",
-    "tail",
-    "wc",
-    "sort",
-    "uniq",
-    "grep",
-    "sed",
-    "which",
-    "file",
-    "stat",
-    "du",
-    "df",
-    "echo",
-    "printf",
-    "date",
-    "tr",
-    "cut",
-    "tee",
-    "diff",
-    "patch",
-    "env",
-    "pwd",
-    "whoami",
-    "uname",
-    "hostname",
-    "id",
-    "dirname",
-    "basename",
-    "realpath",
-    "readlink",
-    "md5sum",
-    "sha256sum",
-    "base64",
-    "xxd",
-    "hexdump",
-    "yes",
-    "true",
-    "false",
+    "ls", "cat", "head", "tail", "wc", "sort", "uniq", "grep", "sed",
+    "which", "file", "stat", "du", "df", "echo", "printf", "date",
+    "tr", "cut", "tee", "diff", "patch", "env", "pwd", "whoami",
+    "uname", "hostname", "id", "dirname", "basename", "realpath",
+    "readlink", "md5sum", "sha256sum", "base64", "xxd", "hexdump",
+    "yes", "true", "false",
     # Dev tools (read-only / query only)
-    "git",
-    "gh",
+    "git", "gh",
     # Guarded commands — allowed but with subcommand/flag restrictions (see EXEC_ARG_BLOCKLIST)
-    "awk",
-    "find",
-    "xargs",
-    "tar",
-    # Network (read-only)
-    "ping",
-    "dig",
-    "nslookup",
-    "host",
-    "traceroute",
-    "ss",
-    "ip",
+    "awk", "find", "xargs", "tar",
     # File ops (safe)
-    "cp",
-    "mv",
-    "mkdir",
-    "touch",
-    "ln",
-    "gzip",
-    "gunzip",
-    "zip",
-    "unzip",
-    # Text
-    "jq",
-    "yq",
-    "csvtool",
-    "sqlite3",
-    "psql",
-    "mysql",
+    "cp", "mv", "mkdir", "touch", "ln",
+    "gzip", "gunzip", "zip", "unzip",
+    # Text processing
+    "jq", "yq", "csvtool",
     # System info
-    "ps",
-    "top",
-    "htop",
-    "free",
-    "uptime",
-    "lsof",
-    "nproc",
-    "lscpu",
-    "lsblk",
+    "ps", "top", "htop", "free", "uptime", "lsof", "nproc", "lscpu", "lsblk",
 }
+
+# Tier 2 (NETWORK): Network diagnostics — requires SALMALM_EXEC_NETWORK=1
+_EXEC_TIER_NETWORK = {
+    "ping", "dig", "nslookup", "host", "traceroute", "ss", "ip",
+}
+
+# Tier 3 (DATABASE): DB clients — requires SALMALM_EXEC_DATABASE=1
+_EXEC_TIER_DATABASE = {
+    "sqlite3", "psql", "mysql",
+}
+
+
+def _build_exec_allowlist() -> set:
+    """Build effective allowlist from tiers + env vars."""
+    allowed = set(_EXEC_TIER_BASIC)
+    if _os.environ.get("SALMALM_EXEC_NETWORK", "1") == "1":
+        allowed |= _EXEC_TIER_NETWORK
+    if _os.environ.get("SALMALM_EXEC_DATABASE", "1") == "1":
+        allowed |= _EXEC_TIER_DATABASE
+    return allowed
+
+
+EXEC_ALLOWLIST = _build_exec_allowlist()
 # Per-command dangerous argument/flag blocklist — blocks code execution vectors
 EXEC_ARG_BLOCKLIST: dict = {
     "awk": {"-f", "--file"},
