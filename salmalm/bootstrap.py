@@ -493,6 +493,19 @@ async def run_server():
     _ws_port = int(os.environ.get("SALMALM_WS_PORT", 18801))
     _print_banner(bind_addr=bind_addr, port=port, ws_port=_ws_port)
 
+    # ── Graceful Shutdown Setup ──
+    _trigger_shutdown = asyncio.Event()
+    _shutdown_count = [0]
+
+    def _handle_shutdown(signum, frame):
+        """Handle shutdown signal."""
+        _shutdown_count[0] += 1
+        if _shutdown_count[0] >= 2:
+            log.warning("[SHUTDOWN] Forced exit (second signal)")
+            os._exit(1)
+        log.info(f"[SHUTDOWN] Signal received ({signum}), initiating graceful shutdown...")
+        asyncio.get_event_loop().call_soon_threadsafe(_trigger_shutdown.set)
+
     # Register signal handlers
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
