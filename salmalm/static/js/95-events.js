@@ -92,7 +92,9 @@
         early_stop:!!document.getElementById('eng-early-stop').checked,
         cost_cap:document.getElementById('eng-cost-cap').value.trim(),
         temperature_chat:parseFloat(document.getElementById('eng-temp-chat').value)||0.7,
-        temperature_tool:parseFloat(document.getElementById('eng-temp-tool').value)||0.3
+        temperature_tool:parseFloat(document.getElementById('eng-temp-tool').value)||0.3,
+        max_tokens_chat:parseInt(document.getElementById('eng-max-tokens-chat').value)||512,
+        max_tokens_code:parseInt(document.getElementById('eng-max-tokens-code').value)||4096
       };
       fetch('/api/engine/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
         .then(function(r){return r.json()}).then(function(d){
@@ -196,6 +198,8 @@
   document.addEventListener('input',function(e){
     if(e.target.id==='eng-temp-chat'){var l=document.getElementById('eng-temp-chat-val');if(l)l.textContent=e.target.value;}
     if(e.target.id==='eng-temp-tool'){var l2=document.getElementById('eng-temp-tool-val');if(l2)l2.textContent=e.target.value;}
+    if(e.target.id==='eng-max-tokens-chat'){var l3=document.getElementById('eng-max-tokens-chat-val');if(l3)l3.textContent=e.target.value;}
+    if(e.target.id==='eng-max-tokens-code'){var l4=document.getElementById('eng-max-tokens-code-val');if(l4)l4.textContent=e.target.value;}
   });
   document.addEventListener('keydown',function(e){
     if(e.key!=='Enter')return;

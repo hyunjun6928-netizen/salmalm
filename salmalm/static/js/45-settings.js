@@ -71,6 +71,8 @@
       var es=document.getElementById('eng-early-stop');if(es)es.checked=!!d.early_stop;
       var tc=document.getElementById('eng-temp-chat');if(tc){tc.value=String(d.temperature_chat!=null?d.temperature_chat:0.7);var tcl=document.getElementById('eng-temp-chat-val');if(tcl)tcl.textContent=tc.value;}
       var tt=document.getElementById('eng-temp-tool');if(tt){tt.value=String(d.temperature_tool!=null?d.temperature_tool:0.3);var ttl=document.getElementById('eng-temp-tool-val');if(ttl)ttl.textContent=tt.value;}
+      var mtc=document.getElementById('eng-max-tokens-chat');if(mtc){mtc.value=String(d.max_tokens_chat||512);var mtcl=document.getElementById('eng-max-tokens-chat-val');if(mtcl)mtcl.textContent=mtc.value;}
+      var mtk=document.getElementById('eng-max-tokens-code');if(mtk){mtk.value=String(d.max_tokens_code||4096);var mtkl=document.getElementById('eng-max-tokens-code-val');if(mtkl)mtkl.textContent=mtk.value;}
     }).catch(function(){});
     if(window._checkTgStatus)window._checkTgStatus();
     if(window._checkDcStatus)window._checkDcStatus();

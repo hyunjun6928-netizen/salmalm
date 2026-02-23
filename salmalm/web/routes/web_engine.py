@@ -164,6 +164,8 @@ class WebEngineMixin:
                 "early_stop": os.environ.get("SALMALM_EARLY_STOP", "0") == "1",
                 "temperature_chat": float(os.environ.get("SALMALM_TEMP_CHAT", "0.7")),
                 "temperature_tool": float(os.environ.get("SALMALM_TEMP_TOOL", "0.3")),
+                "max_tokens_chat": int(os.environ.get("SALMALM_MAX_TOKENS_CHAT", "512")),
+                "max_tokens_code": int(os.environ.get("SALMALM_MAX_TOKENS_CODE", "4096")),
             }
         )
 
@@ -202,4 +204,19 @@ class WebEngineMixin:
                 os.environ["SALMALM_COST_CAP"] = cap
             elif "SALMALM_COST_CAP" in os.environ:
                 del os.environ["SALMALM_COST_CAP"]
+        # Max tokens per intent
+        for _mt_key, _mt_env, _mt_const in [
+            ("max_tokens_chat", "SALMALM_MAX_TOKENS_CHAT", "chat"),
+            ("max_tokens_code", "SALMALM_MAX_TOKENS_CODE", "code"),
+        ]:
+            if _mt_key in body:
+                try:
+                    val = int(body[_mt_key])
+                    if 256 <= val <= 32768:
+                        os.environ[_mt_env] = str(val)
+                        # Update runtime dict
+                        from salmalm.core.classifier import INTENT_MAX_TOKENS
+                        INTENT_MAX_TOKENS[_mt_const] = val
+                except (ValueError, TypeError):
+                    pass
         self._json({"ok": True})

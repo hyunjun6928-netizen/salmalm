@@ -258,13 +258,15 @@ _KEYWORD_TOOLS = {
 }
 
 # Dynamic max_tokens per intent
+import os as _os
+
 INTENT_MAX_TOKENS = {
-    "chat": 512,
+    "chat": int(_os.environ.get("SALMALM_MAX_TOKENS_CHAT", "512")),
     "memory": 512,
     "creative": 1024,
     "search": 1024,
     "analysis": 2048,
-    "code": 4096,
+    "code": int(_os.environ.get("SALMALM_MAX_TOKENS_CODE", "4096")),
     "system": 1024,
 }
 

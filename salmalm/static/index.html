@@ -962,6 +962,27 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           </div>
         </div>
 
+        <!-- Max Tokens -->
+        <div style="margin-top:16px">
+          <div style="font-weight:600;font-size:13px;margin-bottom:8px">
+            <span class="eng-en">📏 Max Response Tokens</span><span class="eng-kr">📏 최대 응답 토큰</span>
+          </div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <label style="font-size:13px;flex:1;min-width:200px">
+              <span class="eng-en">💬 Chat: <b id="eng-max-tokens-chat-val">512</b></span><span class="eng-kr">💬 대화: <b id="eng-max-tokens-chat-val">512</b></span>
+              <input type="range" id="eng-max-tokens-chat" min="256" max="16384" step="256" value="512" style="width:100%;margin-top:4px">
+            </label>
+            <label style="font-size:13px;flex:1;min-width:200px">
+              <span class="eng-en">💻 Code/Analysis: <b id="eng-max-tokens-code-val">4096</b></span><span class="eng-kr">💻 코드/분석: <b id="eng-max-tokens-code-val">4096</b></span>
+              <input type="range" id="eng-max-tokens-code" min="1024" max="32768" step="1024" value="4096" style="width:100%;margin-top:4px">
+            </label>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px">
+            <span class="eng-en">⚠️ Low chat tokens (512) may truncate long responses like code reviews. Increase to 2048~4096 for detailed answers.</span>
+            <span class="eng-kr">⚠️ 대화 토큰이 낮으면 (512) 코드 리뷰 같은 긴 응답이 잘릴 수 있습니다. 상세 답변이 필요하면 2048~4096으로 올리세요.</span>
+          </div>
+        </div>
+
       </div>
 
       <!-- Summary bar -->
