@@ -1337,6 +1337,8 @@ window._i18n={
         }
         h+='</div>';
       });
+      /* Cooldown reset button */
+      h+='<div style="text-align:center;margin-top:12px"><button data-action="resetCooldowns" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;font-size:12px">🔄 '+(kr?'쿨다운 초기화':'Reset Cooldowns')+'</button></div>';
       gridEl.innerHTML=h;
     }).catch(function(e){
       document.getElementById('mr-provider-grid').innerHTML='<div style="color:var(--red)">Failed to load: '+e+'</div>';
@@ -2155,6 +2157,14 @@ window._i18n={
         window.setModel(model);
         setTimeout(function(){if(typeof window._loadModelRouter==='function')window._loadModelRouter()},300);
       }
+    }
+    else if(a==='resetCooldowns'){
+      el.textContent='⏳...';
+      fetch('/api/cooldowns/reset',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok,'X-Requested-With':'XMLHttpRequest'},body:'{}'})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.ok){el.textContent='✅';setTimeout(function(){if(typeof window._loadModelRouter==='function')window._loadModelRouter()},500)}
+        else{el.textContent='❌'}
+      }).catch(function(){el.textContent='❌'});
     }
     else if(a==='toggleFeatCat'){el.parentElement.classList.toggle('open')}
     else if(a==='fillCommand'){var inp=document.getElementById('input');inp.value=el.getAttribute('data-cmd');inp.focus()}

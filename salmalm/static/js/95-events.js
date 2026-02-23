@@ -115,6 +115,14 @@
         setTimeout(function(){if(typeof window._loadModelRouter==='function')window._loadModelRouter()},300);
       }
     }
+    else if(a==='resetCooldowns'){
+      el.textContent='⏳...';
+      fetch('/api/cooldowns/reset',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok,'X-Requested-With':'XMLHttpRequest'},body:'{}'})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.ok){el.textContent='✅';setTimeout(function(){if(typeof window._loadModelRouter==='function')window._loadModelRouter()},500)}
+        else{el.textContent='❌'}
+      }).catch(function(){el.textContent='❌'});
+    }
     else if(a==='toggleFeatCat'){el.parentElement.classList.toggle('open')}
     else if(a==='fillCommand'){var inp=document.getElementById('input');inp.value=el.getAttribute('data-cmd');inp.focus()}
     else if(a==='toggleUser'){var uid=parseInt(el.getAttribute('data-uid'));var en=el.getAttribute('data-enabled')==='true';window.toggleUser(uid,en)}

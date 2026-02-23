@@ -61,6 +61,8 @@
         }
         h+='</div>';
       });
+      /* Cooldown reset button */
+      h+='<div style="text-align:center;margin-top:12px"><button data-action="resetCooldowns" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer;font-size:12px">🔄 '+(kr?'쿨다운 초기화':'Reset Cooldowns')+'</button></div>';
       gridEl.innerHTML=h;
     }).catch(function(e){
       document.getElementById('mr-provider-grid').innerHTML='<div style="color:var(--red)">Failed to load: '+e+'</div>';

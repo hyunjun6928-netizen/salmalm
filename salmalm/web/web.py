@@ -703,9 +703,19 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     def _get_failover(self):
         if not self._require_auth("user"):
             return
-        from salmalm.core.engine import get_failover_config, _load_cooldowns
+        from salmalm.core.engine import get_failover_config
+        from salmalm.core.llm_loop import get_cooldown_status
 
-        self._json({"config": get_failover_config(), "cooldowns": _load_cooldowns()})
+        self._json({"config": get_failover_config(), "cooldowns": get_cooldown_status()})
+
+    def _post_api_cooldowns_reset(self):
+        """POST /api/cooldowns/reset — Clear all model cooldowns."""
+        if not self._require_auth("user"):
+            return
+        from salmalm.core.llm_loop import reset_cooldowns
+
+        reset_cooldowns()
+        self._json({"ok": True, "message": "All cooldowns cleared"})
 
     def _get_memory_files(self):
         if not self._require_auth("user"):
@@ -4197,6 +4207,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         "/api/routing": "_post_api_routing",
         "/api/routing/optimize": "_post_api_routing_optimize",
         "/api/failover": "_post_api_failover",
+        "/api/cooldowns/reset": "_post_api_cooldowns_reset",
         "/api/sessions/rename": "_post_api_sessions_rename",
         "/api/sessions/rollback": "_post_api_sessions_rollback",
         "/api/messages/edit": "_post_api_messages_edit",

@@ -107,6 +107,26 @@ def _cooldown_provider(model: str, cooldown_seconds: int = 3600):
     log.warning(f"[AUTH] Provider {provider} cooled down for {cooldown_seconds}s ({len(all_models)} models)")
 
 
+def reset_cooldowns():
+    """Clear all model/provider cooldowns."""
+    with _cooldown_lock:
+        _save_cooldowns({})
+    log.info("[COOLDOWN] All cooldowns cleared")
+
+
+def get_cooldown_status() -> dict:
+    """Return current cooldown state with human-readable info."""
+    with _cooldown_lock:
+        cd = _load_cooldowns()
+    now = _time.time()
+    result = {}
+    for model, entry in cd.items():
+        remaining = entry.get("until", 0) - now
+        if remaining > 0:
+            result[model] = {"remaining_seconds": int(remaining), "failures": entry.get("failures", 0)}
+    return result
+
+
 def _record_model_failure(model: str, cooldown_seconds: int = 0):
     """Record a model failure and set cooldown."""
     with _cooldown_lock:
