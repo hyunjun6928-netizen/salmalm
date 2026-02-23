@@ -722,8 +722,17 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             # LLM call
             _dynamic_max_tokens = _get_dynamic_max_tokens(classification["intent"], user_message or "", model)
+            # Inject token budget hint so LLM structures its response to fit
+            _budget_hint = {
+                "role": "system",
+                "content": f"[Response budget: ~{_dynamic_max_tokens} tokens. "
+                "Structure your response to be complete within this limit. "
+                "If the topic is too large, prioritize the most important points and summarize the rest. "
+                "Never stop mid-sentence.]",
+            }
+            _msgs_with_budget = list(pruned_messages) + [_budget_hint]
             result, _failover_warn = await self._call_with_failover(
-                pruned_messages,
+                _msgs_with_budget,
                 model=model,
                 tools=tools,
                 max_tokens=_dynamic_max_tokens,
