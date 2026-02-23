@@ -4226,6 +4226,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 "batch_api": os.environ.get("SALMALM_BATCH_API", "0") == "1",
                 "file_presummary": os.environ.get("SALMALM_FILE_PRESUMMARY", "0") == "1",
                 "early_stop": os.environ.get("SALMALM_EARLY_STOP", "0") == "1",
+                "temperature_chat": float(os.environ.get("SALMALM_TEMP_CHAT", "0.7")),
+                "temperature_tool": float(os.environ.get("SALMALM_TEMP_TOOL", "0.3")),
             }
         )
 
@@ -4269,6 +4271,15 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             os.environ["SALMALM_FILE_PRESUMMARY"] = "1" if body["file_presummary"] else "0"
         if "early_stop" in body:
             os.environ["SALMALM_EARLY_STOP"] = "1" if body["early_stop"] else "0"
+        for _tk in ("temperature_chat", "temperature_tool"):
+            if _tk in body:
+                try:
+                    val = float(body[_tk])
+                    if 0.0 <= val <= 2.0:
+                        _env_key = "SALMALM_TEMP_CHAT" if _tk == "temperature_chat" else "SALMALM_TEMP_TOOL"
+                        os.environ[_env_key] = str(val)
+                except (ValueError, TypeError):
+                    pass
         if "cost_cap" in body:
             cap = str(body["cost_cap"]).strip()
             if cap:

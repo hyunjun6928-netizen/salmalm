@@ -12,7 +12,16 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import os as _os
+
 from salmalm.constants import DEFAULT_MAX_TOKENS, FALLBACK_MODELS
+
+
+def _get_temperature(tools: Optional[list]) -> float:
+    """Return temperature based on mode: lower for tool-calling (precision), higher for chat."""
+    if tools:
+        return float(_os.environ.get("SALMALM_TEMP_TOOL", "0.3"))
+    return float(_os.environ.get("SALMALM_TEMP_CHAT", "0.7"))
 from salmalm.security.crypto import vault, log
 from salmalm.core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded, _metrics
 
@@ -279,7 +288,7 @@ def _call_anthropic(
         body["max_tokens"] = max_tokens  # type: ignore[assignment]
 
     if not use_thinking:
-        body["temperature"] = 0.3 if tools else 0.7
+        body["temperature"] = _get_temperature(tools)
     if system_msgs:
         # Prompt caching: split static/dynamic blocks for better cache hits
         sys_text = "\n".join(system_msgs)
@@ -362,7 +371,7 @@ def _call_openai(
             converted_msgs.append({**m, "content": new_content})
         else:
             converted_msgs.append(m)
-    body = {"model": model_id, "max_tokens": max_tokens, "messages": converted_msgs, "temperature": 0.3 if tools else 0.7}
+    body = {"model": model_id, "max_tokens": max_tokens, "messages": converted_msgs, "temperature": _get_temperature(tools)}
     if tools:
         body["tools"] = [{"type": "function", "function": t} for t in tools]
     headers = {"Content-Type": "application/json"}
@@ -388,7 +397,7 @@ def _call_google(
 ) -> Dict[str, Any]:
     # Gemini API — with optional tool support
     merged = _build_gemini_contents(messages)
-    body: dict = {"contents": merged, "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.3 if tools else 0.7}}
+    body: dict = {"contents": merged, "generationConfig": {"maxOutputTokens": max_tokens, "temperature": _get_temperature(tools)}}
     gemini_tools = _build_gemini_tools(tools)
     if gemini_tools:
         body["tools"] = gemini_tools
@@ -487,7 +496,7 @@ def stream_google(
     contents = _build_gemini_contents(messages)
     body: dict = {
         "contents": contents,
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.3 if tools else 0.7},
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": _get_temperature(tools)},
     }
     gemini_tools = _build_gemini_tools(tools)
     if gemini_tools:

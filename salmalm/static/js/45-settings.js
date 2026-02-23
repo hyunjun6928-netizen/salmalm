@@ -69,6 +69,8 @@
       var ba=document.getElementById('eng-batch-api');if(ba)ba.checked=!!d.batch_api;
       var fp=document.getElementById('eng-file-presummary');if(fp)fp.checked=!!d.file_presummary;
       var es=document.getElementById('eng-early-stop');if(es)es.checked=!!d.early_stop;
+      var tc=document.getElementById('eng-temp-chat');if(tc){tc.value=String(d.temperature_chat!=null?d.temperature_chat:0.7);var tcl=document.getElementById('eng-temp-chat-val');if(tcl)tcl.textContent=tc.value;}
+      var tt=document.getElementById('eng-temp-tool');if(tt){tt.value=String(d.temperature_tool!=null?d.temperature_tool:0.3);var ttl=document.getElementById('eng-temp-tool-val');if(ttl)ttl.textContent=tt.value;}
     }).catch(function(){});
     if(window._checkTgStatus)window._checkTgStatus();
     if(window._checkDcStatus)window._checkDcStatus();

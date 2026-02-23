@@ -1245,6 +1245,8 @@ window._i18n={
       var ba=document.getElementById('eng-batch-api');if(ba)ba.checked=!!d.batch_api;
       var fp=document.getElementById('eng-file-presummary');if(fp)fp.checked=!!d.file_presummary;
       var es=document.getElementById('eng-early-stop');if(es)es.checked=!!d.early_stop;
+      var tc=document.getElementById('eng-temp-chat');if(tc){tc.value=String(d.temperature_chat!=null?d.temperature_chat:0.7);var tcl=document.getElementById('eng-temp-chat-val');if(tcl)tcl.textContent=tc.value;}
+      var tt=document.getElementById('eng-temp-tool');if(tt){tt.value=String(d.temperature_tool!=null?d.temperature_tool:0.3);var ttl=document.getElementById('eng-temp-tool-val');if(ttl)ttl.textContent=tt.value;}
     }).catch(function(){});
     if(window._checkTgStatus)window._checkTgStatus();
     if(window._checkDcStatus)window._checkDcStatus();
@@ -2268,7 +2270,9 @@ window._i18n={
         batch_api:!!document.getElementById('eng-batch-api').checked,
         file_presummary:!!document.getElementById('eng-file-presummary').checked,
         early_stop:!!document.getElementById('eng-early-stop').checked,
-        cost_cap:document.getElementById('eng-cost-cap').value.trim()
+        cost_cap:document.getElementById('eng-cost-cap').value.trim(),
+        temperature_chat:parseFloat(document.getElementById('eng-temp-chat').value)||0.7,
+        temperature_tool:parseFloat(document.getElementById('eng-temp-tool').value)||0.3
       };
       fetch('/api/engine/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
         .then(function(r){return r.json()}).then(function(d){
@@ -2367,6 +2371,11 @@ window._i18n={
     var a=el.getAttribute('data-action');
     if(a==='setLang')window.setLang(el.value);
     else if(a==='setModel')window.setModel(el.value);
+  });
+  /* Temperature slider live label update */
+  document.addEventListener('input',function(e){
+    if(e.target.id==='eng-temp-chat'){var l=document.getElementById('eng-temp-chat-val');if(l)l.textContent=e.target.value;}
+    if(e.target.id==='eng-temp-tool'){var l2=document.getElementById('eng-temp-tool-val');if(l2)l2.textContent=e.target.value;}
   });
   document.addEventListener('keydown',function(e){
     if(e.key!=='Enter')return;

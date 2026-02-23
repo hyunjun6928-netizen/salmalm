@@ -938,6 +938,30 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           </div>
         </div>
 
+        <!-- Temperature Control -->
+        <div style="border-left:3px solid var(--accent);padding-left:14px">
+          <div style="font-size:14px;font-weight:600;margin-bottom:6px">
+            <span class="eng-en">🌡️ Temperature Control</span><span class="eng-kr">🌡️ 온도 설정</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.8;margin-bottom:10px">
+            <span class="eng-en">Lower = more precise &amp; factual. Higher = more creative &amp; varied.<br>Tool-calling uses low temperature for accuracy. Chat uses higher for naturalness.</span>
+            <span class="eng-kr">낮을수록 정확하고 사실적. 높을수록 창의적이고 다양.<br>도구 호출 시 낮은 온도로 정확도 ↑, 대화 시 높은 온도로 자연스러움 유지.</span>
+          </div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap">
+            <label style="font-size:13px;flex:1;min-width:200px">
+              <span class="eng-en">💬 Chat: <b id="eng-temp-chat-val">0.7</b></span><span class="eng-kr">💬 대화: <b id="eng-temp-chat-val">0.7</b></span>
+              <input type="range" id="eng-temp-chat" min="0" max="2" step="0.1" value="0.7" style="width:100%;margin-top:4px">
+            </label>
+            <label style="font-size:13px;flex:1;min-width:200px">
+              <span class="eng-en">🔧 Tool Calling: <b id="eng-temp-tool-val">0.3</b></span><span class="eng-kr">🔧 도구 호출: <b id="eng-temp-tool-val">0.3</b></span>
+              <input type="range" id="eng-temp-tool" min="0" max="1" step="0.1" value="0.3" style="width:100%;margin-top:4px">
+            </label>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px">
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Temperature <b>1.0</b> (default). Uses <code>reasoning_effort</code> instead of temperature tuning.</span><span class="eng-kr">🆚 <b>오픈클로:</b> Temperature <b>1.0</b> (기본값). 온도 대신 <code>reasoning_effort</code>로 품질 조절.</span></span>
+          </div>
+        </div>
+
       </div>
 
       <!-- Summary bar -->
