@@ -114,6 +114,42 @@ get_routing_config = _load_routing_config
 _select_model = _select_model_impl
 
 
+# ── User-friendly error messages ──
+_ERROR_MAP = {
+    "AttributeError": "⚠️ 일시적 내부 오류가 발생했습니다. 다시 시도해주세요.\n(Internal error — please retry.)",
+    "KeyError": "⚠️ 설정 오류가 감지되었습니다. `/status`로 상태를 확인해주세요.\n(Configuration error — check `/status`.)",
+    "ConnectionError": "🌐 AI 서버에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.\n(Cannot reach AI server — check your connection.)",
+    "TimeoutError": "⏰ 응답 시간이 초과되었습니다. 다시 시도해주세요.\n(Response timed out — please retry.)",
+    "AuthenticationError": "🔑 API 키가 유효하지 않습니다. 설정에서 확인해주세요.\n(Invalid API key — check Settings.)",
+    "RateLimitError": "🚦 요청 한도에 도달했습니다. 잠시 후 다시 시도해주세요.\n(Rate limited — please wait a moment.)",
+    "InsufficientQuotaError": "💳 API 크레딧이 부족합니다. 제공사 대시보드를 확인해주세요.\n(Insufficient API credits.)",
+}
+
+
+def _friendly_error(exc: Exception) -> str:
+    """Convert raw exception to user-friendly bilingual error message."""
+    exc_type = type(exc).__name__
+    # Check exact type name, then parent classes
+    if exc_type in _ERROR_MAP:
+        return _ERROR_MAP[exc_type]
+    # Check if any mapped name is in the MRO
+    for cls in type(exc).__mro__:
+        if cls.__name__ in _ERROR_MAP:
+            return _ERROR_MAP[cls.__name__]
+    # Check common patterns in message
+    msg_lower = str(exc).lower()
+    if "api key" in msg_lower or "authentication" in msg_lower or "401" in msg_lower:
+        return _ERROR_MAP["AuthenticationError"]
+    if "rate limit" in msg_lower or "429" in msg_lower:
+        return _ERROR_MAP["RateLimitError"]
+    if "timeout" in msg_lower:
+        return _ERROR_MAP["TimeoutError"]
+    if "connection" in msg_lower or "unreachable" in msg_lower:
+        return _ERROR_MAP["ConnectionError"]
+    # Generic fallback
+    return "⚠️ 처리 중 오류가 발생했습니다. 다시 시도해주세요.\n(An error occurred — please retry.)"
+
+
 def _get_event_loop() -> asyncio.AbstractEventLoop:
     """Get the running event loop safely (no stale global reference)."""
     try:
@@ -493,8 +529,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             import traceback
 
             traceback.print_exc()
-            error_msg = f"❌ Processing error: {type(e).__name__}: {e}"
-            session.add_assistant(error_msg)
+            # User-friendly message (기술 세부사항은 로그에만)
+            friendly = _friendly_error(e)
+            session.add_assistant(friendly)
+            error_msg = friendly
             # Fire on_error hook (에러 발생 훅)
             try:
                 from salmalm.features.hooks import hook_manager

@@ -54,27 +54,44 @@ First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Quick Start (5분이면 충분합니다)
 
+### Step 1: 설치 (30초)
 ```bash
-# One-liner install
 pip install salmalm
+```
 
-# Start (web UI at http://localhost:18800)
-salmalm
-
-# Auto-open browser
+### Step 2: 실행 (10초)
+```bash
 salmalm --open
+# → 브라우저가 자동으로 열립니다 (http://localhost:18800)
+```
 
-# Desktop shortcut (double-click to launch!)
-salmalm --shortcut
+### Step 3: API 키 입력 (2분)
+1. 웹 UI의 **Setup Wizard**가 자동으로 뜹니다
+2. AI 제공사의 API 키를 붙여넣기 하세요:
+   - [Anthropic Console](https://console.anthropic.com/) → API Keys
+   - [OpenAI Platform](https://platform.openai.com/api-keys) → API Keys
+   - 또는 [Google AI Studio](https://aistudio.google.com/apikey) → API Keys
+3. "Save" 클릭 → 끝!
 
-# Self-update
-salmalm --update
+### Step 4: 대화 시작 (바로!)
+```
+"오늘 날씨 어때?"          → 웹 검색 + 답변
+"이 코드 리뷰해줘"         → 파일 읽기 + 분석
+"/model sonnet"            → 모델 변경
+"/help"                    → 전체 명령어 보기
+```
 
-# Custom port / external access
-SALMALM_PORT=8080 salmalm
-SALMALM_BIND=0.0.0.0 salmalm    # expose to LAN (see Security section)
+> 💡 **자연어로 말하면 됩니다.** 67개 도구를 AI가 알아서 선택합니다.
+> 명령어를 외울 필요 없이, 하고 싶은 걸 그냥 말하세요.
+
+### 고급 옵션
+```bash
+salmalm --shortcut          # 바탕화면 바로가기 생성
+salmalm doctor              # 자가진단
+salmalm --update            # 자동 업데이트
+SALMALM_PORT=8080 salmalm   # 포트 변경
 ```
 
 ### Supported Providers
