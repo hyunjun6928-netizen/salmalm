@@ -1,6 +1,6 @@
 """User management API — list, delete, toggle, quota, settings, tenant config."""
 
-from salmalm.security.crypto import vault, log
+from salmalm.security.crypto import vault
 from salmalm.web.auth import auth_manager, extract_auth
 
 

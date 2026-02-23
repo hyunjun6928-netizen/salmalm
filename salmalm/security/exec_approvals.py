@@ -1,4 +1,11 @@
-"""Exec approval system — allowlist/denylist + dangerous command detection."""
+"""Exec approval system — allowlist/denylist + dangerous command detection.
+
+Note: This module handles user-configurable approval policy (allow/deny lists,
+dangerous command patterns requiring confirmation). The hardcoded command
+allowlist/blocklist enforcement lives in salmalm.tools.tools_common._is_safe_command
+and salmalm.constants.EXEC_ALLOWLIST. Both layers apply — constants for the
+hard security boundary, this module for the softer approval workflow.
+"""
 
 import re
 import threading
@@ -15,20 +22,25 @@ DANGEROUS_PATTERNS = [
     r"\brm\s+(-[a-zA-Z]*[rR][a-zA-Z]*\s+|.*--recursive)",  # rm -r, rm -rf
     r"\brm\s+-[a-zA-Z]*f",  # rm -f
     r"\bsudo\b",
-    r"\bchmod\s+777\b",
+    r"\bchmod\s+[0-7]*7[0-7]{0,2}\b",  # chmod with world-writable (e.g. 777, 776, 757)
     r"\bchown\b",
     r"\bmkfs\b",
     r"\bdd\s+",
-    r"\b:(){ :|:& };:",  # fork bomb
+    r":\(\)\s*\{.*\|.*&\s*\}\s*;",  # fork bomb (relaxed match)
     r"\bshutdown\b",
     r"\breboot\b",
     r"\bsystemctl\s+(stop|disable|mask)",
     r"\bkill\s+-9\s",
     r"\bpkill\b",
     r"\bkillall\b",
-    r"\bnc\s.*-[lL]",  # netcat listen
+    r"\bnc\s.*-[lLeEp]",  # netcat listen/exec
+    r"\bncat\s.*-[lLeEp]",  # ncat variant
     r"\bcurl\s.*\|\s*(ba)?sh",  # curl | sh
     r"\bwget\s.*\|\s*(ba)?sh",
+    r"\bcurl\s.*\|\s*python",  # curl | python
+    r"\bwget\s.*\|\s*python",
+    r">\s*/dev/[sh]d[a-z]",  # write to raw block device
+    r"\bmv\s+.*\s+/dev/null\b",  # mv to /dev/null (data destruction)
 ]
 
 # Env vars that cannot be overridden (binary hijacking prevention)
@@ -57,7 +69,7 @@ def _save_config(config: dict):
     """Save exec approval config."""
     try:
         ConfigManager.save("exec_approvals", config)
-    except Exception as e:
+    except (OSError, ValueError, TypeError) as e:
         log.error(f"Failed to save exec approvals: {e}")
 
 

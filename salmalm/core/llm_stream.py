@@ -54,7 +54,9 @@ def stream_google(
         {'type': 'error', 'error': '...'}
     """
     if not model:
-        model = "google/gemini-2.5-flash"
+        from salmalm.constants import MODEL_GEMINI_FLASH
+
+        model = MODEL_GEMINI_FLASH
 
     provider, model_id = model.split("/", 1) if "/" in model else ("google", model)
 

@@ -1,6 +1,6 @@
 [flake8]
 max-line-length = 120
-ignore = E501,W503,E402
+ignore = E501,W503,E402,E203
 exclude = plugins/,scripts/,memory/,.git,__pycache__
 per-file-ignores =
-    salmalm/constants.py:F401,E127,W391
+    salmalm/constants.py:F401,F405,E127,W391

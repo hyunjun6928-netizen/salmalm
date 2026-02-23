@@ -214,14 +214,100 @@ def handle_exec_session(args: dict) -> str:
     return f"❌ Unknown action: {action}. Use list, poll, or kill."
 
 
+def _ast_validate(code: str) -> str | None:
+    """AST-based validation. Returns error string if blocked, None if OK."""
+    import ast
+
+    _BLOCKED_MODULES = frozenset(
+        {
+            "os",
+            "subprocess",
+            "sys",
+            "shutil",
+            "pathlib",
+            "socket",
+            "http",
+            "urllib",
+            "requests",
+            "ctypes",
+            "signal",
+            "importlib",
+            "multiprocessing",
+            "threading",
+            "pty",
+            "resource",
+            "code",
+            "codeop",
+            "compileall",
+        }
+    )
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return None  # let exec() handle syntax errors naturally
+    for node in ast.walk(tree):
+        # Check imports
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                top = alias.name.split(".")[0]
+                if top in _BLOCKED_MODULES:
+                    return f"AST blocked: import {alias.name}"
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                top = node.module.split(".")[0]
+                if top in _BLOCKED_MODULES:
+                    return f"AST blocked: from {node.module} import ..."
+        # Block __import__, eval, exec, compile, open, getattr, globals, locals, vars, breakpoint
+        elif isinstance(node, ast.Call):
+            func = node.func
+            name = None
+            if isinstance(func, ast.Name):
+                name = func.id
+            elif isinstance(func, ast.Attribute):
+                name = func.attr
+            if name in (
+                "__import__",
+                "eval",
+                "exec",
+                "compile",
+                "open",
+                "getattr",
+                "globals",
+                "locals",
+                "vars",
+                "breakpoint",
+                "exit",
+                "quit",
+                "input",
+            ):
+                return f"AST blocked: {name}() call"
+        # Block dunder attribute access
+        elif isinstance(node, ast.Attribute):
+            if (
+                node.attr.startswith("__")
+                and node.attr.endswith("__")
+                and node.attr not in ("__len__", "__str__", "__repr__", "__init__", "__name__")
+            ):
+                return f"AST blocked: dunder access .{node.attr}"
+    return None
+
+
 @register("python_eval")
 def handle_python_eval(args: dict) -> str:
     """Handle python eval. Disabled by default — enable with SALMALM_PYTHON_EVAL=1."""
     import os as _os
+
     if _os.environ.get("SALMALM_PYTHON_EVAL", "0") != "1":
         return "⚠️ python_eval is disabled by default for security. Enable with SALMALM_PYTHON_EVAL=1"
     code = args.get("code", "")
     timeout_sec = min(args.get("timeout", 15), 30)
+
+    # Primary: AST-based validation
+    ast_err = _ast_validate(code)
+    if ast_err:
+        return f"Security blocked: {ast_err}"
+
+    # Secondary: string blocklist
     _EVAL_BLOCKLIST = [
         "import os",
         "import sys",

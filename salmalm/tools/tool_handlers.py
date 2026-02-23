@@ -6,6 +6,12 @@ This module re-exports them for backward compatibility.
 
 from typing import Optional
 
+from salmalm.constants import (
+    MODEL_GPT_IMAGE as _MODEL_GPT_IMAGE,
+    MODEL_GPT_4_1_NANO as _MODEL_GPT_4_1_NANO,
+    MODEL_CLAUDE_SONNET as _MODEL_CLAUDE_SONNET,
+)
+
 import os
 import subprocess
 import re
@@ -228,7 +234,7 @@ def _exec_image_generate(args: dict) -> str:
         resp = _http_post(
             "https://api.openai.com/v1/images/generations",
             {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            {"model": "gpt-image-1", "prompt": prompt, "n": 1, "size": size, "output_format": "b64_json"},
+            {"model": _MODEL_GPT_IMAGE, "prompt": prompt, "n": 1, "size": size, "output_format": "b64_json"},
         )
         import base64 as b64mod
 
@@ -281,7 +287,7 @@ def _exec_image_analyze(args: dict) -> str:
             "https://api.openai.com/v1/chat/completions",
             {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             {
-                "model": "gpt-4.1-nano",
+                "model": _MODEL_GPT_4_1_NANO,
                 "messages": [{"role": "user", "content": content_parts}],
                 "max_tokens": 1000,
             },
@@ -300,7 +306,7 @@ def _exec_image_analyze(args: dict) -> str:
             "https://api.anthropic.com/v1/messages",
             {"x-api-key": api_key, "Content-Type": "application/json", "anthropic-version": "2023-06-01"},
             {
-                "model": "claude-sonnet-4-6",
+                "model": _MODEL_CLAUDE_SONNET,
                 "max_tokens": 1000,
                 "messages": [{"role": "user", "content": [img_block, {"type": "text", "text": question}]}],
             },

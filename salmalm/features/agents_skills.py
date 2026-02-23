@@ -6,11 +6,10 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 log = logging.getLogger(__name__)
 
-from salmalm.constants import WORKSPACE_DIR, DATA_DIR, BASE_DIR  # noqa: E402
+from salmalm.constants import WORKSPACE_DIR  # noqa: E402
 
 
 class SkillLoader:

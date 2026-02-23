@@ -2,11 +2,8 @@
 
 import json
 import logging
-import os
-import re
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, Optional
 
 log = logging.getLogger(__name__)
 
@@ -241,8 +238,12 @@ class TelegramMediaMixin:
             _model_ov = None
 
         response = await process_message(
-            session_id, text, model_override=_model_ov, image_data=_image_data,
-            on_token=_on_stream_token, on_status=_on_status,
+            session_id,
+            text,
+            model_override=_model_ov,
+            image_data=_image_data,
+            on_token=_on_stream_token,
+            on_status=_on_status,
         )
         _elapsed = time.time() - _start
 

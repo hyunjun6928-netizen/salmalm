@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Dict
 
 from salmalm.constants import VERSION, COMMAND_MODEL, MODEL_ALIASES as _CONST_ALIASES  # noqa: F401

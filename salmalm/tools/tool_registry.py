@@ -8,6 +8,38 @@ _HANDLERS = {}
 _DYNAMIC_TOOLS = []  # dynamically registered tool definitions
 _modules_loaded = False
 
+# Core tool names that cannot be overwritten by dynamic registration
+_CORE_TOOL_NAMES = frozenset(
+    {
+        "exec",
+        "exec_session",
+        "python_eval",
+        "sandbox_exec",
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_dir",
+        "delete_file",
+        "web_search",
+        "web_fetch",
+        "http_request",
+        "browser",
+        "memory_read",
+        "memory_write",
+        "memory_search",
+        "rag_search",
+        "rag_index",
+        "apply_patch",
+        "create_dir",
+        "send_email",
+        "calendar_list",
+        "calendar_create",
+        "set_reminder",
+        "get_weather",
+        "search_contacts",
+    }
+)
+
 
 def _ensure_modules():
     """Lazy-load all tools_*.py modules so @register decorators run."""
@@ -31,6 +63,7 @@ def _ensure_modules():
         tools_email,
         tools_personal,
     )
+
     # Optional tool modules — may not exist in all installations
     try:
         from salmalm.tools import tools_brave, tools_mesh, tools_sandbox, tools_ui  # noqa: F401
@@ -59,6 +92,14 @@ def register_dynamic(name: str, handler, tool_def: dict = None) -> None:
 
     플러그인에서 런타임에 도구를 동적으로 등록합니다.
     """
+    # Prevent overwriting core tools
+    if name in _CORE_TOOL_NAMES:
+        log.warning(f"[SECURITY] Blocked dynamic registration of core tool: {name}")
+        return
+    # Enforce namespace prefix for non-core tools (must contain _ or . separator)
+    if "_" not in name and "." not in name:
+        log.warning(f"[SECURITY] Dynamic tool name must be namespaced (contain _ or .): {name}")
+        return
     _HANDLERS[name] = handler
     if tool_def:
         # Avoid duplicates
@@ -81,6 +122,7 @@ def get_dynamic_tools() -> list:
 def get_all_tools() -> list:
     """Return all tool definitions (static + dynamic)."""
     from salmalm.tools.tools import TOOL_DEFINITIONS
+
     return list(TOOL_DEFINITIONS) + get_dynamic_tools()
 
 
@@ -103,6 +145,7 @@ def execute_tool(name: str, args: dict) -> str:
         try:
             from salmalm.web.middleware import is_tool_allowed_external
 
+            args = dict(args)  # shallow copy to avoid mutating caller's dict
             _is_auth = bool(args.pop("_authenticated", False))
             if not is_tool_allowed_external(name, is_authenticated=_is_auth, bind_addr=bind):
                 log.warning(f"[SECURITY] Tool '{name}' blocked: external bind + restricted tier")

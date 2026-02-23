@@ -105,18 +105,6 @@ class UserManager:
             FOREIGN KEY (user_id) REFERENCES users(id)
         )""")
 
-        # Add user_id column to session_store if not exists
-        try:
-            conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-        except Exception as e:  # noqa: broad-except
-            log.debug(f"Suppressed: {e}")
-
-        # Add user_id to usage_stats if not exists
-        try:
-            conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL")
-        except Exception as e:  # noqa: broad-except
-            log.debug(f"Suppressed: {e}")
-
         # multi_tenant_config table
         conn.execute("""CREATE TABLE IF NOT EXISTS multi_tenant_config (
             key TEXT PRIMARY KEY,

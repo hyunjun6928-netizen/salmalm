@@ -3,36 +3,32 @@ import sys
 
 try:
     from importlib.metadata import version as _pkg_version
+
     __version__ = _pkg_version("salmalm")
 except Exception:
-    __version__ = "0.19.36"  # fallback for editable/dev installs
+    __version__ = "0.0.0-dev"  # fallback — metadata missing
 
 log = logging.getLogger("salmalm")
 log.addHandler(logging.NullHandler())  # Prevent "No handlers" warning at import
-class _DummyContainer:
-    """Placeholder when Container cannot be imported (e.g. during pip build)."""
-    def get(self, key: str, default=None):
-        raise RuntimeError(f"App container not initialized — cannot access '{key}'. Is the runtime running?")
-
-app = _DummyContainer()  # Will be replaced below if runtime (not during build)
+app = None  # Will be set below if runtime (not during build)
 
 
 def _register_services() -> None:
     """Register all service factories. Called once at import time."""
     if app is None:
         return
-    app.register("vault", lambda: __import__("salmalm.security.crypto", fromlist=["vault"]).vault)
+    app.register("vault", lambda: __import__("salmalm.crypto", fromlist=["vault"]).vault)
     app.register("router", lambda: __import__("salmalm.core", fromlist=["router"]).router)
-    app.register("auth_manager", lambda: __import__("salmalm.web.auth", fromlist=["auth_manager"]).auth_manager)
-    app.register("rate_limiter", lambda: __import__("salmalm.web.auth", fromlist=["rate_limiter"]).rate_limiter)
-    app.register("rag_engine", lambda: __import__("salmalm.features.rag", fromlist=["rag_engine"]).rag_engine)
-    app.register("mcp_manager", lambda: __import__("salmalm.features.mcp", fromlist=["mcp_manager"]).mcp_manager)
-    app.register("node_manager", lambda: __import__("salmalm.features.nodes", fromlist=["node_manager"]).node_manager)
-    app.register("health_monitor", lambda: __import__("salmalm.features.stability", fromlist=["health_monitor"]).health_monitor)
-    app.register("telegram_bot", lambda: __import__("salmalm.channels.telegram", fromlist=["telegram_bot"]).telegram_bot)
-    app.register("user_manager", lambda: __import__("salmalm.features.users", fromlist=["user_manager"]).user_manager)
-    app.register("discord_bot", lambda: __import__("salmalm.channels.discord_bot", fromlist=["discord_bot"]).discord_bot)
-    app.register("ws_server", lambda: __import__("salmalm.web.ws", fromlist=["ws_server"]).ws_server)
+    app.register("auth_manager", lambda: __import__("salmalm.auth", fromlist=["auth_manager"]).auth_manager)
+    app.register("rate_limiter", lambda: __import__("salmalm.auth", fromlist=["rate_limiter"]).rate_limiter)
+    app.register("rag_engine", lambda: __import__("salmalm.rag", fromlist=["rag_engine"]).rag_engine)
+    app.register("mcp_manager", lambda: __import__("salmalm.mcp", fromlist=["mcp_manager"]).mcp_manager)
+    app.register("node_manager", lambda: __import__("salmalm.nodes", fromlist=["node_manager"]).node_manager)
+    app.register("health_monitor", lambda: __import__("salmalm.stability", fromlist=["health_monitor"]).health_monitor)
+    app.register("telegram_bot", lambda: __import__("salmalm.telegram", fromlist=["telegram_bot"]).telegram_bot)
+    app.register("user_manager", lambda: __import__("salmalm.users", fromlist=["user_manager"]).user_manager)
+    app.register("discord_bot", lambda: __import__("salmalm.discord_bot", fromlist=["discord_bot"]).discord_bot)
+    app.register("ws_server", lambda: __import__("salmalm.ws", fromlist=["ws_server"]).ws_server)
 
 
 _logging_initialized = False
@@ -41,10 +37,7 @@ _logging_initialized = False
 def init_logging() -> None:
     """Initialize file + console logging. Called once from entrypoint, not import."""
     global _logging_initialized
-    if _logging_initialized:
-        return
-    # NullHandler doesn't count as real logging setup
-    if log.handlers and not all(isinstance(h, logging.NullHandler) for h in log.handlers):
+    if _logging_initialized or log.handlers:
         return
     _logging_initialized = True
     try:
@@ -54,7 +47,7 @@ def init_logging() -> None:
         log.setLevel(logging.INFO)
         log.addHandler(logging.FileHandler(LOG_FILE, encoding="utf-8"))
         _sh = logging.StreamHandler(sys.stdout)
-        _sh.setStream(open(sys.stdout.fileno(), "w", encoding="utf-8", errors="replace", closefd=False))
+        _sh.encoding = "utf-8"  # type: ignore[attr-defined]
         log.addHandler(_sh)
         for h in log.handlers:
             h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
@@ -62,11 +55,14 @@ def init_logging() -> None:
         log.debug(f"Suppressed: {e}")
 
 
-try:
-    from .container import Container
+import os as _os
 
-    app = Container()
-    _register_services()
-except Exception as e:  # noqa: broad-except
-    # During pip build / isolated environments, constants may fail.
-    pass
+_BUILDING = _os.environ.get("SALMALM_BUILDING") == "1"
+if not _BUILDING:
+    try:
+        from .container import Container
+
+        app = Container()
+        _register_services()
+    except Exception:
+        pass

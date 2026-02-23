@@ -1,9 +1,7 @@
 """RAG utility functions: tokenization, stemming, similarity."""
 
 import json
-import re
 import math
-import unicodedata
 from typing import Dict, List, Optional
 from pathlib import Path
 import logging

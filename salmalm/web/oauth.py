@@ -265,8 +265,14 @@ class OAuthManager:
 
     def _save(self):
         """Save."""
+        import os as _os
+
         _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         _TOKENS_PATH.write_text(_encrypt_tokens(self._tokens))
+        try:
+            _os.chmod(_TOKENS_PATH, 0o600)
+        except OSError as e:
+            log.warning(f"Could not set permissions on {_TOKENS_PATH}: {e}")
 
     def setup(self, provider: str, redirect_uri: str = "http://localhost:8080/oauth/callback") -> str:
         """Setup."""

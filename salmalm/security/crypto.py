@@ -55,7 +55,7 @@ def _keychain_set(password: str) -> bool:
         kr.set_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT, password)
         log.info("[OK] Vault password saved to OS keychain")
         return True
-    except Exception as exc:
+    except (ImportError, OSError, RuntimeError) as exc:
         log.debug(f"[WARN] Could not save to OS keychain: {exc}")
         return False
 
@@ -74,7 +74,9 @@ def _keychain_delete() -> bool:
 
 
 HAS_CRYPTO: bool = False
-_ALLOW_FALLBACK: bool = True  # Auto-fallback when cryptography is missing
+_ALLOW_FALLBACK: bool = (
+    os.environ.get("SALMALM_VAULT_FALLBACK", "1") == "1"
+)  # Auto-fallback when cryptography is missing
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.primitives import hashes as crypto_hashes
@@ -211,6 +213,12 @@ class Vault:
             nonce = secrets.token_bytes(12)
             ct = AESGCM(key).encrypt(nonce, plaintext, None)
             VAULT_FILE.write_bytes(VAULT_VERSION + self._salt + nonce + ct)
+            try:
+                import os as _os
+
+                _os.chmod(VAULT_FILE, 0o600)
+            except OSError:
+                pass
         elif _ALLOW_FALLBACK:
             iv = secrets.token_bytes(16)
             enc_key = _derive_key(self._password, self._salt + b"enc" + iv, 32)
@@ -218,6 +226,12 @@ class Vault:
             hmac_key = _derive_key(self._password, self._salt + b"hmac", 32)
             tag = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
             VAULT_FILE.write_bytes(b"\x02" + self._salt + tag + iv + ct)
+            try:
+                import os as _os
+
+                _os.chmod(VAULT_FILE, 0o600)
+            except OSError:
+                pass
         else:
             raise RuntimeError("Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1")
 

@@ -272,6 +272,7 @@ class SubAgentManager:
         try:
             from salmalm.web.ws import ws_server
             import asyncio
+
             asyncio.run_coroutine_threadsafe(
                 ws_server.broadcast({"type": "subagent_complete", "task": task.to_dict()}),
                 asyncio.get_event_loop(),
@@ -281,6 +282,7 @@ class SubAgentManager:
         # Try Telegram notification
         try:
             from salmalm.integrations.telegram_bot import send_message_to_owner
+
             send_message_to_owner(msg)
         except Exception:
             pass

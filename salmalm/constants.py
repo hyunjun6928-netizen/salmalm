@@ -3,7 +3,11 @@
 from datetime import timedelta, timezone
 from pathlib import Path
 
-from salmalm import __version__ as VERSION  # Single source of truth
+try:
+    from importlib.metadata import version as _pkg_version
+    VERSION = _pkg_version("salmalm")
+except Exception:
+    VERSION = "0.0.0-dev"
 
 APP_NAME = "SalmAlm"
 KST = timezone(timedelta(hours=9))
@@ -80,7 +84,7 @@ _EXEC_TIER_BASIC = {
     "true",
     "false",
     # Dev tools (read-only / query only)
-    "git",  # git: log/status/diff only (clone/pull/push/fetch blocked by EXEC_ARG_BLOCKLIST)
+    "git",
     "gh",
     # Guarded commands — allowed but with subcommand/flag restrictions (see EXEC_ARG_BLOCKLIST)
     "awk",
@@ -135,6 +139,8 @@ _EXEC_TIER_DATABASE = {
 def _build_exec_allowlist() -> set:
     """Build effective allowlist from tiers + env vars."""
     allowed = set(_EXEC_TIER_BASIC)
+    # Tier 2/3 default OFF (opt-in): set env var to "1" to enable.
+    # Security: network/database tools should not be available unless explicitly requested.
     if _os.environ.get("SALMALM_EXEC_NETWORK", "0") == "1":
         allowed |= _EXEC_TIER_NETWORK
     if _os.environ.get("SALMALM_EXEC_DATABASE", "0") == "1":
@@ -429,19 +435,14 @@ COMPLEX_INDICATORS = [
 ]
 TOOL_HINT_KEYWORDS = ["file", "exec", "run", "search", "web", "image", "memory", "system", "cron", "screenshot"]
 
-# ── Model name corrections (deprecated → current API IDs) ──
-# Single source of truth for model ID fixes. Used by model_selection.fix_model_name().
-MODEL_NAME_FIXES: dict = {
-    "claude-haiku-3.5-20241022": "claude-haiku-4-5-20251001",
-    "anthropic/claude-haiku-3.5-20241022": "anthropic/claude-haiku-4-5-20251001",
-    "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
-    "claude-sonnet-4-20250514": "claude-sonnet-4-6",
-    "anthropic/claude-sonnet-4-20250514": "anthropic/claude-sonnet-4-6",
-    "gpt-5.3-codex": "gpt-5.2-codex",
-    "openai/gpt-5.3-codex": "openai/gpt-5.2-codex",
-    "grok-4": "grok-4-0709",
-    "xai/grok-4": "xai/grok-4-0709",
-}
+# ── Well-known model IDs used across the codebase (MED-15) ──
+MODEL_GPT_IMAGE = "gpt-image-1"
+MODEL_GPT_4_1_NANO = "gpt-4.1-nano"
+MODEL_CLAUDE_SONNET = "claude-sonnet-4-6"
+MODEL_CLAUDE_HAIKU = "claude-haiku-4-5-20251001"
+MODEL_GPT_4_1_NANO_OPENAI = "gpt-4.1-nano"  # bare name, no provider prefix
+MODEL_GEMINI_FLASH = "google/gemini-2.5-flash"
+MODEL_GEMINI_2_FLASH = "gemini-2.0-flash"
 
 # ── Model fallback chains for retry logic ──
 MODEL_FALLBACKS = {
@@ -484,4 +485,18 @@ MODEL_FALLBACKS = {
     ],
     "xai/grok-4": ["xai/grok-3", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
     "xai/grok-3": ["xai/grok-4", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
+}
+
+# ── Model name corrections (deprecated → current API IDs) ──
+# Single source of truth for model ID fixes. Used by model_selection.fix_model_name().
+MODEL_NAME_FIXES: dict = {
+    "claude-haiku-3.5-20241022": "claude-haiku-4-5-20251001",
+    "anthropic/claude-haiku-3.5-20241022": "anthropic/claude-haiku-4-5-20251001",
+    "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-20250514": "claude-sonnet-4-6",
+    "anthropic/claude-sonnet-4-20250514": "anthropic/claude-sonnet-4-6",
+    "gpt-5.3-codex": "gpt-5.2-codex",
+    "openai/gpt-5.3-codex": "openai/gpt-5.2-codex",
+    "grok-4": "grok-4-0709",
+    "xai/grok-4": "xai/grok-4-0709",
 }
