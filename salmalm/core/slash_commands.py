@@ -96,36 +96,43 @@ def _cmd_help(cmd: str, session, **_) -> str:
     tool_count = len(TOOL_DEFINITIONS)
     return f"""😈 **SalmAlm v{VERSION}** — Personal AI Gateway
 
-📌 **Commands**
-/clear — Clear conversation
-/help — This help
-/model <name> — Change model
-/think <question> — 🧠 Deep reasoning (Opus)
-/plan <question> — 📋 Plan → Execute
-/status — Usage + Cost
-/context — Context window token usage
-/tools — Tool list
-/uptime — Uptime stats (업타임)
-/latency — Latency stats (레이턴시)
-/health detail — Detailed health report (상세 헬스)
-/security — 🛡️ Security audit report
-/subagents — 🤖 Sub-agents (spawn|list|stop|steer|log|info|collect)
-/evolve — 🧬 Self-evolving prompt (status|apply|reset|history)
-/mood — 🎭 Mood-aware response (status|on|off|sensitive)
-/think <내용> — 💭 Record a thought (or list|search|tag|stats|export)
+💬 **대화 (Chat)**
+/clear — 대화 초기화 (Clear conversation)
+/model <name> — 모델 변경 (Switch model)
+/model — 현재 모델 확인 (Current model)
 
-🤖 **Model Aliases** (27)
-claude, sonnet, opus, haiku, gpt, gpt5, o3, o4mini,
-grok, grok4, gemini, flash, deepseek, llama, auto ...
+🧠 **추론 (Reasoning)**
+/think <질문> — 심층 추론 모드 (Deep reasoning)
+/plan <질문> — 계획 수립 후 실행 (Plan → Execute)
+/compare <질문> — 멀티모델 비교 (Multi-model compare)
 
-🔧 **Tools** ({tool_count})
-File R/W, code exec, web search, RAG search,
-system monitor, cron jobs, image analysis, TTS ...
+📊 **모니터링 (Status)**
+/status — 사용량 + 비용 (Usage & Cost)
+/context — 컨텍스트 윈도우 (Context window)
+/uptime — 가동 시간 (Uptime)
+/latency — 응답 속도 (Latency)
+/health detail — 상세 헬스 리포트
 
-🧠 **Intelligence Engine**
-Auto intent classification (7 levels) → Model routing → Parallel tools → Self-evaluation
+🛡️ **보안 & 관리 (Security)**
+/security — 보안 감사 (Security audit)
+/export — 데이터 내보내기 (Export data)
 
-💡 **Tip**: Just speak naturally. Read a file, search the web, write code, etc."""
+🤖 **에이전트 (Agents)**
+/subagents spawn <task> — 서브에이전트 생성
+/subagents list — 목록 보기
+/subagents stop <id> — 중지
+
+🧬 **개인화 (Personalization)**
+/evolve — 프롬프트 자기진화 (Self-evolving prompt)
+/mood — 감정 인식 응답 (Mood-aware)
+/soul — 페르소나 설정 (Persona)
+/thought <내용> — 생각 기록 (Record thought)
+
+🔧 **도구 ({tool_count} Tools)**
+파일 읽기/쓰기, 코드 실행, 웹 검색, RAG, 시스템 모니터, 크론, 이미지 분석, TTS ...
+
+💡 그냥 자연어로 말하세요. "파일 읽어줘", "웹 검색해줘", "코드 짜줘" 등
+   Just speak naturally — the AI handles tool selection automatically."""
 
 
 def _cmd_status(cmd: str, session, **_):

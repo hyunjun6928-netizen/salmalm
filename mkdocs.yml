@@ -53,6 +53,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - 🚀 초보자 가이드: beginners-guide.md
   - Getting Started: getting-started.md
   - Commands: commands.md
   - Tools: tools.md
