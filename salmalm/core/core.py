@@ -359,6 +359,24 @@ def track_usage(model: str, input_tokens: int, output_tokens: int, user_id: Opti
             conn.commit()
         except Exception as e:
             log.debug(f"Suppressed: {e}")
+        # Also record to usage_detail for dashboard daily/monthly charts
+        try:
+            conn2 = _get_db()
+            conn2.execute(
+                "CREATE TABLE IF NOT EXISTS usage_detail ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, "
+                "session_id TEXT, model TEXT NOT NULL, "
+                "input_tokens INTEGER DEFAULT 0, output_tokens INTEGER DEFAULT 0, "
+                "cost REAL DEFAULT 0.0, intent TEXT DEFAULT '')"
+            )
+            conn2.execute(
+                "INSERT INTO usage_detail (ts, session_id, model, input_tokens, output_tokens, cost) "
+                "VALUES (?,?,?,?,?,?)",
+                (datetime.now(KST).isoformat(), "", model, input_tokens, output_tokens, cost),
+            )
+            conn2.commit()
+        except Exception as e:
+            log.debug(f"usage_detail write: {e}")
         # Record cost against user quota
         if user_id:
             try:
