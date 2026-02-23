@@ -273,17 +273,25 @@ def _call_anthropic(
     system_msgs = [m["content"] for m in messages if m["role"] == "system"]
     chat_msgs = [m for m in messages if m["role"] != "system"]
 
-    # Extended thinking for Opus/Sonnet
-    use_thinking = thinking and ("opus" in model_id or "sonnet" in model_id)
+    # Extended thinking for Opus/Sonnet — level-based budget
+    # thinking can be bool (legacy) or str level: "low"|"medium"|"high"|"xhigh"
+    _THINKING_BUDGETS = {"low": 4000, "medium": 10000, "high": 16000, "xhigh": 32000}
+    think_level = None
+    if isinstance(thinking, str) and thinking in _THINKING_BUDGETS:
+        think_level = thinking
+    elif thinking is True:
+        think_level = "medium"  # legacy bool compat
+
+    use_thinking = think_level is not None and ("opus" in model_id or "sonnet" in model_id)
 
     body = {
         "model": model_id,
         "messages": chat_msgs,
     }
     if use_thinking:
-        # Extended thinking mode — budget_tokens controls thinking depth
-        body["max_tokens"] = 16000  # type: ignore[assignment]
-        body["thinking"] = {"type": "enabled", "budget_tokens": 10000}  # type: ignore[assignment]
+        budget = _THINKING_BUDGETS[think_level]  # type: ignore[index]
+        body["max_tokens"] = max(max_tokens, budget + 4000)  # type: ignore[assignment]
+        body["thinking"] = {"type": "enabled", "budget_tokens": budget}  # type: ignore[assignment]
     else:
         body["max_tokens"] = max_tokens  # type: ignore[assignment]
 
@@ -352,6 +360,7 @@ def _call_openai(
     tools: Optional[List[dict]],
     max_tokens: int,
     base_url: str,
+    thinking: Any = False,
 ) -> Dict[str, Any]:
     # Convert Anthropic-style image blocks to OpenAI format
     converted_msgs = []
@@ -372,6 +381,14 @@ def _call_openai(
         else:
             converted_msgs.append(m)
     body = {"model": model_id, "max_tokens": max_tokens, "messages": converted_msgs, "temperature": _get_temperature(tools)}
+    # OpenAI reasoning_effort for o3/o4-mini reasoning models
+    _REASONING_MAP = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high"}
+    _is_reasoning = any(r in model_id for r in ("o3", "o4", "o1"))
+    if _is_reasoning:
+        think_level = thinking if isinstance(thinking, str) else ("medium" if thinking else None)
+        if think_level and think_level in _REASONING_MAP:
+            body["reasoning_effort"] = _REASONING_MAP[think_level]
+            body.pop("temperature", None)  # reasoning models don't support temperature
     if tools:
         body["tools"] = [{"type": "function", "function": t} for t in tools]
     headers = {"Content-Type": "application/json"}

@@ -524,12 +524,18 @@ class CommandRouter:
     def _cmd_think(cmd, session, **_):
         parts = cmd.replace("/t ", "/think ").split()
         level = parts[1] if len(parts) > 1 else None
-        valid = ("off", "low", "medium", "high")
+        valid = ("off", "low", "medium", "high", "xhigh")
         if level not in valid:
-            return f"❓ Usage: /think {'|'.join(valid)}"
+            return f"❓ Usage: /think {'|'.join(valid)}\n💡 low=4K, medium=10K, high=16K, xhigh=32K budget tokens"
         if session:
-            session.__dict__["thinking_level"] = level
-        return f"🧠 Thinking level: `{level}`"
+            if level == "off":
+                session.thinking_enabled = False
+                session.__dict__["thinking_level"] = "medium"
+            else:
+                session.thinking_enabled = True
+                session.thinking_level = level
+        _budgets = {"low": 4000, "medium": 10000, "high": 16000, "xhigh": 32000}
+        return f"🧠 Thinking: `{level}`" + (" (OFF)" if level == "off" else f" (budget: {_budgets[level]}tok)")
 
     @staticmethod
     def _cmd_verbose(cmd, session, **_):

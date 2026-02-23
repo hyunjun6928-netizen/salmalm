@@ -693,9 +693,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 provider, intent=classification["intent"], user_message=user_message or ""
             )
 
-            # Thinking mode
+            # Thinking mode — pass level string instead of bool
+            _think_level = getattr(session, "thinking_level", "medium") if use_thinking else None
             think_this_call = (
-                use_thinking and iteration == 0 and provider == "anthropic" and ("opus" in model or "sonnet" in model)
+                _think_level if (use_thinking and iteration == 0 and ("opus" in model or "sonnet" in model or "o3" in model or "o4" in model))
+                else False
             )
 
             # History & context management
@@ -1026,7 +1028,9 @@ async def _process_message_inner(
 
     # Thinking is user-controlled only (via /thinking toggle or 🧠 button)
     classification["thinking"] = getattr(session, "thinking_enabled", False)
-    classification["thinking_budget"] = 10000 if classification["thinking"] else 0
+    classification["thinking_level"] = getattr(session, "thinking_level", "medium") if classification["thinking"] else None
+    _BUDGET_MAP = {"low": 4000, "medium": 10000, "high": 16000, "xhigh": 32000}
+    classification["thinking_budget"] = _BUDGET_MAP.get(classification["thinking_level"] or "medium", 10000) if classification["thinking"] else 0
 
     # Suggest thinking mode for complex tasks when it's OFF
     if not classification["thinking"] and classification["tier"] >= 3 and classification["score"] >= 4:

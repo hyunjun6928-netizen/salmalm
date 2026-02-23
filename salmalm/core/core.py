@@ -1327,6 +1327,7 @@ class Session:
         self.metadata: dict = {}  # Arbitrary session metadata
         self._memory_flushed = False  # Track if pre-compaction memory flush happened
         self.thinking_enabled = False  # Extended thinking toggle (default OFF)
+        self.thinking_level = "medium"  # Thinking depth: "low"|"medium"|"high"|"xhigh"
         self.model_override = "auto"  # Multi-model routing: 'auto'|'haiku'|'sonnet'|'opus'|full model string
         self.tts_enabled = False  # TTS toggle
         self.tts_voice = "alloy"  # TTS voice selection
