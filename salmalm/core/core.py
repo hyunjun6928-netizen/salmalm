@@ -27,9 +27,13 @@ from salmalm.constants import (
     TOOL_HINT_KEYWORDS,
 )
 from salmalm.security.crypto import vault, log
+from salmalm.core.audit import (  # noqa: F401
+    _init_audit_db, audit_log, audit_checkpoint, query_audit_log,
+    _flush_audit_buffer,
+)
+from salmalm.core.core_messages import search_messages, delete_message, edit_message  # noqa: F401
 
 # ============================================================
-_audit_lock = threading.Lock()  # Audit log writes
 _usage_lock = threading.Lock()  # Usage tracking (separate to avoid contention)
 _thread_local = threading.local()  # Thread-local DB connections + user context
 
@@ -94,163 +98,21 @@ def _get_db() -> sqlite3.Connection:
     return conn
 
 
-def _init_audit_db():
-    """Init audit db."""
-    conn = _get_db()
-    conn.execute("""CREATE TABLE IF NOT EXISTS audit_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts TEXT NOT NULL, event TEXT NOT NULL,
-        detail TEXT, prev_hash TEXT, hash TEXT NOT NULL
-    )""")
-    conn.execute("""CREATE TABLE IF NOT EXISTS usage_stats (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts TEXT NOT NULL, model TEXT NOT NULL,
-        input_tokens INTEGER, output_tokens INTEGER, cost REAL
-    )""")
-    conn.execute("""CREATE TABLE IF NOT EXISTS session_store (
-        session_id TEXT PRIMARY KEY,
-        messages TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-    )""")
-    try:
-        conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
-    except Exception as e:
-        log.debug(f"Suppressed: {e}")
-    try:
-        conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
-    except Exception as e:
-        log.debug(f"Suppressed: {e}")
-    try:
-        conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-    except Exception as e:
-        log.debug(f"Suppressed: {e}")
-    conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id TEXT NOT NULL,
-        messages_json TEXT NOT NULL,
-        removed_at TEXT NOT NULL,
-        reason TEXT DEFAULT 'rollback'
-    )""")
-    conn.commit()
 
 
-def _ensure_audit_v2_table():
-    """Create the v2 audit_log_v2 table with session_id and JSON detail."""
-    conn = _get_db()
-    conn.execute("""CREATE TABLE IF NOT EXISTS audit_log_v2 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT NOT NULL,
-        event_type TEXT NOT NULL,
-        session_id TEXT DEFAULT '',
-        detail TEXT DEFAULT '{}'
-    )""")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_ts ON audit_log_v2(timestamp)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)")
-    conn.commit()
 
 
 # ── Audit log batching ──
 _audit_buffer: list = []  # buffered audit entries
-_AUDIT_BATCH_SIZE = 20  # flush after this many entries
-_AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush
 _audit_flush_timer: Optional[threading.Timer] = None  # noqa: F405
 
 
-def _flush_audit_buffer() -> None:
-    """Write buffered audit entries to SQLite in a single transaction."""
-    global _audit_flush_timer
-    with _audit_lock:
-        if not _audit_buffer:
-            _audit_flush_timer = None
-            return
-        entries = _audit_buffer[:]
-        _audit_buffer.clear()
-        _audit_flush_timer = None
-
-    conn = _get_db()
-    # Get current chain head
-    row = conn.execute("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
-    prev = row[0] if row else "0" * 64
-
-    for ts, event, detail, session_id, json_detail in entries:
-        # v1: hash-chain
-        payload = f"{ts}|{event}|{detail}|{prev}"
-        h = hashlib.sha256(payload.encode()).hexdigest()
-        conn.execute(
-            "INSERT INTO audit_log (ts, event, detail, prev_hash, hash) VALUES (?,?,?,?,?)",
-            (ts, event, detail[:500], prev, h),
-        )
-        prev = h
-        # v2: structured
-        conn.execute(
-            "INSERT INTO audit_log_v2 (timestamp, event_type, session_id, detail) VALUES (?,?,?,?)",
-            (ts, event, session_id, json_detail),
-        )
-    conn.commit()
 
 
-def _schedule_audit_flush() -> None:
-    """Schedule a delayed flush if not already pending."""
-    global _audit_flush_timer
-    if _audit_flush_timer is None:
-        _audit_flush_timer = threading.Timer(_AUDIT_FLUSH_INTERVAL, _flush_audit_buffer)  # noqa: F405
-        _audit_flush_timer.daemon = True
-        _audit_flush_timer.start()
 
 
-def audit_log(
-    event: str,
-    detail: str = "",
-    session_id: str = "",
-    detail_dict: Optional[dict] = None,
-) -> None:
-    """Write an audit event to the security log (v1 chain + v2 structured).
-
-    Events are buffered and flushed in batches for performance.
-    Flush triggers: batch size (20) or time interval (5s), whichever comes first.
-
-    Args:
-        event: event type string (tool_call, api_call, auth_success, etc.)
-        detail: plain text detail (for v1 compatibility)
-        session_id: associated session ID
-        detail_dict: structured detail as dict (serialized to JSON for v2)
-    """
-    _ensure_audit_v2_table()
-    ts = datetime.now(KST).isoformat()  # noqa: F405
-    json_detail = json.dumps(detail_dict, ensure_ascii=False) if detail_dict else json.dumps({"text": detail[:500]})
-
-    with _audit_lock:
-        _audit_buffer.append((ts, event, detail, session_id, json_detail))
-        if len(_audit_buffer) >= _AUDIT_BATCH_SIZE:
-            pass  # will flush below
-        else:
-            _schedule_audit_flush()
-            return
-
-    # Flush immediately when batch is full
-    _flush_audit_buffer()
 
 
-def audit_checkpoint() -> Optional[str]:
-    """Append current audit chain head hash to a checkpoint file.
-
-    This provides tamper-evidence: if someone modifies the SQLite DB,
-    the checkpoint file (append-only) will show a divergence.
-    Returns the head hash or None on failure.
-    """
-    try:
-        conn = _get_db()
-        row = conn.execute("SELECT hash, id FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
-        if not row:
-            return None
-        head_hash, head_id = row[0], row[1]
-        checkpoint_file = AUDIT_DB.parent / "audit_checkpoint.log"  # noqa: F405
-        ts = datetime.now(KST).isoformat()  # noqa: F405
-        with open(checkpoint_file, "a") as f:
-            f.write(f"{ts} id={head_id} hash={head_hash}\n")
-        return head_hash  # type: ignore[no-any-return]
-    except Exception as e:  # noqa: broad-except
-        return None
 
 
 def audit_log_cleanup(days: int = 30) -> None:
@@ -269,47 +131,6 @@ def audit_log_cleanup(days: int = 30) -> None:
         log.warning(f"Audit cleanup error: {e}")
 
 
-def query_audit_log(limit: int = 50, event_type: Optional[str] = None, session_id: Optional[str] = None) -> list:
-    """Query structured audit log entries.
-
-    Returns list of dicts with id, timestamp, event_type, session_id, detail.
-    """
-    try:
-        conn = _get_db()
-        _ensure_audit_v2_table()
-        sql = "SELECT id, timestamp, event_type, session_id, detail FROM audit_log_v2"
-        params: list = []
-        conditions = []
-        if event_type:
-            conditions.append("event_type = ?")
-            params.append(event_type)
-        if session_id:
-            conditions.append("session_id = ?")
-            params.append(session_id)
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
-        sql += " ORDER BY id DESC LIMIT ?"
-        params.append(min(limit, 500))
-        rows = conn.execute(sql, params).fetchall()
-        results = []
-        for r in rows:
-            try:
-                detail = json.loads(r[4]) if r[4] else {}
-            except (json.JSONDecodeError, TypeError):
-                detail = {"text": r[4]}
-            results.append(
-                {
-                    "id": r[0],
-                    "timestamp": r[1],
-                    "event_type": r[2],
-                    "session_id": r[3],
-                    "detail": detail,
-                }
-            )
-        return results
-    except Exception as e:
-        log.warning(f"Audit query error: {e}")
-        return []
 
 
 def close_all_db_connections() -> None:
@@ -806,137 +627,7 @@ def write_daily_log(entry: str) -> None:
         f.write(f"{header}- [{ts}] {entry}\n")
 
 
-def edit_message(session_id: str, message_index: int, new_content: str) -> dict:
-    """Edit a message at the given index in a session.
 
-    Backs up the original messages first, then replaces the content.
-    Returns {'ok': True, 'index': int} or {'ok': False, 'error': ...}.
-    """
-    session = get_session(session_id)
-    if message_index < 0 or message_index >= len(session.messages):
-        return {"ok": False, "error": f"Invalid message_index: {message_index}"}
-    msg = session.messages[message_index]
-    if msg.get("role") != "user":
-        return {"ok": False, "error": "Can only edit user messages"}
-    # Backup current state
-    conn = _get_db()
-    conn.execute(
-        "INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)",
-        (
-            session_id,
-            json.dumps(session.messages, ensure_ascii=False),
-            datetime.now(KST).isoformat(),
-            "edit",
-        ),
-    )  # noqa: F405
-    conn.commit()
-    # Update the message content
-    session.messages[message_index]["content"] = new_content
-    # Remove all messages after this index (assistant response will be regenerated)
-    removed_count = len(session.messages) - message_index - 1
-    session.messages = session.messages[: message_index + 1]
-    session._persist()
-    try:
-        save_session_to_disk(session_id)
-    except Exception as e:
-        log.debug(f"Suppressed: {e}")
-    audit_log(
-        "message_edit",
-        f"{session_id}: edited index {message_index}, removed {removed_count} subsequent",
-        session_id=session_id,
-    )
-    return {"ok": True, "index": message_index, "removed_after": removed_count}
-
-
-def delete_message(session_id: str, message_index: int) -> dict:
-    """Delete a user message and its paired assistant response.
-
-    Backs up removed messages to session_message_backup table.
-    Returns {'ok': True, 'removed': int} or {'ok': False, 'error': ...}.
-    """
-    session = get_session(session_id)
-    if message_index < 0 or message_index >= len(session.messages):
-        return {"ok": False, "error": f"Invalid message_index: {message_index}"}
-    msg = session.messages[message_index]
-    if msg.get("role") != "user":
-        return {"ok": False, "error": "Can only delete user messages"}
-    indices_to_remove = [message_index]
-    # Also remove the paired assistant message (next one if it's assistant)
-    if message_index + 1 < len(session.messages) and session.messages[message_index + 1].get("role") == "assistant":
-        indices_to_remove.append(message_index + 1)
-    # Backup
-    removed_msgs = [session.messages[i] for i in indices_to_remove]
-    conn = _get_db()
-    conn.execute(
-        "INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)",
-        (
-            session_id,
-            json.dumps(removed_msgs, ensure_ascii=False),
-            datetime.now(KST).isoformat(),
-            "delete",
-        ),
-    )  # noqa: F405
-    conn.commit()
-    # Remove in reverse order
-    for i in sorted(indices_to_remove, reverse=True):
-        session.messages.pop(i)
-    session._persist()
-    try:
-        save_session_to_disk(session_id)
-    except Exception as e:
-        log.debug(f"Suppressed: {e}")
-    audit_log(
-        "message_delete",
-        f"{session_id}: deleted {len(indices_to_remove)} messages at index {message_index}",
-        session_id=session_id,
-    )
-    return {"ok": True, "removed": len(indices_to_remove)}
-
-
-def search_messages(query: str, limit: int = 20) -> list:
-    """Search messages across all sessions using LIKE matching.
-
-    Returns list of {'session_id', 'role', 'content', 'match_snippet', 'updated_at'}.
-    """
-    if not query or len(query.strip()) < 2:
-        return []
-    query = query.strip()
-    results = []
-    try:
-        conn = _get_db()
-        rows = conn.execute(
-            "SELECT session_id, messages, updated_at FROM session_store ORDER BY updated_at DESC"
-        ).fetchall()
-        for sid, msgs_json, updated_at in rows:
-            try:
-                msgs = json.loads(msgs_json)
-            except Exception as e:  # noqa: broad-except
-                log.debug(f"Suppressed: {e}")
-            for msg in msgs:
-                role = msg.get("role", "")
-                if role not in ("user", "assistant"):
-                    continue
-                content = _msg_content_str(msg)
-                if query.lower() in content.lower():
-                    # Extract snippet around the match
-                    idx = content.lower().index(query.lower())
-                    start = max(0, idx - 40)
-                    end = min(len(content), idx + len(query) + 40)
-                    snippet = ("..." if start > 0 else "") + content[start:end] + ("..." if end < len(content) else "")
-                    results.append(
-                        {
-                            "session_id": sid,
-                            "role": role,
-                            "content": content[:200],
-                            "match_snippet": snippet,
-                            "updated_at": updated_at,
-                        }
-                    )
-                    if len(results) >= limit:
-                        return results
-    except Exception as e:
-        log.warning(f"search_messages error: {e}")
-    return results
 
 
 # Re-export from agents.py

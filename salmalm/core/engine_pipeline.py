@@ -1,0 +1,386 @@
+"""Engine message processing pipeline."""
+
+import asyncio
+import json
+import logging
+import time
+from typing import Optional, Tuple, Dict, Any, List, Callable
+
+import threading as _threading
+
+log = logging.getLogger(__name__)
+
+_shutting_down = False
+_active_requests = 0
+_active_requests_lock = _threading.Lock()
+_active_requests_event = _threading.Event()
+
+import base64 as b64
+import re as _re
+import traceback
+
+_MAX_MESSAGE_LENGTH = 100_000
+_SESSION_ID_RE = _re.compile(r"^[a-zA-Z0-9_\-\.]+$")
+
+# Lazy imports to break circular deps — resolved at call time
+def _get_engine_deps():
+    """Import engine dependencies lazily."""
+    from salmalm.core.session_store import get_session
+    from salmalm.core.prompt import build_system_prompt
+    from salmalm.core.compaction import compact_messages
+    from salmalm.core.core import auto_title_session, router, track_usage, set_current_user_id
+    from salmalm.core.slash_commands import _dispatch_slash_command
+    from salmalm.core.classifier import TaskClassifier
+    from salmalm.core.model_selection import _select_model
+    from salmalm.security.crypto import vault
+    return locals()
+
+def _sanitize_input(text: str) -> str:
+    """Strip null bytes and control characters (keep newlines/tabs)."""
+    return "".join(c for c in text if c == "\n" or c == "\t" or c == "\r" or (ord(c) >= 32) or ord(c) > 127)
+
+
+async def process_message(
+    session_id: str,
+    user_message: str,
+    model_override: Optional[str] = None,
+    image_data: Optional[Tuple[str, str]] = None,
+    on_tool: Optional[Callable[[str, Any], None]] = None,
+    on_token: Optional[Callable] = None,
+    on_status: Optional[Callable] = None,
+    lang: Optional[str] = None,
+) -> str:
+    """Process a user message through the Intelligence Engine pipeline.
+
+    Edge cases:
+    - Shutdown rejection
+    - Unhandled exceptions → graceful error message
+    """
+    # Event loop reference is now obtained dynamically via _get_event_loop()
+    # Reject new requests during shutdown
+    if _shutting_down:
+        return "⚠️ Server is shutting down. Please try again later. / 서버가 종료 중입니다."
+
+    with _active_requests_lock:
+        global _active_requests
+        _active_requests += 1
+        _active_requests_event.clear()
+
+    try:
+        return await _process_message_inner(
+            session_id,
+            user_message,
+            model_override=model_override,
+            image_data=image_data,
+            on_tool=on_tool,
+            on_token=on_token,
+            on_status=on_status,
+            lang=lang,
+        )
+    except Exception as e:
+        log.error(f"[ENGINE] Unhandled error: {type(e).__name__}: {e}")
+        import traceback
+
+        traceback.print_exc()
+        return f"❌ Internal error / 내부 오류: {type(e).__name__}. Please try again."
+    finally:
+        with _active_requests_lock:
+            _active_requests -= 1
+            if _active_requests == 0:
+                _active_requests_event.set()
+
+
+def _classify_task(session, user_message: str) -> dict:
+    """Classify task and apply thinking settings."""
+    classification = TaskClassifier.classify(user_message, len(session.messages))
+    thinking_on = getattr(session, "thinking_enabled", False)
+    classification["thinking"] = thinking_on
+    level = getattr(session, "thinking_level", "medium") if thinking_on else None
+    classification["thinking_level"] = level
+    classification["thinking_budget"] = _THINKING_BUDGET_MAP.get(level or "medium", 10000) if thinking_on else 0
+
+    if not thinking_on and classification["tier"] >= 3 and classification["score"] >= 4:
+        _suggest_key = f"_thinking_suggested_{getattr(session, 'id', '')}"
+        if not getattr(session, _suggest_key, False):
+            setattr(session, _suggest_key, True)
+            session._thinking_hint = (
+                "\n\n💡 *이 작업은 복잡해 보입니다. 🧠 Extended Thinking을 켜면 더 정확한 결과를 얻을 수 있습니다.* "
+                "`/thinking on` 또는 🧠 버튼을 눌러주세요."
+                "\n💡 *This looks complex. Enable 🧠 Extended Thinking for better results.* "
+                "Use `/thinking on` or the 🧠 button."
+            )
+    return classification
+
+
+def _route_model(model_override, user_message: str, session) -> tuple:
+    """Select model via routing or override. Returns (model, complexity)."""
+    if model_override:
+        return _fix_model_name(model_override), "auto"
+    selected, complexity = _select_model(user_message, session)
+    log.info(f"[ROUTE] Multi-model: {complexity} → {selected}")
+    return _fix_model_name(selected), complexity
+
+
+def _prepare_context(session, user_message: str, lang, on_status) -> None:
+    """Prepare session context: language, compaction, RAG, mood, self-evolve."""
+    if lang and lang in ("en", "ko"):
+        lang_directive = "Respond in English." if lang == "en" else "한국어로 응답하세요."
+        session.messages.append({"role": "system", "content": f"[Language: {lang_directive}]"})
+
+    session.messages = compact_messages(session.messages, session=session, on_status=on_status)
+    if len(session.messages) % 20 == 0:
+        session.add_system(build_system_prompt(full=False))
+
+    try:
+        from salmalm.features.rag import inject_rag_context
+        for i, m in enumerate(session.messages):
+            if m.get("role") == "system":
+                session.messages[i] = dict(m)
+                session.messages[i]["content"] = inject_rag_context(session.messages, m["content"], max_chars=2500)
+                break
+    except Exception as e:
+        log.warning(f"RAG injection skipped: {e}")
+
+    try:
+        from salmalm.features.mood import mood_detector
+        if mood_detector.enabled:
+            _detected_mood, _mood_conf = mood_detector.detect(user_message)
+            if _detected_mood != "neutral" and _mood_conf > 0.3:
+                _tone_hint = mood_detector.get_tone_injection(_detected_mood)
+                if _tone_hint:
+                    for i, m in enumerate(session.messages):
+                        if m.get("role") == "system":
+                            session.messages[i] = dict(m)
+                            session.messages[i]["content"] = m["content"] + f"\n\n[감정 감지: {_detected_mood}] {_tone_hint}"
+                            break
+                mood_detector.record_mood(_detected_mood, _mood_conf)
+    except Exception as _mood_err:
+        log.debug(f"Mood detection skipped: {_mood_err}")
+
+    try:
+        from salmalm.features.self_evolve import prompt_evolver
+        if len(session.messages) > 4 and len(session.messages) % 10 == 0:
+            prompt_evolver.record_conversation(session.messages)
+    except Exception as _exc:
+        log.debug(f"Suppressed: {_exc}")
+
+
+def _record_sla(sla_start: float, first_token_time: float, model: str, session_id: str) -> None:
+    """Record SLA latency metrics."""
+    try:
+        from salmalm.features.sla import latency_tracker, sla_config as _sla_cfg
+        sla_end = _time.time()
+        ttft_ms = (first_token_time - sla_start) * 1000 if first_token_time > 0 else (sla_end - sla_start) * 1000
+        total_ms = (sla_end - sla_start) * 1000
+        timed_out = total_ms > _sla_cfg.get("response_target_ms", 30000)
+        latency_tracker.record(ttft_ms=ttft_ms, total_ms=total_ms, model=model or "auto", timed_out=timed_out, session_id=session_id)
+        if latency_tracker.should_failover():
+            log.warning("[SLA] Consecutive timeout threshold reached — failover recommended")
+            latency_tracker.reset_timeout_counter()
+    except Exception as e:
+        log.debug(f"[SLA] Latency tracking error: {e}")
+
+
+def _post_process(session, session_id: str, user_message: str, response: str, classification: dict) -> str:
+    """Post-process: auto-title, notification, hooks, thinking hint."""
+    try:
+        user_msgs = [m for m in session.messages if m.get("role") == "user" and isinstance(m.get("content"), str)]
+        assistant_msgs = [m for m in session.messages if m.get("role") == "assistant"]
+        if len(assistant_msgs) == 1 and user_msgs:
+            from salmalm.core import auto_title_session
+            auto_title_session(session_id, user_msgs[0]["content"])
+    except Exception as e:
+        log.warning(f"Auto-title hook error: {e}")
+
+    try:
+        _notify_completion(session_id, user_message, response, classification)
+    except Exception as e:
+        log.error(f"Notification hook error: {e}")
+
+    try:
+        from salmalm.features.hooks import hook_manager
+        hook_manager.fire("on_response", {"session_id": session_id, "message": response})
+    except Exception as _exc:
+        log.debug(f"Suppressed: {_exc}")
+
+    _hint = getattr(session, "_thinking_hint", None)
+    if _hint:
+        response = response + _hint
+        del session._thinking_hint
+    return response
+
+
+async def _process_message_inner(
+    session_id: str,
+    user_message: str,
+    model_override: Optional[str] = None,
+    image_data: Optional[Tuple[str, str]] = None,
+    on_tool: Optional[Callable[[str, Any], None]] = None,
+    on_token: Optional[Callable] = None,
+    on_status: Optional[Callable] = None,
+    lang: Optional[str] = None,
+) -> str:
+    """Inner implementation of process_message."""
+    # Input sanitization
+    if not _SESSION_ID_RE.match(session_id):
+        return "❌ Invalid session ID format (alphanumeric and hyphens only)."
+    if len(user_message) > _MAX_MESSAGE_LENGTH:
+        return f"❌ Message too long ({len(user_message)} chars). Maximum is {_MAX_MESSAGE_LENGTH}."
+    user_message = _sanitize_input(user_message)
+
+    from salmalm.core.session_store import get_session; session = get_session(session_id)
+
+    # Set user context for cost tracking (multi-tenant)
+    from salmalm.core import set_current_user_id
+
+    set_current_user_id(session.user_id)
+
+    # Multi-tenant quota check
+    if session.user_id:
+        try:
+            from salmalm.features.users import user_manager, QuotaExceeded
+
+            user_manager.check_quota(session.user_id)
+        except QuotaExceeded as e:
+            return f"⚠️ {e.message}"
+
+    # Fire on_message hook (메시지 수신 훅)
+    try:
+        from salmalm.features.hooks import hook_manager
+
+        hook_manager.fire("on_message", {"session_id": session_id, "message": user_message})
+    except Exception as _exc:
+        log.debug(f"Suppressed: {_exc}")
+
+    # --- Slash commands (fast path, no LLM) ---
+    cmd = user_message.strip()
+    from salmalm.core.slash_commands import _dispatch_slash_command; slash_result = await _dispatch_slash_command(cmd, session, session_id, model_override, on_tool)
+    if slash_result is not None:
+        return slash_result
+
+    # --- Normal message processing ---
+    if not user_message.strip() and not image_data:
+        return "Please enter a message."
+
+    if image_data:
+        b64, mime = image_data
+        log.info(f"[IMG] Image attached: {mime}, {len(b64) // 1024}KB base64")
+        # Auto-resize for token savings
+        from salmalm.core.image_resize import resize_image_b64
+
+        b64, mime = resize_image_b64(b64, mime)
+        content = [
+            {"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}},
+            {"type": "text", "text": user_message or "Analyze this image."},
+        ]
+        session.messages.append({"role": "user", "content": content})
+    else:
+        session.add_user(user_message)
+
+    _prepare_context(session, user_message, lang, on_status)
+
+    classification = _classify_task(session, user_message)
+    selected_model, complexity = _route_model(model_override, user_message, session)
+
+    # ── SLA: Measure latency (레이턴시 측정) + abort token accumulation ──
+    _sla_start = _time.time()
+    _sla_first_token_time = [0.0]  # mutable for closure
+    _orig_on_token = on_token
+
+    # Start streaming accumulator for abort recovery
+    from salmalm.features.abort import abort_controller as _abort_ctl
+
+    _abort_ctl.start_streaming(session_id)
+
+    def _sla_on_token(event) -> None:
+        """Sla on token."""
+        if _sla_first_token_time[0] == 0.0:
+            _sla_first_token_time[0] = _time.time()
+        # Accumulate tokens for abort recovery
+        if isinstance(event, dict):
+            delta = event.get("delta", {})
+            if isinstance(delta, dict) and delta.get("type") == "text_delta":
+                _abort_ctl.accumulate_token(session_id, delta.get("text", ""))
+            elif event.get("type") == "text" and event.get("text"):
+                _abort_ctl.accumulate_token(session_id, event["text"])
+        if _orig_on_token:
+            _orig_on_token(event)
+
+    response = await _engine.run(
+        session,
+        user_message,
+        model_override=selected_model,
+        on_tool=on_tool,
+        classification=classification,
+        on_token=_sla_on_token,
+        on_status=on_status,
+    )
+
+    _record_sla(_sla_start, _sla_first_token_time[0], selected_model, session_id)
+    session.last_model = selected_model or "auto"
+    session.last_complexity = complexity
+    response = _post_process(session, session_id, user_message, response, classification)
+    return response
+
+
+def _notify_completion(session_id: str, user_message: str, response: str, classification: dict) -> None:
+    """Send completion notifications to Telegram + Web chat."""
+    from salmalm.core import _tg_bot
+    from salmalm.security.crypto import vault
+
+    # Only notify for complex tasks (tier 3 or high-score tool-using)
+    tier = classification.get("tier", 1)
+    intent = classification.get("intent", "chat")
+    score = classification.get("score", 0)
+    if tier < 3 and score < 3:
+        return  # Skip simple/medium tasks — avoid notification spam
+
+    # Build summary
+    task_preview = user_message[:80] + ("..." if len(user_message) > 80 else "")
+    resp_preview = response[:150] + ("..." if len(response) > 150 else "")
+    notify_text = f"✅ Task completed [{intent}]\n📝 Request: {task_preview}\n💬 Result: {resp_preview}"
+
+    # Telegram notification (if task came from web)
+    if session_id != "telegram" and _tg_bot and _tg_bot.token:
+        owner_id = vault.get("telegram_owner_id") if vault.is_unlocked else None
+        if owner_id:
+            try:
+                _tg_bot.send_message(owner_id, f"🔔 SalmAlm webchat Task completed\n{notify_text}")
+            except Exception as e:
+                log.error(f"TG notify error: {e}")
+
+    # Web notification (if task came from telegram)
+    if session_id == "telegram":
+        # Store notification for web polling
+        from salmalm.core import _sessions  # noqa: F811
+
+        web_session = _sessions.get("web")
+        if web_session:
+            if not hasattr(web_session, "_notifications"):
+                web_session._notifications = []  # type: ignore[attr-defined]
+            web_session._notifications.append(
+                {  # type: ignore[attr-defined]
+                    "time": __import__("time").time(),
+                    "text": f"🔔 SalmAlm telegram Task completed\n{notify_text}",
+                }
+            )
+            # Keep max 20 notifications
+            web_session._notifications = web_session._notifications[-20:]  # type: ignore[attr-defined]
+
+
+def begin_shutdown() -> None:
+    """Signal the engine to stop accepting new requests."""
+    global _shutting_down
+    _shutting_down = True
+    log.info("[SHUTDOWN] Engine: rejecting new requests")
+
+
+def wait_for_active_requests(timeout: float = 30.0) -> bool:
+    """Wait for active requests to complete. Returns True if all done, False if timed out."""
+    with _active_requests_lock:
+        if _active_requests == 0:
+            return True
+    log.info(f"[SHUTDOWN] Waiting for {_active_requests} active request(s) (timeout={timeout}s)")
+    return _active_requests_event.wait(timeout=timeout)
+
+

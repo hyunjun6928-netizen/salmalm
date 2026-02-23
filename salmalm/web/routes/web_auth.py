@@ -3,6 +3,7 @@
 
 
 from salmalm.security.crypto import vault, log
+from salmalm.web.auth import rate_limiter, RateLimitExceeded  # noqa: F401
 import os
 import secrets
 import time
@@ -211,3 +212,60 @@ class WebAuthMixin:
             audit_log("unlock_fail", "wrong password")
             self._json({"ok": False, "error": "Wrong password"}, 401)
 
+
+    def _security_headers(self):
+        """Add security headers to all responses.
+
+        CSP defaults to nonce-based script-src (strict mode).
+        Set SALMALM_CSP_COMPAT=1 to fall back to 'unsafe-inline' for compatibility.
+        """
+        self._csp_nonce = secrets.token_urlsafe(16)
+
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
+        # CSP: unsafe-inline by default (setup/unlock templates use inline scripts).
+        # Set SALMALM_CSP_STRICT=1 to use nonce-based script-src instead.
+        if os.environ.get("SALMALM_CSP_STRICT"):
+            script_src = f"'self' 'nonce-{self._csp_nonce}'"
+        else:
+            script_src = "'self' 'unsafe-inline'"
+        self.send_header(
+            "Content-Security-Policy",
+            f"default-src 'self'; "
+            f"script-src {script_src}; "
+            f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "
+            f"img-src 'self' data: blob:; "
+            f"connect-src 'self' ws://127.0.0.1:* ws://localhost:* wss://127.0.0.1:* wss://localhost:*; "
+            f"font-src 'self' data: https://fonts.gstatic.com; "
+            f"object-src 'none'; "
+            f"base-uri 'self'; "
+            f"form-action 'self'",
+        )
+
+    def _check_rate_limit(self) -> bool:
+        """Check rate limit. Returns True if OK, sends 429 if exceeded."""
+        ip = self._get_client_ip()
+        user = extract_auth(dict(self.headers))
+        # Loopback admin bypass: only when server is bound to 127.0.0.1 (not 0.0.0.0)
+        _bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+        if (
+            not user
+            and ip in ("127.0.0.1", "::1", "localhost")
+            and vault.is_unlocked
+            and _bind in ("127.0.0.1", "::1", "localhost")
+        ):
+            user = {"username": "local", "role": "admin"}
+        role = user.get("role", "anonymous") if user else "anonymous"
+        key = user.get("username", ip) if user else ip
+        try:
+            rate_limiter.check(key, role)
+            return True
+        except RateLimitExceeded as e:
+            self.send_response(429)
+            self.send_header("Retry-After", str(int(e.retry_after)))
+            self._cors()
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Rate limit exceeded", "retry_after": e.retry_after}).encode())
+            return False

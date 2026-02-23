@@ -34,14 +34,16 @@ from typing import Dict, List, Optional, Tuple
 
 from salmalm.constants import MEMORY_DIR, WORKSPACE_DIR, MEMORY_FILE, BASE_DIR, DATA_DIR
 from salmalm.security.crypto import log
+from salmalm.features.rag_utils import (  # noqa: F401
+    decompose_jamo, simple_stem, compute_tf,
+    expand_query, load_rag_config, cosine_similarity,
+    CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHUNK_CHARS,
+)
 
 # ── BM25 Parameters ──
 BM25_K1 = 1.5
 BM25_B = 0.75
-CHUNK_SIZE = 5
-CHUNK_OVERLAP = 2
 REINDEX_INTERVAL = 120
-MAX_CHUNK_CHARS = 1500
 
 # Stop words (Korean + English)
 _STOP_WORDS = frozenset(
@@ -135,222 +137,41 @@ _STOP_WORDS = frozenset(
     ]
 )
 
-# ── Korean Jamo Decomposition ──
-_CHO = list("ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ")
-_JUNG = list("ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ")
-_JONG = [""] + list("ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ")
+# Korean jamo constants moved to rag_utils.py
 
 
-def decompose_jamo(text: str) -> str:
-    """Decompose Korean syllables into jamo (초성/중성/종성)."""
-    result = []
-    for ch in text:
-        code = ord(ch)
-        if 0xAC00 <= code <= 0xD7A3:
-            offset = code - 0xAC00
-            cho = offset // (21 * 28)
-            jung = (offset % (21 * 28)) // 28
-            jong = offset % 28
-            result.append(_CHO[cho])
-            result.append(_JUNG[jung])
-            if jong:
-                result.append(_JONG[jong])
-        else:
-            result.append(ch)
-    return "".join(result)
 
 
 # ── English Stemming (simple Porter-like) ──
 
 
-def simple_stem(word: str) -> str:
-    """Simple English suffix stripping."""
-    if len(word) <= 3:
-        return word
-    # Order matters: try longest suffixes first
-    for suffix, replacement in [
-        ("ational", "ate"),
-        ("tional", "tion"),
-        ("enci", "ence"),
-        ("anci", "ance"),
-        ("izer", "ize"),
-        ("isation", "ize"),
-        ("ization", "ize"),
-        ("ation", "ate"),
-        ("fulness", "ful"),
-        ("ousness", "ous"),
-        ("iveness", "ive"),
-        ("ement", ""),
-        ("ment", ""),
-        ("ness", ""),
-        ("ible", ""),
-        ("able", ""),
-        ("ling", ""),
-        ("ying", "y"),
-        ("ting", "t"),
-        ("ning", "n"),
-        ("ring", "r"),
-        ("ies", "y"),
-        ("ing", ""),
-        ("ely", ""),
-        ("ally", "al"),
-        ("ity", ""),
-        ("ous", ""),
-        ("ive", ""),
-        ("ful", ""),
-        ("less", ""),
-        ("ion", ""),
-        ("ers", ""),
-        ("ed", ""),
-        ("es", ""),
-        ("ly", ""),
-        ("er", ""),
-        ("s", ""),
-    ]:
-        if word.endswith(suffix) and len(word) - len(suffix) + len(replacement) >= 3:
-            return word[: -len(suffix)] + replacement
-    return word
 
 
 # ── Synonym / Query Expansion Dictionary ──
 
-_SYNONYMS: Dict[str, List[str]] = {
-    # Korean
-    "검색": ["찾기", "탐색", "서치"],
-    "파일": ["문서", "파일"],
-    "설정": ["설정", "세팅", "구성", "환경설정"],
-    "삭제": ["제거", "지우기"],
-    "추가": ["생성", "만들기", "등록"],
-    "수정": ["변경", "편집", "업데이트"],
-    "저장": ["보관", "세이브"],
-    "실행": ["구동", "런", "시작"],
-    "오류": ["에러", "버그", "문제"],
-    "메모리": ["기억", "메모"],
-    "사용자": ["유저", "사용자"],
-    "서버": ["서버", "호스트"],
-    "데이터": ["정보", "자료"],
-    "데이터베이스": ["디비", "DB", "데이터베이스"],
-    # English
-    "search": ["find", "lookup", "query"],
-    "file": ["document", "doc"],
-    "config": ["configuration", "settings", "setup"],
-    "delete": ["remove", "erase"],
-    "create": ["add", "make", "new"],
-    "update": ["modify", "edit", "change"],
-    "save": ["store", "persist"],
-    "run": ["execute", "start", "launch"],
-    "error": ["bug", "issue", "problem", "fail"],
-    "memory": ["recall", "remember"],
-    "user": ["person", "account"],
-    "server": ["host", "backend"],
-    "data": ["info", "information"],
-    "database": ["db", "datastore"],
-}
-
-# Build reverse lookup
-_SYNONYM_REVERSE: Dict[str, List[str]] = {}
-for _key, _vals in _SYNONYMS.items():
-    for _v in _vals:
-        _vl = _v.lower()
-        if _vl not in _SYNONYM_REVERSE:
-            _SYNONYM_REVERSE[_vl] = []
-        _SYNONYM_REVERSE[_vl].append(_key.lower())
-    _kl = _key.lower()
-    if _kl not in _SYNONYM_REVERSE:
-        _SYNONYM_REVERSE[_kl] = []
-    _SYNONYM_REVERSE[_kl].extend(v.lower() for v in _vals)
+from salmalm.features.rag_utils import _SYNONYMS, _SYNONYM_REVERSE  # noqa: F401,E402
 
 
-def expand_query(tokens: List[str]) -> List[str]:
-    """Expand query tokens with synonyms."""
-    expanded = list(tokens)
-    seen = set(t.lower() for t in tokens)
-    for t in tokens:
-        tl = t.lower()
-        # Direct lookup
-        if tl in _SYNONYMS:
-            for syn in _SYNONYMS[tl]:
-                sl = syn.lower()
-                if sl not in seen:
-                    expanded.append(sl)
-                    seen.add(sl)
-        # Reverse lookup
-        if tl in _SYNONYM_REVERSE:
-            for syn in _SYNONYM_REVERSE[tl]:
-                if syn not in seen:
-                    expanded.append(syn)
-                    seen.add(syn)
-    return expanded
 
 
 # ── RAG Configuration ──
 
-_DEFAULT_CONFIG = {
-    "hybrid": {"enabled": True, "vectorWeight": 0.7, "textWeight": 0.3},
-    "sessionIndexing": {"enabled": False, "retentionDays": 30},
-    "extraPaths": [],
-    "chunkSize": 5,
-    "chunkOverlap": 2,
-    "reindexInterval": 120,
-}
+from salmalm.features.rag_utils import _DEFAULT_CONFIG  # noqa: F401
 
 
-def load_rag_config(config_path: Optional[Path] = None) -> dict:
-    """Load rag.json config, falling back to defaults."""
-    path = config_path or DATA_DIR / "rag.json"
-    config = dict(_DEFAULT_CONFIG)
-    if path.exists():
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                user_cfg = json.load(f)
-            # Merge top-level keys
-            for k, v in user_cfg.items():
-                if k in config and isinstance(config[k], dict) and isinstance(v, dict):
-                    merged = dict(config[k])
-                    merged.update(v)
-                    config[k] = merged
-                else:
-                    config[k] = v
-        except Exception as e:
-            log.warning(f"RAG config load error: {e}")
-    return config
 
 
 # ── TF-IDF Vector Utilities ──
 
 
-def compute_tf(tokens: List[str]) -> Dict[str, float]:
-    """Compute term frequency vector (normalized)."""
-    if not tokens:
-        return {}
-    counts: Dict[str, int] = {}
-    for t in tokens:
-        counts[t] = counts.get(t, 0) + 1
-    n = len(tokens)
-    return {t: c / n for t, c in counts.items()}
 
 
-def cosine_similarity(v1: Dict[str, float], v2: Dict[str, float]) -> float:
-    """Cosine similarity between two sparse vectors (dict-based)."""
-    if not v1 or not v2:
-        return 0.0
-    # Dot product - iterate over smaller dict
-    if len(v1) > len(v2):
-        v1, v2 = v2, v1
-    dot = 0.0
-    for k, val in v1.items():
-        if k in v2:
-            dot += val * v2[k]
-    if dot == 0.0:
-        return 0.0
-    norm1 = math.sqrt(sum(v * v for v in v1.values()))
-    norm2 = math.sqrt(sum(v * v for v in v2.values()))
-    if norm1 == 0.0 or norm2 == 0.0:
-        return 0.0
-    return dot / (norm1 * norm2)
 
 
-class RAGEngine:
+from salmalm.features.rag_indexer import RAGIndexerMixin
+
+
+class RAGEngine(RAGIndexerMixin):
     """Hybrid BM25 + TF-IDF vector retrieval engine with persistent SQLite index."""
 
     def __init__(self, db_path: Optional[Path] = None, config_path: Optional[Path] = None) -> None:
@@ -470,187 +291,6 @@ class RAGEngine:
             self._last_check = time.time()
         except Exception as e:
             log.warning(f"RAG index_file error ({label}): {e}")
-
-    def _index_text(self, label: str, text: str, mtime: float):
-        """Index text content as chunks."""
-        cfg = self.config
-        chunk_size = cfg.get("chunkSize", CHUNK_SIZE)
-        chunk_overlap = cfg.get("chunkOverlap", CHUNK_OVERLAP)
-
-        lines = text.splitlines()
-        new_docs = []
-        vectors = []
-        doc_freq: Dict[str, int] = {}
-
-        step = max(1, chunk_size - chunk_overlap)
-        for i in range(0, len(lines), step):
-            chunk_lines = lines[i : i + chunk_size]
-            chunk_text = "\n".join(chunk_lines).strip()
-            if not chunk_text or len(chunk_text) < 10:
-                continue
-            if len(chunk_text) > MAX_CHUNK_CHARS:
-                chunk_text = chunk_text[:MAX_CHUNK_CHARS]
-
-            tokens = self._tokenize(chunk_text)
-            if not tokens:
-                continue
-
-            h = hashlib.md5(chunk_text.encode()).hexdigest()[:12]
-            new_docs.append((label, i + 1, i + len(chunk_lines), chunk_text, json.dumps(tokens), len(tokens), mtime, h))
-
-            # TF vector for this chunk
-            tf_vec = compute_tf(tokens)
-            vectors.append(tf_vec)
-
-            for t in set(tokens):
-                doc_freq[t] = doc_freq.get(t, 0) + 1
-
-        if not new_docs:
-            return
-
-        # Remove old chunks for this label
-        self._conn.execute(
-            "DELETE FROM tfidf_vectors WHERE chunk_id IN (SELECT id FROM chunks WHERE source=?)", (label,)
-        )
-        self._conn.execute("DELETE FROM chunks WHERE source=?", (label,))
-
-        # Insert new chunks
-        for doc in new_docs:
-            cur = self._conn.execute(
-                "INSERT INTO chunks (source, line_start, line_end, text, tokens, token_count, mtime, hash) VALUES (?,?,?,?,?,?,?,?)",
-                doc,
-            )
-            chunk_id = cur.lastrowid
-            idx = len(vectors) - len(new_docs) + new_docs.index(doc)
-            self._conn.execute(
-                "INSERT INTO tfidf_vectors (chunk_id, vector) VALUES (?,?)", (chunk_id, json.dumps(vectors[idx]))
-            )
-
-        # Update doc_freq (rebuild entirely for simplicity during reindex)
-        # This is handled in reindex(); for single file we just update
-        for term, df_val in doc_freq.items():
-            self._conn.execute(
-                "INSERT OR REPLACE INTO doc_freq (term, df) VALUES (?, COALESCE((SELECT df FROM doc_freq WHERE term=?), 0) + ?)",
-                (term, term, df_val),
-            )
-
-        self._conn.commit()
-        self._load_stats()
-
-    def _get_indexable_files(self) -> List[Tuple[str, Path]]:
-        """Enumerate files to index."""
-        files = []
-        if MEMORY_FILE.exists():
-            files.append(("MEMORY.md", MEMORY_FILE))
-        if MEMORY_DIR.exists():
-            for f in sorted(MEMORY_DIR.glob("*.md")):
-                files.append((f"memory/{f.name}", f))
-        for name in ("SOUL.md", "USER.md", "TOOLS.md", "AGENTS.md", "HEARTBEAT.md"):
-            p = BASE_DIR / name
-            if p.exists():
-                files.append((name, p))
-        uploads = WORKSPACE_DIR / "uploads"
-        if uploads.exists():
-            for f in uploads.glob("*"):
-                if f.suffix.lower() in (
-                    ".txt",
-                    ".md",
-                    ".py",
-                    ".js",
-                    ".json",
-                    ".csv",
-                    ".html",
-                    ".css",
-                    ".log",
-                    ".xml",
-                    ".yaml",
-                    ".yml",
-                    ".sql",
-                    ".sh",
-                    ".bat",
-                    ".toml",
-                    ".cfg",
-                    ".ini",
-                ):
-                    files.append((f"uploads/{f.name}", f))
-        skills = WORKSPACE_DIR / "skills"
-        if skills.exists():
-            for f in skills.glob("**/*.md"):
-                files.append((f"skills/{f.relative_to(skills)}", f))
-
-        # Extra paths from config
-        cfg = self.config
-        for extra in cfg.get("extraPaths", []):
-            ep = Path(extra).expanduser()
-            if ep.is_file():
-                files.append((str(ep.name), ep))
-            elif ep.is_dir():
-                for f in ep.glob("**/*"):
-                    if f.is_file() and f.suffix.lower() in (".txt", ".md", ".py", ".json"):
-                        files.append((str(f.relative_to(ep)), f))
-
-        return files
-
-    def _get_session_files(self) -> List[Tuple[str, Path]]:
-        """Get session transcript files for indexing."""
-        cfg = self.config
-        si = cfg.get("sessionIndexing", {})
-        if not si.get("enabled", False):
-            return []
-
-        sessions_dir = DATA_DIR / "sessions"
-        if not sessions_dir.exists():
-            return []
-
-        retention_days = si.get("retentionDays", 30)
-        cutoff = time.time() - (retention_days * 86400)
-        files = []
-        for f in sessions_dir.glob("*.json"):
-            try:
-                if f.stat().st_mtime >= cutoff:
-                    files.append((f"session/{f.name}", f))
-            except OSError:
-                continue
-        return files
-
-    def _index_session_file(self, label: str, fpath: Path, mtime: float):
-        """Index a session JSON file, extracting conversation text."""
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception as e:  # noqa: broad-except
-            return
-
-        # Extract messages text
-        parts = []
-        messages = data if isinstance(data, list) else data.get("messages", [])
-        for msg in messages:
-            if isinstance(msg, dict):
-                content = msg.get("content", "")
-                if isinstance(content, str) and content.strip():
-                    parts.append(content)
-
-        if parts:
-            text = "\n".join(parts)
-            self._index_text(label, text, mtime)
-
-    def _needs_reindex(self) -> bool:
-        """Check if any source files changed since last index."""
-        now = time.time()
-        reindex_interval = self.config.get("reindexInterval", REINDEX_INTERVAL)
-        if now - self._last_check < reindex_interval:
-            return False
-        self._last_check = now
-
-        all_files = self._get_indexable_files() + self._get_session_files()
-        for label, fpath in all_files:
-            try:
-                mtime = fpath.stat().st_mtime
-                if label not in self._mtimes or self._mtimes[label] != mtime:
-                    return True
-            except OSError:
-                continue
-        return False
 
     def _chunk_and_index(self, label, text, mtime, chunk_size, chunk_overlap, new_docs, vectors, doc_freq):
         """Chunk text and add to index arrays."""
