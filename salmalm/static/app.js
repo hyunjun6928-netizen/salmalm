@@ -695,9 +695,8 @@
     if(!pending)return;
     var pd;try{pd=JSON.parse(pending)}catch(e){localStorage.removeItem('salm_sse_pending');return}
     var sid=pd.session||'web';
-    var sendTime=pd.ts||0;
-    /* If pending flag is older than 5 minutes, discard */
-    if(sendTime&&(Date.now()/1000-sendTime)>300){localStorage.removeItem('salm_sse_pending');return}
+    var prevCount=pd.prevCount||0;
+    var prevMsg=(pd.prevMsg||'').substring(0,100);
     localStorage.removeItem('salm_sse_pending');
     /* Show recovery indicator */
     addMsg('assistant','⏳ Recovering response after refresh...');
@@ -710,25 +709,34 @@
       polls++;
       fetch('/api/sessions/'+encodeURIComponent(sid)+'/last',{headers:{'X-Session-Token':_tok}})
       .then(function(r){return r.json()}).then(function(d){
-        /* Check if server has a response that was created AFTER we sent the request */
-        if(d.ok&&d.message&&d.last_active&&d.last_active>sendTime){
+        /* New response = msg_count increased OR last message content changed */
+        var newCount=d.msg_count||0;
+        var newMsg=(d.message||'').substring(0,100);
+        if(d.ok&&d.message&&(newCount>prevCount||newMsg!==prevMsg)){
           _removeRecoveryMsg();
           addMsg('assistant',d.message,'🔄 recovered after refresh');
         }else if(polls<30){
           setTimeout(_rpoll,2000);
         }else{
           _removeRecoveryMsg();
-          addMsg('assistant','⚠️ Response may still be processing. Check back shortly or resend.');
+          addMsg('assistant','⚠️ Response may still be processing. Try refreshing again.');
         }
       }).catch(function(){if(polls<30)setTimeout(_rpoll,2000)});
     }
+    /* Wait 3s for server to start/finish processing */
     setTimeout(_rpoll,3000);
   };
 
   async function _sendViaSse(chatBody,_sendStart){
     try{
-      /* Mark pending so page refresh can recover — use timestamp for comparison */
-      localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',ts:Date.now()/1000}));
+      /* Mark pending so page refresh can recover — fetch server msg count for comparison */
+      try{
+        var _preR=await fetch('/api/sessions/'+encodeURIComponent(chatBody.session||'web')+'/last',{headers:{'X-Session-Token':_tok}});
+        var _preD=await _preR.json();
+        localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',prevCount:(_preD.msg_count||0),prevMsg:(_preD.message||'').substring(0,100)}));
+      }catch(e){
+        localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',prevCount:0,prevMsg:''}));
+      }
       _currentAbort=new AbortController();
       var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify(chatBody),signal:_currentAbort.signal});
