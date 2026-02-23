@@ -240,7 +240,7 @@ class SystemMixin:
 
     def _get_static_app_js(self):
         """Serve extracted main application JavaScript."""
-        js_path = Path(__file__).parent.parent / "static" / "app.js"
+        js_path = Path(__file__).parent.parent.parent / "static" / "app.js"
         if not js_path.exists():
             self.send_error(404)
             return
