@@ -234,6 +234,16 @@ async def run_server():
         if not vault.is_unlocked:
             if vault.unlock(""):
                 log.info("[UNLOCK] Vault auto-unlocked (no password)")
+        # 5. All auto-unlock methods failed on localhost → reset vault for setup wizard
+        if not vault.is_unlocked and not _is_external_bind:
+            log.warning("[VAULT] All auto-unlock failed — resetting vault for setup wizard")
+            try:
+                VAULT_FILE.unlink(missing_ok=True)
+                _pw_hint = VAULT_FILE.parent / ".vault_auto"
+                _pw_hint.unlink(missing_ok=True)
+                log.info("[VAULT] Vault reset — setup wizard will run on next page load")
+            except Exception as _e:
+                log.error(f"[VAULT] Reset failed: {_e}")
 
     _core.set_telegram_bot(telegram_bot)
 
