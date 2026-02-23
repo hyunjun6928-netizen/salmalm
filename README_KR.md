@@ -129,7 +129,11 @@ SALMALM_PORT=8080 salmalm   # 포트 변경
 웹 검색(Brave), 이메일(Gmail), 캘린더(Google), 파일 읽기/쓰기, 셸 실행, Python eval, 이미지 생성(DALL-E/Aurora), TTS/STT, 브라우저 자동화(Playwright), RAG 검색, QR 코드, 시스템 모니터, OS 네이티브 샌드박스, 메시 네트워킹, 캔버스 미리보기 등.
 
 ### 웹 UI
-- 실시간 스트리밍 (WebSocket + SSE 폴백)
+- 실시간 스트리밍 (SSE 우선, WebSocket은 타이핑 표시용)
+- 임베딩 RAG — 하이브리드 벡터 검색 (OpenAI/Google 임베딩 + BM25 폴백)
+- 에이전트 조종 — `/agent steer <label> <message>`로 실행 중인 서브에이전트 제어
+- 브라우저 aria-ref 압축 — 브라우저 자동화 토큰 10배 절약
+- 사고 스트림 UI — 실시간 접이식 사고 과정 표시
 - 세션 분기, 롤백, 검색 (`Ctrl+K`), 명령 팔레트 (`Ctrl+Shift+P`)
 - 다크/라이트 테마, **한국어/영어 전환** (설정에서 토글)
 - 이미지 붙여넣기/드래그앤드롭 + 비전, 코드 구문 강조
@@ -345,7 +349,7 @@ SALMALM_VAULT_FALLBACK=1    # cryptography 없이 HMAC-CTR 볼트
                          └── 볼트 (PBKDF2 + AES-256-GCM / HMAC-CTR)
 ```
 
-- **190개 모듈, ~40K 줄, 1,877개 테스트**
+- **192개 모듈, ~52K 줄, 1,878개 테스트**
 - 순수 Python 3.10+ 표준 라이브러리 — 프레임워크 없음, 무거운 의존성 없음
 - 데이터는 `~/SalmAlm`에 저장 (`SALMALM_HOME`으로 변경 가능)
 

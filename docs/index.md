@@ -79,10 +79,10 @@ On first launch, the setup wizard guides you through API key configuration.
 
 | Metric | Value |
 |--------|-------|
-| Python files | 190 |
-| Total lines | ~40K |
+| Python files | 192 |
+| Total lines | ~52K |
 | Functions | ~1,800 |
-| Test count | 1,877 |
+| Test count | 1,878 |
 | Max cyclomatic complexity | 20 |
 | Largest file | 778 lines |
 | Docstring coverage | 99% |

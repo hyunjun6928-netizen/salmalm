@@ -18,7 +18,7 @@ python -m pytest tests/ -q --timeout=30 -x \
   --ignore=tests/test_fresh_install_e2e.py
 ```
 
-Expected: **1,877 passed, 17 skipped**.
+Expected: **1,878 passed, 17 skipped**.
 
 ### Run a specific test file
 
@@ -125,7 +125,7 @@ CI automatically checks version consistency between these files.
 ## Pull Request Checklist
 
 - [ ] Tests pass: `python -m pytest tests/test_yourfile.py -v --timeout=30`
-- [ ] Full suite: `python -m pytest tests/ -q --timeout=30 -x --ignore=tests/test_multi_tenant.py --ignore=tests/test_fresh_install_e2e.py` (1,877 tests expected)
+- [ ] Full suite: `python -m pytest tests/ -q --timeout=30 -x --ignore=tests/test_multi_tenant.py --ignore=tests/test_fresh_install_e2e.py` (1,878 tests expected)
 - [ ] No new dependencies (stdlib only)
 - [ ] i18n: Both EN and KR strings provided
 - [ ] Security: Dangerous features default OFF with env var opt-in

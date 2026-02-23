@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
-[![Tests](https://img.shields.io/badge/tests-1%2C877%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1%2C878%20passed-brightgreen)]()
 [![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
 [![Coverage](https://img.shields.io/badge/docstrings-99%25-blue)]()
 
@@ -133,15 +133,15 @@ Discord  ──►             ├── Sub-Agent Manager (spawn/steer/kill/not
 
 | Metric | Value |
 |---|---|
-| Python files | 190 |
-| Total lines | ~40,000 |
+| Python files | 192 |
+| Total lines | ~52,450 |
 | Functions | ~1,800 |
 | Max cyclomatic complexity | 20 (all functions) |
 | Largest file | 778 lines |
 | Files > 800 lines | 0 |
 | Docstring coverage | 99% |
 | Return type hints | 81% |
-| Tests | 1,877 passing |
+| Tests | 1,878 passing |
 
 ---
 
@@ -183,7 +183,11 @@ Discord  ──►             ├── Sub-Agent Manager (spawn/steer/kill/not
 Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Python eval (opt-in), image generation (DALL-E/Aurora), TTS/STT, **browser automation (Playwright)**, RAG search, QR codes, system monitor, OS-native sandbox, mesh networking, and more.
 
 ### Web UI
-- Real-time streaming (WebSocket + SSE fallback)
+- Real-time streaming (SSE-first, WebSocket for typing indicators)
+- Embedding RAG — hybrid vector search (OpenAI/Google embeddings + BM25 fallback)
+- Agent steer — `/agent steer <label> <message>` to control running sub-agents
+- Browser aria-ref compression — 10x token savings for browser automation
+- Thinking stream UI — real-time collapsible thinking display
 - Session branching, rollback, search (`Ctrl+K`), command palette (`Ctrl+Shift+P`)
 - Dark/Light themes, **EN/KR i18n**
 - Image paste/drag-drop with vision, code syntax highlighting

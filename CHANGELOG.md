@@ -2,6 +2,39 @@
 
 > **Note:** Versions v0.10.x through v0.18.x were rapid iteration releases during initial development (2026-02-19 ~ 2026-02-23). Daily version bumps reflect active development, not production releases. Stable releases begin from v0.19.x.
 
+## v0.19.48 (2026-02-24)
+- **24-item external review complete** — all findings addressed
+- SSE-first architecture (tab-switch-safe message delivery)
+- Embedding RAG with hybrid vector search (OpenAI/Google embeddings + BM25 fallback)
+- Agent steer command (`/agent steer <label> <message>`)
+- Browser aria-ref compression (10x token savings)
+- Thinking stream UI (real-time collapsible display)
+- Documentation updated to match v0.19.48 reality
+
+## v0.19.47 (2026-02-24)
+- Thinking stream UI — collapsible real-time thinking display
+
+## v0.19.46 (2026-02-24)
+- Browser aria-ref compression — 10x token savings
+
+## v0.19.45 (2026-02-24)
+- Agent steer command for sub-agent control
+
+## v0.19.44 (2026-02-24)
+- Embedding RAG — hybrid vector search with BM25 fallback
+
+## v0.19.43 (2026-02-24)
+- SSE-first transport architecture
+
+## v0.19.42 (2026-02-24)
+- Fix SSE reconnection edge cases
+
+## v0.19.41 (2026-02-24)
+- WebSocket demoted to typing indicators only
+
+## v0.19.40 (2026-02-24)
+- External review round 3 — remaining P2/P3 fixes
+
 ## v0.19.39 (2026-02-24)
 - Detailed explanations for temperature & max tokens settings
 

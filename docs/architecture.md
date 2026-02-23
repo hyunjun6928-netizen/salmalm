@@ -143,3 +143,5 @@ User Input → Channel (Web/Telegram/Discord)
 3. **Lazy module loading** — tools loaded on first use / 첫 사용 시 모듈 로딩
 4. **Multi-channel abstraction** — single engine, multiple frontends / 단일 엔진, 다중 프론트엔드
 5. **Feature isolation** — each feature is a standalone module / 각 기능은 독립 모듈
+6. **SSE-first transport** — SSE is the primary message delivery channel (tab-switch-safe); WebSocket demoted to typing indicators only / SSE가 기본 전송 채널 (탭 전환 안전); WebSocket은 타이핑 표시만
+7. **Embedding RAG** — hybrid vector search with OpenAI/Google embeddings + BM25 fallback for memory recall / 하이브리드 벡터 검색 (임베딩 + BM25 폴백)

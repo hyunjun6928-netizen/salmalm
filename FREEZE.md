@@ -30,7 +30,7 @@ Score target: 70 → 80/100.
 - Complete service failure
 
 ## Status
-⚠️ **Freeze has been broken repeatedly** — multiple bug fixes and improvements landed during the freeze period (v0.19.25–v0.19.39). The intent remains valid but enforcement has been relaxed for critical fixes.
+🔓 **Freeze ended early (2026-02-24)** — Critical findings from a 24-item external code review required immediate fixes (v0.19.25–v0.19.48). The freeze was formally ended to address security, stability, and architecture issues. The original goal of stabilization was achieved through the review process itself.
 
 ---
 *"통제할 수 없는 것에 동요하지 않고, 자신의 역할에 충실하라." — 마르쿠스 아우렐리우스*
