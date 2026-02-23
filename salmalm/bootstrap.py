@@ -127,24 +127,23 @@ if vault.is_unlocked:
         except Exception as e:
             log.warning(f"[DISCORD] Failed to start: {e}")
 
-_rag_stats = rag_engine.get_stats()  # noqa: F841
-try:
-    st = f"{selftest['passed']}/{selftest['total']}"  # noqa: F821
-except NameError:
-    st = "skipped"
-update_msg = _check_for_updates()
-log.info(
-    f"\n╔══════════════════════════════════════════════╗\n"
-    f"║  😈 {APP_NAME} v{VERSION}                   ║\n"
-    f"║  Web UI:    http://{bind_addr}:{port:<5}           ║\n"
-    f"║  WebSocket: ws://{bind_addr}:{ws_port:<5}            ║\n"
-    f"║  Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}         ║\n"
-    f"║  Crypto:    {'AES-256-GCM' if HAS_CRYPTO else ('HMAC-CTR (fallback)' if os.environ.get('SALMALM_VAULT_FALLBACK') else 'Vault disabled')}            ║\n"
-    f"║  Self-test: {st}                               ║\n"
-    f"╚══════════════════════════════════════════════╝"
-)
-if update_msg:
-    log.info(f"  {update_msg}")
+def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=18801):
+    """Print startup banner (deferred to run_server call)."""
+    _rag_stats = rag_engine.get_stats()  # noqa: F841
+    st = f"{selftest['passed']}/{selftest['total']}" if selftest else "skipped"
+    update_msg = _check_for_updates()
+    log.info(
+        f"\n╔══════════════════════════════════════════════╗\n"
+        f"║  😈 {APP_NAME} v{VERSION}                   ║\n"
+        f"║  Web UI:    http://{bind_addr}:{port:<5}           ║\n"
+        f"║  WebSocket: ws://{bind_addr}:{ws_port:<5}            ║\n"
+        f"║  Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}         ║\n"
+        f"║  Crypto:    {'AES-256-GCM' if HAS_CRYPTO else ('HMAC-CTR (fallback)' if os.environ.get('SALMALM_VAULT_FALLBACK') else 'Vault disabled')}            ║\n"
+        f"║  Self-test: {st}                               ║\n"
+        f"╚══════════════════════════════════════════════╝"
+    )
+    if update_msg:
+        log.info(f"  {update_msg}")
 
 
 def _auto_unlock_vault() -> None:
@@ -489,6 +488,8 @@ async def run_server():
         webbrowser.open(url)
 
     await _setup_services(host, port, httpd, server_thread, url)
+
+    _print_banner(selftest=selftest, bind_addr=bind_addr, port=port, ws_port=ws_port)
 
     # Register signal handlers
     for sig in (signal.SIGINT, signal.SIGTERM):
