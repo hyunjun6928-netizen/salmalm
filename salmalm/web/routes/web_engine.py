@@ -107,7 +107,7 @@ class WebEngineMixin:
             return
         config = auto_optimize_and_save(available_keys)
         # Build human-readable summary
-        from salmalm.core.model_selection import MODEL_COSTS
+        from salmalm.core.model_selection import _MODEL_COSTS as MODEL_COSTS
 
         summary = {}
         for tier, model in config.items():

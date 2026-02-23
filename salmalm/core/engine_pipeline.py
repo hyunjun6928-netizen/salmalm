@@ -101,6 +101,7 @@ async def process_message(
 
 def _classify_task(session, user_message: str) -> dict:
     """Classify task and apply thinking settings."""
+    from salmalm.core.classifier import TaskClassifier
     classification = TaskClassifier.classify(user_message, len(session.messages))
     thinking_on = getattr(session, "thinking_enabled", False)
     classification["thinking"] = thinking_on
@@ -123,6 +124,7 @@ def _classify_task(session, user_message: str) -> dict:
 
 def _route_model(model_override, user_message: str, session) -> tuple:
     """Select model via routing or override. Returns (model, complexity)."""
+    from salmalm.core.model_selection import _select_model
     if model_override:
         return _fix_model_name(model_override), "auto"
     selected, complexity = _select_model(user_message, session)
@@ -132,6 +134,9 @@ def _route_model(model_override, user_message: str, session) -> tuple:
 
 def _prepare_context(session, user_message: str, lang, on_status) -> None:
     """Prepare session context: language, compaction, RAG, mood, self-evolve."""
+    from salmalm.core.compaction import compact_messages
+    from salmalm.core.prompt import build_system_prompt
+
     if lang and lang in ("en", "ko"):
         lang_directive = "Respond in English." if lang == "en" else "한국어로 응답하세요."
         session.messages.append({"role": "system", "content": f"[Language: {lang_directive}]"})
