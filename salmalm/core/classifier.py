@@ -261,13 +261,13 @@ _KEYWORD_TOOLS = {
 import os as _os
 
 INTENT_MAX_TOKENS = {
-    "chat": int(_os.environ.get("SALMALM_MAX_TOKENS_CHAT", "4096")),
-    "memory": 1024,
-    "creative": 4096,
-    "search": 2048,
-    "analysis": 4096,
-    "code": int(_os.environ.get("SALMALM_MAX_TOKENS_CODE", "8192")),
-    "system": 2048,
+    "chat": int(_os.environ.get("SALMALM_MAX_TOKENS_CHAT", "512")),
+    "memory": 512,
+    "creative": 1024,
+    "search": 1024,
+    "analysis": 2048,
+    "code": int(_os.environ.get("SALMALM_MAX_TOKENS_CODE", "4096")),
+    "system": 1024,
 }
 
 # Keywords that trigger higher max_tokens
