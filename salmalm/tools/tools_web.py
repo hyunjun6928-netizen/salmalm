@@ -18,13 +18,22 @@ def handle_web_search(args: dict) -> str:
     """Handle web search."""
     api_key = vault.get("brave_api_key")
     if not api_key:
-        return "Brave Search API key not found"
+        return "Brave Search API key not found. Add it in Settings → API Keys."
     query = urllib.parse.quote(args["query"])
     count = min(args.get("count", 5), 10)
-    resp = _http_get(
-        f"https://api.search.brave.com/res/v1/web/search?q={query}&count={count}",
-        {"Accept": "application/json", "X-Subscription-Token": api_key},
-    )
+    try:
+        resp = _http_get(
+            f"https://api.search.brave.com/res/v1/web/search?q={query}&count={count}",
+            {"Accept": "application/json", "X-Subscription-Token": api_key},
+        )
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return "Brave API key is invalid. Please update it in Settings."
+        if e.code == 429:
+            return "Brave API rate limit reached. Please wait a moment."
+        return f"Search failed (HTTP {e.code}). Please try again."
+    except Exception as e:
+        return f"Search request failed: {e}"
     results = []
     for r in resp.get("web", {}).get("results", [])[:count]:
         results.append(f"**{r['title']}**\n{r['url']}\n{r.get('description', '')}\n")
@@ -47,7 +56,13 @@ def handle_web_fetch(args: dict) -> str:
         opener = _resolve_and_pin(final_url)
     except ValueError as e:
         return f"SSRF blocked: {e}"
-    with opener.open(req, timeout=15) as resp:
+    try:
+        resp = opener.open(req, timeout=15)
+    except urllib.error.HTTPError as e:
+        return f"Page returned HTTP {e.code} ({e.reason}). The URL may not exist or may require authentication."
+    except urllib.error.URLError as e:
+        return f"Could not reach {url}: {e.reason}"
+    with resp:
         # Limit download to 2MB to prevent memory explosion
         raw = resp.read(2 * 1024 * 1024).decode("utf-8", errors="replace")
     from html.parser import HTMLParser
