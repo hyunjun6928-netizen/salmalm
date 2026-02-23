@@ -2,9 +2,10 @@ import logging
 import sys
 
 try:
-    __version__ = "0.19.10"
-except Exception as e:  # noqa: broad-except
-    __version__ = "0.19.10"
+    from importlib.metadata import version as _pkg_version
+    __version__ = _pkg_version("salmalm")
+except Exception:
+    __version__ = "0.19.11"  # fallback for editable/dev installs
 
 log = logging.getLogger("salmalm")
 log.addHandler(logging.NullHandler())  # Prevent "No handlers" warning at import
