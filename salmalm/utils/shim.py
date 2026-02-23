@@ -46,7 +46,7 @@ def install_shim(package_name: str, real_module: str, submodules: set) -> None:
     proxy.__loader__ = old.__loader__
     proxy.__spec__ = old.__spec__
     sys.modules[package_name] = proxy
-    short_name = package_name.rsplit('.', 1)[-1]
+    short_name = package_name.rsplit(".", 1)[-1]
     warnings.warn(
         f"{short_name} is a shim; use {real_module} directly",
         DeprecationWarning,

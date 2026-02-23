@@ -12,7 +12,11 @@ MODEL_ALIASES = {"auto": None, **_CONST_ALIASES}
 from salmalm.core.cost import estimate_tokens, estimate_cost, MODEL_PRICING, get_pricing as _get_pricing  # noqa: F401
 from salmalm.security.crypto import log  # noqa: F401
 from salmalm.core.slash_commands_ext import (  # noqa: F401
-    _cmd_context, _cmd_usage, _cmd_thought, _cmd_subagents, _subagent_list,
+    _cmd_context,
+    _cmd_usage,
+    _cmd_thought,
+    _cmd_subagents,
+    _subagent_list,
 )
 
 
@@ -344,8 +348,6 @@ def _cmd_security(cmd: str, session, **_):
     return security_auditor.format_report()
 
 
-
-
 def _cmd_soul(cmd: str, session, **_) -> str:
     """Cmd soul."""
     from salmalm.core.prompt import get_user_soul, USER_SOUL_FILE
@@ -415,8 +417,6 @@ def _cmd_voice(cmd: str, session, **_) -> str:
         session.tts_voice = arg
         return f"🎙️ Voice: **{arg}** — saved ✅"
     return f"Available voices: {', '.join(valid_voices)}"
-
-
 
 
 def _cmd_agent(cmd: str, session, *, session_id="", **_) -> str:
@@ -555,7 +555,6 @@ def _cmd_mood(cmd: str, session, **_) -> str:
 
 
 # ── Thought Stream commands ──
-
 
 
 def _cmd_export_fn(cmd: str, session, **_) -> str:

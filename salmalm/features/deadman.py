@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from salmalm.constants import KST, DATA_DIR
+
 DEADMAN_DIR = DATA_DIR
 DEADMAN_CONFIG = DEADMAN_DIR / "deadman.json"
 DEADMAN_STATE = DEADMAN_DIR / "deadman_state.json"

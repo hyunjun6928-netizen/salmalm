@@ -11,6 +11,7 @@ from salmalm.core.cost import estimate_tokens, estimate_cost  # noqa: E402
 from salmalm.constants import VERSION
 from salmalm.core.core import track_usage  # noqa: E402  # noqa: E402
 
+
 def _cmd_context(cmd: str, session, **_):
     """Show context window token usage breakdown."""
     sub = cmd.strip().split()
@@ -103,7 +104,9 @@ def _cmd_usage(cmd: str, session, *, session_id="", **_) -> str:
     """Handle /usage tokens|full|cost|off commands."""
     parts = cmd.strip().split()
     sub = parts[1] if len(parts) > 1 else "tokens"
-    from salmalm.core.slash_commands import _get_session_usage; su = _get_session_usage(session_id)
+    from salmalm.core.slash_commands import _get_session_usage
+
+    su = _get_session_usage(session_id)
 
     if sub == "off":
         su["mode"] = "off"
@@ -161,7 +164,9 @@ def _subagent_list(SubAgent) -> str:
     lines = ["🤖 **Sub-agents**\n"]
     for i, a in enumerate(agents, 1):
         icon = {"running": "🔄", "completed": "✅", "error": "❌", "stopped": "⏹"}.get(a["status"].split(".")[0], "❓")
-        lines.append(f"{icon} #{i} `{a['id']}` — {a['label']} [{a['status']}] ({a['runtime_s']}s, ${a.get('estimated_cost', 0):.4f})")
+        lines.append(
+            f"{icon} #{i} `{a['id']}` — {a['label']} [{a['status']}] ({a['runtime_s']}s, ${a.get('estimated_cost', 0):.4f})"
+        )
     return "\n".join(lines)
 
 
@@ -298,5 +303,3 @@ def _cmd_thought(cmd: str, session, **_) -> str:
         if found_tags:
             tags = f" 🏷️ {', '.join('#' + t for t in found_tags)}"
         return f"💭 생각 #{tid} 기록됨{tags}"
-
-

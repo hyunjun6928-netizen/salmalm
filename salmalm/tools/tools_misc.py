@@ -25,8 +25,22 @@ _reminder_thread_started = False
 
 def _resolve_next_weekday(s_orig: str, s_stripped: str, now) -> int:
     """Resolve 'next week' + optional weekday name to day offset."""
-    _WEEKDAYS = {"월": 0, "화": 1, "수": 2, "목": 3, "금": 4, "토": 5, "일": 6,
-                 "mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+    _WEEKDAYS = {
+        "월": 0,
+        "화": 1,
+        "수": 2,
+        "목": 3,
+        "금": 4,
+        "토": 5,
+        "일": 6,
+        "mon": 0,
+        "tue": 1,
+        "wed": 2,
+        "thu": 3,
+        "fri": 4,
+        "sat": 5,
+        "sun": 6,
+    }
     for wd, idx in _WEEKDAYS.items():
         if wd in s_orig or wd in s_stripped:
             days_ahead = (idx - now.weekday() + 7) % 7
@@ -97,8 +111,10 @@ def _parse_relative_time(s: str) -> datetime:
         day_offset = _resolve_next_weekday(s_orig, s_stripped, now)
 
     _TIME_KEYWORDS = [
-        (("아침", "morning"), 8), (("점심", "noon", "lunch"), 12),
-        (("저녁", "evening"), 18), (("밤", "night"), 21),
+        (("아침", "morning"), 8),
+        (("점심", "noon", "lunch"), 12),
+        (("저녁", "evening"), 18),
+        (("밤", "night"), 21),
     ]
     for keywords, h in _TIME_KEYWORDS:
         if any(k in s_orig or k in s_stripped for k in keywords):
@@ -155,6 +171,7 @@ def _send_notification_impl(
     if channel in ("telegram", "all"):
         try:
             from salmalm.core import _tg_bot
+
             tg = _tg_bot
             if tg:
                 owner = vault.get("telegram_owner_id") or ""

@@ -215,7 +215,12 @@ class WebSocketServer:
         """Resume buffered messages from prior connection and register presence."""
         session_id = client.session_id
         for old_id, old_client in list(self.clients.items()):
-            if old_id != client._id and old_client.session_id == session_id and not old_client.connected and old_client._buffer:
+            if (
+                old_id != client._id
+                and old_client.session_id == session_id
+                and not old_client.connected
+                and old_client._buffer
+            ):
                 log.info(f"[WS] Resuming {len(old_client._buffer)} buffered messages for session={session_id}")
                 for buffered_msg in old_client._buffer:
                     try:
@@ -226,10 +231,16 @@ class WebSocketServer:
                 self.clients.pop(old_id, None)
         try:
             from salmalm.features.presence import presence_manager
+
             peer = writer.get_extra_info("peername")
             ip = peer[0] if peer else ""
-            presence_manager.register(f"ws_{client._id}", ip=ip, mode="websocket",
-                                      host=headers.get("host", ""), user_agent=headers.get("user-agent", ""))
+            presence_manager.register(
+                f"ws_{client._id}",
+                ip=ip,
+                mode="websocket",
+                host=headers.get("host", ""),
+                user_agent=headers.get("user-agent", ""),
+            )
         except Exception as e:  # noqa: broad-except
             log.debug(f"Suppressed: {e}")
 
@@ -239,6 +250,7 @@ class WebSocketServer:
         self.clients.pop(client._id, None)
         try:
             from salmalm.features.presence import presence_manager
+
             presence_manager.unregister(f"ws_{client._id}")
         except Exception as e:  # noqa: broad-except
             log.debug(f"Suppressed: {e}")
@@ -265,6 +277,7 @@ class WebSocketServer:
         if data.get("type") == "abort":
             try:
                 from salmalm.features.edge_cases import abort_controller
+
                 sid = data.get("session", client.session_id)
                 abort_controller.set_abort(sid)
                 await client.send_json({"type": "aborted", "session": sid})
@@ -302,6 +315,7 @@ class WebSocketServer:
         origin = headers.get("origin", "")
         if origin:
             from urllib.parse import urlparse
+
             o = urlparse(origin)
             if o.hostname and o.hostname not in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
                 log.warning("WS rejected: origin %s not in allowlist", origin)

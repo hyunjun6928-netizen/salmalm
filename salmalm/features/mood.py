@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
 from salmalm.constants import KST, DATA_DIR
+
 MOOD_DIR = DATA_DIR
 MOOD_CONFIG_FILE = MOOD_DIR / "mood.json"
 MOOD_HISTORY_FILE = MOOD_DIR / "mood_history.json"

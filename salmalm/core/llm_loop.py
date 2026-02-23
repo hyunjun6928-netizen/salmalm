@@ -29,17 +29,43 @@ _cooldown_lock = _threading.Lock()
 # Default fallback chains (no config needed)
 _DEFAULT_FALLBACKS = {
     # Same-provider fallbacks + cross-provider fallbacks
-    "anthropic/claude-opus-4-6": ["anthropic/claude-sonnet-4-6", "anthropic/claude-haiku-4-5-20251001", "google/gemini-2.5-pro", "openai/gpt-4.1"],
-    "anthropic/claude-sonnet-4-6": ["anthropic/claude-haiku-4-5-20251001", "anthropic/claude-opus-4-6", "google/gemini-2.5-flash", "openai/gpt-4.1-mini"],
-    "anthropic/claude-haiku-4-5-20251001": ["anthropic/claude-sonnet-4-6", "google/gemini-2.0-flash", "openai/gpt-4.1-mini"],
+    "anthropic/claude-opus-4-6": [
+        "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-haiku-4-5-20251001",
+        "google/gemini-2.5-pro",
+        "openai/gpt-4.1",
+    ],
+    "anthropic/claude-sonnet-4-6": [
+        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-opus-4-6",
+        "google/gemini-2.5-flash",
+        "openai/gpt-4.1-mini",
+    ],
+    "anthropic/claude-haiku-4-5-20251001": [
+        "anthropic/claude-sonnet-4-6",
+        "google/gemini-2.0-flash",
+        "openai/gpt-4.1-mini",
+    ],
     "openai/gpt-5.2": ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
     "openai/gpt-4.1": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
     "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"],
     "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.0-flash", "anthropic/claude-sonnet-4-6"],
-    "google/gemini-2.5-flash": ["google/gemini-2.0-flash", "google/gemini-2.5-pro", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.5-flash": [
+        "google/gemini-2.0-flash",
+        "google/gemini-2.5-pro",
+        "anthropic/claude-haiku-4-5-20251001",
+    ],
     "google/gemini-2.0-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
-    "google/gemini-3-pro-preview": ["google/gemini-2.5-pro", "google/gemini-3-flash-preview", "anthropic/claude-sonnet-4-6"],
-    "google/gemini-3-flash-preview": ["google/gemini-2.0-flash", "google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-3-pro-preview": [
+        "google/gemini-2.5-pro",
+        "google/gemini-3-flash-preview",
+        "anthropic/claude-sonnet-4-6",
+    ],
+    "google/gemini-3-flash-preview": [
+        "google/gemini-2.0-flash",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4-5-20251001",
+    ],
     "xai/grok-4": ["xai/grok-3", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
     "xai/grok-3": ["xai/grok-4", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
 }
@@ -237,7 +263,9 @@ async def _call_google_streaming(messages: list, model=None, tools=None, max_tok
     return await asyncio.to_thread(_run)
 
 
-async def _call_llm_streaming(messages: list, model=None, tools=None, max_tokens=4096, thinking=False, on_token=None) -> dict:
+async def _call_llm_streaming(
+    messages: list, model=None, tools=None, max_tokens=4096, thinking=False, on_token=None
+) -> dict:
     """Streaming LLM call — yields tokens via on_token callback, returns final result.
 
     on_token: callback(event_dict) called for each streaming event.

@@ -134,17 +134,21 @@ class TelegramBot(TelegramCommandsMixin, TelegramMediaMixin):
     def _check_telegram_auth(self, chat_id, user_id: str, msg: dict) -> tuple:
         """Check multi-tenant or legacy auth. Returns (tenant_user, error_msg) or (user, None)."""
         from salmalm.features.users import user_manager
+
         if user_manager.multi_tenant_enabled:
             tenant = user_manager.get_user_by_telegram(str(chat_id))
             text_check = msg.get("text", "") or ""
             if not tenant and not text_check.startswith(("/register", "/start")):
-                return None, ("🔐 등록이 필요합니다. /register <비밀번호>로 등록하세요.\n"
-                              "Registration required. Use /register <password> to sign up.")
+                return None, (
+                    "🔐 등록이 필요합니다. /register <비밀번호>로 등록하세요.\n"
+                    "Registration required. Use /register <password> to sign up."
+                )
             if tenant and not tenant.get("enabled", True):
                 return None, "⛔ 계정이 비활성화되었습니다. 관리자에게 문의하세요. / Account disabled."
             if tenant:
                 try:
                     from salmalm.features.users import QuotaExceeded
+
                     user_manager.check_quota(tenant["id"])
                 except QuotaExceeded as e:
                     return None, f"⚠️ {e.message}"
@@ -189,8 +193,9 @@ class TelegramBot(TelegramCommandsMixin, TelegramMediaMixin):
         return ""
 
     @staticmethod
-    def _build_send_data(chat_id, text: str, parse_mode, reply_markup,
-                         thread_id, reply_to_id, idx: int, is_last: bool) -> dict:
+    def _build_send_data(
+        chat_id, text: str, parse_mode, reply_markup, thread_id, reply_to_id, idx: int, is_last: bool
+    ) -> dict:
         """Build sendMessage API data dict."""
         data = {"chat_id": chat_id, "text": text}
         if thread_id:
@@ -243,8 +248,9 @@ class TelegramBot(TelegramCommandsMixin, TelegramMediaMixin):
             if not chunk.strip():
                 continue
             is_last = idx == len(chunks) - 1
-            data = self._build_send_data(chat_id, chunk, parse_mode, reply_markup,
-                                          message_thread_id, reply_to_message_id, idx, is_last)
+            data = self._build_send_data(
+                chat_id, chunk, parse_mode, reply_markup, message_thread_id, reply_to_message_id, idx, is_last
+            )
             try:
                 self._api("sendMessage", data)
             except Exception as e:
@@ -620,10 +626,12 @@ class TelegramBot(TelegramCommandsMixin, TelegramMediaMixin):
 
         await self._handle_update_continued(chat_id, msg, text, _image_data, _tenant_user)
 
-    def _send_llm_response(self, chat_id, response: str, model_short: str, elapsed: float,
-                           draft_sent: bool, msg_id, session_obj) -> None:
+    def _send_llm_response(
+        self, chat_id, response: str, model_short: str, elapsed: float, draft_sent: bool, msg_id, session_obj
+    ) -> None:
         """Send LLM response with media detection, draft finalization, and TTS."""
         import re as _re
+
         img_match = _re.search(r"uploads/[\w.-]+\.(png|jpg|jpeg|gif|webp)", response)
         audio_match = _re.search(r"uploads/[\w.-]+\.(mp3|wav|ogg)", response)
         suffix = f"\n\n🤖 {model_short} · ⏱️ {elapsed:.1f}s"
@@ -661,7 +669,6 @@ class TelegramBot(TelegramCommandsMixin, TelegramMediaMixin):
             self._finalize_draft(chat_id, response, suffix)
         else:
             self.send_message(chat_id, f"{response}{suffix}")
-
 
     def stop(self) -> None:
         """Stop the Telegram polling loop."""

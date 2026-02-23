@@ -512,8 +512,8 @@ TOOL_DEFINITIONS = [
 
 # Extended tools (split for file size)
 from salmalm.tools.tools_schema_ext import TOOL_DEFINITIONS_EXT  # noqa: E402
-TOOL_DEFINITIONS.extend(TOOL_DEFINITIONS_EXT)
 
+TOOL_DEFINITIONS.extend(TOOL_DEFINITIONS_EXT)
 
 
 # Re-export handler for backward compatibility

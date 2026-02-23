@@ -11,6 +11,7 @@ from salmalm.core.classifier import INTENT_TOOLS, _KEYWORD_TOOLS
 from salmalm.constants import TOOL_HINT_KEYWORDS
 from salmalm.security.crypto import log
 
+
 def get_tools_for_provider(provider: str, intent: str = None, user_message: str = "") -> list:
     """Get tools for provider."""
     from salmalm.tools import TOOL_DEFINITIONS
@@ -100,8 +101,10 @@ def get_tools_for_provider(provider: str, intent: str = None, user_message: str 
 
     schema_key = "input_schema" if provider == "anthropic" else "parameters"
     return [
-        {"name": t["name"], "description": _compress_desc(t["description"]),
-         schema_key: _compress_schema(t["input_schema"])}
+        {
+            "name": t["name"],
+            "description": _compress_desc(t["description"]),
+            schema_key: _compress_schema(t["input_schema"]),
+        }
         for t in all_tools
     ]
-

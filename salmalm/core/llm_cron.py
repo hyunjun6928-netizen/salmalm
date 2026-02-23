@@ -10,6 +10,7 @@ from typing import Optional
 from salmalm.constants import BASE_DIR, DATA_DIR, KST, MEMORY_DIR
 from salmalm.security.crypto import vault, log
 
+
 class LLMCronManager:
     """OpenClaw-style LLM cron with isolated session execution.
 
@@ -183,6 +184,7 @@ class LLMCronManager:
                 channel_id = notify_cfg.get("channel_id", "")
                 if channel_id:
                     import salmalm.channels.discord_bot as _dmod
+
                     dbot = getattr(_dmod, "_bot", None)
                     if dbot and hasattr(dbot, "send_message"):
                         dbot.send_message(channel_id, text)

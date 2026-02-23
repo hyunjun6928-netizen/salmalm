@@ -1,7 +1,5 @@
 """Engine optimization & routing API — SLA, routing, failover, engine settings."""
 
-
-
 from salmalm.security.crypto import vault, log
 import os
 from salmalm.constants import COMPACTION_THRESHOLD, MODEL_COSTS
@@ -25,6 +23,7 @@ def _apply_int_setting(body: dict, key: str, min_val: int, max_val: int, env_key
 
 class WebEngineMixin:
     """Mixin providing engine route handlers."""
+
     def _get_sla(self):
         """Get sla."""
         from salmalm.features.sla import uptime_monitor, latency_tracker, watchdog, sla_config
@@ -204,4 +203,3 @@ class WebEngineMixin:
             elif "SALMALM_COST_CAP" in os.environ:
                 del os.environ["SALMALM_COST_CAP"]
         self._json({"ok": True})
-

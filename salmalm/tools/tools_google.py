@@ -128,6 +128,7 @@ def _gmail_list(args: dict, base_url: str, headers: dict) -> str:
     params = f"maxResults={count}"
     if query:
         import urllib.parse
+
         params += f"&q={urllib.parse.quote(query)}"
     elif label:
         params += f"&labelIds={label}"

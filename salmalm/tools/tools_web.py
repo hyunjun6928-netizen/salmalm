@@ -43,6 +43,7 @@ def handle_web_fetch(args: dict) -> str:
     # DNS pinning: connect to the IP we already validated (anti-rebinding)
     try:
         from salmalm.tools.tools_common import _resolve_and_pin
+
         opener = _resolve_and_pin(final_url)
     except ValueError as e:
         return f"SSRF blocked: {e}"
@@ -161,6 +162,7 @@ def handle_http_request(args: dict) -> str:
         # DNS pinning (anti-rebinding)
         try:
             from salmalm.tools.tools_common import _resolve_and_pin
+
             _opener = _resolve_and_pin(url)
         except ValueError as _ve:
             return f"SSRF blocked: {_ve}"

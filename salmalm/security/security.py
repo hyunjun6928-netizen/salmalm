@@ -10,7 +10,9 @@ Features:
 보안 모듈 — OWASP 준수, 보안 감사, 강화.
 """
 
-import logging; log = logging.getLogger("salmalm")
+import logging
+
+log = logging.getLogger("salmalm")
 import ipaddress
 import os
 import re

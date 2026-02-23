@@ -37,7 +37,9 @@ class ConversationFork:
         except Exception as e:
             log.warning(f"Alternatives table init: {e}")
 
-    def save_alternative(self, session_id: str, message_index: int, content: str, model: str = "", active: bool = True) -> None:
+    def save_alternative(
+        self, session_id: str, message_index: int, content: str, model: str = "", active: bool = True
+    ) -> None:
         """Save alternative."""
         try:
             from salmalm.core import _get_db

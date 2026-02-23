@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from salmalm.constants import KST, DATA_DIR
+
 CAPSULE_DB = DATA_DIR / "capsules.db"
 
 _SCHEMA = """

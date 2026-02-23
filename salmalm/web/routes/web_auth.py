@@ -1,7 +1,5 @@
 """Authentication endpoints — login, register, unlock, Google OAuth."""
 
-
-
 from salmalm.security.crypto import vault, log
 from salmalm.web.auth import rate_limiter, RateLimitExceeded  # noqa: F401
 import os
@@ -14,6 +12,7 @@ from salmalm.web.auth import auth_manager, extract_auth
 
 class WebAuthMixin:
     """Mixin providing auth route handlers."""
+
     def _auto_unlock_localhost(self) -> bool:
         """Auto-unlock vault for localhost connections.
 
@@ -110,7 +109,9 @@ class WebAuthMixin:
         redirect_uri = f"http://localhost:{port}/api/google/callback"
         # CSRF protection: generate and store state token
         state = secrets.token_urlsafe(32)
-        from salmalm.web.web import _google_oauth_pending_states; _google_oauth_pending_states[state] = time.time()
+        from salmalm.web.web import _google_oauth_pending_states
+
+        _google_oauth_pending_states[state] = time.time()
         params = urllib.parse.urlencode(
             {
                 "client_id": client_id,
@@ -211,7 +212,6 @@ class WebAuthMixin:
         else:
             audit_log("unlock_fail", "wrong password")
             self._json({"ok": False, "error": "Wrong password"}, 401)
-
 
     def _security_headers(self):
         """Add security headers to all responses.

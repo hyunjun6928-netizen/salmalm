@@ -1,6 +1,8 @@
 """Brave Search API tools — web, news, images, LLM context."""
 
-import logging; log = logging.getLogger("salmalm")
+import logging
+
+log = logging.getLogger("salmalm")
 import json
 import os
 import urllib.request

@@ -252,7 +252,9 @@ class UserManager:
         conn.commit()
         conn.close()
 
-    def set_quota(self, user_id: int, daily_limit: Optional[float] = None, monthly_limit: Optional[float] = None) -> None:
+    def set_quota(
+        self, user_id: int, daily_limit: Optional[float] = None, monthly_limit: Optional[float] = None
+    ) -> None:
         """Set quota limits for a user (admin only)."""
         self._ensure_db()
         self.ensure_quota(user_id)

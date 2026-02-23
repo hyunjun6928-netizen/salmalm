@@ -375,4 +375,3 @@ class WebFeaturesMixin:
             },
         ]
         self._json({"categories": cats})
-

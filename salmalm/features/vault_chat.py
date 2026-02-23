@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional
 
 from salmalm.constants import KST, DATA_DIR
+
 VAULT_CHAT_DIR = DATA_DIR
 VAULT_CHAT_DB = VAULT_CHAT_DIR / "vault_chat.db"
 VAULT_CHAT_META = VAULT_CHAT_DIR / "vault_chat_meta.json"

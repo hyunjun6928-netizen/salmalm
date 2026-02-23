@@ -1,7 +1,5 @@
 """Session management API — list, create, import, delete, rename, rollback, branch."""
 
-
-
 from datetime import datetime
 from salmalm.security.crypto import vault, log
 import json
@@ -10,6 +8,7 @@ from salmalm.core import audit_log
 
 class WebSessionsMixin:
     """Mixin providing sessions route handlers."""
+
     def _get_api_sessions(self):
         """Get api sessions."""
         _auth_user = self._require_auth("user")
@@ -177,4 +176,3 @@ class WebSessionsMixin:
 
         result = branch_session(sid, int(message_index))
         self._json(result)
-

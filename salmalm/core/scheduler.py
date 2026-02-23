@@ -10,6 +10,7 @@ from typing import Optional
 from salmalm.constants import BASE_DIR, DATA_DIR, KST, MEMORY_DIR
 from salmalm.security.crypto import log
 
+
 class CronScheduler:
     """OpenClaw-style cron scheduler with isolated session execution."""
 

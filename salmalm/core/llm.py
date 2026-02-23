@@ -22,9 +22,12 @@ def _get_temperature(tools: Optional[list]) -> float:
     if tools:
         return float(_os.environ.get("SALMALM_TEMP_TOOL", "0.3"))
     return float(_os.environ.get("SALMALM_TEMP_CHAT", "0.7"))
+
+
 from salmalm.security.crypto import vault, log
 from salmalm.core.llm_stream import (  # noqa: F401
-    stream_google, stream_anthropic,
+    stream_google,
+    stream_anthropic,
 )
 from salmalm.core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded, _metrics
 
@@ -91,11 +94,14 @@ def _try_fallback(provider, model, messages, tools, max_tokens, t0) -> Optional[
         if not fb_model_id:
             continue
         from salmalm.core.engine import _fix_model_name
+
         fb_model_id = _fix_model_name(fb_model_id)
         log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id} [after {time.time() - t0:.2f}s]")
         try:
             fb_tools = _adapt_tools_for_provider(tools, fb_provider)
-            result = _call_provider(fb_provider, fb_key, fb_model_id, messages, fb_tools, max_tokens, timeout=_LLM_TIMEOUT)
+            result = _call_provider(
+                fb_provider, fb_key, fb_model_id, messages, fb_tools, max_tokens, timeout=_LLM_TIMEOUT
+            )
             result["model"] = f"{fb_provider}/{fb_model_id}"
             usage = result.get("usage", {})
             track_usage(result["model"], usage.get("input", 0), usage.get("output", 0))
@@ -110,11 +116,23 @@ def _adapt_tools_for_provider(tools, provider: str) -> Optional[list]:
     if not tools:
         return None
     if provider == "anthropic":
-        return [{"name": t["name"], "description": t["description"],
-                 "input_schema": t.get("input_schema", t.get("parameters", {}))} for t in tools]
+        return [
+            {
+                "name": t["name"],
+                "description": t["description"],
+                "input_schema": t.get("input_schema", t.get("parameters", {})),
+            }
+            for t in tools
+        ]
     if provider in ("openai", "xai", "google"):
-        return [{"name": t["name"], "description": t["description"],
-                 "parameters": t.get("parameters", t.get("input_schema", {}))} for t in tools]
+        return [
+            {
+                "name": t["name"],
+                "description": t["description"],
+                "parameters": t.get("parameters", t.get("input_schema", {})),
+            }
+            for t in tools
+        ]
     return None
 
 
@@ -378,7 +396,12 @@ def _call_openai(
             converted_msgs.append({**m, "content": new_content})
         else:
             converted_msgs.append(m)
-    body = {"model": model_id, "max_tokens": max_tokens, "messages": converted_msgs, "temperature": _get_temperature(tools)}
+    body = {
+        "model": model_id,
+        "max_tokens": max_tokens,
+        "messages": converted_msgs,
+        "temperature": _get_temperature(tools),
+    }
     # OpenAI reasoning_effort for o3/o4-mini reasoning models
     _REASONING_MAP = {"low": "low", "medium": "medium", "high": "high", "xhigh": "high"}
     _is_reasoning = any(r in model_id for r in ("o3", "o4", "o1"))
@@ -413,7 +436,10 @@ def _call_google(
     # Gemini API — with optional tool support
     """Call google."""
     merged = _build_gemini_contents(messages)
-    body: dict = {"contents": merged, "generationConfig": {"maxOutputTokens": max_tokens, "temperature": _get_temperature(tools)}}
+    body: dict = {
+        "contents": merged,
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": _get_temperature(tools)},
+    }
     gemini_tools = _build_gemini_tools(tools)
     if gemini_tools:
         body["tools"] = gemini_tools
@@ -478,12 +504,6 @@ def _build_gemini_tools(tools: Optional[List[dict]]) -> Optional[list]:
     return [{"functionDeclarations": gemini_tools}]
 
 
-
 # ============================================================
 # STREAMING API — Token-by-token streaming for Anthropic
 # ============================================================
-
-
-
-
-

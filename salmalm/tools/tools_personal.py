@@ -297,8 +297,10 @@ def _save_link_impl(args: dict) -> str:
     now = datetime.now(KST).isoformat()
     with _db_lock:
         conn = _get_db()
-        conn.execute("INSERT INTO saved_links (id, url, title, summary, tags, content, saved_at) VALUES (?,?,?,?,?,?,?)",
-                     (lid, url, title, summary, tags, content, now))
+        conn.execute(
+            "INSERT INTO saved_links (id, url, title, summary, tags, content, saved_at) VALUES (?,?,?,?,?,?,?)",
+            (lid, url, title, summary, tags, content, now),
+        )
         conn.commit()
         conn.close()
     return f"🔖 링크 저장됨 [{lid}]\n  **{title}**\n  {url}"

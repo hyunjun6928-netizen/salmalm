@@ -18,6 +18,7 @@ except ImportError:
 
 from salmalm.constants import VERSION, BASE_DIR
 import logging
+
 log = logging.getLogger(__name__)
 
 _start_time = time.time()

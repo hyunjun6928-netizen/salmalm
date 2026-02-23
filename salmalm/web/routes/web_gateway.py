@@ -1,13 +1,12 @@
 """Gateway & webhook API — Telegram, Slack, gateway nodes."""
 
-
-
 from salmalm.security.crypto import vault, log
 import json
 
 
 class WebGatewayMixin:
     """Mixin providing gateway route handlers."""
+
     def _get_gateway_nodes(self):
         """Get gateway nodes."""
         from salmalm.features.nodes import gateway
@@ -131,4 +130,3 @@ class WebGatewayMixin:
         except Exception as e:
             log.error(f"Webhook handler error: {e}")
             self._json({"ok": True})  # Always return 200 to Telegram
-

@@ -377,7 +377,9 @@ class LatencyTracker:
         self._consecutive_timeouts = 0
         self._timeout_threshold = 3  # Trigger failover after N consecutive timeouts
 
-    def record(self, ttft_ms: float, total_ms: float, model: str = "", timed_out: bool = False, session_id: str = "") -> None:
+    def record(
+        self, ttft_ms: float, total_ms: float, model: str = "", timed_out: bool = False, session_id: str = ""
+    ) -> None:
         """Record a single request's latency.
 
         요청의 레이턴시 기록.

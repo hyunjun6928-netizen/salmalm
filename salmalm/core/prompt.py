@@ -3,11 +3,23 @@ from __future__ import annotations
 import textwrap
 from datetime import datetime
 
-from salmalm.constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, MEMORY_DIR, BASE_DIR, VERSION, KST, DATA_DIR
+from salmalm.constants import (
+    SOUL_FILE,
+    AGENTS_FILE,
+    MEMORY_FILE,
+    USER_FILE,
+    MEMORY_DIR,
+    BASE_DIR,
+    VERSION,
+    KST,
+    DATA_DIR,
+)
 import logging
+
 log = logging.getLogger(__name__)
 from salmalm.core import SkillLoader
 import logging
+
 log = logging.getLogger(__name__)
 from typing import Optional
 
@@ -140,6 +152,7 @@ def _inject_session_memory(parts: list) -> None:
     """Inject session memory context into system prompt parts."""
     try:
         from salmalm.core.memory import memory_manager
+
         session_ctx = memory_manager.load_session_context()
         if session_ctx:
             parts.append(_truncate_file(session_ctx, MAX_SESSION_MEMORY_CHARS))

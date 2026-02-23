@@ -7,7 +7,7 @@ from salmalm.tools.tool_registry import register
 def _mesh_status(mgr, args: dict) -> str:
     peers = mgr.list_peers()
     if not peers:
-        return "📡 **SalmAlm Mesh** — No peers connected.\nAdd: mesh(action=\"add\", url=\"http://192.168.1.x:18800\")"
+        return '📡 **SalmAlm Mesh** — No peers connected.\nAdd: mesh(action="add", url="http://192.168.1.x:18800")'
     lines = ["📡 **SalmAlm Mesh**\n"]
     for p in peers:
         icon = "🟢" if p["status"] == "online" else "🔴"
@@ -80,15 +80,21 @@ def _mesh_discover(mgr, args: dict) -> str:
 
 
 _MESH_DISPATCH = {
-    "status": _mesh_status, "add": _mesh_add, "remove": _mesh_remove,
-    "ping": _mesh_ping, "task": _mesh_task, "broadcast": _mesh_broadcast,
-    "clipboard": _mesh_clipboard, "discover": _mesh_discover,
+    "status": _mesh_status,
+    "add": _mesh_add,
+    "remove": _mesh_remove,
+    "ping": _mesh_ping,
+    "task": _mesh_task,
+    "broadcast": _mesh_broadcast,
+    "clipboard": _mesh_clipboard,
+    "discover": _mesh_discover,
 }
 
 
 def handle_mesh(args: dict) -> str:
     """SalmAlm Mesh — peer-to-peer networking."""
     from salmalm.features.mesh import mesh_manager
+
     action = args.get("action", "status")
     handler = _MESH_DISPATCH.get(action)
     if handler:

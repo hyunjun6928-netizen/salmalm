@@ -66,7 +66,8 @@ class WebHandler(
     WebSystemMixin,
     WebManageMixin,
     WebContentMixin,
-    http.server.BaseHTTPRequestHandler):
+    http.server.BaseHTTPRequestHandler,
+):
     """HTTP handler for web UI and API."""
 
     def log_message(self, format: str, *args) -> None:
@@ -627,8 +628,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
     # Max POST body size: 10MB
     _MAX_POST_SIZE = 10 * 1024 * 1024
 
-
-
     _POST_ROUTES = {
         "/api/users/register": "_post_api_users_register",
         "/api/users/delete": "_post_api_users_delete",
@@ -751,6 +750,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             return self._post_api_thoughts_search()
         else:
             self._json({"error": "Not found"}, 404)
+
     _GET_PREFIX_ROUTES = [
         ("/api/search", "_get_api_search", None),
         ("/api/sessions/", "_get_api_sessions_export", """and "/export" in self.path"""),
@@ -764,15 +764,3 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         ("/api/agent/export", "_get_api_agent_export", None),
         ("/uploads/", "_get_uploads", None),
     ]
-
-
-
-
-
-
-
-
-
-
-
-

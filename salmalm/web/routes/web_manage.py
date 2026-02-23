@@ -1,4 +1,5 @@
 """Web Manage routes mixin."""
+
 import json
 import logging
 import os
@@ -15,8 +16,8 @@ from salmalm.web.auth import extract_auth, auth_manager  # noqa: F401
 
 log = logging.getLogger(__name__)
 
-class ManageMixin:
 
+class ManageMixin:
     def _post_api_cooldowns_reset(self):
         """POST /api/cooldowns/reset — Clear all model cooldowns."""
         if not self._require_auth("user"):

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from salmalm.constants import KST, DATA_DIR
+
 EVOLUTION_DIR = DATA_DIR
 EVOLUTION_FILE = EVOLUTION_DIR / "evolution.json"
 EVOLUTION_HISTORY_FILE = EVOLUTION_DIR / "evolution_history.json"

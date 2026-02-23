@@ -1,33 +1,85 @@
 # MCP Integration
-# MCP 통합
 
-## Overview / 개요
+SalmAlm implements the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP), enabling interoperability with any MCP-compatible client.
 
-SalmAlm implements the Model Context Protocol (MCP) as both server and client, enabling interoperability with other AI tools.
+## What is MCP?
 
-SalmAlm은 MCP(Model Context Protocol)를 서버와 클라이언트 모두로 구현하여 다른 AI 도구와의 상호 운용성을 제공합니다.
+MCP is an open protocol for connecting AI assistants to external tools and data sources. SalmAlm acts as an **MCP server**, exposing its 43 tools and memory resources over JSON-RPC.
 
-## MCP Server / MCP 서버
+## Capabilities
 
-SalmAlm exposes its tools via JSON-RPC 2.0 stdio transport.
+### Tools
 
-SalmAlm은 JSON-RPC 2.0 stdio 트랜스포트를 통해 도구를 노출합니다.
+All SalmAlm tools are exposed as MCP tools with full JSON Schema:
 
-- `tools/list` — list available tools / 사용 가능한 도구 목록
-- `tools/call` — execute a tool / 도구 실행
-- `resources/list` — list resources / 리소스 목록
-- `prompts/list` — list prompt templates / 프롬프트 템플릿 목록
+```json
+{
+  "method": "tools/list",
+  "result": {
+    "tools": [
+      {"name": "exec", "description": "Execute shell commands", "inputSchema": {...}},
+      {"name": "web_search", "description": "Search the web", "inputSchema": {...}}
+    ]
+  }
+}
+```
 
-## MCP Marketplace / MCP 마켓플레이스
+### Resources
 
-Install and manage MCP servers from the marketplace:
+Memory files are exposed as MCP resources:
 
-마켓플레이스에서 MCP 서버를 설치하고 관리하세요:
+```json
+{
+  "method": "resources/list",
+  "result": {
+    "resources": [
+      {"uri": "file://MEMORY.md", "name": "MEMORY.md", "mimeType": "text/markdown"},
+      {"uri": "file://memory/2025-01-15.md", "name": "2025-01-15.md"}
+    ]
+  }
+}
+```
+
+### Prompts
+
+System prompts are available as MCP prompt templates.
+
+## Connection
+
+### WebSocket
 
 ```
-/mcp catalog
-/mcp install <server-name>
-/mcp list
-/mcp remove <server-name>
-/mcp status
+ws://localhost:18800/mcp
 ```
+
+Messages follow JSON-RPC 2.0 format:
+
+```json
+{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"clientInfo": {"name": "my-client"}}}
+```
+
+### Supported Methods
+
+| Method | Description |
+|--------|-------------|
+| `initialize` | Handshake with capabilities |
+| `tools/list` | List available tools |
+| `tools/call` | Execute a tool |
+| `resources/list` | List memory resources |
+| `resources/read` | Read a resource |
+| `prompts/list` | List prompt templates |
+
+## Web UI
+
+The **MCP** panel in Settings shows:
+
+- Connection status
+- Connected clients
+- Tool call history
+- Resource access log
+
+## Use Cases
+
+- **Claude Desktop** → Connect SalmAlm as an MCP tool server
+- **VS Code extensions** → Use SalmAlm tools from your editor
+- **Custom clients** → Build your own MCP client against SalmAlm

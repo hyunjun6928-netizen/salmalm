@@ -7,6 +7,7 @@ import unicodedata
 from typing import Dict, List, Optional
 from pathlib import Path
 import logging
+
 log = logging.getLogger(__name__)
 
 # ── Korean Jamo Decomposition ──
@@ -76,6 +77,7 @@ for _key, _vals in _SYNONYMS.items():
     if _kl not in _SYNONYM_REVERSE:
         _SYNONYM_REVERSE[_kl] = []
     _SYNONYM_REVERSE[_kl].extend(v.lower() for v in _vals)
+
 
 def decompose_jamo(text: str) -> str:
     """Decompose Korean syllables into jamo (초성/중성/종성)."""
@@ -217,5 +219,3 @@ def cosine_similarity(v1: Dict[str, float], v2: Dict[str, float]) -> float:
     if norm1 == 0.0 or norm2 == 0.0:
         return 0.0
     return dot / (norm1 * norm2)
-
-

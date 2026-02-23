@@ -1,7 +1,5 @@
 """Setup & onboarding API — first run, setup wizard, onboarding flow."""
 
-
-
 from salmalm.security.crypto import vault, log
 import json
 import os
@@ -13,6 +11,7 @@ def _ensure_vault_unlocked(vault) -> bool:
     """Ensure vault is unlocked (auto-create or unlock with empty password). Returns True if unlocked."""
     try:
         from salmalm.security.crypto import VAULT_FILE
+
         if not VAULT_FILE.exists():
             vault.create("", save_to_keychain=False)
         else:
@@ -24,6 +23,7 @@ def _ensure_vault_unlocked(vault) -> bool:
 
 class WebSetupMixin:
     """Mixin providing setup route handlers."""
+
     def _needs_onboarding(self) -> bool:
         """Check if first-run onboarding is needed (no API keys or Ollama configured)."""
         if not vault.is_unlocked:
@@ -52,7 +52,9 @@ class WebSetupMixin:
     def _get_setup(self):
         # Allow re-running the setup wizard anytime
         """Get setup."""
-        from salmalm.web import templates as _tmpl; self._html(_tmpl.ONBOARDING_HTML)
+        from salmalm.web import templates as _tmpl
+
+        self._html(_tmpl.ONBOARDING_HTML)
 
     def _post_api_setup(self):
         """Post api setup."""
@@ -261,4 +263,3 @@ class WebSetupMixin:
         audit_log("onboarding", f"preferences: model={model}, persona={persona}")
         self._json({"ok": True})
         return
-

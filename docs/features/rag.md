@@ -1,23 +1,70 @@
 # RAG & Knowledge Base
-# RAG 및 지식 베이스
 
-## Overview / 개요
+SalmAlm includes a zero-dependency RAG (Retrieval-Augmented Generation) system — no external vector DB, no embeddings API. Everything runs locally in SQLite.
 
-SalmAlm includes a built-in RAG (Retrieval-Augmented Generation) system with vector search for long-term knowledge storage.
+## How It Works
 
-SalmAlm은 장기 지식 저장을 위한 벡터 검색 기능을 갖춘 내장 RAG(검색 증강 생성) 시스템을 포함합니다.
+```
+User Query → Tokenize → BM25 + TF-IDF Hybrid Search → Top-K Chunks → Inject into Prompt
+```
 
-## Features / 기능
+1. **Indexing**: Files are chunked (5 lines, 2-line overlap) and tokenized with Korean jamo decomposition + English stemming
+2. **Search**: Hybrid BM25 (text weight 0.3) + TF-IDF cosine similarity (vector weight 0.7)
+3. **Injection**: Top results are prepended to the system prompt as context
 
-- **Vector embeddings** stored in SQLite (`rag.db`) / SQLite에 벡터 임베딩 저장
-- **Semantic search** across all stored documents / 모든 저장 문서에 대한 시맨틱 검색
-- **Auto-indexing** of notes and saved links / 메모 및 저장 링크 자동 인덱싱
-- **File indexing** via `file_index` tool / `file_index` 도구를 통한 파일 인덱싱
+## What Gets Indexed
 
-## Usage / 사용법
+| Source | Auto-indexed | Tool |
+|--------|-------------|------|
+| Memory files (`~/SalmAlm/memory/`) | ✅ | `memory_write` |
+| Notes | ✅ | `note` |
+| Saved links | ✅ | `save_link` |
+| Workspace files | On demand | `file_index` |
+| Session transcripts | Optional | Config toggle |
 
-The AI automatically uses RAG search when it needs context from your knowledge base.
+## Configuration
 
-AI는 지식 베이스의 컨텍스트가 필요할 때 자동으로 RAG 검색을 사용합니다.
+Edit `~/SalmAlm/rag.json`:
 
-Tools: `rag_search`, `memory_write`, `memory_search`, `note`, `save_link`
+```json
+{
+  "hybrid": {
+    "enabled": true,
+    "vectorWeight": 0.7,
+    "textWeight": 0.3
+  },
+  "sessionIndexing": {
+    "enabled": false,
+    "retentionDays": 30
+  },
+  "chunkSize": 5,
+  "chunkOverlap": 2,
+  "reindexInterval": 120
+}
+```
+
+## Korean Language Support
+
+SalmAlm's RAG has first-class Korean support:
+
+- **Jamo decomposition** — decomposes Hangul into consonants/vowels for fuzzy matching
+- **Korean stemming** — strips common suffixes (은/는/이/가/을/를/에서/으로 etc.)
+- **Synonym expansion** — 검색→찾기/탐색, 오류→에러/버그 etc.
+- **Stop word filtering** — removes Korean particles and common English stop words
+
+## Web UI
+
+Access the RAG panel at **Settings → RAG & Knowledge** to:
+
+- View index statistics (document count, chunk count, last indexed)
+- Trigger manual reindex
+- Configure hybrid search weights
+- Enable/disable session indexing
+
+## Related Tools
+
+- `rag_search` — Direct semantic search
+- `memory_write` / `memory_search` — Long-term memory CRUD
+- `note` — Quick notes (auto-indexed)
+- `save_link` — Save URLs with auto-fetched content
+- `file_index` — Index workspace files on demand

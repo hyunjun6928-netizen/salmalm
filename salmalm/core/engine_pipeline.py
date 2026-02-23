@@ -22,6 +22,7 @@ import traceback
 _MAX_MESSAGE_LENGTH = 100_000
 _SESSION_ID_RE = _re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
+
 # Lazy imports to break circular deps — resolved at call time
 def _get_engine_deps():
     """Import engine dependencies lazily."""
@@ -33,7 +34,9 @@ def _get_engine_deps():
     from salmalm.core.classifier import TaskClassifier
     from salmalm.core.model_selection import _select_model
     from salmalm.security.crypto import vault
+
     return locals()
+
 
 def _sanitize_input(text: str) -> str:
     """Strip null bytes and control characters (keep newlines/tabs)."""
@@ -133,6 +136,7 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
 
     try:
         from salmalm.features.rag import inject_rag_context
+
         for i, m in enumerate(session.messages):
             if m.get("role") == "system":
                 session.messages[i] = dict(m)
@@ -143,6 +147,7 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
 
     try:
         from salmalm.features.mood import mood_detector
+
         if mood_detector.enabled:
             _detected_mood, _mood_conf = mood_detector.detect(user_message)
             if _detected_mood != "neutral" and _mood_conf > 0.3:
@@ -151,7 +156,9 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
                     for i, m in enumerate(session.messages):
                         if m.get("role") == "system":
                             session.messages[i] = dict(m)
-                            session.messages[i]["content"] = m["content"] + f"\n\n[감정 감지: {_detected_mood}] {_tone_hint}"
+                            session.messages[i]["content"] = (
+                                m["content"] + f"\n\n[감정 감지: {_detected_mood}] {_tone_hint}"
+                            )
                             break
                 mood_detector.record_mood(_detected_mood, _mood_conf)
     except Exception as _mood_err:
@@ -159,6 +166,7 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
 
     try:
         from salmalm.features.self_evolve import prompt_evolver
+
         if len(session.messages) > 4 and len(session.messages) % 10 == 0:
             prompt_evolver.record_conversation(session.messages)
     except Exception as _exc:
@@ -169,11 +177,14 @@ def _record_sla(sla_start: float, first_token_time: float, model: str, session_i
     """Record SLA latency metrics."""
     try:
         from salmalm.features.sla import latency_tracker, sla_config as _sla_cfg
+
         sla_end = _time.time()
         ttft_ms = (first_token_time - sla_start) * 1000 if first_token_time > 0 else (sla_end - sla_start) * 1000
         total_ms = (sla_end - sla_start) * 1000
         timed_out = total_ms > _sla_cfg.get("response_target_ms", 30000)
-        latency_tracker.record(ttft_ms=ttft_ms, total_ms=total_ms, model=model or "auto", timed_out=timed_out, session_id=session_id)
+        latency_tracker.record(
+            ttft_ms=ttft_ms, total_ms=total_ms, model=model or "auto", timed_out=timed_out, session_id=session_id
+        )
         if latency_tracker.should_failover():
             log.warning("[SLA] Consecutive timeout threshold reached — failover recommended")
             latency_tracker.reset_timeout_counter()
@@ -188,6 +199,7 @@ def _post_process(session, session_id: str, user_message: str, response: str, cl
         assistant_msgs = [m for m in session.messages if m.get("role") == "assistant"]
         if len(assistant_msgs) == 1 and user_msgs:
             from salmalm.core import auto_title_session
+
             auto_title_session(session_id, user_msgs[0]["content"])
     except Exception as e:
         log.warning(f"Auto-title hook error: {e}")
@@ -199,6 +211,7 @@ def _post_process(session, session_id: str, user_message: str, response: str, cl
 
     try:
         from salmalm.features.hooks import hook_manager
+
         hook_manager.fire("on_response", {"session_id": session_id, "message": response})
     except Exception as _exc:
         log.debug(f"Suppressed: {_exc}")
@@ -228,7 +241,9 @@ async def _process_message_inner(
         return f"❌ Message too long ({len(user_message)} chars). Maximum is {_MAX_MESSAGE_LENGTH}."
     user_message = _sanitize_input(user_message)
 
-    from salmalm.core.session_store import get_session; session = get_session(session_id)
+    from salmalm.core.session_store import get_session
+
+    session = get_session(session_id)
 
     # Set user context for cost tracking (multi-tenant)
     from salmalm.core import set_current_user_id
@@ -254,7 +269,9 @@ async def _process_message_inner(
 
     # --- Slash commands (fast path, no LLM) ---
     cmd = user_message.strip()
-    from salmalm.core.slash_commands import _dispatch_slash_command; slash_result = await _dispatch_slash_command(cmd, session, session_id, model_override, on_tool)
+    from salmalm.core.slash_commands import _dispatch_slash_command
+
+    slash_result = await _dispatch_slash_command(cmd, session, session_id, model_override, on_tool)
     if slash_result is not None:
         return slash_result
 
@@ -382,5 +399,3 @@ def wait_for_active_requests(timeout: float = 30.0) -> bool:
             return True
     log.info(f"[SHUTDOWN] Waiting for {_active_requests} active request(s) (timeout={timeout}s)")
     return _active_requests_event.wait(timeout=timeout)
-
-

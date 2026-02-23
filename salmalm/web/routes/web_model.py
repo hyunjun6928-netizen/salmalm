@@ -1,7 +1,5 @@
 """Model & provider API — list models, switch, test keys, router info, usage."""
 
-
-
 from salmalm.security.crypto import vault, log
 import json
 import os
@@ -10,6 +8,7 @@ from salmalm.core import router
 
 class WebModelMixin:
     """Mixin providing model route handlers."""
+
     def _get_usage_models(self):
         """Get usage models."""
         if not self._require_auth("user"):
@@ -273,4 +272,3 @@ class WebModelMixin:
                     os.environ[env_key] = old_val
                 elif env_key in os.environ:
                     del os.environ[env_key]
-

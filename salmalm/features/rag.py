@@ -35,9 +35,15 @@ from typing import Dict, List, Optional, Tuple
 from salmalm.constants import MEMORY_DIR, WORKSPACE_DIR, MEMORY_FILE, BASE_DIR, DATA_DIR
 from salmalm.security.crypto import log
 from salmalm.features.rag_utils import (  # noqa: F401
-    decompose_jamo, simple_stem, compute_tf,
-    expand_query, load_rag_config, cosine_similarity,
-    CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHUNK_CHARS,
+    decompose_jamo,
+    simple_stem,
+    compute_tf,
+    expand_query,
+    load_rag_config,
+    cosine_similarity,
+    CHUNK_SIZE,
+    CHUNK_OVERLAP,
+    MAX_CHUNK_CHARS,
 )
 
 # ── BM25 Parameters ──
@@ -140,11 +146,7 @@ _STOP_WORDS = frozenset(
 # Korean jamo constants moved to rag_utils.py
 
 
-
-
 # ── English Stemming (simple Porter-like) ──
-
-
 
 
 # ── Synonym / Query Expansion Dictionary ──
@@ -152,20 +154,12 @@ _STOP_WORDS = frozenset(
 from salmalm.features.rag_utils import _SYNONYMS, _SYNONYM_REVERSE  # noqa: F401,E402
 
 
-
-
 # ── RAG Configuration ──
 
 from salmalm.features.rag_utils import _DEFAULT_CONFIG  # noqa: F401
 
 
-
-
 # ── TF-IDF Vector Utilities ──
-
-
-
-
 
 
 from salmalm.features.rag_indexer import RAGIndexerMixin
@@ -297,7 +291,7 @@ class RAGEngine(RAGIndexerMixin):
         lines = text.splitlines()
         step = max(1, chunk_size - chunk_overlap)
         for i in range(0, len(lines), step):
-            chunk_lines = lines[i:i + chunk_size]
+            chunk_lines = lines[i : i + chunk_size]
             chunk_text = "\n".join(chunk_lines).strip()
             if not chunk_text or len(chunk_text) < 10:
                 continue

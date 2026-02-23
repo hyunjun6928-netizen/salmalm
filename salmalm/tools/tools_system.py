@@ -46,7 +46,9 @@ _MONITOR_COLLECTORS = {
     "cpu": _collect_cpu,
     "memory": lambda: _collect_cmd(["free", "-h"], "💾"),
     "disk": lambda: _collect_cmd(["df", "-h", "/"], "💿"),
-    "network": lambda: (["🌐 Network:"] + _collect_cmd(["ss", "-s"], "  ", 5)) if _collect_cmd(["ss", "-s"], "", 1) else [],
+    "network": lambda: (
+        (["🌐 Network:"] + _collect_cmd(["ss", "-s"], "  ", 5)) if _collect_cmd(["ss", "-s"], "", 1) else []
+    ),
 }
 
 

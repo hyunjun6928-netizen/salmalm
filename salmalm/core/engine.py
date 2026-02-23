@@ -21,8 +21,11 @@ import threading as _threading
 import time as _time
 from salmalm.security.crypto import log
 from salmalm.core.engine_pipeline import (  # noqa: F401
-    process_message, _process_message_inner, _notify_completion,
-    begin_shutdown, wait_for_active_requests,
+    process_message,
+    _process_message_inner,
+    _notify_completion,
+    begin_shutdown,
+    wait_for_active_requests,
 )
 from salmalm.core.cost import (  # noqa: F401
     estimate_tokens,
@@ -33,7 +36,10 @@ from salmalm.core.cost import (  # noqa: F401
 
 # Graceful shutdown state
 from salmalm.core.engine_pipeline import (  # noqa: E402
-    _shutting_down, _active_requests, _active_requests_lock, _active_requests_event,
+    _shutting_down,
+    _active_requests,
+    _active_requests_lock,
+    _active_requests_event,
 )
 from salmalm.core import (  # noqa: F401
     router,
@@ -182,6 +188,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     def _get_tools_for_provider(self, provider: str, intent: str = None, user_message: str = "") -> list:
         """Get tools for provider."""
         from salmalm.core.tool_selector import get_tools_for_provider
+
         return get_tools_for_provider(provider, intent, user_message)
 
     # Max chars per tool result sent to LLM context (default + per-type overrides)
@@ -501,7 +508,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     MAX_TOOL_ITERATIONS = 15
     MAX_CONSECUTIVE_ERRORS = 3
 
-    async def _handle_token_overflow(self, session, model: str, tools: list, max_tokens: int, thinking, on_status) -> tuple:
+    async def _handle_token_overflow(
+        self, session, model: str, tools: list, max_tokens: int, thinking, on_status
+    ) -> tuple:
         """Handle token overflow with 3-stage recovery. Returns (result, error_msg_or_None)."""
         log.warning(f"[CUT] Token overflow with {len(session.messages)} messages — running compaction")
 
@@ -534,10 +543,12 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             return result, "⚠️ Context too large. Use /clear to reset."
         return result, None
 
-    async def _handle_tool_calls(self, result, session, provider, on_tool, on_status,
-                                 consecutive_errors: int, recent_tool_calls: list) -> Optional[str]:
+    async def _handle_tool_calls(
+        self, result, session, provider, on_tool, on_status, consecutive_errors: int, recent_tool_calls: list
+    ) -> Optional[str]:
         """Execute tool calls, check circuit breaker and loop detection. Returns break message or None."""
         from salmalm.core.loop_helpers import validate_tool_calls, check_circuit_breaker, check_loop_detection
+
         if on_status:
             tool_names = ", ".join(tc["name"] for tc in result["tool_calls"][:3])
             _safe_callback(on_status, STATUS_TOOL_RUNNING, f"🔧 Running {tool_names}...")
@@ -547,7 +558,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             exec_outputs = await asyncio.to_thread(self._execute_tools_parallel, valid_tools, on_tool)
             tool_outputs.update(exec_outputs)
 
-        consecutive_errors, break_msg = check_circuit_breaker(tool_outputs, consecutive_errors, self.MAX_CONSECUTIVE_ERRORS)
+        consecutive_errors, break_msg = check_circuit_breaker(
+            tool_outputs, consecutive_errors, self.MAX_CONSECUTIVE_ERRORS
+        )
         if break_msg:
             session.add_assistant(break_msg)
             return break_msg
@@ -560,11 +573,21 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         self._append_tool_results(session, provider, result, result["tool_calls"], tool_outputs)
         return None
 
-    async def _finalize_loop_response(self, result, session, pruned_messages, model: str, tools,
-                                       user_message: str, classification: dict, iteration: int,
-                                       failover_warn) -> str:
+    async def _finalize_loop_response(
+        self,
+        result,
+        session,
+        pruned_messages,
+        model: str,
+        tools,
+        user_message: str,
+        classification: dict,
+        iteration: int,
+        failover_warn,
+    ) -> str:
         """Finalize LLM response: empty retry, reflection, logging."""
         from salmalm.core.loop_helpers import handle_empty_response, finalize_response, auto_log_conversation
+
         response = result.get("content", "")
         if not response or not response.strip():
             response = await handle_empty_response(self._call_with_failover, pruned_messages, model, tools)
@@ -577,7 +600,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             response = f"{failover_warn}\n\n{response}"
 
         session.add_assistant(response)
-        log.info(f"[CHAT] Response ({result.get('model', '?')}): {len(response)} chars, iteration {iteration + 1}, intent={classification['intent']}")
+        log.info(
+            f"[CHAT] Response ({result.get('model', '?')}): {len(response)} chars, iteration {iteration + 1}, intent={classification['intent']}"
+        )
         auto_log_conversation(user_message, response, classification)
         session.messages = [m for m in session.messages if not m.get("_plan_injected")]
         return response
@@ -646,7 +671,12 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             # Thinking mode — pass level string instead of bool
             _think_level = getattr(session, "thinking_level", "medium") if use_thinking else None
             think_this_call = (
-                _think_level if (use_thinking and iteration == 0 and ("opus" in model or "sonnet" in model or "o3" in model or "o4" in model))
+                _think_level
+                if (
+                    use_thinking
+                    and iteration == 0
+                    and ("opus" in model or "sonnet" in model or "o3" in model or "o4" in model)
+                )
                 else False
             )
 
@@ -692,8 +722,13 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             # ── Tool execution branch ──
             if result.get("tool_calls"):
                 break_msg = await self._handle_tool_calls(
-                    result, session, provider, on_tool, on_status,
-                    consecutive_errors, _recent_tool_calls,
+                    result,
+                    session,
+                    provider,
+                    on_tool,
+                    on_status,
+                    consecutive_errors,
+                    _recent_tool_calls,
                 )
                 if break_msg:
                     return break_msg
@@ -706,8 +741,15 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             # ── Final response branch ──
             return await self._finalize_loop_response(
-                result, session, pruned_messages, model, tools, user_message,
-                classification, iteration, _failover_warn,
+                result,
+                session,
+                pruned_messages,
+                model,
+                tools,
+                user_message,
+                classification,
+                iteration,
+                _failover_warn,
             )
 
         # Loop exhausted
@@ -728,8 +770,6 @@ _MAX_MESSAGE_LENGTH = 100_000
 _SESSION_ID_RE = _re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 
 
-
-
 # ── Slash commands + usage tracking — extracted to slash_commands.py ──
 from salmalm.core.slash_commands import (  # noqa: F401, E402
     _session_usage,
@@ -747,12 +787,3 @@ from salmalm.core.slash_commands import (  # noqa: F401, E402
 
 
 _THINKING_BUDGET_MAP = {"low": 4000, "medium": 10000, "high": 16000, "xhigh": 32000}
-
-
-
-
-
-
-
-
-

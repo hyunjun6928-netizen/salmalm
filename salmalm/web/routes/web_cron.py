@@ -1,10 +1,11 @@
 from salmalm.core import cron
-"""Cron job API — list, add, delete, toggle, run."""
 
+"""Cron job API — list, add, delete, toggle, run."""
 
 
 class WebCronMixin:
     """Mixin providing cron route handlers."""
+
     def _get_cron(self):
         """Get cron."""
         if not self._require_auth("user"):
@@ -86,8 +87,8 @@ class WebCronMixin:
             for j in _llm_cron.jobs:
                 if j["id"] == job_id:
                     import threading
+
                     threading.Thread(target=_llm_cron._execute_job, args=(j,), daemon=True).start()
                     self._json({"ok": True, "message": "Job triggered"})
                     return
         self._json({"ok": False, "error": "Job not found"}, 404)
-

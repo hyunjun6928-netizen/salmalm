@@ -67,6 +67,8 @@ def _check_for_updates() -> str:
 
 async def _start_telegram_bot() -> None:
     """Phase 11: Start Telegram bot polling."""
+
+
 if not vault.is_unlocked:
     log.warning("[TELEGRAM] Skipped — vault is locked. Unlock vault to enable Telegram.")
 if vault.is_unlocked:
@@ -89,9 +91,10 @@ if vault.is_unlocked:
             asyncio.create_task(telegram_bot.poll())
 
 
-
 async def _start_discord_bot() -> None:
     """Phase 12: Start Discord bot polling."""
+
+
 if not vault.is_unlocked:
     log.warning("[DISCORD] Skipped — vault is locked. Unlock vault to enable Discord.")
 if vault.is_unlocked:
@@ -141,12 +144,12 @@ if update_msg:
     log.info(f"  {update_msg}")
 
 
-
 def _auto_unlock_vault() -> None:
     """Phase 5: Vault auto-unlock with cascade fallbacks."""
+
+
 _auto_unlock_vault()
 _core.set_telegram_bot(telegram_bot)
-
 
 
 def _auto_unlock_vault() -> None:
@@ -203,6 +206,7 @@ def _try_vault_auto_file() -> None:
         _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
         if _hint:
             import base64 as _b64
+
             _auto_pw = _b64.b64decode(_hint).decode()
         else:
             _auto_pw = ""
@@ -220,17 +224,34 @@ def _start_https_if_configured(bind_addr: str) -> None:
     https_port = https_port or 18443
     try:
         import ssl
+
         cert_dir = DATA_DIR / ".certs"
         cert_dir.mkdir(exist_ok=True)
         cert_file = cert_dir / "salmalm.pem"
         key_file = cert_dir / "salmalm-key.pem"
         if not cert_file.exists():
             import subprocess
+
             subprocess.run(
-                ["openssl", "req", "-x509", "-newkey", "rsa:2048",
-                 "-keyout", str(key_file), "-out", str(cert_file),
-                 "-days", "3650", "-nodes", "-batch", "-subj", "/CN=localhost"],
-                capture_output=True, timeout=30,
+                [
+                    "openssl",
+                    "req",
+                    "-x509",
+                    "-newkey",
+                    "rsa:2048",
+                    "-keyout",
+                    str(key_file),
+                    "-out",
+                    str(cert_file),
+                    "-days",
+                    "3650",
+                    "-nodes",
+                    "-batch",
+                    "-subj",
+                    "/CN=localhost",
+                ],
+                capture_output=True,
+                timeout=30,
             )
             log.info("[HTTPS] Self-signed certificate generated")
         if cert_file.exists() and key_file.exists():
@@ -280,8 +301,12 @@ async def _handle_ws_msg(client, data: dict) -> None:
         if _model_ov_ws == "auto":
             _model_ov_ws = None
         response = await process_message(
-            session_id, text or "", image_data=image_data,
-            model_override=_model_ov_ws, on_tool=on_tool, on_status=on_status,
+            session_id,
+            text or "",
+            image_data=image_data,
+            model_override=_model_ov_ws,
+            on_tool=on_tool,
+            on_status=on_status,
         )
         await stream.send_done(response)
     except Exception as e:
@@ -373,7 +398,6 @@ async def _setup_services(host: str, port: int, httpd, server_thread, url: str) 
     _trigger_shutdown = asyncio.Event()
 
 
-
 def _init_extensions() -> None:
     """Phase 3: Initialize hooks, plugins, agents."""
     try:
@@ -460,7 +484,6 @@ async def run_server():
         import webbrowser
 
         webbrowser.open(url)
-
 
     await _setup_services(host, port, httpd, server_thread, url)
 

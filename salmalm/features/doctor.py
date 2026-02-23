@@ -37,6 +37,7 @@ class Doctor:
     def check_python_version(self) -> dict:
         """Python 버전 확인 (3.9+ 필수)."""
         import sys
+
         v = sys.version_info
         if v >= (3, 9):
             return _status(True, f"Python {v.major}.{v.minor}.{v.micro}")
@@ -46,6 +47,7 @@ class Doctor:
         """cryptography 패키지 설치 여부."""
         try:
             from salmalm.security.crypto import HAS_CRYPTO
+
             if HAS_CRYPTO:
                 return _status(True, "Vault: AES-256-GCM (cryptography installed)")
             return _status(False, "⚠️ Vault: HMAC-CTR fallback (weaker). Run: pip install salmalm[crypto]")
@@ -56,6 +58,7 @@ class Doctor:
         """Telegram/Discord 봇 토큰 유효성."""
         import urllib.request
         import urllib.error
+
         try:
             from salmalm.security.crypto import vault
         except Exception as e:  # noqa: broad-except

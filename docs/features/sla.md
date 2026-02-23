@@ -1,41 +1,84 @@
 # SLA & Monitoring
-# SLA 및 모니터링
 
-## Overview / 개요
+SalmAlm tracks performance metrics for every request — latency, token usage, cost, and error rates.
 
-SalmAlm tracks uptime, response times, and system health for production reliability.
+## Metrics Tracked
 
-SalmAlm은 프로덕션 안정성을 위해 업타임, 응답 시간, 시스템 상태를 추적합니다.
+### Per-Request
+- **Time to First Token (TTFT)** — milliseconds until first streaming chunk
+- **Total latency** — end-to-end request time
+- **Input/output tokens** — per model
+- **Estimated cost** — based on model pricing
 
-## Metrics / 메트릭
+### Aggregate
+- **Uptime** — server start time, total runtime
+- **Request count** — total requests processed
+- **Error rate** — failed requests / total
+- **Model distribution** — which models handle which tiers
 
-- **Uptime** — 99.9% target tracking / 99.9% 목표 추적
-- **Response time** — P50/P95/P99 percentiles / P50/P95/P99 백분위
-- **Tool call stats** — usage by tool / 도구별 사용량
-- **Cost tracking** — by model / 모델별 비용 추적
-- **Error rates** — by category / 카테고리별 오류율
+## Cost Tracking
 
-## Dashboard / 대시보드
+SalmAlm estimates costs using built-in pricing tables:
 
-Access at `/dashboard` — auto-refreshes every 60 seconds.
+| Model | Input ($/1M tok) | Output ($/1M tok) |
+|-------|-------------------|---------------------|
+| Claude Haiku 3.5 | $0.80 | $4.00 |
+| Claude Sonnet 4 | $3.00 | $15.00 |
+| GPT-4o | $2.50 | $10.00 |
+| Gemini 2.5 Flash | $0.15 | $0.60 |
 
-`/dashboard`에서 접근 — 60초마다 자동 새로고침.
+### Cost Cap
 
-Features: / 기능:
+Set a daily spending limit:
 
-- Tool calls bar chart (24h) / 도구 호출 막대 그래프 (24시간)
-- Cost doughnut chart (by model) / 비용 도넛 차트 (모델별)
-- Model stats table / 모델 통계 테이블
-- Cron/plugin status / 크론/플러그인 상태
+```bash
+SALMALM_COST_CAP=5.00  # $5/day limit
+```
 
-## Auto Watchdog / 자동 워치독
+When the cap is reached, all LLM calls are blocked with a `CostCapExceeded` error until the next day.
 
-Self-healing watchdog that restarts the server if it becomes unresponsive.
+## Commands
 
-서버가 응답하지 않으면 자동으로 재시작하는 자가 복구 워치독.
+| Command | Description |
+|---------|-------------|
+| `/usage` | Token usage and cost summary |
+| `/usage tokens` | Detailed token breakdown |
+| `/usage cost` | Cost breakdown by model |
+| `/latency` | Request latency statistics |
+| `/uptime` | Server uptime |
 
-## Doctor / 진단
+## Web Dashboard
 
-Run `/doctor` for a full system diagnostic.
+**Settings → Usage & Monitoring** shows:
 
-`/doctor`를 실행하면 전체 시스템 진단을 수행합니다.
+- Daily/monthly usage charts
+- Cost breakdown by model
+- Latency percentiles (p50, p95, p99)
+- Real-time request feed
+
+### API Endpoints
+
+```
+GET /api/usage/daily    — Daily usage report
+GET /api/usage/monthly  — Monthly aggregate
+GET /api/metrics        — Prometheus-compatible metrics
+GET /api/latency        — Latency statistics
+GET /api/status         — Server health check
+```
+
+## Alerting
+
+SalmAlm logs warnings when:
+
+- Latency exceeds 10s (P95 threshold)
+- Daily cost exceeds 80% of cap
+- Error rate exceeds 5%
+- Context window approaches model limit
+
+## Circuit Breaker
+
+The built-in circuit breaker detects:
+
+- **Infinite loops** — 3+ identical (tool, args) in last 6 iterations
+- **Provider failures** — consecutive 5xx errors trigger backoff
+- **Cost overruns** — immediate halt on cap exceeded

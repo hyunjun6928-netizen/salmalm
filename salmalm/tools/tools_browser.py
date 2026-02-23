@@ -189,8 +189,10 @@ def _is_internal_url(url: str) -> bool:
 def _browser_act(args: dict) -> str:
     """Execute a browser action (click, type, etc)."""
     act_args = {
-        "url": args.get("url", "about:blank"), "kind": args.get("kind", "click"),
-        "selector": args.get("selector", ""), "text": args.get("text", ""),
+        "url": args.get("url", "about:blank"),
+        "kind": args.get("kind", "click"),
+        "selector": args.get("selector", ""),
+        "text": args.get("text", ""),
         "screenshot_path": str(_SCREENSHOT_DIR / f"act_{int(time.time())}.png"),
         "timeout": args.get("timeout", 30000),
     }
@@ -222,7 +224,12 @@ def _browser_screenshot(args: dict) -> str:
     if err:
         return err
     screenshot_path = str(_SCREENSHOT_DIR / f"screenshot_{int(time.time())}.png")
-    act_args = {"url": url, "kind": "screenshot", "screenshot_path": screenshot_path, "timeout": args.get("timeout", 30000)}
+    act_args = {
+        "url": url,
+        "kind": "screenshot",
+        "screenshot_path": screenshot_path,
+        "timeout": args.get("timeout", 30000),
+    }
     result = _run_playwright_script(_ACT_SCRIPT, [json.dumps(act_args)])
     if "error" in result:
         return f"❌ Browser error: {result['error']}"

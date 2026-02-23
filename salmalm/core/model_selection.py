@@ -12,6 +12,7 @@ from typing import Tuple
 
 from salmalm.constants import MODELS as _MODELS, DATA_DIR
 import logging
+
 log = logging.getLogger(__name__)
 # ── Complexity keywords ──
 _SIMPLE_PATTERNS = re.compile(
@@ -55,6 +56,7 @@ _COMPLEX_KEYWORDS = [
 # ── Model name corrections (from constants — single source of truth) ──
 from salmalm.constants import MODEL_NAME_FIXES as _MODEL_NAME_FIXES
 import logging
+
 log = logging.getLogger(__name__)
 
 # ── Routing config ──
@@ -188,6 +190,7 @@ def _validate_tier_keys(rc: dict, prov_keys: dict) -> None:
     """Strip tier models whose provider has no API key."""
     try:
         from salmalm.security.crypto import vault
+
         for k in ("simple", "moderate", "complex"):
             model = rc.get(k, "")
             if model:

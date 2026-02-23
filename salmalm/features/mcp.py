@@ -321,7 +321,9 @@ class MCPServer:
 class MCPClientConnection:
     """A connection to a single external MCP server (stdio transport)."""
 
-    def __init__(self, name: str, command: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None) -> None:
+    def __init__(
+        self, name: str, command: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None
+    ) -> None:
         """Init  ."""
         self.name = name
         self.command = command

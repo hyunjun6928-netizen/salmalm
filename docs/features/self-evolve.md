@@ -1,25 +1,58 @@
 # Self-Evolution
-# 자기 진화
 
-## Overview / 개요
+SalmAlm's self-evolution system allows the AI to improve its own behavior over time through prompt refinement, memory curation, and conversation logging.
 
-SalmAlm can analyze its own performance and suggest improvements to prompts, tools, and behavior.
+## Components
 
-SalmAlm은 자체 성능을 분석하고 프롬프트, 도구, 동작 개선을 제안할 수 있습니다.
+### 1. Auto Memory Curation
 
-## How It Works / 작동 방식
+After context compaction, SalmAlm automatically reviews recent conversations and extracts key information into structured memory:
 
-The `/evolve` command triggers self-analysis:
+```
+Compaction triggered → auto_curate() → Update memory files → Secret scrubbing
+```
 
-`/evolve` 명령어가 자기 분석을 트리거합니다:
+Memory files are stored in `~/SalmAlm/memory/` as markdown, organized by date.
 
-1. Reviews recent interactions / 최근 상호작용 검토
-2. Identifies patterns and failures / 패턴 및 실패 식별
-3. Suggests prompt improvements / 프롬프트 개선 제안
-4. Updates tool configurations / 도구 설정 업데이트
+### 2. Conversation Auto-Logging
 
-## Safety / 안전
+Every conversation is automatically logged to daily files:
 
-All changes require user approval before being applied.
+```
+~/SalmAlm/memory/2025-01-15.md
+~/SalmAlm/memory/2025-01-16.md
+```
 
-모든 변경 사항은 적용 전 사용자 승인이 필요합니다.
+The AI can reference these for continuity across sessions.
+
+### 3. Prompt Evolution
+
+The optional prompt evolver (`SALMALM_EVOLVE=1`) analyzes conversation patterns and suggests system prompt improvements:
+
+- Which instructions are effective
+- Which get ignored or misunderstood
+- What new directives might help
+
+### 4. Soul File
+
+`~/SalmAlm/soul.md` defines the AI's personality and behavior. The AI can read and (with permission) modify this file to adjust its own character over time.
+
+## Security
+
+- **Secret scrubbing**: API keys, tokens, and credentials are automatically stripped before writing to memory (7 regex patterns)
+- **Memory isolation**: Each user's memory is scoped to their session
+- **No external transmission**: All evolution happens locally
+
+## Configuration
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `SALMALM_EVOLVE` | `0` | Enable prompt evolution |
+| `SALMALM_REFLECT` | `0` | Enable post-response reflection |
+| `SALMALM_PLANNING` | `0` | Enable task planning phase |
+
+## Related Tools
+
+- `memory_write` — Write to memory files
+- `memory_search` — Semantic search across memory
+- `soul_edit` — Modify the soul/personality file

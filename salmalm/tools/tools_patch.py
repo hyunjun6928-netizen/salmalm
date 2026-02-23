@@ -123,7 +123,7 @@ def _apply_update_file(filepath: str, lines: list, i: int, base_dir: str, result
                 i += 1
             match_idx = _find_context_match(file_lines, old_h, pos)
             if match_idx >= 0:
-                file_lines[match_idx:match_idx + len(old_h)] = new_h
+                file_lines[match_idx : match_idx + len(old_h)] = new_h
                 pos = match_idx + len(new_h)
                 hunks_applied += 1
             else:

@@ -28,7 +28,10 @@ from salmalm.constants import (
 )
 from salmalm.security.crypto import vault, log
 from salmalm.core.audit import (  # noqa: F401
-    _init_audit_db, audit_log, audit_checkpoint, query_audit_log,
+    _init_audit_db,
+    audit_log,
+    audit_checkpoint,
+    query_audit_log,
     _flush_audit_buffer,
 )
 from salmalm.core.core_messages import search_messages, delete_message, edit_message  # noqa: F401
@@ -98,21 +101,9 @@ def _get_db() -> sqlite3.Connection:
     return conn
 
 
-
-
-
-
 # ── Audit log batching ──
 _audit_buffer: list = []  # buffered audit entries
 _audit_flush_timer: Optional[threading.Timer] = None  # noqa: F405
-
-
-
-
-
-
-
-
 
 
 def audit_log_cleanup(days: int = 30) -> None:
@@ -129,8 +120,6 @@ def audit_log_cleanup(days: int = 30) -> None:
             log.info(f"[AUDIT] Cleaned up {deleted} audit entries older than {days} days")
     except Exception as e:
         log.warning(f"Audit cleanup error: {e}")
-
-
 
 
 def close_all_db_connections() -> None:
@@ -625,9 +614,6 @@ def write_daily_log(entry: str) -> None:
     with open(log_file, "a", encoding="utf-8") as f:
         ts = datetime.now(KST).strftime("%H:%M")  # noqa: F405
         f.write(f"{header}- [{ts}] {entry}\n")
-
-
-
 
 
 # Re-export from agents.py

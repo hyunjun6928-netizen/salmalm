@@ -3,6 +3,7 @@
 Shared utilities live in tools_common.py (single source of truth).
 This module re-exports them for backward compatibility.
 """
+
 from typing import Optional
 
 import os
@@ -62,11 +63,21 @@ telegram_bot = None
 
 
 _PATH_KEYS = ("path", "file_path", "image_path", "audio_path", "file1", "file2")
-_WRITE_TOOLS = frozenset({
-    "write_file", "create_file", "append_file", "save_file",
-    "move_file", "copy_file", "rename_file", "patch_file",
-    "download_file", "write_note", "save_note",
-})
+_WRITE_TOOLS = frozenset(
+    {
+        "write_file",
+        "create_file",
+        "append_file",
+        "save_file",
+        "move_file",
+        "copy_file",
+        "rename_file",
+        "patch_file",
+        "download_file",
+        "write_note",
+        "save_note",
+    }
+)
 _SENSITIVE_DIRS = ("/etc/", "/var/", "/root/", "/proc/", "/sys/", "/boot/", "/dev/", "C:\\Windows", "C:\\System")
 
 
@@ -74,6 +85,7 @@ def _check_path_safety(tool_name: str, args: dict) -> Optional[str]:
     """Check path arguments for traversal and access violations. Returns error string or None."""
     from salmalm.constants import WORKSPACE_DIR, DATA_DIR
     from pathlib import Path as _P
+
     _allowed_roots = (str(WORKSPACE_DIR), str(DATA_DIR), "/tmp")
     for key in _PATH_KEYS:
         val = args.get(key, "")
@@ -226,7 +238,6 @@ def _exec_image_generate(args: dict) -> str:
     return f"✅ Image generated: uploads/{fname} ({size_kb:.1f}KB)\nPrompt: {prompt}"
 
 
-
 def _exec_image_analyze(args: dict) -> str:
     """Execute image_analyze tool."""
     image_path = args["image_path"]
@@ -296,7 +307,6 @@ def _exec_image_analyze(args: dict) -> str:
     return "❌ No vision API key found (need OpenAI or Anthropic)"
 
 
-
 def _exec_tts(args: dict) -> str:
     """Execute tts tool."""
     text = args["text"]
@@ -321,7 +331,6 @@ def _exec_tts(args: dict) -> str:
     size_kb = len(audio) / 1024
     log.info(f"[AUDIO] TTS generated: {fname} ({size_kb:.1f}KB)")
     return f"✅ TTS generated: uploads/{fname} ({size_kb:.1f}KB)\nText: {text[:100]}"
-
 
 
 def _exec_stt(args: dict) -> str:
@@ -369,7 +378,6 @@ def _exec_stt(args: dict) -> str:
     text = result.get("text", "")
     log.info(f"[MIC] STT transcribed: {len(text)} chars")
     return f"🎤 Transcription:\n{text}"
-
 
 
 def _exec_screenshot(args: dict) -> str:

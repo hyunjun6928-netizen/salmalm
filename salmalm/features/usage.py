@@ -34,7 +34,9 @@ class UsageTracker:
         conn.commit()
         return conn
 
-    def record(self, session_id: str, model: str, input_tokens: int, output_tokens: int, cost: float, intent: str = "") -> None:
+    def record(
+        self, session_id: str, model: str, input_tokens: int, output_tokens: int, cost: float, intent: str = ""
+    ) -> None:
         """Record."""
         try:
             conn = self._get_db()

@@ -23,9 +23,19 @@ _clipboard_lock = threading.Lock()
 
 
 _SENSITIVE_PATHS = (
-    "/etc/shadow", "/etc/passwd", "/etc/sudoers", "/proc/", "/sys/",
-    ".ssh/", ".gnupg/", ".aws/", ".kube/", ".docker/",
-    ".pypirc", ".netrc", ".env",
+    "/etc/shadow",
+    "/etc/passwd",
+    "/etc/sudoers",
+    "/proc/",
+    "/sys/",
+    ".ssh/",
+    ".gnupg/",
+    ".aws/",
+    ".kube/",
+    ".docker/",
+    ".pypirc",
+    ".netrc",
+    ".env",
 )
 _ARCHIVE_CMDS = {"tar", "unzip", "zip", "gzip", "gunzip"}
 
@@ -46,7 +56,10 @@ def _check_stage_allowlist(stage: str) -> tuple:
     if first_word in EXEC_ELEVATED:
         _bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
         if _bind not in ("127.0.0.1", "::1", "localhost") and not os.environ.get("SALMALM_ALLOW_ELEVATED"):
-            return False, f"Elevated command '{first_word}' blocked on external bind (set SALMALM_ALLOW_ELEVATED=1 to override)"
+            return (
+                False,
+                f"Elevated command '{first_word}' blocked on external bind (set SALMALM_ALLOW_ELEVATED=1 to override)",
+            )
         log.warning(f"[WARN] Elevated exec: {first_word} (can run arbitrary code)")
     elif first_word not in EXEC_ALLOWLIST:
         return False, f"Command not in allowlist: {first_word}"
@@ -308,6 +321,7 @@ def _make_pinned_opener(resolved_ip: str, hostname: str):
             # Connect TCP to pinned IP, but use original hostname for SNI + cert check
             """Connect."""
             import socket as _sock
+
             self.sock = _sock.create_connection((resolved_ip, self.port or 443), self.timeout)
             ctx = ssl.create_default_context()
             self.sock = ctx.wrap_socket(self.sock, server_hostname=hostname)
@@ -349,7 +363,14 @@ def _resolve_and_pin(url: str):
     chosen_ip = None
     for family, _, _, _, sockaddr in addrs:
         ip = ipaddress.ip_address(sockaddr[0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
             continue
         chosen_ip = sockaddr[0]
         break

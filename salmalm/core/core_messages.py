@@ -11,7 +11,9 @@ log = logging.getLogger(__name__)
 def _get_db():
     """Lazy import to avoid circular dependency."""
     from salmalm.core.core import _get_db as _db
+
     return _db()
+
 
 def edit_message(session_id: str, message_index: int, new_content: str) -> dict:
     """Edit a message at the given index in a session.
@@ -144,5 +146,3 @@ def search_messages(query: str, limit: int = 20) -> list:
     except Exception as e:
         log.warning(f"search_messages error: {e}")
     return results
-
-

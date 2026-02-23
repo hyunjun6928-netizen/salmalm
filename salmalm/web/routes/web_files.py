@@ -4,6 +4,7 @@
 def _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, export_user, _json, datetime) -> None:
     """Populate export zip file with soul, memory, config, sessions, data, vault."""
     from salmalm.constants import DATA_DIR, MEMORY_DIR, VERSION
+
     # Soul + memory
     for name in ("soul.md", "memory.md"):
         p = DATA_DIR / name
@@ -21,13 +22,23 @@ def _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, export_user, _js
     # Sessions
     if inc_sessions:
         from salmalm.core import _get_db
+
         conn = _get_db()
         uid = export_user.get("id", 0)
         if uid and uid > 0:
-            rows = conn.execute("SELECT session_id, messages, title FROM session_store WHERE user_id=? OR user_id IS NULL", (uid,)).fetchall()
+            rows = conn.execute(
+                "SELECT session_id, messages, title FROM session_store WHERE user_id=? OR user_id IS NULL", (uid,)
+            ).fetchall()
         else:
             rows = conn.execute("SELECT session_id, messages, title FROM session_store").fetchall()
-        zf.writestr("sessions.json", _json.dumps([{"id": r[0], "data": r[1], "title": r[2] if len(r) > 2 else ""} for r in rows], ensure_ascii=False, indent=2))
+        zf.writestr(
+            "sessions.json",
+            _json.dumps(
+                [{"id": r[0], "data": r[1], "title": r[2] if len(r) > 2 else ""} for r in rows],
+                ensure_ascii=False,
+                indent=2,
+            ),
+        )
     # Data files
     if inc_data:
         for name in ("notes.json", "expenses.json", "habits.json", "journal.json", "dashboard.json"):
@@ -37,13 +48,23 @@ def _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, export_user, _js
     # Vault keys
     if inc_vault:
         from salmalm.security.crypto import vault as _v
+
         if _v.is_unlocked:
             keys = {k: _v.get(k) for k in _v.keys() if _v.get(k)}
             if keys:
                 zf.writestr("vault_keys.json", _json.dumps(keys, indent=2))
     # Manifest
-    zf.writestr("manifest.json", _json.dumps({"version": VERSION, "exported_at": datetime.datetime.now().isoformat(),
-        "includes": {"sessions": inc_sessions, "data": inc_data, "vault": inc_vault}}, indent=2))
+    zf.writestr(
+        "manifest.json",
+        _json.dumps(
+            {
+                "version": VERSION,
+                "exported_at": datetime.datetime.now().isoformat(),
+                "includes": {"sessions": inc_sessions, "data": inc_data, "vault": inc_vault},
+            },
+            indent=2,
+        ),
+    )
 
 
 class WebFilesMixin:
@@ -297,7 +318,7 @@ class WebFilesMixin:
         # CSRF: validate state token
         if not state or state not in _google_oauth_pending_states:
             self._html(
-                '<html><body><h2>Invalid OAuth State</h2>'
+                "<html><body><h2>Invalid OAuth State</h2>"
                 "<p>CSRF protection: state token missing or invalid.</p>"
                 '<p><a href="/">Back</a></p></body></html>'
             )
@@ -306,7 +327,7 @@ class WebFilesMixin:
         # Expire states older than 10 minutes
         if time.time() - issued_at > 600:
             self._html(
-                '<html><body><h2>OAuth State Expired</h2>'
+                "<html><body><h2>OAuth State Expired</h2>"
                 '<p>Please try again.</p><p><a href="/">Back</a></p></body></html>'
             )
             return
@@ -437,4 +458,3 @@ class WebFilesMixin:
         self.send_header("Cache-Control", "public, max-age=86400")
         self.end_headers()
         self.wfile.write(fpath.read_bytes())
-

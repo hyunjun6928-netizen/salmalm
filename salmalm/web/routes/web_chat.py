@@ -1,6 +1,6 @@
 """Chat API endpoints — send, abort, regenerate, compare, edit, delete messages."""
-import asyncio
 
+import asyncio
 
 
 from salmalm.security.crypto import vault, log
@@ -10,6 +10,7 @@ from salmalm.core import router
 
 class WebChatMixin:
     """Mixin providing chat route handlers."""
+
     def _post_api_chat(self):
         """Handle /api/chat and /api/chat/stream — main conversation endpoint."""
         from salmalm.core.engine import process_message
@@ -285,4 +286,3 @@ class WebChatMixin:
 
         result = delete_message(sid, int(idx))
         self._json(result)
-

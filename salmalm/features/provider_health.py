@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-import logging; log = logging.getLogger("salmalm")
+import logging
+
+log = logging.getLogger("salmalm")
 import json
 import time
 from datetime import datetime

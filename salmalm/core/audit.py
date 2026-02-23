@@ -12,12 +12,17 @@ from typing import Any, Dict, List, Optional
 
 log = logging.getLogger(__name__)
 
+
 def _audit_get_db():
     """Lazy import to avoid circular dependency."""
     from salmalm.core.core import _get_db
+
     return _get_db()
+
+
 from salmalm.constants import KST  # noqa: E402
 from datetime import datetime  # noqa: E402
+
 
 def _ensure_audit_v2_table():
     """Create the v2 audit_log_v2 table with session_id and JSON detail."""
@@ -33,9 +38,11 @@ def _ensure_audit_v2_table():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)")
     conn.commit()
 
+
 _audit_buffer: list = []
 _audit_flush_timer = None
 _AUDIT_BATCH_SIZE = 20  # flush after this many entries
+
 
 def _schedule_audit_flush() -> None:
     """Schedule a delayed flush if not already pending."""
@@ -221,5 +228,3 @@ def query_audit_log(limit: int = 50, event_type: Optional[str] = None, session_i
     except Exception as e:
         log.warning(f"Audit query error: {e}")
         return []
-
-

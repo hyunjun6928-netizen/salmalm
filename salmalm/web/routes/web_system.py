@@ -1,4 +1,5 @@
 """Web System routes mixin."""
+
 import json
 import os
 import threading
@@ -12,10 +13,11 @@ from salmalm.constants import APP_NAME  # noqa: F401
 from salmalm.core.core import get_usage_report, router  # noqa: F401
 
 import logging
+
 log = logging.getLogger(__name__)
 
-class SystemMixin:
 
+class SystemMixin:
     def _get_uptime(self):
         """Get uptime."""
         from salmalm.features.sla import uptime_monitor
@@ -103,6 +105,7 @@ class SystemMixin:
         """Vault type label."""
         try:
             from salmalm.security.crypto import HAS_CRYPTO
+
             return "AES-256-GCM" if HAS_CRYPTO else "HMAC-CTR (obfuscation only)"
         except Exception as e:  # noqa: broad-except
             return "unknown"

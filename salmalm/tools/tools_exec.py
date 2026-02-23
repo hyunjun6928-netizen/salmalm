@@ -54,12 +54,15 @@ def _sanitized_env(extra_env: dict | None = None) -> dict:
 def _run_foreground(cmd: str, timeout: int, env) -> str:
     """Run command in foreground with resource limits and output truncation."""
     import shlex
+
     run_env = _sanitized_env(env)
     needs_shell = any(c in cmd for c in ["|", ">", "<", "&&", "||", ";"])
     if needs_shell:
         if not os.environ.get("SALMALM_ALLOW_SHELL"):
-            return ("❌ Shell operators (|, >, <, &&, ;) require explicit opt-in.\n"
-                    "Set SALMALM_ALLOW_SHELL=1 or use individual commands.")
+            return (
+                "❌ Shell operators (|, >, <, &&, ;) require explicit opt-in.\n"
+                "Set SALMALM_ALLOW_SHELL=1 or use individual commands."
+            )
         run_args = {"args": cmd, "shell": True}
     else:
         try:
@@ -82,6 +85,7 @@ def _set_exec_limits(timeout: int) -> None:
     """Set resource limits for sandboxed execution (Linux/macOS)."""
     try:
         import resource
+
         resource.setrlimit(resource.RLIMIT_CPU, (timeout + 5, timeout + 10))
         resource.setrlimit(resource.RLIMIT_AS, (1024**3, 1024**3))
         resource.setrlimit(resource.RLIMIT_NOFILE, (100, 100))

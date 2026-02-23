@@ -6,31 +6,78 @@ from salmalm.core import SubAgent, SkillLoader
 
 
 @register("sub_agent")
-def _agent_spawn(args): return f"🤖 Sub-agent spawned: [{SubAgent.spawn(args.get('task',''), model=args.get('model'))}]\nTask: {args.get('task','')[:100]}" if args.get("task") else "❌ Task is required"
+def _agent_spawn(args):
+    return (
+        f"🤖 Sub-agent spawned: [{SubAgent.spawn(args.get('task', ''), model=args.get('model'))}]\nTask: {args.get('task', '')[:100]}"
+        if args.get("task")
+        else "❌ Task is required"
+    )
+
+
 def _agent_list(args):
     agents = SubAgent.list_agents()
-    if not agents: return "📋 No running sub-agents."
-    return "\n".join(f"{'🟢' if a['status']=='running' else '✅' if a['status']=='completed' else '❌'} [{a['id']}] {a['task']} — {a['status']}" for a in agents)
+    if not agents:
+        return "📋 No running sub-agents."
+    return "\n".join(
+        f"{'🟢' if a['status'] == 'running' else '✅' if a['status'] == 'completed' else '❌'} [{a['id']}] {a['task']} — {a['status']}"
+        for a in agents
+    )
+
+
 def _agent_result(args):
     info = SubAgent.get_result(args.get("agent_id", ""))
-    if "error" in info: return f"❌ {info['error']}"
-    if info["status"] == "running": return f"⏳ [{args.get('agent_id','')}] Still running.\nStarted: {info['started']}"
-    return f"{'✅' if info['status']=='completed' else '❌'} [{args.get('agent_id','')}] {info['status']}\nStarted: {info['started']}\nFinished: {info['completed']}\n\n{info.get('result','')[:3000]}"
+    if "error" in info:
+        return f"❌ {info['error']}"
+    if info["status"] == "running":
+        return f"⏳ [{args.get('agent_id', '')}] Still running.\nStarted: {info['started']}"
+    return f"{'✅' if info['status'] == 'completed' else '❌'} [{args.get('agent_id', '')}] {info['status']}\nStarted: {info['started']}\nFinished: {info['completed']}\n\n{info.get('result', '')[:3000]}"
+
+
 def _agent_send(args):
-    if not args.get("agent_id") or not args.get("message"): return "❌ agent_id and message are required"
+    if not args.get("agent_id") or not args.get("message"):
+        return "❌ agent_id and message are required"
     return SubAgent.send_message(args["agent_id"], args["message"])
-def _agent_stop(args): return SubAgent.stop_agent(args.get("agent_id", "all"))
-def _agent_log(args): return SubAgent.get_log(args.get("agent_id",""), limit=args.get("limit",20)) if args.get("agent_id") else "❌ agent_id is required"
-def _agent_info(args): return SubAgent.get_info(args.get("agent_id","")) if args.get("agent_id") else "❌ agent_id is required"
+
+
+def _agent_stop(args):
+    return SubAgent.stop_agent(args.get("agent_id", "all"))
+
+
+def _agent_log(args):
+    return (
+        SubAgent.get_log(args.get("agent_id", ""), limit=args.get("limit", 20))
+        if args.get("agent_id")
+        else "❌ agent_id is required"
+    )
+
+
+def _agent_info(args):
+    return SubAgent.get_info(args.get("agent_id", "")) if args.get("agent_id") else "❌ agent_id is required"
+
+
 def _agent_steer(args):
-    if not args.get("agent_id") or not args.get("message"): return "❌ agent_id and message are required for steering"
+    if not args.get("agent_id") or not args.get("message"):
+        return "❌ agent_id and message are required for steering"
     try:
         from salmalm.features.subagents import subagent_manager
-        return subagent_manager.steer(args["agent_id"], args["message"])
-    except Exception: return SubAgent.send_message(args["agent_id"], args["message"])
 
-_AGENT_DISPATCH = {"spawn": _agent_spawn, "list": _agent_list, "result": _agent_result, "send": _agent_send,
-                    "stop": _agent_stop, "kill": _agent_stop, "log": _agent_log, "info": _agent_info, "steer": _agent_steer}
+        return subagent_manager.steer(args["agent_id"], args["message"])
+    except Exception:
+        return SubAgent.send_message(args["agent_id"], args["message"])
+
+
+_AGENT_DISPATCH = {
+    "spawn": _agent_spawn,
+    "list": _agent_list,
+    "result": _agent_result,
+    "send": _agent_send,
+    "stop": _agent_stop,
+    "kill": _agent_stop,
+    "log": _agent_log,
+    "info": _agent_info,
+    "steer": _agent_steer,
+}
+
 
 def handle_sub_agent(args: dict) -> str:
     """Handle sub agent."""

@@ -51,7 +51,12 @@ def _parse_relative_en(m, s_lower, now):
     """Parse English relative time (in N minutes/hours/days/weeks)."""
     val = int(m.group(1))
     unit = m.group(2)[0]
-    deltas = {"m": timedelta(minutes=val), "h": timedelta(hours=val), "d": timedelta(days=val), "w": timedelta(weeks=val)}
+    deltas = {
+        "m": timedelta(minutes=val),
+        "h": timedelta(hours=val),
+        "d": timedelta(days=val),
+        "w": timedelta(weeks=val),
+    }
     base = now + deltas.get(unit, timedelta(minutes=val))
     hour, minute = _extract_time_en(s_lower)
     if hour is not None:
@@ -63,7 +68,12 @@ def _parse_relative_kr(m, s, now):
     """Parse Korean relative time expression (N분/시간/일/주 후)."""
     val = int(m.group(1))
     unit = m.group(2)
-    deltas = {"분": timedelta(minutes=val), "시간": timedelta(hours=val), "일": timedelta(days=val), "주": timedelta(weeks=val)}
+    deltas = {
+        "분": timedelta(minutes=val),
+        "시간": timedelta(hours=val),
+        "일": timedelta(days=val),
+        "주": timedelta(weeks=val),
+    }
     base = now + deltas[unit]
     hour, minute = _extract_time_kr(s)
     if hour is not None:

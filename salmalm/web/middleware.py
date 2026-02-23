@@ -24,7 +24,9 @@ class RoutePolicy:
 
     __slots__ = ("auth", "audit", "csrf", "rate")
 
-    def __init__(self, auth: str = "required", audit: bool = True, csrf: bool = False, rate: Optional[str] = None) -> None:
+    def __init__(
+        self, auth: str = "required", audit: bool = True, csrf: bool = False, rate: Optional[str] = None
+    ) -> None:
         """Init  ."""
         self.auth = auth  # "none" | "optional" | "required"
         self.audit = audit  # log to audit trail

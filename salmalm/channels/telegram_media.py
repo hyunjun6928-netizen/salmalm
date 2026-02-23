@@ -254,4 +254,3 @@ class TelegramMediaMixin:
         __complexity = getattr(session_obj, "last_complexity", "")  # noqa: F841
 
         self._send_llm_response(chat_id, response, _model_short, _elapsed, _draft_sent[0], _msg_id, session_obj)
-

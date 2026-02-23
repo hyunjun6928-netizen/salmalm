@@ -103,7 +103,6 @@ def retry_with_backoff(
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        """Decorator."""
         def wrapper(*args, **kwargs):
             """Wrapper."""
             last_error = None

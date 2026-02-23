@@ -309,6 +309,7 @@ class CommandRouter:
     def _cmd_setup(cmd: str, session, **_) -> str:
         """Cmd setup."""
         from salmalm.constants import PORT
+
         return f"🔧 Setup Wizard: Open http://localhost:{PORT}/setup in your browser to re-run the setup wizard."
 
     @staticmethod

@@ -1,13 +1,12 @@
 """User management API — list, delete, toggle, quota, settings, tenant config."""
 
-
-
 from salmalm.security.crypto import vault, log
 from salmalm.web.auth import auth_manager, extract_auth
 
 
 class WebUsersMixin:
     """Mixin providing users route handlers."""
+
     def _get_api_users(self):
         # Admin: full user list with stats (멀티테넌트 사용자 관리)
         """Get api users."""
@@ -171,4 +170,3 @@ class WebUsersMixin:
             user_manager.set_telegram_allowlist_mode(body["telegram_allowlist"])
         self._json({"ok": True})
         return
-

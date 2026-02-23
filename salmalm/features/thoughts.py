@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from salmalm.constants import KST, DATA_DIR
+
 THOUGHTS_DIR = DATA_DIR
 THOUGHTS_DB = THOUGHTS_DIR / "thoughts.db"
 

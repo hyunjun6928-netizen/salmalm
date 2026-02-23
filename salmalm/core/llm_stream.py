@@ -12,9 +12,11 @@ from salmalm.core.core import CostCapExceeded, check_cost_cap  # noqa: E402
 
 from salmalm.constants import DEFAULT_MAX_TOKENS  # noqa: E402
 
+
 def _lazy_track_usage(model, inp, out):
     """Lazy import to avoid circular."""
     from salmalm.core.core import track_usage
+
     track_usage(model, inp, out)
 
 
@@ -25,13 +27,16 @@ from salmalm.security.crypto import vault
 def _lazy_get_temperature(tools):
     """Lazy import to avoid circular."""
     from salmalm.core.llm import _get_temperature
+
     return _get_temperature(tools)
 
 
 def _lazy_build_gemini_tools(tools):
     """Lazy import to avoid circular."""
     from salmalm.core.llm import _build_gemini_tools
+
     return _build_gemini_tools(tools)  # noqa: E402
+
 
 def stream_google(
     messages: List[Dict[str, Any]],
@@ -64,7 +69,9 @@ def stream_google(
         yield {"type": "error", "error": "❌ Google API key not configured. Set GOOGLE_API_KEY or GEMINI_API_KEY."}
         return
 
-    from salmalm.core.llm import _build_gemini_contents; contents = _build_gemini_contents(messages)
+    from salmalm.core.llm import _build_gemini_contents
+
+    contents = _build_gemini_contents(messages)
     body: dict = {
         "contents": contents,
         "generationConfig": {"maxOutputTokens": max_tokens, "temperature": _lazy_get_temperature(tools)},
@@ -315,7 +322,13 @@ def stream_anthropic(
         accum = {"content": "", "thinking": "", "tool": None, "tool_json": ""}
         yield from _iter_sse_events(resp, tool_calls, accum, usage)
         _lazy_track_usage(model, usage["input"], usage["output"])
-        result = {"type": "message_end", "content": accum["content"], "tool_calls": tool_calls, "usage": usage, "model": model}
+        result = {
+            "type": "message_end",
+            "content": accum["content"],
+            "tool_calls": tool_calls,
+            "usage": usage,
+            "model": model,
+        }
         if accum["thinking"]:
             result["thinking"] = accum["thinking"]
         yield result
@@ -387,5 +400,3 @@ def _process_stream_event(
             except json.JSONDecodeError:
                 args = {}
             yield {"type": "tool_use_end", "id": current_tool["id"], "name": current_tool["name"], "arguments": args}
-
-

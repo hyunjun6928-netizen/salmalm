@@ -290,15 +290,21 @@ class DiscordBot:
                 full = "".join(_stream_buf)
                 if not _draft_msg_id[0] and len(full) >= 200:
                     try:
-                        resp = self._api("POST", f"/channels/{channel_id}/messages",
-                                        {"content": full[:1900] + " ▍", "message_reference": {"message_id": message_id}})
+                        resp = self._api(
+                            "POST",
+                            f"/channels/{channel_id}/messages",
+                            {"content": full[:1900] + " ▍", "message_reference": {"message_id": message_id}},
+                        )
                         _draft_msg_id[0] = resp.get("id")
                     except Exception:
                         pass
                 elif _draft_msg_id[0] and len(full) % 150 < 10:
                     try:
-                        self._api("PATCH", f"/channels/{channel_id}/messages/{_draft_msg_id[0]}",
-                                 {"content": full[:1900] + " ▍"})
+                        self._api(
+                            "PATCH",
+                            f"/channels/{channel_id}/messages/{_draft_msg_id[0]}",
+                            {"content": full[:1900] + " ▍"},
+                        )
                     except Exception:
                         pass
 

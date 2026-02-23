@@ -17,6 +17,7 @@ from salmalm.constants import (
 )
 from salmalm.security.crypto import log
 
+
 def _persist_compaction_summary(session_id: str, summary: str) -> None:
     """Save compaction summary to DB for cross-session restoration.
 
@@ -26,7 +27,9 @@ def _persist_compaction_summary(session_id: str, summary: str) -> None:
     if not summary or not session_id:
         return
     try:
-        from salmalm.core.core import _get_db; conn = _get_db()
+        from salmalm.core.core import _get_db
+
+        conn = _get_db()
         conn.execute("""CREATE TABLE IF NOT EXISTS compaction_summaries (
             session_id TEXT PRIMARY KEY,
             summary TEXT NOT NULL,
@@ -45,7 +48,9 @@ def _persist_compaction_summary(session_id: str, summary: str) -> None:
 def _restore_compaction_summary(session_id: str) -> Optional[str]:
     """Restore last compaction summary for a session (cross-session continuity)."""
     try:
-        from salmalm.core.core import _get_db; conn = _get_db()
+        from salmalm.core.core import _get_db
+
+        conn = _get_db()
         row = conn.execute(
             "SELECT summary FROM compaction_summaries WHERE session_id=?",
             (session_id,),
@@ -126,8 +131,9 @@ def _stage4_truncate_old(old_important: list) -> list:
     return result
 
 
-def _stage5_llm_summarize(to_summarize: list, system_msgs: list, recent: list,
-                           stage4: list, messages: list, total_chars: int, session) -> list:
+def _stage5_llm_summarize(
+    to_summarize: list, system_msgs: list, recent: list, stage4: list, messages: list, total_chars: int, session
+) -> list:
     """Stage 5: LLM summarization of old context."""
     if not to_summarize:
         return system_msgs + recent
@@ -141,19 +147,23 @@ def _stage5_llm_summarize(to_summarize: list, system_msgs: list, recent: list,
 
     from salmalm.core.llm import call_llm
     from salmalm.core.core import router
+
     summary_model = router._pick_available(1)
     _summ_msgs = [
-        {"role": "system", "content": (
-            "Summarize the following conversation concisely but thoroughly. "
-            "You MUST preserve:\n1. Key decisions and conclusions\n"
-            "2. Task progress and what was accomplished\n"
-            "3. Important facts, numbers, file paths, code context\n"
-            "4. User preferences and constraints mentioned\n"
-            "5. Any pending/blocked items\n"
-            "Write in the same language as the conversation. "
-            "Use 5-15 sentences. Do NOT start with 'The conversation...' — "
-            "write as a factual summary that can serve as context for continued work."
-        )},
+        {
+            "role": "system",
+            "content": (
+                "Summarize the following conversation concisely but thoroughly. "
+                "You MUST preserve:\n1. Key decisions and conclusions\n"
+                "2. Task progress and what was accomplished\n"
+                "3. Important facts, numbers, file paths, code context\n"
+                "4. User preferences and constraints mentioned\n"
+                "5. Any pending/blocked items\n"
+                "Write in the same language as the conversation. "
+                "Use 5-15 sentences. Do NOT start with 'The conversation...' — "
+                "write as a factual summary that can serve as context for continued work."
+            ),
+        },
         {"role": "user", "content": "\n".join(summary_parts)},
     ]
     try:
@@ -172,9 +182,16 @@ def _stage5_llm_summarize(to_summarize: list, system_msgs: list, recent: list,
         log.warning(f"[PKG] Summary ({len(summary_content)}) > original ({original_chars}) — using stage 4")
         return stage4
 
-    compacted = system_msgs + [
-        {"role": "system", "content": f"[Previous conversation summary — {len(to_summarize)} messages compacted]\n{summary_content}"}
-    ] + recent
+    compacted = (
+        system_msgs
+        + [
+            {
+                "role": "system",
+                "content": f"[Previous conversation summary — {len(to_summarize)} messages compacted]\n{summary_content}",
+            }
+        ]
+        + recent
+    )
 
     if session:
         try:
@@ -182,7 +199,9 @@ def _stage5_llm_summarize(to_summarize: list, system_msgs: list, recent: list,
         except Exception as e:
             log.warning(f"[PKG] Summary persistence error: {e}")
 
-    log.info(f"[PKG] Stage 5 compacted: {len(messages)} -> {len(compacted)} messages, {total_chars} → {sum(len(_msg_content_str(m)) for m in compacted)} chars")
+    log.info(
+        f"[PKG] Stage 5 compacted: {len(messages)} -> {len(compacted)} messages, {total_chars} → {sum(len(_msg_content_str(m)) for m in compacted)} chars"
+    )
 
     try:
         result = memory_manager.auto_curate(days_back=3)
@@ -295,7 +314,6 @@ _tfidf = TFIDFSearch()
 # ============================================================
 # LLMCronManager extracted to salmalm/core/llm_cron.py
 from salmalm.core.llm_cron import LLMCronManager  # noqa: E402
-
 
 
 def _estimate_tokens(messages: list) -> int:

@@ -18,21 +18,25 @@ from salmalm.security.crypto import log, vault
 
 # ── Lazy accessors for core.py globals (break circular import) ──
 
+
 def _get_db():
     """Get db."""
     from salmalm.core.core import _get_db as _impl
+
     return _impl()
 
 
 def _audit_log(*args, **kwargs):
     """Audit log."""
     from salmalm.core.core import audit_log as _impl
+
     return _impl(*args, **kwargs)
 
 
 def _restore_compaction_summary(session_id: str) -> Optional[str]:
     """Restore compaction summary."""
     from salmalm.core.compaction import _restore_compaction_summary as _impl
+
     return _impl(session_id)
 
 
@@ -322,7 +326,6 @@ def branch_session(session_id: str, message_index: int) -> dict:
     Copies messages[0:message_index+1] into a new session.
     Returns {'ok': True, 'new_session_id': ...} or error.
     """
-    
 
     session = get_session(session_id)
     if message_index < 0 or message_index >= len(session.messages):
@@ -426,4 +429,3 @@ def restore_all_sessions_from_disk() -> None:
             count += 1
     if count:
         log.info(f"[DISK] Restored {count} sessions from disk")
-

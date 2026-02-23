@@ -1,4 +1,5 @@
 """Web Content routes mixin."""
+
 import json
 import logging
 import os
@@ -10,8 +11,8 @@ from salmalm.security.crypto import vault, log as _log  # noqa: F401
 
 log = logging.getLogger(__name__)
 
-class ContentMixin:
 
+class ContentMixin:
     def _get_thoughts(self):
         """Get thoughts."""
         from salmalm.features.thoughts import thought_stream

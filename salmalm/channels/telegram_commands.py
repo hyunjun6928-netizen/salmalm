@@ -403,9 +403,7 @@ class TelegramCommandsMixin:
             )
         elif sub == "delete":
             nid = parts[2] if len(parts) > 2 else ""
-            result = (
-                _exec_tool("note", {"action": "delete", "note_id": nid}) if nid else "❌ Usage: /note delete <id>"
-            )
+            result = _exec_tool("note", {"action": "delete", "note_id": nid}) if nid else "❌ Usage: /note delete <id>"
         else:
             # /note <content> → save directly
             content = text[len("/note") :].strip()
@@ -483,9 +481,7 @@ class TelegramCommandsMixin:
         elif sub == "delete":
             lid = parts[2] if len(parts) > 2 else ""
             result = (
-                _exec_tool("save_link", {"action": "delete", "link_id": lid})
-                if lid
-                else "❌ Usage: /saved delete <id>"
+                _exec_tool("save_link", {"action": "delete", "link_id": lid}) if lid else "❌ Usage: /saved delete <id>"
             )
         else:
             result = _exec_tool("save_link", {"action": "list"})
@@ -601,4 +597,3 @@ class TelegramCommandsMixin:
                 self.send_message(chat_id, f"❌ {e}")
         else:
             self.send_message(chat_id, "Usage: /sync export | /sync import <json>")
-

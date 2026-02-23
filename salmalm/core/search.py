@@ -5,6 +5,7 @@ import math
 import re
 from collections import OrderedDict
 
+
 class TFIDFSearch:
     """Lightweight TF-IDF + cosine similarity search. No external deps."""
 
