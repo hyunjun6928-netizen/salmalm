@@ -169,7 +169,7 @@ class TestNotificationTool(unittest.TestCase):
         result = execute_tool('notification', {'message': ''})
         self.assertIn('required', result)
 
-    @patch('salmalm.tool_handlers._send_notification_impl')
+    @patch('salmalm.tools.tool_handlers._send_notification_impl')
     def test_send_notification(self, mock_send):
         mock_send.return_value = ['desktop: ✅']
         from salmalm.tools.tool_handlers import execute_tool

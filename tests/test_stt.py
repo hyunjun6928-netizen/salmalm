@@ -52,7 +52,7 @@ class TestSTTManager(unittest.TestCase):
         result = mgr.handle_telegram_voice(b'audio')
         self.assertIsNone(result)
 
-    @patch('salmalm.stt.urllib.request.urlopen')
+    @patch('salmalm.features.stt.urllib.request.urlopen')
     def test_whisper_success(self, mock_urlopen):
         import json
         mock_resp = MagicMock()

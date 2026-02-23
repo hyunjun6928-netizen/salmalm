@@ -7,9 +7,9 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def tmp_mood(tmp_path, monkeypatch):
-    monkeypatch.setattr('salmalm.mood.MOOD_DIR', tmp_path)
-    monkeypatch.setattr('salmalm.mood.MOOD_CONFIG_FILE', tmp_path / 'mood.json')
-    monkeypatch.setattr('salmalm.mood.MOOD_HISTORY_FILE', tmp_path / 'mood_history.json')
+    monkeypatch.setattr('salmalm.features.mood.MOOD_DIR', tmp_path)
+    monkeypatch.setattr('salmalm.features.mood.MOOD_CONFIG_FILE', tmp_path / 'mood.json')
+    monkeypatch.setattr('salmalm.features.mood.MOOD_HISTORY_FILE', tmp_path / 'mood_history.json')
     return tmp_path
 
 

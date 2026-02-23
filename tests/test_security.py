@@ -390,12 +390,12 @@ class TestCryptography(unittest.TestCase):
             temp_path = f.name
         try:
             from unittest.mock import patch
-            with patch('salmalm.crypto.VAULT_FILE', Path(temp_path)):
+            with patch('salmalm.security.crypto.VAULT_FILE', Path(temp_path)):
                 v.create('test_password')
                 v.set('test_key', 'test_value')
                 # Create new vault instance and unlock
                 v2 = Vault()
-                with patch('salmalm.crypto.VAULT_FILE', Path(temp_path)):
+                with patch('salmalm.security.crypto.VAULT_FILE', Path(temp_path)):
                     ok = v2.unlock('test_password')
                     self.assertTrue(ok, "Failed to unlock vault")
                     self.assertEqual(v2.get('test_key'), 'test_value')

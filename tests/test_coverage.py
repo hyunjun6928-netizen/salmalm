@@ -378,7 +378,7 @@ class TestToolHandlersMore(unittest.TestCase):
         result = execute_tool('memory_search', {'query': 'test'})
         self.assertIsInstance(result, str)
 
-    @patch('salmalm.tool_handlers.urllib.request.urlopen')
+    @patch('salmalm.tools.tool_handlers.urllib.request.urlopen')
     def test_web_search_mock(self, mock_urlopen):
         from salmalm.tools.tool_handlers import execute_tool
         mock_resp = MagicMock()
@@ -389,7 +389,7 @@ class TestToolHandlersMore(unittest.TestCase):
         result = execute_tool('web_search', {'query': 'test'})
         self.assertIsInstance(result, str)
 
-    @patch('salmalm.tool_handlers.urllib.request.urlopen')
+    @patch('salmalm.tools.tool_handlers.urllib.request.urlopen')
     def test_web_fetch_mock(self, mock_urlopen):
         from salmalm.tools.tool_handlers import execute_tool
         mock_resp = MagicMock()
@@ -401,7 +401,7 @@ class TestToolHandlersMore(unittest.TestCase):
         result = execute_tool('web_fetch', {'url': 'http://example.com'})
         self.assertIsInstance(result, str)
 
-    @patch('salmalm.tool_handlers.urllib.request.urlopen')
+    @patch('salmalm.tools.tool_handlers.urllib.request.urlopen')
     def test_http_request_mock(self, mock_urlopen):
         from salmalm.tools.tool_handlers import execute_tool
         mock_resp = MagicMock()

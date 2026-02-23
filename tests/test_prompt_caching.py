@@ -27,7 +27,7 @@ def test_anthropic_system_prompt_cache_marking():
             'usage': {'input_tokens': 10, 'output_tokens': 5}
         }
 
-    with patch('salmalm.llm._http_post', fake_http_post):
+    with patch('salmalm.core.llm._http_post', fake_http_post):
         messages = [
             {'role': 'system', 'content': 'You are helpful.'},
             {'role': 'user', 'content': 'hi'}
@@ -52,7 +52,7 @@ def test_anthropic_beta_header():
             'usage': {'input_tokens': 10, 'output_tokens': 5}
         }
 
-    with patch('salmalm.llm._http_post', fake_http_post):
+    with patch('salmalm.core.llm._http_post', fake_http_post):
         from salmalm.core.llm import _call_anthropic
         messages = [{'role': 'user', 'content': 'hi'}]
         _call_anthropic('fake-key', 'claude-sonnet-4-20250514', messages, None, 1024)
@@ -72,7 +72,7 @@ def test_tool_schema_cache_marking():
             'usage': {'input_tokens': 10, 'output_tokens': 5}
         }
 
-    with patch('salmalm.llm._http_post', fake_http_post):
+    with patch('salmalm.core.llm._http_post', fake_http_post):
         from salmalm.core.llm import _call_anthropic
         tools = [
             {'name': 'tool_a', 'description': 'A', 'input_schema': {}},

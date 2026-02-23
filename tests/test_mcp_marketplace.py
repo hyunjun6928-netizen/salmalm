@@ -28,8 +28,8 @@ class TestMCPCatalog:
 class TestMCPMarketplace:
     @pytest.fixture
     def mp(self, tmp_path):
-        with patch('salmalm.mcp_marketplace._SERVERS_PATH', tmp_path / 'servers.json'), \
-             patch('salmalm.mcp_marketplace._CONFIG_DIR', tmp_path):
+        with patch('salmalm.features.mcp_marketplace._SERVERS_PATH', tmp_path / 'servers.json'), \
+             patch('salmalm.features.mcp_marketplace._CONFIG_DIR', tmp_path):
             m = MCPMarketplace()
             yield m
 
@@ -84,7 +84,7 @@ class TestMCPMarketplace:
 
     def test_remove(self, mp):
         mp._installed['memory'] = {'name': 'memory', 'command': [], 'status': 'installed'}
-        with patch('salmalm.mcp_marketplace.MCPMarketplace._save'):
+        with patch('salmalm.features.mcp_marketplace.MCPMarketplace._save'):
             result = mp.remove('memory')
             assert '🗑️' in result
             assert 'memory' not in mp._installed

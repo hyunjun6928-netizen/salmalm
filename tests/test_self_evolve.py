@@ -11,9 +11,9 @@ import pytest
 @pytest.fixture(autouse=True)
 def tmp_evolution(tmp_path, monkeypatch):
     """Redirect evolution files to tmp."""
-    monkeypatch.setattr('salmalm.self_evolve.EVOLUTION_DIR', tmp_path)
-    monkeypatch.setattr('salmalm.self_evolve.EVOLUTION_FILE', tmp_path / 'evolution.json')
-    monkeypatch.setattr('salmalm.self_evolve.EVOLUTION_HISTORY_FILE', tmp_path / 'evolution_history.json')
+    monkeypatch.setattr('salmalm.features.self_evolve.EVOLUTION_DIR', tmp_path)
+    monkeypatch.setattr('salmalm.features.self_evolve.EVOLUTION_FILE', tmp_path / 'evolution.json')
+    monkeypatch.setattr('salmalm.features.self_evolve.EVOLUTION_HISTORY_FILE', tmp_path / 'evolution_history.json')
     return tmp_path
 
 

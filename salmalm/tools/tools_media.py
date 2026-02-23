@@ -9,7 +9,7 @@ from salmalm.tools.tool_registry import register
 
 def _legacy(name: str, args):
     """Call legacy tool_handlers implementation."""
-    from salmalm import tool_handlers as _th
+    from salmalm.tools import tool_handlers as _th
 
     return _th._legacy_execute(name, args)
 

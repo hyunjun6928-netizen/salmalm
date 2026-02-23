@@ -93,13 +93,13 @@ class TestCommandRouter:
         assert len(_runtime_overrides) == 0
 
     def test_config_show_empty(self, router, session):
-        with patch('salmalm.commands._CONFIG_PATH', Path(tempfile.mktemp())):
+        with patch('salmalm.features.commands._CONFIG_PATH', Path(tempfile.mktemp())):
             result = _run(router.dispatch('/config show', session))
             assert 'empty' in result.lower() or 'Config' in result
 
     def test_config_set_get(self, router, session):
         tmp = Path(tempfile.mktemp())
-        with patch('salmalm.commands._CONFIG_PATH', tmp):
+        with patch('salmalm.features.commands._CONFIG_PATH', tmp):
             _run(router.dispatch('/config set mykey myval', session))
             result = _run(router.dispatch('/config get mykey', session))
             assert 'myval' in result
@@ -139,7 +139,7 @@ class TestCommandRouter:
         assert 'mention' in result
 
     def test_allowlist_empty(self, router, session):
-        with patch('salmalm.commands._CONFIG_DIR', Path(tempfile.mkdtemp())):
+        with patch('salmalm.features.commands._CONFIG_DIR', Path(tempfile.mkdtemp())):
             result = _run(router.dispatch('/allowlist list', session))
             assert 'empty' in result.lower() or 'Allowlist' in result
 
@@ -148,7 +148,7 @@ class TestCommandRouter:
         assert 'Usage' in result
 
     def test_bash_echo(self, router, session):
-        with patch('salmalm.commands.subprocess.run') as mock_run:
+        with patch('salmalm.features.commands.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(stdout='hello', stderr='', returncode=0)
             result = _run(router.dispatch('/bash echo hello', session))
             assert 'hello' in result

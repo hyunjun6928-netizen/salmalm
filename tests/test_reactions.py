@@ -32,7 +32,7 @@ class TestSendReaction(unittest.TestCase):
         result = send_reaction('slack', '123', '👍', channel_id='456', config={})
         self.assertFalse(result['ok'])
 
-    @patch('salmalm.tools_reaction.urllib.request.urlopen')
+    @patch('salmalm.tools.tools_reaction.urllib.request.urlopen')
     def test_telegram_success(self, mock_urlopen):
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps({'ok': True}).encode()
@@ -43,7 +43,7 @@ class TestSendReaction(unittest.TestCase):
         result = _react_telegram('123', '456', '👍', {'token': 'fake_token'})
         self.assertTrue(result['ok'])
 
-    @patch('salmalm.tools_reaction.urllib.request.urlopen')
+    @patch('salmalm.tools.tools_reaction.urllib.request.urlopen')
     def test_discord_success(self, mock_urlopen):
         mock_resp = MagicMock()
         mock_resp.read.return_value = b''

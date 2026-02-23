@@ -69,7 +69,7 @@ class TestE2EMessageToResponse(unittest.TestCase):
     def test_message_to_response_flow(self):
         """Full message pipeline with mocked LLM."""
         from salmalm.core import Session
-        from salmalm import engine
+        from salmalm.core import engine
 
         mock_result = {
             'content': '안녕하세요! 도움이 필요하신가요?',
@@ -96,7 +96,7 @@ class TestE2EToolExecution(unittest.TestCase):
     def test_tool_execution_flow(self):
         """execute_tool dispatches and returns string result."""
         from salmalm.tools.tool_handlers import execute_tool
-        with patch('salmalm.tool_registry.execute_tool', return_value='result: ok'):
+        with patch('salmalm.tools.tool_registry.execute_tool', return_value='result: ok'):
             result = execute_tool('exec', {'command': 'echo hello'})
             self.assertIn('ok', result.lower() if 'ok' in result.lower() else result)
 

@@ -10,9 +10,9 @@ from salmalm.features.a2a import A2AProtocol, PROTOCOL_VERSION, VALID_ACTIONS
 
 @pytest.fixture
 def a2a(tmp_path, monkeypatch):
-    monkeypatch.setattr("salmalm.a2a._PEERS_PATH", tmp_path / "peers.json")
-    monkeypatch.setattr("salmalm.a2a._INBOX_PATH", tmp_path / "inbox.json")
-    monkeypatch.setattr("salmalm.a2a._DATA_DIR", tmp_path)
+    monkeypatch.setattr("salmalm.features.a2a._PEERS_PATH", tmp_path / "peers.json")
+    monkeypatch.setattr("salmalm.features.a2a._INBOX_PATH", tmp_path / "inbox.json")
+    monkeypatch.setattr("salmalm.features.a2a._DATA_DIR", tmp_path)
     return A2AProtocol(instance_name="TestBot", instance_id="test123")
 
 
@@ -179,9 +179,9 @@ def test_web_endpoints(a2a):
 def test_persistence(tmp_path, monkeypatch):
     peers_path = tmp_path / "peers.json"
     inbox_path = tmp_path / "inbox.json"
-    monkeypatch.setattr("salmalm.a2a._PEERS_PATH", peers_path)
-    monkeypatch.setattr("salmalm.a2a._INBOX_PATH", inbox_path)
-    monkeypatch.setattr("salmalm.a2a._DATA_DIR", tmp_path)
+    monkeypatch.setattr("salmalm.features.a2a._PEERS_PATH", peers_path)
+    monkeypatch.setattr("salmalm.features.a2a._INBOX_PATH", inbox_path)
+    monkeypatch.setattr("salmalm.features.a2a._DATA_DIR", tmp_path)
 
     a1 = A2AProtocol(instance_name="A")
     pid = a1.pair("http://z.local", "sec")

@@ -69,7 +69,7 @@ class TestLLMInternals(unittest.TestCase):
         from salmalm.core.llm import track_usage
         track_usage('test/model2', 0, 0)
 
-    @patch('salmalm.llm.urllib.request.urlopen')
+    @patch('salmalm.core.llm.urllib.request.urlopen')
     def test_call_anthropic_mock(self, mock_urlopen):
         from salmalm.core.llm import call_llm
         mock_resp = MagicMock()
@@ -90,7 +90,7 @@ class TestLLMInternals(unittest.TestCase):
         finally:
             loop.close()
 
-    @patch('salmalm.llm.urllib.request.urlopen')
+    @patch('salmalm.core.llm.urllib.request.urlopen')
     def test_call_google_mock(self, mock_urlopen):
         from salmalm.core.llm import call_llm
         mock_resp = MagicMock()

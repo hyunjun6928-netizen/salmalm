@@ -76,8 +76,8 @@ class TestOpenAIOAuth:
 class TestOAuthManager:
     @pytest.fixture
     def manager(self, tmp_path):
-        with patch('salmalm.oauth._TOKENS_PATH', tmp_path / 'tokens.json'), \
-             patch('salmalm.oauth._CONFIG_DIR', tmp_path):
+        with patch('salmalm.web.oauth._TOKENS_PATH', tmp_path / 'tokens.json'), \
+             patch('salmalm.web.oauth._CONFIG_DIR', tmp_path):
             mgr = OAuthManager()
             yield mgr
 
@@ -100,7 +100,7 @@ class TestOAuthManager:
 
     def test_revoke(self, manager):
         manager._tokens = {'anthropic': {'access_token': 'x'}}
-        with patch('salmalm.oauth._TOKENS_PATH') as mp:
+        with patch('salmalm.web.oauth._TOKENS_PATH') as mp:
             mp.exists.return_value = False
             result = manager.revoke()
         assert 'revoked' in result.lower()

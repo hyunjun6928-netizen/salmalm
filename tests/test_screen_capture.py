@@ -23,8 +23,8 @@ class TestScreenCapture:
         assert isinstance(b64, str)
         assert len(b64) > 0
 
-    @patch('salmalm.screen_capture.subprocess.run')
-    @patch('salmalm.screen_capture.sys')
+    @patch('salmalm.features.screen_capture.subprocess.run')
+    @patch('salmalm.features.screen_capture.sys')
     def test_capture_macos(self, mock_sys, mock_run):
         mock_sys.platform = 'darwin'
         sc = ScreenCapture()
@@ -36,7 +36,7 @@ class TestScreenCapture:
         assert result == b'fake-png-data'
         os.unlink(tmp_path)
 
-    @patch('salmalm.screen_capture.shutil.which', return_value=None)
+    @patch('salmalm.features.screen_capture.shutil.which', return_value=None)
     def test_capture_linux_no_tools(self, mock_which):
         sc = ScreenCapture()
         result = sc._capture_linux('/tmp/test.png')
@@ -62,13 +62,13 @@ class TestScreenCapture:
             result = sc.capture_and_analyze()
             assert 'captured' in result.lower()
 
-    @patch('salmalm.screen_capture.shutil.which', return_value=None)
+    @patch('salmalm.features.screen_capture.shutil.which', return_value=None)
     def test_ocr_no_tesseract(self, mock_which):
         sc = ScreenCapture()
         assert sc.ocr_image('/fake.png') is None
 
-    @patch('salmalm.screen_capture.shutil.which', return_value='/usr/bin/tesseract')
-    @patch('salmalm.screen_capture.subprocess.run')
+    @patch('salmalm.features.screen_capture.shutil.which', return_value='/usr/bin/tesseract')
+    @patch('salmalm.features.screen_capture.subprocess.run')
     def test_ocr_with_tesseract(self, mock_run, mock_which):
         mock_run.return_value = MagicMock(returncode=0, stdout='OCR text here')
         sc = ScreenCapture()
@@ -79,15 +79,15 @@ class TestScreenCapture:
 class TestScreenHistory:
     @pytest.fixture
     def history(self, tmp_path):
-        with patch('salmalm.screen_capture._HISTORY_DIR', tmp_path / 'history'), \
-             patch('salmalm.screen_capture._SCREEN_CONFIG_PATH', tmp_path / 'config.json'), \
-             patch('salmalm.screen_capture._CONFIG_DIR', tmp_path):
+        with patch('salmalm.features.screen_capture._HISTORY_DIR', tmp_path / 'history'), \
+             patch('salmalm.features.screen_capture._SCREEN_CONFIG_PATH', tmp_path / 'config.json'), \
+             patch('salmalm.features.screen_capture._CONFIG_DIR', tmp_path):
             (tmp_path / 'history').mkdir()
             h = ScreenHistory()
             yield h
 
     def test_save_capture(self, history, tmp_path):
-        with patch('salmalm.screen_capture._HISTORY_DIR', tmp_path / 'history'):
+        with patch('salmalm.features.screen_capture._HISTORY_DIR', tmp_path / 'history'):
             path = history.save_capture(b'fake-png', 'some text')
             assert os.path.exists(path)
 

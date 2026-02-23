@@ -39,7 +39,7 @@ class TestExecApprovalSystem:
         from salmalm.security.exec_approvals import check_approval, _load_config, _APPROVALS_FILE
         # Mock config with denylist
         config = {'allowlist': [], 'denylist': [r'forbidden_cmd'], 'auto_approve': False}
-        with patch('salmalm.exec_approvals._load_config', return_value=config):
+        with patch('salmalm.security.exec_approvals._load_config', return_value=config):
             approved, reason, needs_confirm = check_approval('forbidden_cmd --flag')
             assert approved is False
             assert 'Denied' in reason
@@ -47,7 +47,7 @@ class TestExecApprovalSystem:
     def test_allowlist(self):
         from salmalm.security.exec_approvals import check_approval
         config = {'allowlist': ['git '], 'denylist': [], 'auto_approve': False}
-        with patch('salmalm.exec_approvals._load_config', return_value=config):
+        with patch('salmalm.security.exec_approvals._load_config', return_value=config):
             approved, reason, needs_confirm = check_approval('git push origin main')
             assert approved is True
 

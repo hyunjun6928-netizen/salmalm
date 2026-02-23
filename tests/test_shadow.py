@@ -12,8 +12,8 @@ from salmalm.features.shadow import ShadowMode, _PROFILE_PATH, _EMOJI_RE, _HONOR
 @pytest.fixture
 def shadow(tmp_path, monkeypatch):
     profile_path = tmp_path / "shadow_profile.json"
-    monkeypatch.setattr("salmalm.shadow._PROFILE_PATH", profile_path)
-    monkeypatch.setattr("salmalm.shadow._PROFILE_DIR", tmp_path)
+    monkeypatch.setattr("salmalm.features.shadow._PROFILE_PATH", profile_path)
+    monkeypatch.setattr("salmalm.features.shadow._PROFILE_DIR", tmp_path)
     return ShadowMode()
 
 
