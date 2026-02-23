@@ -127,6 +127,7 @@ if vault.is_unlocked:
         except Exception as e:
             log.warning(f"[DISCORD] Failed to start: {e}")
 
+
 def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=18801):
     """Print startup banner (deferred to run_server call)."""
     _rag_stats = rag_engine.get_stats()  # noqa: F841
@@ -210,7 +211,7 @@ def _try_vault_auto_file() -> None:
             _auto_pw = ""
         if vault.unlock(_auto_pw, save_to_keychain=True):
             log.info("[UNLOCK] Vault auto-unlocked from .vault_auto")
-    except Exception as _e:
+    except (OSError, ValueError, ImportError) as _e:
         log.warning(f"[UNLOCK] .vault_auto read failed: {_e}")
 
 
@@ -259,7 +260,7 @@ def _start_https_if_configured(bind_addr: str) -> None:
             ssl_server.socket = ctx.wrap_socket(ssl_server.socket, server_side=True)
             threading.Thread(target=ssl_server.serve_forever, daemon=True).start()
             log.info(f"[HTTPS] Secure UI: https://localhost:{https_port}")
-    except Exception as e:
+    except (OSError, ssl.SSLError, ValueError) as e:
         log.warning(f"[HTTPS] Failed to start: {e}")
 
 
@@ -463,9 +464,6 @@ def _start_tunnel(port: int) -> None:
     def _print_qr(url: str) -> None:
         """Print QR code to terminal using Unicode blocks."""
         try:
-            import urllib.request
-            import json
-
             api = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={url}&format=svg"
             print(f"  QR: {api}\n  (또는 브라우저에서 직접 접속: {url})\n")
         except Exception:
@@ -495,7 +493,7 @@ async def run_server():
         uptime_monitor.on_startup()
         watchdog.start()
         log.info("[SLA] Uptime monitor + watchdog initialized")
-    except Exception as e:
+    except (ImportError, OSError, RuntimeError) as e:
         log.warning(f"[SLA] Init error: {e}")
 
     _init_extensions()

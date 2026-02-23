@@ -3,6 +3,12 @@
 from datetime import timedelta, timezone
 from pathlib import Path
 
+try:
+    from importlib.metadata import version as _pkg_version
+    VERSION = _pkg_version("salmalm")
+except Exception:
+    VERSION = "0.0.0-dev"
+
 from salmalm import __version__ as VERSION  # Single source of truth
 
 APP_NAME = "SalmAlm"
@@ -135,9 +141,11 @@ _EXEC_TIER_DATABASE = {
 def _build_exec_allowlist() -> set:
     """Build effective allowlist from tiers + env vars."""
     allowed = set(_EXEC_TIER_BASIC)
-    if _os.environ.get("SALMALM_EXEC_NETWORK", "1") == "1":
+    # Tier 2/3 default OFF (opt-in): set env var to "1" to enable.
+    # Security: network/database tools should not be available unless explicitly requested.
+    if _os.environ.get("SALMALM_EXEC_NETWORK", "0") == "1":
         allowed |= _EXEC_TIER_NETWORK
-    if _os.environ.get("SALMALM_EXEC_DATABASE", "1") == "1":
+    if _os.environ.get("SALMALM_EXEC_DATABASE", "0") == "1":
         allowed |= _EXEC_TIER_DATABASE
     return allowed
 
@@ -428,6 +436,15 @@ COMPLEX_INDICATORS = [
     "automate",
 ]
 TOOL_HINT_KEYWORDS = ["file", "exec", "run", "search", "web", "image", "memory", "system", "cron", "screenshot"]
+
+# ── Well-known model IDs used across the codebase (MED-15) ──
+MODEL_GPT_IMAGE = "gpt-image-1"
+MODEL_GPT_4_1_NANO = "gpt-4.1-nano"
+MODEL_CLAUDE_SONNET = "claude-sonnet-4-6"
+MODEL_CLAUDE_HAIKU = "claude-haiku-4-5-20251001"
+MODEL_GPT_4_1_NANO_OPENAI = "gpt-4.1-nano"  # bare name, no provider prefix
+MODEL_GEMINI_FLASH = "google/gemini-2.5-flash"
+MODEL_GEMINI_2_FLASH = "gemini-2.0-flash"
 
 # ── Model name corrections (deprecated → current API IDs) ──
 # Single source of truth for model ID fixes. Used by model_selection.fix_model_name().

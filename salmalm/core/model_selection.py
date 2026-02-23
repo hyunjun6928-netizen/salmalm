@@ -10,7 +10,7 @@ import json
 import re
 from typing import Tuple
 
-from salmalm.constants import MODELS as _MODELS, DATA_DIR
+from salmalm.constants import MODELS as _MODELS, DATA_DIR, MODEL_NAME_FIXES as _MODEL_NAME_FIXES
 import logging
 
 log = logging.getLogger(__name__)
@@ -54,10 +54,6 @@ _COMPLEX_KEYWORDS = [
 ]
 
 # ── Model name corrections (from constants — single source of truth) ──
-from salmalm.constants import MODEL_NAME_FIXES as _MODEL_NAME_FIXES
-import logging
-
-log = logging.getLogger(__name__)
 
 # ── Routing config ──
 _ROUTING_CONFIG_FILE = DATA_DIR / "routing.json"
@@ -96,6 +92,7 @@ def _build_model_costs() -> dict:
     """Build model cost lookup from single source (constants.MODEL_COSTS)."""
     try:
         from salmalm.constants import MODEL_COSTS
+
         result = {}
         for model_id, prices in MODEL_COSTS.items():
             # MODEL_COSTS uses short names; we need provider/model format
@@ -107,8 +104,7 @@ def _build_model_costs() -> dict:
 
 # Model costs derived from constants.MODEL_COSTS (single source of truth)
 # Used for cost-aware routing decisions
-_MODEL_COSTS = _build_model_costs() or {
-}
+_MODEL_COSTS = _build_model_costs() or {}
 
 # Tier candidates: (model_id, provider_key_name)
 # Tier candidates: ordered by cost-effectiveness per tier.

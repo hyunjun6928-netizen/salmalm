@@ -9,11 +9,10 @@ import threading
 import time
 import uuid as _uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 from salmalm.constants import DATA_DIR, KST
-from salmalm.security.crypto import log, vault
+from salmalm.security.crypto import log
 
 
 # ── Lazy accessors for core.py globals (break circular import) ──
@@ -90,23 +89,17 @@ class Session:
                 elif isinstance(m.get("content"), str):
                     saveable.append(m)
             conn = _get_db()
-            # Ensure columns exist
-            for _col_sql in [
-                "ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL",
-                "ALTER TABLE session_store ADD COLUMN session_meta TEXT DEFAULT '{}'",
-            ]:
-                try:
-                    conn.execute(_col_sql)
-                except Exception as e:
-                    log.debug(f"Suppressed: {e}")
             # Persist session metadata (model_override, thinking, tts)
-            _meta = json.dumps({
-                "model_override": self.model_override,
-                "thinking_enabled": self.thinking_enabled,
-                "thinking_level": self.thinking_level,
-                "tts_enabled": self.tts_enabled,
-                "tts_voice": self.tts_voice,
-            }, ensure_ascii=False)
+            _meta = json.dumps(
+                {
+                    "model_override": self.model_override,
+                    "thinking_enabled": self.thinking_enabled,
+                    "thinking_level": self.thinking_level,
+                    "tts_enabled": self.tts_enabled,
+                    "tts_voice": self.tts_voice,
+                },
+                ensure_ascii=False,
+            )
             conn.execute(
                 "INSERT OR REPLACE INTO session_store (session_id, messages, updated_at, user_id, session_meta) VALUES (?,?,?,?,?)",
                 (
@@ -219,7 +212,9 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
             existing = _sessions[session_id]
             if user_id is not None and existing.user_id is not None and existing.user_id != user_id:
                 # Session belongs to another user — create isolated session
-                log.warning(f"[SESSION] User {user_id} denied access to session {session_id} (owned by {existing.user_id})")
+                log.warning(
+                    f"[SESSION] User {user_id} denied access to session {session_id} (owned by {existing.user_id})"
+                )
                 isolated_id = f"{session_id}_u{user_id}"
                 if isolated_id not in _sessions:
                     _sessions[isolated_id] = Session(isolated_id, user_id=user_id)
@@ -385,14 +380,6 @@ def branch_session(session_id: str, message_index: int) -> dict:
     new_session._persist()
 
     conn = _get_db()
-    try:
-        conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
-    except Exception as e:
-        log.debug(f"Suppressed: {e}")
-    try:
-        conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
-    except Exception as e:
-        log.debug(f"Suppressed: {e}")
     conn.execute(
         "UPDATE session_store SET parent_session_id=?, branch_index=? WHERE session_id=?",
         (session_id, message_index, new_id),

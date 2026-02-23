@@ -186,6 +186,7 @@ class MemoryManager:
             return ""
         try:
             from salmalm.features.rag import rag_engine
+
             results = rag_engine.search(user_message, max_results=max_results)
             if not results:
                 return ""

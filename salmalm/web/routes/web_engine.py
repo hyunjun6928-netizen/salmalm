@@ -1,8 +1,8 @@
 """Engine optimization & routing API — SLA, routing, failover, engine settings."""
 
-from salmalm.security.crypto import vault, log
+from salmalm.security.crypto import vault
 import os
-from salmalm.constants import COMPACTION_THRESHOLD, MODEL_COSTS, MODELS
+from salmalm.constants import MODELS
 
 
 def _apply_int_setting(body: dict, key: str, min_val: int, max_val: int, env_key: str = None, const_attr=None) -> None:
@@ -216,6 +216,7 @@ class WebEngineMixin:
                         os.environ[_mt_env] = str(val)
                         # Update runtime dict
                         from salmalm.core.classifier import INTENT_MAX_TOKENS
+
                         INTENT_MAX_TOKENS[_mt_const] = val
                 except (ValueError, TypeError):
                     pass

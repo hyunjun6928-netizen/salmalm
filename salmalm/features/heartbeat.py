@@ -5,6 +5,8 @@ Periodically sends a minimal request to keep the prompt cache warm.
 
 from __future__ import annotations
 
+from salmalm.constants import MODEL_CLAUDE_HAIKU as _HEARTBEAT_MODEL
+
 import json
 import threading
 import time
@@ -112,7 +114,7 @@ class CacheWarmer:
         import urllib.error
 
         body = {
-            "model": "claude-haiku-4-5-20251001",  # Cheapest model
+            "model": _HEARTBEAT_MODEL,  # Cheapest model
             "max_tokens": 1,
             "messages": [{"role": "user", "content": "ping"}],
             "system": [{"type": "text", "text": sys_prompt, "cache_control": {"type": "ephemeral"}}],

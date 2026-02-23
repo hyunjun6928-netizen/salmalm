@@ -273,7 +273,8 @@ class DiscordBot:
 
     async def _identify(self):
         """Send IDENTIFY payload."""
-        await self._ws_send_auto({
+        await self._ws_send_auto(
+            {
                 "op": 2,
                 "d": {
                     "token": self.token,

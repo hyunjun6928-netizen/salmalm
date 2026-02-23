@@ -20,7 +20,6 @@ from salmalm.constants import (  # noqa: F401
     COMMAND_MODEL,
 )  # noqa: F401
 import re as _re
-import threading as _threading
 import time as _time
 from salmalm.security.crypto import log
 from salmalm.core.engine_pipeline import (  # noqa: F401
@@ -38,12 +37,6 @@ from salmalm.core.cost import (  # noqa: F401
 )
 
 # Graceful shutdown state
-from salmalm.core.engine_pipeline import (  # noqa: E402
-    _shutting_down,
-    _active_requests,
-    _active_requests_lock,
-    _active_requests_event,
-)
 from salmalm.core import (  # noqa: F401
     router,
     compact_messages,
@@ -54,7 +47,6 @@ from salmalm.core import (  # noqa: F401
     auto_compact_if_needed,
     audit_log,
 )  # noqa: F401
-from salmalm.core.prompt import build_system_prompt
 from salmalm.tools.tool_handlers import execute_tool
 
 # ── Imports from extracted modules ──
@@ -638,17 +630,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     ):
         """Execute loop."""
         from salmalm.core.loop_helpers import (
-            auto_log_conversation,
             check_abort,
             select_model,
             trim_history,
             prune_session_context,
             record_usage,
-            validate_tool_calls,
-            check_circuit_breaker,
-            check_loop_detection,
-            handle_empty_response,
-            finalize_response,
         )
 
         use_thinking = getattr(session, "thinking_enabled", False)

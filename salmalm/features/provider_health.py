@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from salmalm.constants import MODEL_CLAUDE_HAIKU as _MODEL_CLAUDE_HAIKU, MODEL_GPT_4_1_NANO as _MODEL_GPT_4_1_NANO
+
 import logging
 
 log = logging.getLogger("salmalm")
@@ -77,7 +79,7 @@ class ProviderHealthCheck:
                 "https://api.anthropic.com/v1/messages",
                 {"x-api-key": key, "content-type": "application/json", "anthropic-version": "2023-06-01"},
                 {
-                    "model": "claude-haiku-4-5-20251001",
+                    "model": _MODEL_CLAUDE_HAIKU,
                     "max_tokens": 5,
                     "messages": [{"role": "user", "content": "ping"}],
                 },
@@ -95,7 +97,7 @@ class ProviderHealthCheck:
             _http_post(
                 "https://api.openai.com/v1/chat/completions",
                 {"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                {"model": "gpt-4.1-nano", "max_tokens": 5, "messages": [{"role": "user", "content": "ping"}]},
+                {"model": _MODEL_GPT_4_1_NANO, "max_tokens": 5, "messages": [{"role": "user", "content": "ping"}]},
                 timeout=10,
             )
             return "ok"

@@ -3,9 +3,10 @@ import sys
 
 try:
     from importlib.metadata import version as _pkg_version
+
     __version__ = _pkg_version("salmalm")
 except Exception:
-    __version__ = "0.19.18"  # fallback for editable/dev installs
+    __version__ = "0.0.0-dev"  # fallback — metadata missing
 
 log = logging.getLogger("salmalm")
 log.addHandler(logging.NullHandler())  # Prevent "No handlers" warning at import
@@ -46,7 +47,7 @@ def init_logging() -> None:
         log.setLevel(logging.INFO)
         log.addHandler(logging.FileHandler(LOG_FILE, encoding="utf-8"))
         _sh = logging.StreamHandler(sys.stdout)
-        _sh.setStream(open(sys.stdout.fileno(), "w", encoding="utf-8", errors="replace", closefd=False))
+        _sh.encoding = "utf-8"  # type: ignore[attr-defined]
         log.addHandler(_sh)
         for h in log.handlers:
             h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
@@ -54,11 +55,14 @@ def init_logging() -> None:
         log.debug(f"Suppressed: {e}")
 
 
-try:
-    from .container import Container
+import os as _os
 
-    app = Container()
-    _register_services()
-except Exception as e:  # noqa: broad-except
-    # During pip build / isolated environments, constants may fail.
-    pass
+_BUILDING = _os.environ.get("SALMALM_BUILDING") == "1"
+if not _BUILDING:
+    try:
+        from .container import Container
+
+        app = Container()
+        _register_services()
+    except Exception:
+        pass

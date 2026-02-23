@@ -1,11 +1,7 @@
 """Telegram command handler — extracted from TelegramBot._handle_command."""
 
-import os
 import json
-import asyncio
-from pathlib import Path
-from salmalm.security.crypto import vault, log
-from salmalm.constants import DATA_DIR, VERSION, KST
+from salmalm.constants import VERSION
 
 
 class TelegramCommandsMixin:

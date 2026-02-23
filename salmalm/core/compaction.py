@@ -1,21 +1,11 @@
 """Context compaction — auto-summarize long conversations to save tokens."""
 
-import hashlib
-import json
-import os
-import re
-import time
 from datetime import datetime
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional
 
 from salmalm.constants import (
     COMPACTION_THRESHOLD,
-    COMPLEX_INDICATORS,
-    DATA_DIR,
     KST,
-    MODEL_TIERS,
-    SIMPLE_QUERY_MAX_CHARS,
-    TOOL_HINT_KEYWORDS,
 )
 from salmalm.security.crypto import log
 
@@ -303,7 +293,6 @@ def compact_messages(
 
 
 # ============================================================
-import math  # noqa: F811
 
 
 # TFIDFSearch extracted to salmalm/core/search.py
@@ -315,7 +304,6 @@ _tfidf = TFIDFSearch()
 # LLM CRON MANAGER — Scheduled tasks with LLM execution
 # ============================================================
 # LLMCronManager extracted to salmalm/core/llm_cron.py
-from salmalm.core.llm_cron import LLMCronManager  # noqa: E402
 
 
 def _estimate_tokens(messages: list) -> int:

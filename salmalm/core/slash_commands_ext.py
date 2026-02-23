@@ -2,14 +2,10 @@
 
 import json
 import logging
-import time
-from typing import Any
 
 log = logging.getLogger(__name__)
 
-from salmalm.core.cost import estimate_tokens, estimate_cost  # noqa: E402
-from salmalm.constants import VERSION
-from salmalm.core.core import track_usage  # noqa: E402  # noqa: E402
+from salmalm.core.cost import estimate_tokens  # noqa: E402
 
 
 def _cmd_context(cmd: str, session, **_):
@@ -202,9 +198,13 @@ def _cmd_subagents(cmd: str, session, **_) -> str:
         # Use subagent_manager for enhanced features
         try:
             from salmalm.features.subagents import subagent_manager
+
             task = subagent_manager.spawn(
-                description=arg.strip(), model=model, thinking_level=thinking,
-                label=label, parent_session=getattr(session, 'id', 'web'),
+                description=arg.strip(),
+                model=model,
+                thinking_level=thinking,
+                label=label,
+                parent_session=getattr(session, "id", "web"),
             )
             return f"🤖 Sub-agent spawned: `{task.task_id}`\nLabel: {task.label or '-'}\nModel: {model or 'auto'}\nThinking: {thinking or 'off'}\nWill notify on completion."
         except Exception:

@@ -3,22 +3,18 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 import secrets
-import textwrap
 import time
 import urllib.request
 from typing import Any, Dict, Optional
 
 from pathlib import Path
-from salmalm.constants import VERSION, WORKSPACE_DIR
-from salmalm.security.crypto import vault, log
-from salmalm.core import get_session, audit_log, set_telegram_bot
+from salmalm.constants import WORKSPACE_DIR
+from salmalm.security.crypto import log
+from salmalm.core import audit_log, set_telegram_bot
 from salmalm.core.llm import _http_post, _http_get
-from salmalm.core.prompt import build_system_prompt
-from salmalm.tools import execute_tool
-from salmalm.utils.chunker import EmbeddedBlockChunker, ChunkerConfig, CHANNEL_TELEGRAM, load_config_from_file
+from salmalm.utils.chunker import EmbeddedBlockChunker, ChunkerConfig, CHANNEL_TELEGRAM
 from salmalm.channels.telegram_commands import TelegramCommandsMixin
 
 

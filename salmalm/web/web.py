@@ -3,15 +3,12 @@
 import warnings
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="web")
-import asyncio
 import http.server
 import json
 import os
 import re
-import secrets
 import sys
 import time
-from pathlib import Path
 from typing import Optional
 
 from salmalm.constants import (  # noqa: F401
@@ -26,8 +23,7 @@ from salmalm.constants import (  # noqa: F401
     WORKSPACE_DIR,
 )
 from salmalm.security.crypto import vault, log
-from salmalm.core import get_usage_report, router, audit_log
-from salmalm.web.auth import auth_manager, rate_limiter, extract_auth, RateLimitExceeded
+from salmalm.web.auth import extract_auth
 from salmalm.utils.logging_ext import request_logger, set_correlation_id
 from salmalm.web import templates as _tmpl
 from salmalm.web.routes.web_auth import WebAuthMixin

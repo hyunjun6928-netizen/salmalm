@@ -30,9 +30,9 @@ import re
 import sqlite3
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-from salmalm.constants import MEMORY_DIR, WORKSPACE_DIR, MEMORY_FILE, BASE_DIR, DATA_DIR
+from salmalm.constants import BASE_DIR
 from salmalm.security.crypto import log
 from salmalm.features.rag_utils import (  # noqa: F401
     decompose_jamo,

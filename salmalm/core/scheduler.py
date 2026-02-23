@@ -4,10 +4,9 @@ import asyncio
 import json
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
-from salmalm.constants import BASE_DIR, DATA_DIR, KST, MEMORY_DIR
+from salmalm.constants import BASE_DIR, KST, MEMORY_DIR
 from salmalm.security.crypto import log
 
 

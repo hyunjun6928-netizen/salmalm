@@ -252,7 +252,7 @@ def sandbox_exec(
     except subprocess.TimeoutExpired:
         result["stderr"] = f"Timeout ({timeout}s)"
         result["exit_code"] = 124
-    except Exception as e:
+    except (OSError, ValueError) as e:
         result["stderr"] = str(e)
         result["exit_code"] = 1
 

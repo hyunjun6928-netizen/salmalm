@@ -1,14 +1,12 @@
 """LLM Cron Manager — scheduled AI tasks with error tracking and auto-disable."""
 
-import asyncio
 import json
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
-from salmalm.constants import BASE_DIR, DATA_DIR, KST, MEMORY_DIR
-from salmalm.security.crypto import vault, log
+from salmalm.constants import BASE_DIR, KST
+from salmalm.security.crypto import log
 
 
 class LLMCronManager:

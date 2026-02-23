@@ -2,10 +2,7 @@
 
 import json
 import os
-import threading
-import time
 from pathlib import Path
-from typing import Optional
 
 from salmalm.constants import DATA_DIR, VERSION, WORKSPACE_DIR, BASE_DIR  # noqa: F401
 from salmalm.security.crypto import vault  # noqa: F401

@@ -73,7 +73,8 @@ timeout = 30
 
 [tool.flake8]
 max-line-length = 120
-ignore = ["E501", "W503", "E402", "E203", "F405", "F401"]
+ignore = ["E501", "W503", "E402", "E203"]
+per-file-ignores = ["salmalm/constants.py:F401,F405"]
 exclude = ["plugins/", "scripts/", "memory/", ".git", "__pycache__"]
 
 [tool.ruff]

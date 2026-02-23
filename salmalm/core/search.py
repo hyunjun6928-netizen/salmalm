@@ -3,7 +3,6 @@
 from salmalm.security.crypto import log
 import math
 import re
-from collections import OrderedDict
 
 
 class TFIDFSearch:
@@ -187,7 +186,6 @@ _tfidf = TFIDFSearch()
 # ============================================================
 # MEMORY MANAGER — delegated to salmalm.memory module
 # ============================================================
-from salmalm.core.memory import MemoryManager, memory_manager
 
 
 # ============================================================

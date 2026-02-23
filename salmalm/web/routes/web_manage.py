@@ -1,14 +1,8 @@
 """Web Manage routes mixin."""
 
-import json
 import logging
 import os
-import subprocess
 import sys
-import threading
-import time
-from pathlib import Path
-from typing import Optional
 
 from salmalm.constants import DATA_DIR, VERSION, WORKSPACE_DIR, BASE_DIR  # noqa: F401
 from salmalm.security.crypto import vault  # noqa: F401
@@ -198,7 +192,6 @@ class ManageMixin:
         if self._get_client_ip() not in ("127.0.0.1", "::1", "localhost"):
             self._json({"error": "Restart only allowed from localhost"}, 403)
             return
-        import sys
 
         audit_log("restart", "user-initiated restart")
         self._json({"ok": True, "message": "Restarting..."})

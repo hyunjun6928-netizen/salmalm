@@ -1,7 +1,6 @@
 """Session management API — list, create, import, delete, rename, rollback, branch."""
 
-from datetime import datetime
-from salmalm.security.crypto import vault, log
+from salmalm.security.crypto import log
 import json
 from salmalm.core import audit_log
 

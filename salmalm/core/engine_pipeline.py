@@ -1,10 +1,8 @@
 """Engine message processing pipeline."""
 
-import asyncio
-import json
 import logging
 import time
-from typing import Optional, Tuple, Dict, Any, List, Callable
+from typing import Optional, Tuple, Any, Callable
 
 import threading as _threading
 
@@ -15,15 +13,15 @@ _active_requests = 0
 _active_requests_lock = _threading.Lock()
 _active_requests_event = _threading.Event()
 
-import base64 as b64
 import re as _re
-import traceback
 
 
 def _get_thinking_budget_map():
     """Lazy import to avoid circular dependency."""
     from salmalm.core.engine import _THINKING_BUDGET_MAP
+
     return _THINKING_BUDGET_MAP
+
 
 _MAX_MESSAGE_LENGTH = 100_000
 _SESSION_ID_RE = _re.compile(r"^[a-zA-Z0-9_\-\.]+$")
@@ -32,14 +30,6 @@ _SESSION_ID_RE = _re.compile(r"^[a-zA-Z0-9_\-\.]+$")
 # Lazy imports to break circular deps — resolved at call time
 def _get_engine_deps():
     """Import engine dependencies lazily."""
-    from salmalm.core.session_store import get_session
-    from salmalm.core.prompt import build_system_prompt
-    from salmalm.core.compaction import compact_messages
-    from salmalm.core.core import auto_title_session, router, track_usage, set_current_user_id
-    from salmalm.core.slash_commands import _dispatch_slash_command
-    from salmalm.core.classifier import TaskClassifier
-    from salmalm.core.model_selection import select_model as _select_model
-    from salmalm.security.crypto import vault
 
     return locals()
 
@@ -102,6 +92,7 @@ async def process_message(
 def _classify_task(session, user_message: str) -> dict:
     """Classify task and apply thinking settings."""
     from salmalm.core.classifier import TaskClassifier
+
     classification = TaskClassifier.classify(user_message, len(session.messages))
     thinking_on = getattr(session, "thinking_enabled", False)
     classification["thinking"] = thinking_on
@@ -123,8 +114,14 @@ def _classify_task(session, user_message: str) -> dict:
 
 
 def _route_model(model_override, user_message: str, session) -> tuple:
-    """Select model via routing or override. Returns (model, complexity)."""
+    """Select model via routing or override. Returns (model, complexity).
+
+    .. deprecated:: Thin wrapper — all routing logic lives in
+       :mod:`salmalm.core.model_selection`.  Prefer calling
+       ``model_selection.select_model`` directly for new code.
+    """
     from salmalm.core.model_selection import select_model as _select_model, fix_model_name as _fix_model_name
+
     if model_override:
         return _fix_model_name(model_override), "auto"
     selected, complexity = _select_model(user_message, session)
@@ -159,6 +156,7 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
     # Auto-recall: inject relevant memory context (OpenClaw-style)
     try:
         from salmalm.core.memory import memory_manager
+
         recall = memory_manager.auto_recall(user_message)
         if recall:
             session.messages.append({"role": "system", "content": recall})
@@ -255,6 +253,7 @@ async def _process_message_inner(
 ) -> str:
     """Inner implementation of process_message."""
     from salmalm.core.engine import _engine  # singleton
+
     # Input sanitization
     if not _SESSION_ID_RE.match(session_id):
         return "❌ Invalid session ID format (alphanumeric and hyphens only)."

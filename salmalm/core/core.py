@@ -1,12 +1,9 @@
 """SalmAlm core — audit, cache, usage, router, compaction, search,
 subagent, skills, session, cron, daily."""
 
-import asyncio
 import hashlib
 import json
-import math
 import os
-import re
 import sqlite3
 import threading
 import time
@@ -44,6 +41,27 @@ _thread_local = threading.local()  # Thread-local DB connections + user context
 _all_db_connections: list = []  # Track all connections for shutdown cleanup
 _db_connections_lock = threading.Lock()
 
+# LOW-23: Ensure DB connections are closed on interpreter exit
+import atexit as _atexit
+
+
+def _atexit_close_db():
+    """Close all tracked DB connections at interpreter shutdown."""
+    import weakref as _weakref
+
+    with _db_connections_lock:
+        for ref in _all_db_connections:
+            try:
+                conn = ref() if isinstance(ref, _weakref.ref) else ref
+                if conn is not None:
+                    conn.close()
+            except Exception:
+                pass
+        _all_db_connections.clear()
+
+
+_atexit.register(_atexit_close_db)
+
 
 def _get_db() -> sqlite3.Connection:
     """Get thread-local SQLite connection (reused across calls, WAL mode)."""
@@ -56,9 +74,12 @@ def _get_db() -> sqlite3.Connection:
         conn.execute("PRAGMA synchronous=NORMAL")
         # Track for shutdown cleanup (cap to prevent unbounded growth)
         import weakref as _weakref
+
         with _db_connections_lock:
             # Prune dead weak refs
-            _all_db_connections[:] = [r for r in _all_db_connections if (not isinstance(r, _weakref.ref)) or r() is not None]
+            _all_db_connections[:] = [
+                r for r in _all_db_connections if (not isinstance(r, _weakref.ref)) or r() is not None
+            ]
             try:
                 _all_db_connections.append(_weakref.ref(conn))
             except TypeError:
@@ -135,6 +156,7 @@ def audit_log_cleanup(days: int = 30) -> None:
 def close_all_db_connections() -> None:
     """Close all tracked SQLite connections (for graceful shutdown)."""
     import weakref as _weakref
+
     with _db_connections_lock:
         for ref in _all_db_connections:
             try:
@@ -156,15 +178,41 @@ class ResponseCache:
         self._max_size = max_size
         self._ttl = ttl
 
-    def _key(self, model: str, messages: list, session_id: str = "") -> str:
-        # Include last 5 messages for better session isolation even without explicit session_id
-        """Key."""
-        content = json.dumps({"s": session_id, "m": model, "msgs": messages[-5:]}, sort_keys=True)
+    def _key(
+        self,
+        model: str,
+        messages: list,
+        session_id: str = "",
+        system_prompt: str = "",
+        tools: list | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        """Build cache key including model params for correctness."""
+        key_data: dict = {"s": session_id, "m": model, "msgs": messages[-5:]}
+        if system_prompt:
+            key_data["sp"] = hashlib.sha256(system_prompt.encode()).hexdigest()[:12]
+        if tools:
+            key_data["tools"] = hashlib.sha256(json.dumps(tools, sort_keys=True).encode()).hexdigest()[:12]
+        if temperature is not None:
+            key_data["temp"] = temperature
+        if max_tokens is not None:
+            key_data["mt"] = max_tokens
+        content = json.dumps(key_data, sort_keys=True)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
-    def get(self, model: str, messages: list, session_id: str = "") -> Optional[str]:
+    def get(
+        self,
+        model: str,
+        messages: list,
+        session_id: str = "",
+        system_prompt: str = "",
+        tools: list | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> Optional[str]:
         """Get a cached response by key, or None if expired/missing."""
-        k = self._key(model, messages, session_id)
+        k = self._key(model, messages, session_id, system_prompt, tools, temperature, max_tokens)
         if k in self._cache:
             entry = self._cache[k]
             if time.time() - entry["ts"] < self._ttl:
@@ -174,9 +222,19 @@ class ResponseCache:
             del self._cache[k]
         return None
 
-    def put(self, model: str, messages: list, response: str, session_id: str = "") -> None:
+    def put(
+        self,
+        model: str,
+        messages: list,
+        response: str,
+        session_id: str = "",
+        system_prompt: str = "",
+        tools: list | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> None:
         """Store a response in cache with TTL."""
-        k = self._key(model, messages, session_id)
+        k = self._key(model, messages, session_id, system_prompt, tools, temperature, max_tokens)
         self._cache[k] = {"response": response, "ts": time.time()}
         if len(self._cache) > self._max_size:
             self._cache.popitem(last=False)
@@ -287,11 +345,6 @@ def track_usage(model: str, input_tokens: int, output_tokens: int, user_id: Opti
         # Persist to SQLite (with user_id for multi-tenant tracking)
         try:
             conn = _get_db()
-            # Ensure user_id column exists
-            try:
-                conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL")
-            except Exception as e:
-                log.debug(f"Suppressed: {e}")
             conn.execute(
                 "INSERT INTO usage_stats (ts, model, input_tokens, output_tokens, cost, user_id) VALUES (?,?,?,?,?,?)",
                 (
@@ -418,7 +471,7 @@ router = ModelRouter()
 # Compaction Summary Persistence — cross-session continuity
 # ============================================================
 # Compaction extracted to salmalm/core/compaction.py
-from salmalm.core.compaction import (  # noqa: E402
+from salmalm.core.compaction import (  # noqa: E402, F401
     compact_messages,
     _persist_compaction_summary,
     _restore_compaction_summary,
@@ -431,7 +484,7 @@ _tfidf = TFIDFSearch()
 
 
 # Session + session management extracted to salmalm/core/session_store.py
-from salmalm.core.session_store import (  # noqa: E402
+from salmalm.core.session_store import (  # noqa: E402, F401
     Session,
     _tg_bot,
     get_telegram_bot,
@@ -456,6 +509,7 @@ from salmalm.core.scheduler import CronScheduler, HeartbeatManager  # noqa: E402
 
 cron = CronScheduler()
 heartbeat = HeartbeatManager()
+_llm_cron: Optional[LLMCronManager] = None  # Set by bootstrap at runtime
 
 
 # ============================================================
@@ -603,12 +657,6 @@ def auto_title_session(session_id: str, first_message: str) -> None:
         return
     try:
         conn = _get_db()
-        # Ensure title column exists
-        try:
-            conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
-            conn.commit()
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
         conn.execute(
             'UPDATE session_store SET title=? WHERE session_id=? AND (title IS NULL OR title="")',
             (title, session_id),

@@ -206,7 +206,7 @@ def is_internal_ip(url: str) -> Tuple[bool, str]:
                 return True, f"Internal IP blocked: {hostname} -> {ip}"
     except socket.gaierror:
         return True, f"DNS resolution failed: {hostname}"
-    except Exception as e:
+    except (OSError, ValueError) as e:
         return True, f"IP check error: {e}"
 
     return False, ""

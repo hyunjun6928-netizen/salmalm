@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, List, Optional
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -149,9 +149,9 @@ def _resolve_api_key(provider: str) -> Optional[str]:
 
 def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
     """Convert messages between provider formats to avoid role errors.
-    
+
     - Anthropic only accepts 'user', 'assistant', 'system' roles
-    - OpenAI uses 'tool' role for tool results  
+    - OpenAI uses 'tool' role for tool results
     - Google uses 'model' instead of 'assistant'
     """
     if provider == "anthropic":
@@ -160,16 +160,18 @@ def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
             role = msg.get("role", "")
             if role == "tool":
                 # Convert OpenAI tool result → Anthropic user message with tool_result
-                sanitized.append({
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": msg.get("tool_call_id", "unknown"),
-                            "content": msg.get("content", ""),
-                        }
-                    ],
-                })
+                sanitized.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": msg.get("tool_call_id", "unknown"),
+                                "content": msg.get("content", ""),
+                            }
+                        ],
+                    }
+                )
             elif role == "model":
                 sanitized.append({**msg, "role": "assistant"})
             else:

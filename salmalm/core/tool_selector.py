@@ -3,13 +3,7 @@
 Extracted from IntelligenceEngine._get_tools_for_provider to reduce god object.
 """
 
-import os
-import re
-from typing import List, Optional
-
 from salmalm.core.classifier import INTENT_TOOLS, _KEYWORD_TOOLS
-from salmalm.constants import TOOL_HINT_KEYWORDS
-from salmalm.security.crypto import log
 
 
 def get_tools_for_provider(provider: str, intent: str = None, user_message: str = "") -> list:
