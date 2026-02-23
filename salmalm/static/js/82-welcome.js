@@ -5,11 +5,11 @@
   input.focus();
 
   /* --- Restore model preference from server --- */
-  fetch('/api/status').then(r=>r.json()).then(d=>{
+  fetch('/api/status?session='+encodeURIComponent(_currentSession)).then(r=>r.json()).then(d=>{
     if(d.model&&d.model!=='auto'){
       var sel=document.getElementById('s-model');
       if(sel){sel.value=d.model;modelBadge.textContent=d.model.split('/').pop()}
-    }
+    }else{modelBadge.textContent='auto routing'}
     /* Channel badges */
     var ch=d.channels||{};
     var tgB=document.querySelector('#tg-status .badge');

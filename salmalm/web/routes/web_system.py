@@ -119,6 +119,19 @@ class SystemMixin:
         if vault.is_unlocked:
             channels["telegram"] = bool(vault.get("telegram_token"))
             channels["discord"] = bool(vault.get("discord_token"))
+        # Include session-level model override if available
+        from urllib.parse import parse_qs, urlparse
+        qs = parse_qs(urlparse(self.path).query)
+        _sid = qs.get("session", ["web"])[0]
+        _effective_model = router.force_model or "auto"
+        try:
+            from salmalm.core import get_session
+            _sess = get_session(_sid)
+            _ov = getattr(_sess, "model_override", None)
+            if _ov and _ov != "auto":
+                _effective_model = _ov
+        except Exception:
+            pass
         self._json(
             {
                 "app": APP_NAME,
@@ -126,7 +139,7 @@ class SystemMixin:
                 "unlocked": vault.is_unlocked,
                 "vault_type": self._vault_type_label(),
                 "usage": get_usage_report(),
-                "model": router.force_model or "auto",
+                "model": _effective_model,
                 "channels": channels,
             }
         )
