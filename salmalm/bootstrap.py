@@ -126,7 +126,7 @@ async def _start_discord_bot() -> None:
 
 def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=18801):
     """Print startup banner (deferred to run_server call)."""
-    _rag_stats = rag_engine.get_stats()  # noqa: F841
+    # RAG stats available but not displayed in banner (intentional)
     st = f"{selftest['passed']}/{selftest['total']}" if selftest else "skipped"
     update_msg = _check_for_updates()
     log.info(

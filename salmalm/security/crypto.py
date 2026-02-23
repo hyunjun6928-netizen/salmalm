@@ -153,6 +153,7 @@ class Vault:
                 _keychain_set(password)
             return True
         except Exception as e:  # noqa: broad-except
+            log.warning(f"[VAULT] Unlock failed: {type(e).__name__}: {e}")
             self._password = None
             return False
 

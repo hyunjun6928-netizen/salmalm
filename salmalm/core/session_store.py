@@ -40,6 +40,9 @@ def _restore_compaction_summary(session_id: str) -> Optional[str]:
     return _impl(session_id)
 
 
+_PERSIST_MESSAGE_LIMIT = 50  # Max messages to persist to SQLite
+
+
 class Session:
     """OpenClaw-style isolated session with its own context.
 
@@ -51,7 +54,7 @@ class Session:
     """
 
     def __init__(self, session_id: str, user_id: Optional[int] = None) -> None:
-        """Init  ."""
+        """Create a new session with isolated context, message history, and model preferences."""
         self.id = session_id
         self.user_id = user_id  # Multi-tenant: owning user (None = legacy/local)
         self.messages: list = []
@@ -81,7 +84,7 @@ class Session:
         try:
             # Filter out large binary data from messages
             saveable = []
-            for m in self.messages[-50:]:  # Keep last 50 messages
+            for m in self.messages[-_PERSIST_MESSAGE_LIMIT:]:  # Keep last 50 messages
                 if isinstance(m.get("content"), list):
                     # Multimodal — save text parts only
                     texts = [b for b in m["content"] if b.get("type") == "text"]
@@ -410,7 +413,7 @@ def save_session_to_disk(session_id: str) -> None:
     try:
         _SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
         saveable_msgs = []
-        for m in session.messages[-50:]:
+        for m in session.messages[-_PERSIST_MESSAGE_LIMIT:]:
             if isinstance(m.get("content"), list):
                 texts = [b for b in m["content"] if isinstance(b, dict) and b.get("type") == "text"]
                 if texts:

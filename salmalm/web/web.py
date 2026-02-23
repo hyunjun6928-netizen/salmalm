@@ -71,21 +71,28 @@ class WebHandler(
     """HTTP handler for web UI and API."""
 
     def log_message(self, format: str, *args) -> None:
-        """Suppress default HTTP request logging."""
-        pass  # Suppress default logging
+        """Suppress default HTTP stderr logging — requests logged via salmalm logger in each handler."""
+        pass
 
-    # Allowed origins for CORS (same-host only)
-    _ALLOWED_ORIGINS = {
-        "http://127.0.0.1:18800",
-        "http://localhost:18800",
-        "http://127.0.0.1:18801",
-        "http://localhost:18801",
-        "https://127.0.0.1:18800",
-        "https://localhost:18800",
-    }
+    # Allowed origins for CORS (same-host only, dynamic port)
+    @staticmethod
+    def _build_allowed_origins():
+        """Build allowed origins from configured port."""
+        _port = int(os.environ.get("SALMALM_PORT", 18800))
+        _ws_port = int(os.environ.get("SALMALM_WS_PORT", 18801))
+        origins = set()
+        for scheme in ("http", "https"):
+            for host in ("127.0.0.1", "localhost"):
+                origins.add(f"{scheme}://{host}:{_port}")
+                origins.add(f"{scheme}://{host}:{_ws_port}")
+        return origins
+
+    _ALLOWED_ORIGINS = None  # lazily built
 
     def _cors(self):
         """Cors."""
+        if self._ALLOWED_ORIGINS is None:
+            WebHandler._ALLOWED_ORIGINS = WebHandler._build_allowed_origins()
         origin = self.headers.get("Origin", "")
         if origin in self._ALLOWED_ORIGINS:
             self.send_header("Access-Control-Allow-Origin", origin)

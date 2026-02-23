@@ -148,6 +148,7 @@ def _safe_callback(cb, *args) -> None:
             if _loop:
                 asyncio.run_coroutine_threadsafe(result, _loop)
             else:
+                log.warning("[ENGINE] Dropping coroutine callback — no event loop available")
                 result.close()
 
 
@@ -172,6 +173,7 @@ class IntelligenceEngine:
     """
 
     # Planning prompt — injected before complex tasks
+    # Engine-internal prompts (opt-in via SALMALM_PLANNING=1 / SALMALM_REFLECT=1)
     PLAN_PROMPT = """Before answering, briefly plan your approach:
 1. What is the user asking? (one sentence)
 2. What tools/steps are needed? (bullet list)

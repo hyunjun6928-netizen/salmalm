@@ -112,6 +112,10 @@ class WebAuthMixin:
         from salmalm.web.web import _google_oauth_pending_states
 
         _google_oauth_pending_states[state] = time.time()
+        # Cleanup stale states on every new auth attempt (prevent unbounded growth)
+        _cutoff = time.time() - 900
+        for _k in [k for k, v in _google_oauth_pending_states.items() if v < _cutoff]:
+            _google_oauth_pending_states.pop(_k, None)
         params = urllib.parse.urlencode(
             {
                 "client_id": client_id,

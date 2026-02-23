@@ -28,7 +28,7 @@ _cooldown_lock = _threading.Lock()
 
 # Default fallback chains (no config needed)
 _DEFAULT_FALLBACKS = {
-    # Same-provider fallbacks + cross-provider fallbacks
+    # Fallback chains for retry logic. Model names must match constants.py MODEL_TIERS.
     "anthropic/claude-opus-4-6": [
         "anthropic/claude-sonnet-4-6",
         "anthropic/claude-haiku-4-5-20251001",
