@@ -249,3 +249,81 @@ def test_memory_write_scrubs(tmp_path):
     finally:
         mem_mod.MEMORY_DIR = orig_dir
         mem_mod.MEMORY_FILE = orig_file
+
+
+class TestExecPathRestriction:
+    """Test exec path safety — sensitive file access blocking."""
+
+    def _check(self, cmd):
+        from salmalm.tools.tools_common import _is_safe_command
+        return _is_safe_command(cmd)
+
+    def test_block_etc_passwd(self):
+        ok, reason = self._check("cat /etc/passwd")
+        assert not ok
+        assert "sensitive" in reason.lower()
+
+    def test_block_etc_shadow(self):
+        ok, reason = self._check("cat /etc/shadow")
+        assert not ok
+
+    def test_block_ssh_key(self):
+        ok, reason = self._check("cat ~/.ssh/id_rsa")
+        assert not ok
+
+    def test_block_pypirc(self):
+        ok, reason = self._check("cat ~/.pypirc")
+        assert not ok
+
+    def test_block_aws_credentials(self):
+        ok, reason = self._check("cat ~/.aws/credentials")
+        assert not ok
+
+    def test_block_env_file(self):
+        ok, reason = self._check("cat ~/.env")
+        assert not ok
+
+    def test_block_gnupg(self):
+        ok, reason = self._check("cat ~/.gnupg/private-keys-v1.d/key")
+        assert not ok
+
+    def test_block_kube_config(self):
+        ok, reason = self._check("cat ~/.kube/config")
+        assert not ok
+
+    def test_block_docker_config(self):
+        ok, reason = self._check("cat ~/.docker/config.json")
+        assert not ok
+
+    def test_allow_normal_file(self):
+        ok, _ = self._check("cat README.md")
+        assert ok
+
+    def test_allow_tmp_file(self):
+        ok, _ = self._check("cat /tmp/test.txt")
+        assert ok
+
+    def test_block_tar_traversal(self):
+        ok, reason = self._check("tar xf evil.tar --strip ../../../etc")
+        assert not ok
+        assert "traversal" in reason.lower()
+
+    def test_block_unzip_traversal(self):
+        ok, reason = self._check("unzip ../escape.zip")
+        assert not ok
+
+    def test_block_proc_access(self):
+        ok, reason = self._check("cat /proc/self/environ")
+        assert not ok
+
+    def test_block_netrc(self):
+        ok, reason = self._check("cat ~/.netrc")
+        assert not ok
+
+    def test_head_etc_passwd(self):
+        ok, reason = self._check("head -5 /etc/passwd")
+        assert not ok
+
+    def test_grep_ssh_dir(self):
+        ok, reason = self._check("grep -r key ~/.ssh/")
+        assert not ok
