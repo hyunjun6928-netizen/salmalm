@@ -108,23 +108,23 @@ class TestDynamicMaxTokens(unittest.TestCase):
 
     def test_chat_1024(self):
         from salmalm.core.engine import _get_dynamic_max_tokens
-        self.assertEqual(_get_dynamic_max_tokens('chat', 'hello'), 512)  # optimized
+        self.assertEqual(_get_dynamic_max_tokens('chat', 'hello'), 4096)
 
     def test_code_4096(self):
         from salmalm.core.engine import _get_dynamic_max_tokens
-        self.assertEqual(_get_dynamic_max_tokens('code', 'write code'), 4096)
+        self.assertEqual(_get_dynamic_max_tokens('code', 'write code'), 8192)
 
     def test_search_2048(self):
         from salmalm.core.engine import _get_dynamic_max_tokens
-        self.assertEqual(_get_dynamic_max_tokens('search', 'find'), 1024)  # optimized
+        self.assertEqual(_get_dynamic_max_tokens('search', 'find'), 2048)
 
     def test_detail_upgrade(self):
         from salmalm.core.engine import _get_dynamic_max_tokens
-        self.assertEqual(_get_dynamic_max_tokens('chat', '자세히 설명해'), 4096)
+        self.assertEqual(_get_dynamic_max_tokens('chat', '자세히 설명해'), 8192)
 
     def test_detail_english(self):
         from salmalm.core.engine import _get_dynamic_max_tokens
-        self.assertEqual(_get_dynamic_max_tokens('chat', 'explain in detail'), 4096)
+        self.assertEqual(_get_dynamic_max_tokens('chat', 'explain in detail'), 8192)
 
 
 class TestContextCommand(unittest.TestCase):

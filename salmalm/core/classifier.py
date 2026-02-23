@@ -261,13 +261,13 @@ _KEYWORD_TOOLS = {
 import os as _os
 
 INTENT_MAX_TOKENS = {
-    "chat": int(_os.environ.get("SALMALM_MAX_TOKENS_CHAT", "512")),
-    "memory": 512,
-    "creative": 1024,
-    "search": 1024,
-    "analysis": 2048,
-    "code": int(_os.environ.get("SALMALM_MAX_TOKENS_CODE", "4096")),
-    "system": 1024,
+    "chat": int(_os.environ.get("SALMALM_MAX_TOKENS_CHAT", "4096")),
+    "memory": 1024,
+    "creative": 4096,
+    "search": 2048,
+    "analysis": 4096,
+    "code": int(_os.environ.get("SALMALM_MAX_TOKENS_CODE", "8192")),
+    "system": 2048,
 }
 
 # Keywords that trigger higher max_tokens
@@ -293,6 +293,10 @@ def _get_dynamic_max_tokens(intent: str, user_message: str, model: str = "") -> 
         provider = model.split("/")[0] if "/" in model else "anthropic"
         base = _MODEL_DEFAULT_MAX.get(provider, 8192)
     msg_lower = user_message.lower()
+    # Scale up for detailed requests
     if any(kw in msg_lower for kw in _DETAIL_KEYWORDS):
-        return max(base, 4096)
+        return max(base * 2, 8192)
+    # Scale up for long input (long question → likely long answer)
+    if len(user_message) > 500:
+        return max(base, 8192)
     return base
