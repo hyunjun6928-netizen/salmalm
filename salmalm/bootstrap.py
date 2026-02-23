@@ -367,6 +367,7 @@ async def _setup_services(host: str, port: int, httpd, server_thread, url: str) 
 
     # ── Phase 10: Self-test, Nodes, Plugins, Cron start ──
     selftest = health_monitor.startup_selftest()
+    log.info(f"[SELFTEST] {selftest.get('passed', 0)}/{selftest.get('total', 0)} passed")
     node_manager.load_config()
     PluginLoader.scan()
     asyncio.create_task(cron.run())
@@ -489,7 +490,7 @@ async def run_server():
 
     await _setup_services(bind_addr, port, server, web_thread, url)
 
-    _print_banner(selftest=selftest, bind_addr=bind_addr, port=port, ws_port=ws_port)
+    _print_banner(bind_addr=bind_addr, port=port, ws_port=ws_port)
 
     # Register signal handlers
     for sig in (signal.SIGINT, signal.SIGTERM):
