@@ -262,10 +262,15 @@ REFLECT_SNIPPET_LEN = 500  # max chars of user message in reflection prompt
 MODEL_COSTS = {
     # Anthropic
     "claude-opus-4-6": {"input": 15.0, "output": 75.0},
+    "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
     "claude-sonnet-4": {"input": 3.0, "output": 15.0},
-    "claude-haiku-3.5": {"input": 0.80, "output": 4.0},
+    "claude-haiku-4-5": {"input": 1.0, "output": 5.0},
     # OpenAI
-    "gpt-5.3-codex": {"input": 2.0, "output": 8.0},
+    "gpt-5.2": {"input": 2.0, "output": 8.0},
+    "gpt-5.2-codex": {"input": 2.0, "output": 8.0},
+    "gpt-5": {"input": 2.0, "output": 8.0},
+    "gpt-5-mini": {"input": 0.40, "output": 1.60},
+    "gpt-5-nano": {"input": 0.10, "output": 0.40},
     "gpt-5.1-codex": {"input": 1.5, "output": 6.0},
     "gpt-4.1": {"input": 2.0, "output": 8.0},
     "gpt-4.1-mini": {"input": 0.40, "output": 1.60},
@@ -278,6 +283,7 @@ MODEL_COSTS = {
     "grok-3": {"input": 3.0, "output": 15.0},
     "grok-3-mini": {"input": 0.30, "output": 0.50},
     # Google
+    "gemini-3.1-pro": {"input": 1.25, "output": 10.0},
     "gemini-3-pro-preview": {"input": 1.25, "output": 10.0},
     "gemini-3-flash-preview": {"input": 0.15, "output": 0.60},
     "gemini-2.5-pro": {"input": 1.25, "output": 10.0},
@@ -296,10 +302,10 @@ MODEL_COSTS = {
 MODELS = {
     # Anthropic
     "opus": "anthropic/claude-opus-4-6",
-    "sonnet": "anthropic/claude-sonnet-4-20250514",
+    "sonnet": "anthropic/claude-sonnet-4-6",
     "haiku": "anthropic/claude-haiku-4-5-20251001",
     # OpenAI
-    "gpt5.3": "openai/gpt-5.3-codex",
+    "gpt5.2": "openai/gpt-5.2-codex",
     "gpt5.1": "openai/gpt-5.1-codex",
     "gpt4.1": "openai/gpt-4.1",
     "gpt4.1mini": "openai/gpt-4.1-mini",
@@ -336,7 +342,7 @@ MODEL_TIERS = {
     ],
     2: [
         MODELS["sonnet"],
-        MODELS["gpt5.3"],
+        MODELS["gpt5.2"],
         MODELS["grok4"],
         MODELS["gemini3pro"],
         MODELS["gpt4.1"],
@@ -368,8 +374,8 @@ MODEL_ALIASES = {
     "sonnet": MODELS["sonnet"],
     "opus": MODELS["opus"],
     "haiku": MODELS["haiku"],
-    "gpt": MODELS["gpt5.3"],
-    "gpt5": MODELS["gpt5.3"],
+    "gpt": MODELS["gpt5.2"],
+    "gpt5": MODELS["gpt5.2"],
     "gpt5.1": MODELS["gpt5.1"],
     "gpt4.1": MODELS["gpt4.1"],
     "4.1mini": MODELS["gpt4.1mini"],

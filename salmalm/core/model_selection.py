@@ -95,13 +95,13 @@ def save_routing_config(config: dict) -> None:
 _MODEL_COSTS = {
     # Anthropic
     "anthropic/claude-haiku-4-5-20251001": (1.0, 5.0),
-    "anthropic/claude-sonnet-4-20250514": (3.0, 15.0),
+    "anthropic/claude-sonnet-4-6": (3.0, 15.0),
     "anthropic/claude-opus-4-6": (5.0, 25.0),
     # OpenAI
     "openai/gpt-4.1-nano": (0.1, 0.4),
     "openai/gpt-4.1-mini": (0.4, 1.6),
     "openai/gpt-4.1": (2.0, 8.0),
-    "openai/gpt-5.3-codex": (2.0, 8.0),
+    "openai/gpt-5.2-codex": (2.0, 8.0),
     "openai/gpt-5.1-codex": (1.5, 6.0),
     "openai/o4-mini": (1.1, 4.4),
     # Google
@@ -139,7 +139,7 @@ _TIER_CANDIDATES = {
         ("google/gemini-3-pro-preview", "google_api_key"),  # $1.25/$10
         ("openai/gpt-4.1", "openai_api_key"),  # $2/$8
         ("xai/grok-3", "xai_api_key"),  # $3/$15
-        ("anthropic/claude-sonnet-4-20250514", "anthropic_api_key"),  # $3/$15
+        ("anthropic/claude-sonnet-4-6", "anthropic_api_key"),  # $3/$15
         ("anthropic/claude-haiku-4-5-20251001", "anthropic_api_key"),  # $1/$5 (last resort)
     ],
     "complex": [
@@ -149,7 +149,7 @@ _TIER_CANDIDATES = {
         ("google/gemini-3-pro-preview", "google_api_key"),  # $1.25/$10
         ("xai/grok-4", "xai_api_key"),  # $3/$15
         ("anthropic/claude-opus-4-6", "anthropic_api_key"),  # $5/$25 (max quality)
-        ("anthropic/claude-sonnet-4-20250514", "anthropic_api_key"),  # $3/$15 (fallback)
+        ("anthropic/claude-sonnet-4-6", "anthropic_api_key"),  # $3/$15 (fallback)
         ("google/gemini-2.5-pro", "google_api_key"),  # $1.25/$10
     ],
 }
@@ -174,7 +174,7 @@ def auto_optimize_routing(available_keys: list[str]) -> dict:
                 break
         if tier not in result:
             # Fallback: use whatever is available
-            result[tier] = _MODELS.get("sonnet", "anthropic/claude-sonnet-4-20250514")
+            result[tier] = _MODELS.get("sonnet", "anthropic/claude-sonnet-4-6")
 
     return result
 
