@@ -4,6 +4,7 @@ import json
 import logging
 
 from salmalm.constants import DATA_DIR, VERSION, WORKSPACE_DIR, MEMORY_DIR, BASE_DIR, AUDIT_DB  # noqa: F401
+from salmalm.core.core import get_usage_report  # noqa: F401
 from salmalm.security.crypto import vault, log as _log  # noqa: F401
 
 log = logging.getLogger(__name__)
