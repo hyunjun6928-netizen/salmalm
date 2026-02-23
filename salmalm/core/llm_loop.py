@@ -72,7 +72,7 @@ def _load_cooldowns() -> dict:
     return {}
 
 
-def _save_cooldowns(cd: dict):
+def _save_cooldowns(cd: dict) -> None:
     try:
         _COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
         _COOLDOWN_FILE.write_text(json.dumps(cd), encoding="utf-8")
@@ -90,7 +90,7 @@ def _is_model_cooled_down(model: str) -> bool:
         return _time.time() < entry.get("until", 0)
 
 
-def _cooldown_provider(model: str, cooldown_seconds: int = 3600):
+def _cooldown_provider(model: str, cooldown_seconds: int = 3600) -> None:
     """Cooldown all models from the same provider (e.g., invalid API key)."""
     provider = model.split("/")[0] if "/" in model else model
     with _cooldown_lock:
@@ -107,7 +107,7 @@ def _cooldown_provider(model: str, cooldown_seconds: int = 3600):
     log.warning(f"[AUTH] Provider {provider} cooled down for {cooldown_seconds}s ({len(all_models)} models)")
 
 
-def reset_cooldowns():
+def reset_cooldowns() -> None:
     """Clear all model/provider cooldowns."""
     with _cooldown_lock:
         _save_cooldowns({})
@@ -127,7 +127,7 @@ def get_cooldown_status() -> dict:
     return result
 
 
-def _record_model_failure(model: str, cooldown_seconds: int = 0):
+def _record_model_failure(model: str, cooldown_seconds: int = 0) -> None:
     """Record a model failure and set cooldown."""
     with _cooldown_lock:
         cd = _load_cooldowns()
@@ -146,7 +146,7 @@ def _record_model_failure(model: str, cooldown_seconds: int = 0):
         log.warning(f"[FAILOVER] {model} cooled down for {cooldown_secs}s (failure #{failures + 1})")
 
 
-def _clear_model_cooldown(model: str):
+def _clear_model_cooldown(model: str) -> None:
     """Clear cooldown on successful call."""
     with _cooldown_lock:
         cd = _load_cooldowns()

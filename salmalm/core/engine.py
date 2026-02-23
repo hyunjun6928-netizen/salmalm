@@ -105,7 +105,7 @@ get_routing_config = _load_routing_config
 _select_model = _select_model_impl
 
 
-def _get_event_loop():
+def _get_event_loop() -> asyncio.AbstractEventLoop:
     """Get the running event loop safely (no stale global reference)."""
     try:
         loop = asyncio.get_running_loop()
@@ -114,7 +114,7 @@ def _get_event_loop():
         return None
 
 
-def _safe_callback(cb, *args):
+def _safe_callback(cb, *args) -> None:
     """Call a callback that may be sync or async. Fire-and-forget for async.
 
     Works from both async context and sync threads (e.g. ThreadPoolExecutor).
@@ -172,7 +172,7 @@ Then execute the plan."""
 - Could the answer be improved?
 If the answer is insufficient, improve it now. If satisfactory, return it as-is."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._tool_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tool")
 
     def _get_tools_for_provider(self, provider: str, intent: str = None, user_message: str = "") -> list:
@@ -368,7 +368,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         log.info(f"[FAST] Parallel: {len(tool_calls)} tools completed")
         return outputs
 
-    def _append_tool_results(self, session, provider, result, tool_calls, tool_outputs):
+    def _append_tool_results(self, session, provider, result, tool_calls, tool_outputs) -> None:
         """Append tool call + results to session messages."""
         if provider == "anthropic":
             content_blocks = []
@@ -944,7 +944,7 @@ async def _process_message_inner(
 
     _abort_ctl.start_streaming(session_id)
 
-    def _sla_on_token(event):
+    def _sla_on_token(event) -> None:
         if _sla_first_token_time[0] == 0.0:
             _sla_first_token_time[0] = _time.time()
         # Accumulate tokens for abort recovery
@@ -1040,7 +1040,7 @@ async def _process_message_inner(
     return response
 
 
-def _notify_completion(session_id: str, user_message: str, response: str, classification: dict):
+def _notify_completion(session_id: str, user_message: str, response: str, classification: dict) -> None:
     """Send completion notifications to Telegram + Web chat."""
     from salmalm.core import _tg_bot
     from salmalm.security.crypto import vault

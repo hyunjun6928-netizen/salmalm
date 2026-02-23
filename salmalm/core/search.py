@@ -7,7 +7,7 @@ from collections import OrderedDict
 class TFIDFSearch:
     """Lightweight TF-IDF + cosine similarity search. No external deps."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._docs: list = []  # [(label, line_no, text, tokens)]
         self._idf: dict = {}  # term -> IDF score
         self._built = False
@@ -73,7 +73,7 @@ class TFIDFSearch:
         tokens = re.findall(r"[\w가-힣]+", text)
         return [t for t in tokens if len(t) > 1 and t not in self._stop_words]
 
-    def _index_files(self):
+    def _index_files(self) -> None:
         """Build index from MEMORY.md, memory/*.md, uploads/*.txt etc."""
         now = time.time()
         if self._built and now - self._last_index_time < 300:  # Re-index every 5 min

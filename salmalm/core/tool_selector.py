@@ -76,7 +76,7 @@ def get_tools_for_provider(provider: str, intent: str = None, user_message: str 
     all_tools = [t for t in all_tools if t["name"] in selected_names]
 
     # ── Schema compression: strip param descriptions, keep only required + type ──
-    def _compress_schema(schema):
+    def _compress_schema(schema) -> dict:
         if not schema or not isinstance(schema, dict):
             return schema
         props = schema.get("properties", {})
@@ -97,7 +97,7 @@ def get_tools_for_provider(provider: str, intent: str = None, user_message: str 
             result["required"] = list(required)
         return result
 
-    def _compress_desc(desc):
+    def _compress_desc(desc) -> str:
         """Truncate description to first sentence, max 80 chars."""
         if not desc:
             return desc

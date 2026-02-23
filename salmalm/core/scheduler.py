@@ -13,7 +13,7 @@ from salmalm.security.crypto import log
 class CronScheduler:
     """OpenClaw-style cron scheduler with isolated session execution."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.jobs = []
         self._running = False
 
@@ -91,7 +91,7 @@ class HeartbeatManager:
         return {"lastChecks": {}, "history": [], "totalBeats": 0}
 
     @classmethod
-    def _save_state(cls, state: dict):
+    def _save_state(cls, state: dict) -> None:
         """Persist heartbeat state to JSON file."""
         try:
             MEMORY_DIR.mkdir(exist_ok=True)  # noqa: F405
@@ -213,7 +213,7 @@ class HeartbeatManager:
             return None
 
     @classmethod
-    def _announce(cls, result: str):
+    def _announce(cls, result: str) -> None:
         """Announce heartbeat results to configured channels."""
         # Telegram notification
         if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
