@@ -28,6 +28,7 @@ import json
 import math
 import re
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -170,9 +171,10 @@ class RAGEngine(RAGIndexerMixin):
 
     def __init__(self, db_path: Optional[Path] = None, config_path: Optional[Path] = None) -> None:
         """Init  ."""
-        self._db_path = db_path or (BASE_DIR / "rag.db")
+        self._db_path = db_path or (DATA_DIR / "rag.db")
         self._config_path = config_path
         self._conn: Optional[sqlite3.Connection] = None
+        self._db_lock = threading.Lock()
         self._mtimes: Dict[str, float] = {}
         self._last_check = 0
         self._doc_count = 0

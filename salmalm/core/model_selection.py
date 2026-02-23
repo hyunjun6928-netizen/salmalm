@@ -55,9 +55,6 @@ _COMPLEX_KEYWORDS = [
 
 # ── Model name corrections (from constants — single source of truth) ──
 from salmalm.constants import MODEL_NAME_FIXES as _MODEL_NAME_FIXES
-import logging
-
-log = logging.getLogger(__name__)
 
 # ── Routing config ──
 _ROUTING_CONFIG_FILE = DATA_DIR / "routing.json"

@@ -9,7 +9,7 @@ import asyncio
 import json
 import threading as _threading
 import time as _time
-from salmalm.constants import DATA_DIR as _DATA_DIR
+from salmalm.constants import DATA_DIR as _DATA_DIR, MODEL_FALLBACKS as _DEFAULT_FALLBACKS
 from typing import Any, Dict, Optional, Tuple
 
 from salmalm.security.crypto import log
@@ -26,49 +26,7 @@ _FAILOVER_CONFIG_FILE = _DATA_DIR / "failover.json"
 _COOLDOWN_FILE = _DATA_DIR / "cooldowns.json"
 _cooldown_lock = _threading.Lock()
 
-# Default fallback chains (no config needed)
-_DEFAULT_FALLBACKS = {
-    # Fallback chains for retry logic. Model names must match constants.py MODEL_TIERS.
-    "anthropic/claude-opus-4-6": [
-        "anthropic/claude-sonnet-4-6",
-        "anthropic/claude-haiku-4-5-20251001",
-        "google/gemini-2.5-pro",
-        "openai/gpt-4.1",
-    ],
-    "anthropic/claude-sonnet-4-6": [
-        "anthropic/claude-haiku-4-5-20251001",
-        "anthropic/claude-opus-4-6",
-        "google/gemini-2.5-flash",
-        "openai/gpt-4.1-mini",
-    ],
-    "anthropic/claude-haiku-4-5-20251001": [
-        "anthropic/claude-sonnet-4-6",
-        "google/gemini-2.0-flash",
-        "openai/gpt-4.1-mini",
-    ],
-    "openai/gpt-5.2": ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
-    "openai/gpt-4.1": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
-    "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"],
-    "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.0-flash", "anthropic/claude-sonnet-4-6"],
-    "google/gemini-2.5-flash": [
-        "google/gemini-2.0-flash",
-        "google/gemini-2.5-pro",
-        "anthropic/claude-haiku-4-5-20251001",
-    ],
-    "google/gemini-2.0-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
-    "google/gemini-3-pro-preview": [
-        "google/gemini-2.5-pro",
-        "google/gemini-3-flash-preview",
-        "anthropic/claude-sonnet-4-6",
-    ],
-    "google/gemini-3-flash-preview": [
-        "google/gemini-2.0-flash",
-        "google/gemini-2.5-flash",
-        "anthropic/claude-haiku-4-5-20251001",
-    ],
-    "xai/grok-4": ["xai/grok-3", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
-    "xai/grok-3": ["xai/grok-4", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
-}
+# _DEFAULT_FALLBACKS imported from constants.py as MODEL_FALLBACKS
 _COOLDOWN_STEPS = [60, 300, 1500, 3600]  # 1m, 5m, 25m, 1h
 
 

@@ -155,10 +155,24 @@ def get_api_key(provider: str) -> Optional[str]:
     return key
 
 
+def detect_ollama(base_url: str = "") -> dict:
+    """Auto-detect Ollama and list installed models."""
+    import urllib.request
+    url = base_url or os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+    try:
+        req = urllib.request.Request(f"{url}/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read())
+            models = [m["name"] for m in data.get("models", [])]
+            return {"available": True, "models": models, "url": url}
+    except Exception:
+        return {"available": False, "models": [], "url": url}
+
+
 def is_provider_available(provider: str) -> bool:
     """Check if a provider is available (has API key or is local)."""
     if provider == "ollama":
-        return True  # always "available", may fail at call time
+        return detect_ollama().get("available", False)
     return bool(get_api_key(provider))
 
 

@@ -117,7 +117,18 @@ class WSClient:
             payload = await self.reader.readexactly(length) if length > 0 else b""
 
             if mask_key:
-                payload = bytes(b ^ mask_key[i % 4] for i, b in enumerate(payload))
+                # Fast XOR unmask using 4-byte block expansion
+                mask_int = int.from_bytes(mask_key, "big")
+                full_blocks = len(payload) // 4
+                remainder = len(payload) % 4
+                arr = bytearray(len(payload))
+                for j in range(full_blocks):
+                    off = j * 4
+                    block = int.from_bytes(payload[off:off + 4], "big") ^ mask_int
+                    arr[off:off + 4] = block.to_bytes(4, "big")
+                for j in range(remainder):
+                    arr[full_blocks * 4 + j] = payload[full_blocks * 4 + j] ^ mask_key[j]
+                payload = bytes(arr)
 
             return (opcode, payload)
         except (asyncio.IncompleteReadError, ConnectionError, OSError):

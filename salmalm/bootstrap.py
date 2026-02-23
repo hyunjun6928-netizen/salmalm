@@ -79,9 +79,7 @@ async def _start_telegram_bot() -> None:
         telegram_bot.configure(tg_token, tg_owner)
         _core.set_telegram_bot(telegram_bot)
         log.info("[TELEGRAM] Bot configured, starting polling...")
-        import os as _os2
-
-        _wh_url = _os2.environ.get("SALMALM_TELEGRAM_WEBHOOK_URL") or vault.get("telegram_webhook_url") or ""
+        _wh_url = os.environ.get("SALMALM_TELEGRAM_WEBHOOK_URL") or vault.get("telegram_webhook_url") or ""
         if _wh_url:
             telegram_bot.set_webhook(
                 _wh_url.rstrip("/") + "/webhook/telegram" if not _wh_url.endswith("/webhook/telegram") else _wh_url
@@ -107,15 +105,13 @@ async def _start_discord_bot() -> None:
             # Register message handler → core engine
             async def _discord_message_handler(content: str, raw_data, on_token=None):
                 """Discord message handler."""
-                import time as _t
-
                 _channel_id = raw_data.get("channel_id", "")
                 _session_id = f"discord_{_channel_id}"
-                _start = _t.time()
+                _start = time.time()
                 from salmalm.core.engine import process_message
 
                 response = await process_message(_session_id, content, on_token=on_token)
-                _elapsed = _t.time() - _start
+                _elapsed = time.time() - _start
                 return f"{response}\n\n⏱️ {_elapsed:.1f}s" if response else None
 
             discord_bot.on_message(_discord_message_handler)
@@ -129,16 +125,20 @@ def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=1880
     # RAG stats available but not displayed in banner (intentional)
     st = f"{selftest['passed']}/{selftest['total']}" if selftest else "skipped"
     update_msg = _check_for_updates()
-    log.info(
-        f"\n╔══════════════════════════════════════════════╗\n"
-        f"║  😈 {APP_NAME} v{VERSION}                   ║\n"
-        f"║  Web UI:    http://{bind_addr}:{port:<5}           ║\n"
-        f"║  WebSocket: ws://{bind_addr}:{ws_port:<5}            ║\n"
-        f"║  Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}         ║\n"
-        f"║  Crypto:    {'AES-256-GCM' if HAS_CRYPTO else ('HMAC-CTR (fallback)' if os.environ.get('SALMALM_VAULT_FALLBACK') else 'Vault disabled')}            ║\n"
-        f"║  Self-test: {st}                               ║\n"
-        f"╚══════════════════════════════════════════════╝"
-    )
+    _w = 42  # inner width between ║ markers
+    _lines = [
+        f"😈 {APP_NAME} v{VERSION}",
+        f"Web UI:    http://{bind_addr}:{port}",
+        f"WebSocket: ws://{bind_addr}:{ws_port}",
+        f"Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}",
+        f"Crypto:    {'AES-256-GCM' if HAS_CRYPTO else ('HMAC-CTR (fallback)' if os.environ.get('SALMALM_VAULT_FALLBACK') else 'Vault disabled')}",
+        f"Self-test: {st}",
+    ]
+    _box = "\n╔" + "═" * (_w + 2) + "╗\n"
+    for _l in _lines:
+        _box += f"║ {_l.ljust(_w)} ║\n"
+    _box += "╚" + "═" * (_w + 2) + "╝"
+    log.info(_box)
     if update_msg:
         log.info(f"  {update_msg}")
 
@@ -356,6 +356,20 @@ async def _setup_services(host: str, port: int, httpd, server_thread, url: str) 
     node_manager.load_config()
     PluginLoader.scan()
     asyncio.create_task(cron.run())
+
+    # ── Phase 10.5: Auto-detect Ollama ──
+    try:
+        from salmalm.core.llm_router import detect_ollama
+        ollama_info = detect_ollama()
+        if ollama_info["available"]:
+            models = ollama_info["models"]
+            log.info(f"[OLLAMA] Auto-detected: {len(models)} models at {ollama_info['url']}")
+            if models:
+                log.info(f"[OLLAMA] Models: {', '.join(models[:10])}")
+        else:
+            log.debug("[OLLAMA] Not detected at localhost:11434")
+    except Exception as e:
+        log.debug(f"[OLLAMA] Detection skipped: {e}")
 
     # ── Phase 11: Telegram Bot ──
     await _start_telegram_bot()

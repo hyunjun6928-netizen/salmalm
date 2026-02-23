@@ -9,7 +9,12 @@ except Exception:
 
 log = logging.getLogger("salmalm")
 log.addHandler(logging.NullHandler())  # Prevent "No handlers" warning at import
-app = None  # Will be set below if runtime (not during build)
+class _DummyContainer:
+    """Placeholder when Container cannot be imported (e.g. during pip build)."""
+    def get(self, key: str, default=None):
+        raise RuntimeError(f"App container not initialized — cannot access '{key}'. Is the runtime running?")
+
+app = _DummyContainer()  # Will be replaced below if runtime (not during build)
 
 
 def _register_services() -> None:

@@ -91,9 +91,10 @@ def _stage1_strip_images(messages: list) -> list:
 
 def _stage2_trim_tool_results(trimmed: list) -> list:
     """Stage 2: Trim long tool results to 500 chars."""
-    for i, m in enumerate(trimmed):
+    result = []
+    for m in trimmed:
         if m["role"] == "tool" and len(_msg_content_str(m)) > 500:
-            trimmed[i] = {**m, "content": _msg_content_str(m)[:500] + "\n... [truncated]"}
+            result.append({**m, "content": _msg_content_str(m)[:500] + "\n... [truncated]"})
         elif m["role"] == "user" and isinstance(m.get("content"), list):
             new_blocks = []
             for block in m["content"]:
@@ -105,8 +106,10 @@ def _stage2_trim_tool_results(trimmed: list) -> list:
                         new_blocks.append(block)
                 else:
                     new_blocks.append(block)
-            trimmed[i] = {**m, "content": new_blocks}
-    return trimmed
+            result.append({**m, "content": new_blocks})
+        else:
+            result.append(m)
+    return result
 
 
 def _stage3_split_messages(trimmed: list) -> tuple:

@@ -56,6 +56,8 @@ from salmalm.tools.tools_misc import (  # noqa: F401 — re-export for tests and
 
 # clipboard lock (used by tools_util.py)
 _clipboard_lock = threading.Lock()
+# Set by telegram integration on startup (salmalm.integrations.telegram sets this
+# after bot initialization). Read via get_telegram_bot() if available, or directly.
 telegram_bot = None
 
 

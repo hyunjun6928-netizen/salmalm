@@ -6,7 +6,7 @@ Extracted from engine.py to reduce God Object anti-pattern.
 from __future__ import annotations
 
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from salmalm.constants import (
     INTENT_SHORT_MSG,
@@ -136,48 +136,62 @@ class TaskClassifier:
 
     @classmethod
     def classify(cls, message: str, context_len: int = 0) -> Dict[str, Any]:
-        """Classify user message intent and determine processing tier."""
-        msg = message.lower()
-        msg_len = len(message)
-        scores = {}
-        for intent, info in cls.INTENTS.items():
-            score = sum(2 for kw in info["keywords"] if kw in msg)  # type: ignore[attr-defined, misc]
-            if intent == "code" and any(c in message for c in ["```", "def ", "class ", "{", "}"]):
-                score += 3
-            if intent in ("code", "analysis") and "github.com" in msg:
-                score += 3
-            scores[intent] = score
+        """Classify user message intent and determine processing tier.
 
-        best = max(scores, key=scores.get) if any(scores.values()) else "chat"  # type: ignore[arg-type]
-        if scores[best] == 0:
-            best = "chat"
+        Thin wrapper around :func:`classify_task` for backward compatibility.
+        """
+        return classify_task(message, context_len=context_len, intents=cls.INTENTS)
 
-        info = cls.INTENTS[best]
-        # Escalate tier for long/complex messages
-        tier = info["tier"]
-        if msg_len > INTENT_SHORT_MSG:
-            tier = max(tier, 2)  # type: ignore[call-overload]
-        if msg_len > INTENT_COMPLEX_MSG or context_len > INTENT_CONTEXT_DEPTH:
-            tier = max(tier, 3)  # type: ignore[call-overload]
 
-        # Adaptive thinking budget
-        thinking = info["thinking"]
-        thinking_budget = 0
-        if thinking:
-            if msg_len < 300:
-                thinking_budget = 5000
-            elif msg_len < 1000:
-                thinking_budget = 10000
-            else:
-                thinking_budget = 16000
+def classify_task(
+    message: str,
+    context_len: int = 0,
+    intents: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Classify user message intent and determine processing tier."""
+    if intents is None:
+        intents = TaskClassifier.INTENTS
+    msg = message.lower()
+    msg_len = len(message)
+    scores = {}
+    for intent, info in intents.items():
+        score = sum(2 for kw in info["keywords"] if kw in msg)  # type: ignore[attr-defined, misc]
+        if intent == "code" and any(c in message for c in ["```", "def ", "class ", "{", "}"]):
+            score += 3
+        if intent in ("code", "analysis") and "github.com" in msg:
+            score += 3
+        scores[intent] = score
 
-        return {
-            "intent": best,
-            "tier": tier,
-            "thinking": thinking,
-            "thinking_budget": thinking_budget,
-            "score": scores[best],
-        }
+    best = max(scores, key=scores.get) if any(scores.values()) else "chat"  # type: ignore[arg-type]
+    if scores[best] == 0:
+        best = "chat"
+
+    info = intents[best]
+    # Escalate tier for long/complex messages
+    tier = info["tier"]
+    if msg_len > INTENT_SHORT_MSG:
+        tier = max(tier, 2)  # type: ignore[call-overload]
+    if msg_len > INTENT_COMPLEX_MSG or context_len > INTENT_CONTEXT_DEPTH:
+        tier = max(tier, 3)  # type: ignore[call-overload]
+
+    # Adaptive thinking budget
+    thinking = info["thinking"]
+    thinking_budget = 0
+    if thinking:
+        if msg_len < 300:
+            thinking_budget = 5000
+        elif msg_len < 1000:
+            thinking_budget = 10000
+        else:
+            thinking_budget = 16000
+
+    return {
+        "intent": best,
+        "tier": tier,
+        "thinking": thinking,
+        "thinking_budget": thinking_budget,
+        "score": scores[best],
+    }
 
 
 # ── Intent-based tool selection (token optimization) ──

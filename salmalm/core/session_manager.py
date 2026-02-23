@@ -21,14 +21,14 @@ from typing import Dict, Optional, Tuple
 # ============================================================
 # Session Pruning — soft-trim / hard-clear old tool results
 # ============================================================
-# ── Cache TTL tracking for pruning ──
-_last_api_call_time: float = 0.0
+# ── Cache TTL tracking for pruning (per-session) ──
+_last_api_call_time: Dict[str, float] = {}   # session_id → timestamp
 _CACHE_TTL_SECONDS = 300  # 5 minutes (Anthropic prompt cache TTL)
-_last_prune_time: float = 0.0
+_last_prune_time: Dict[str, float] = {}      # session_id → timestamp
 _PRUNE_COOLDOWN = 60  # Don't prune more than once per 60s
 
 
-def _should_prune_for_cache() -> bool:
+def _should_prune_for_cache(session_id: str = "__global__") -> bool:
     """Only prune if cache TTL has expired since last API call.
 
     OpenClaw pattern: Anthropic charges for cache_creation_input_tokens
@@ -37,25 +37,24 @@ def _should_prune_for_cache() -> bool:
     forcing re-creation. So we only prune when TTL has already expired.
     Additionally, enforce a cooldown to prevent excessive pruning.
     """
-    global _last_api_call_time, _last_prune_time  # noqa: F824
     now = _time.time()
-    if _last_api_call_time == 0:
+    last_api = _last_api_call_time.get(session_id, 0.0)
+    last_prune = _last_prune_time.get(session_id, 0.0)
+    if last_api == 0:
         return True
-    if now - _last_prune_time < _PRUNE_COOLDOWN:
+    if now - last_prune < _PRUNE_COOLDOWN:
         return False
-    return (now - _last_api_call_time) >= _CACHE_TTL_SECONDS
+    return (now - last_api) >= _CACHE_TTL_SECONDS
 
 
-def _record_api_call_time():
+def _record_api_call_time(session_id: str = "__global__"):
     """Record timestamp of API call for TTL tracking."""
-    global _last_api_call_time
-    _last_api_call_time = _time.time()
+    _last_api_call_time[session_id] = _time.time()
 
 
-def _record_prune_time():
+def _record_prune_time(session_id: str = "__global__"):
     """Record timestamp of pruning for cooldown tracking."""
-    global _last_prune_time
-    _last_prune_time = _time.time()
+    _last_prune_time[session_id] = _time.time()
 
 
 _PRUNE_KEEP_LAST_ASSISTANTS = 3

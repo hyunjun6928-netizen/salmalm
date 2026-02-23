@@ -46,7 +46,8 @@ def _get_engine_deps():
 
 def _sanitize_input(text: str) -> str:
     """Strip null bytes and control characters. Keeps newlines/tabs and Unicode (ord > 127) for i18n support."""
-    return "".join(c for c in text if c == "\n" or c == "\t" or c == "\r" or (ord(c) >= 32) or ord(c) > 127)
+    # Keep printable ASCII (32+) and all Unicode; strip control chars except \n \t \r
+    return "".join(c for c in text if c == "\n" or c == "\t" or c == "\r" or ord(c) >= 32)
 
 
 async def process_message(

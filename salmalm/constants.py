@@ -80,7 +80,7 @@ _EXEC_TIER_BASIC = {
     "true",
     "false",
     # Dev tools (read-only / query only)
-    "git",
+    "git",  # git: log/status/diff only (clone/pull/push/fetch blocked by EXEC_ARG_BLOCKLIST)
     "gh",
     # Guarded commands — allowed but with subcommand/flag restrictions (see EXEC_ARG_BLOCKLIST)
     "awk",
@@ -137,7 +137,7 @@ def _build_exec_allowlist() -> set:
     allowed = set(_EXEC_TIER_BASIC)
     if _os.environ.get("SALMALM_EXEC_NETWORK", "0") == "1":
         allowed |= _EXEC_TIER_NETWORK
-    if _os.environ.get("SALMALM_EXEC_DATABASE", "1") == "1":
+    if _os.environ.get("SALMALM_EXEC_DATABASE", "0") == "1":
         allowed |= _EXEC_TIER_DATABASE
     return allowed
 
@@ -441,4 +441,47 @@ MODEL_NAME_FIXES: dict = {
     "openai/gpt-5.3-codex": "openai/gpt-5.2-codex",
     "grok-4": "grok-4-0709",
     "xai/grok-4": "xai/grok-4-0709",
+}
+
+# ── Model fallback chains for retry logic ──
+MODEL_FALLBACKS = {
+    "anthropic/claude-opus-4-6": [
+        "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-haiku-4-5-20251001",
+        "google/gemini-2.5-pro",
+        "openai/gpt-4.1",
+    ],
+    "anthropic/claude-sonnet-4-6": [
+        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-opus-4-6",
+        "google/gemini-2.5-flash",
+        "openai/gpt-4.1-mini",
+    ],
+    "anthropic/claude-haiku-4-5-20251001": [
+        "anthropic/claude-sonnet-4-6",
+        "google/gemini-2.0-flash",
+        "openai/gpt-4.1-mini",
+    ],
+    "openai/gpt-5.2": ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
+    "openai/gpt-4.1": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
+    "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.0-flash", "anthropic/claude-sonnet-4-6"],
+    "google/gemini-2.5-flash": [
+        "google/gemini-2.0-flash",
+        "google/gemini-2.5-pro",
+        "anthropic/claude-haiku-4-5-20251001",
+    ],
+    "google/gemini-2.0-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-3-pro-preview": [
+        "google/gemini-2.5-pro",
+        "google/gemini-3-flash-preview",
+        "anthropic/claude-sonnet-4-6",
+    ],
+    "google/gemini-3-flash-preview": [
+        "google/gemini-2.0-flash",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4-5-20251001",
+    ],
+    "xai/grok-4": ["xai/grok-3", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
+    "xai/grok-3": ["xai/grok-4", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
 }

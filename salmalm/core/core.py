@@ -61,7 +61,7 @@ def _get_db() -> sqlite3.Connection:
             try:
                 _all_db_connections.append(weakref.ref(conn))
             except TypeError:
-                _all_db_connections.append(conn)
+                log.debug("weakref not supported for connection object; skipping tracking")
         # Auto-create tables on first connection per thread
         conn.execute("""CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,26 +78,21 @@ def _get_db() -> sqlite3.Connection:
             messages TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )""")
-        try:
-            conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
-        try:
-            conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
-        try:
-            conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
-        try:
-            conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
-        try:
-            conn.execute("ALTER TABLE session_store ADD COLUMN session_meta TEXT DEFAULT '{}'")
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
+        # Add missing columns (check first to avoid noisy ALTER on every connection)
+        _existing = {row[1] for row in conn.execute("PRAGMA table_info(session_store)").fetchall()}
+        _session_cols = {
+            "parent_session_id": "TEXT DEFAULT NULL",
+            "branch_index": "INTEGER DEFAULT NULL",
+            "title": 'TEXT DEFAULT ""',
+            "user_id": "INTEGER DEFAULT NULL",
+            "session_meta": "TEXT DEFAULT '{}'",
+        }
+        for _col, _typedef in _session_cols.items():
+            if _col not in _existing:
+                try:
+                    conn.execute(f"ALTER TABLE session_store ADD COLUMN {_col} {_typedef}")
+                except Exception as e:
+                    log.debug(f"Suppressed: {e}")
         conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
@@ -287,10 +282,12 @@ def track_usage(model: str, input_tokens: int, output_tokens: int, user_id: Opti
         try:
             conn = _get_db()
             # Ensure user_id column exists
-            try:
-                conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL")
-            except Exception as e:
-                log.debug(f"Suppressed: {e}")
+            _ucols = {row[1] for row in conn.execute("PRAGMA table_info(usage_stats)").fetchall()}
+            if "user_id" not in _ucols:
+                try:
+                    conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL")
+                except Exception as e:
+                    log.debug(f"Suppressed: {e}")
             conn.execute(
                 "INSERT INTO usage_stats (ts, model, input_tokens, output_tokens, cost, user_id) VALUES (?,?,?,?,?,?)",
                 (
@@ -603,11 +600,13 @@ def auto_title_session(session_id: str, first_message: str) -> None:
     try:
         conn = _get_db()
         # Ensure title column exists
-        try:
-            conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
-            conn.commit()
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
+        _tcols = {row[1] for row in conn.execute("PRAGMA table_info(session_store)").fetchall()}
+        if "title" not in _tcols:
+            try:
+                conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
+                conn.commit()
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
         conn.execute(
             'UPDATE session_store SET title=? WHERE session_id=? AND (title IS NULL OR title="")',
             (title, session_id),

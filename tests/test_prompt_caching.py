@@ -217,22 +217,22 @@ def test_cost_estimation_haiku():
 def test_ttl_prune_fresh_cache():
     """Should NOT prune when cache is fresh (within TTL)."""
     import salmalm.core.session_manager as sm
-    sm._last_api_call_time = time.time()  # Just called
+    sm._last_api_call_time["__global__"] = time.time()  # Just called
     assert not sm._should_prune_for_cache()
 
 
 def test_ttl_prune_expired_cache():
     """Should prune when cache TTL expired."""
     import salmalm.core.session_manager as sm
-    sm._last_api_call_time = time.time() - 600  # 10 min ago
-    sm._last_prune_time = 0.0  # Reset prune cooldown
+    sm._last_api_call_time["__global__"] = time.time() - 600  # 10 min ago
+    sm._last_prune_time["__global__"] = 0.0  # Reset prune cooldown
     assert sm._should_prune_for_cache()
 
 
 def test_ttl_prune_never_called():
     """Should prune on first call (no previous API call)."""
     import salmalm.core.session_manager as sm
-    sm._last_api_call_time = 0.0
+    sm._last_api_call_time["__global__"] = 0.0
     assert sm._should_prune_for_cache()
 
 

@@ -58,8 +58,13 @@ class TestDetectProvider(unittest.TestCase):
 
 
 class TestProviderAvailability(unittest.TestCase):
-    def test_ollama_always_available(self):
-        assert is_provider_available('ollama') is True
+    def test_ollama_available_when_detected(self):
+        with patch('salmalm.core.llm_router.detect_ollama', return_value={"available": True, "models": [], "url": ""}):
+            assert is_provider_available('ollama') is True
+
+    def test_ollama_unavailable_when_not_detected(self):
+        with patch('salmalm.core.llm_router.detect_ollama', return_value={"available": False, "models": [], "url": ""}):
+            assert is_provider_available('ollama') is False
 
     def test_anthropic_needs_key(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -87,9 +92,10 @@ class TestListModels(unittest.TestCase):
             assert 'openai' in providers
 
     def test_list_includes_ollama(self):
-        models = list_available_models()
-        providers = {m['provider'] for m in models}
-        assert 'ollama' in providers
+        with patch('salmalm.core.llm_router.detect_ollama', return_value={"available": True, "models": ["llama3.2"], "url": ""}):
+            models = list_available_models()
+            providers = {m['provider'] for m in models}
+            assert 'ollama' in providers
 
 
 class TestLLMRouter(unittest.TestCase):

@@ -347,6 +347,7 @@ class WebHandler(
         "/api/features": "_get_features",
         "/api/engine/settings": "_get_api_engine_settings",
         "/api/tools/list": "_get_tools_list",
+        "/api/ollama/detect": "_get_ollama_detect",
         "/api/commands": "_get_commands",
         "/setup": "_get_setup",
         "/api/sessions": "_get_api_sessions",

@@ -15,10 +15,10 @@ class TestLLMRouterAPI(unittest.TestCase):
     def test_list_available_models_no_keys(self):
         from salmalm.core.llm_router import list_available_models
         with patch.dict(os.environ, {}, clear=True):
-            models = list_available_models()
-            # Ollama is always available
-            ollama_models = [m for m in models if m['provider'] == 'ollama']
-            self.assertTrue(len(ollama_models) > 0)
+            with patch('salmalm.core.llm_router.detect_ollama', return_value={"available": True, "models": ["llama3.2"], "url": ""}):
+                models = list_available_models()
+                ollama_models = [m for m in models if m['provider'] == 'ollama']
+                self.assertTrue(len(ollama_models) > 0)
 
     def test_detect_provider(self):
         from salmalm.core.llm_router import detect_provider
@@ -37,8 +37,8 @@ class TestLLMRouterAPI(unittest.TestCase):
     def test_switch_model(self):
         from salmalm.core.llm_router import LLMRouter
         r = LLMRouter()
-        # Ollama doesn't need key
-        msg = r.switch_model('ollama/llama3.2')
+        with patch('salmalm.core.llm_router.detect_ollama', return_value={'available': True, 'models': ['llama3.2'], 'url': ''}):
+            msg = r.switch_model('ollama/llama3.2')
         self.assertIn('✅', msg)
         self.assertEqual(r.current_model, 'ollama/llama3.2')
 
@@ -51,7 +51,8 @@ class TestLLMRouterAPI(unittest.TestCase):
 
     def test_is_provider_available(self):
         from salmalm.core.llm_router import is_provider_available
-        self.assertTrue(is_provider_available('ollama'))
+        with patch('salmalm.core.llm_router.detect_ollama', return_value={"available": True, "models": [], "url": ""}):
+            self.assertTrue(is_provider_available('ollama'))
         with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'sk-test'}):
             self.assertTrue(is_provider_available('anthropic'))
         with patch.dict(os.environ, {}, clear=True):
@@ -89,7 +90,8 @@ class TestLLMRouterAPI(unittest.TestCase):
     def test_model_switch_endpoint_body(self):
         """Test that model switch returns expected keys."""
         from salmalm.core.llm_router import llm_router
-        msg = llm_router.switch_model('ollama/llama3.2')
+        with patch('salmalm.core.llm_router.detect_ollama', return_value={'available': True, 'models': ['llama3.2'], 'url': ''}):
+            msg = llm_router.switch_model('ollama/llama3.2')
         ok = '✅' in msg
         result = {'ok': ok, 'message': msg, 'current_model': llm_router.current_model}
         self.assertTrue(result['ok'])

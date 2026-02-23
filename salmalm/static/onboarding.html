@@ -97,6 +97,13 @@ button:disabled{opacity:0.5;cursor:not-allowed}
     <div class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
   </div>
   <div class="divider"></div>
+  <div id="ollama-detect-banner" style="display:none;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #7c5cfc;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center">
+    <div style="font-size:24px;margin-bottom:8px">🦙✨</div>
+    <div style="font-weight:700;font-size:15px;color:#7c5cfc">Ollama Detected!</div>
+    <div id="ollama-detect-models" style="font-size:12px;color:#aaa;margin-top:4px"></div>
+    <div style="font-size:13px;color:#ccc;margin-top:8px">No API key needed — skip straight to chatting!</div>
+    <button onclick="skipWithOllama()" style="margin-top:12px;padding:10px 24px;border-radius:8px;border:none;background:#7c5cfc;color:#fff;font-weight:700;font-size:14px;cursor:pointer">🚀 Start with Ollama (Free)</button>
+  </div>
   <div class="field">
     <label>🦙 Ollama / Local LLM URL</label>
     <input type="text" id="ollama" placeholder="http://localhost:11434/v1">
@@ -185,6 +192,30 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 
 <script>
 let currentStep=0, selectedModel='auto', selectedPersona='expert';
+
+/* Auto-detect Ollama on page load */
+(function(){
+  fetch('/api/ollama/detect').then(r=>r.json()).then(d=>{
+    if(d.available){
+      var banner=document.getElementById('ollama-detect-banner');
+      if(banner){banner.style.display='block'}
+      var mDiv=document.getElementById('ollama-detect-models');
+      if(mDiv&&d.models&&d.models.length){mDiv.textContent=d.models.slice(0,5).join(', ')+(d.models.length>5?' + '+(d.models.length-5)+' more':'');}
+      var inp=document.getElementById('ollama');
+      if(inp&&!inp.value)inp.value=d.url+'/v1';
+    }
+  }).catch(function(){});
+})();
+
+function skipWithOllama(){
+  var url=document.getElementById('ollama').value||'http://localhost:11434/v1';
+  fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ollama_url:url})})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok){window.location.href='/';}
+    else{alert(d.error||'Failed');}
+  });
+}
 
 function goStep(n){
   document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));

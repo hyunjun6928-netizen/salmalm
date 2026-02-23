@@ -22,13 +22,24 @@ from salmalm import log
 _KEYCHAIN_SERVICE = "salmalm"
 _KEYCHAIN_ACCOUNT = "vault_master"
 
+try:
+    import keyring as _keyring  # noqa: F401
+except (ImportError, Exception):
+    _keyring = None
+
+def _get_keyring():
+    """Get keyring module. Uses sys.modules to support test patching."""
+    import sys
+    return sys.modules.get("keyring", _keyring)
+
 
 def _keychain_get() -> Optional[str]:
     """Retrieve vault password from OS keychain. Returns None if unavailable."""
     try:
-        import keyring
-
-        pw = keyring.get_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
+        kr = _get_keyring()
+        if kr is None:
+            return None
+        pw = kr.get_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
         return pw
     except Exception as e:  # noqa: broad-except
         log.debug(f"[KEYCHAIN] get failed: {e}")
@@ -38,9 +49,10 @@ def _keychain_get() -> Optional[str]:
 def _keychain_set(password: str) -> bool:
     """Store vault password in OS keychain. Returns True on success."""
     try:
-        import keyring
-
-        keyring.set_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT, password)
+        kr = _get_keyring()
+        if kr is None:
+            return False
+        kr.set_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT, password)
         log.info("[OK] Vault password saved to OS keychain")
         return True
     except Exception as exc:
@@ -51,9 +63,10 @@ def _keychain_set(password: str) -> bool:
 def _keychain_delete() -> bool:
     """Remove vault password from OS keychain."""
     try:
-        import keyring
-
-        keyring.delete_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
+        kr = _get_keyring()
+        if kr is None:
+            return False
+        kr.delete_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
         return True
     except Exception as e:  # noqa: broad-except
         log.debug(f"[KEYCHAIN] delete failed: {e}")
@@ -154,6 +167,14 @@ class Vault:
             if save_to_keychain and password:
                 _keychain_set(password)
             return True
+        except json.JSONDecodeError as e:
+            log.warning(f"[VAULT] Unlock failed: corrupted vault data: {e}")
+            self._password = None
+            return False
+        except ValueError as e:
+            log.warning(f"[VAULT] Unlock failed: bad decryption (wrong password?): {e}")
+            self._password = None
+            return False
         except Exception as e:  # noqa: broad-except
             log.warning(f"[VAULT] Unlock failed: {type(e).__name__}: {e}")
             self._password = None

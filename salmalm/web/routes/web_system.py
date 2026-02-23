@@ -110,6 +110,12 @@ class SystemMixin:
         except Exception as e:  # noqa: broad-except
             return "unknown"
 
+    def _get_ollama_detect(self):
+        """GET /api/ollama/detect — auto-detect Ollama and list models."""
+        from salmalm.core.llm_router import detect_ollama
+        result = detect_ollama()
+        self._json(result)
+
     def _get_status(self):
         """Get status."""
         channels = {}

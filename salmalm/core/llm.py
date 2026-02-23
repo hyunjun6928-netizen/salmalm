@@ -20,8 +20,15 @@ from salmalm.constants import DEFAULT_MAX_TOKENS, FALLBACK_MODELS
 def _get_temperature(tools: Optional[list]) -> float:
     """Return temperature based on mode: lower for tool-calling (precision), higher for chat."""
     if tools:
-        return float(_os.environ.get("SALMALM_TEMP_TOOL", "0.3"))
-    return float(_os.environ.get("SALMALM_TEMP_CHAT", "0.7"))
+        default = 0.3
+        raw = _os.environ.get("SALMALM_TEMP_TOOL", "0.3")
+    else:
+        default = 0.7
+        raw = _os.environ.get("SALMALM_TEMP_CHAT", "0.7")
+    try:
+        return float(raw)
+    except (ValueError, TypeError):
+        return default
 
 
 from salmalm.security.crypto import vault, log
