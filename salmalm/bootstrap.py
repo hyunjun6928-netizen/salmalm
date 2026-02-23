@@ -490,7 +490,8 @@ async def run_server():
 
     await _setup_services(bind_addr, port, server, web_thread, url)
 
-    _print_banner(bind_addr=bind_addr, port=port, ws_port=ws_port)
+    _ws_port = int(os.environ.get("SALMALM_WS_PORT", 18801))
+    _print_banner(bind_addr=bind_addr, port=port, ws_port=_ws_port)
 
     # Register signal handlers
     for sig in (signal.SIGINT, signal.SIGTERM):
