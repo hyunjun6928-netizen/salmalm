@@ -31,6 +31,7 @@ def _keychain_get() -> Optional[str]:
         pw = keyring.get_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
         return pw
     except Exception as e:  # noqa: broad-except
+        log.debug(f"[KEYCHAIN] get failed: {e}")
         return None
 
 
@@ -55,6 +56,7 @@ def _keychain_delete() -> bool:
         keyring.delete_password(_KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT)
         return True
     except Exception as e:  # noqa: broad-except
+        log.debug(f"[KEYCHAIN] delete failed: {e}")
         return False
 
 

@@ -31,7 +31,6 @@ from salmalm.core.llm_stream import (  # noqa: F401
 )
 from salmalm.core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded, _metrics
 
-import os as _os
 
 _LLM_TIMEOUT = int(_os.environ.get("SALMALM_LLM_TIMEOUT", "30"))
 
@@ -56,7 +55,10 @@ def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8", errors="replace")
-            log.error(f"HTTP {e.code}: {err_body[:300]}")
+            # Mask potential API keys in error body
+            import re as _re_mask
+            _safe_body = _re_mask.sub(r'(sk-[a-zA-Z0-9]{4})[a-zA-Z0-9-]+', r'\1***', err_body[:300])
+            log.error(f"HTTP {e.code}: {_safe_body}")
             if e.code == 401:
                 from salmalm.core.exceptions import AuthError
 

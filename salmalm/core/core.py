@@ -61,7 +61,7 @@ def _get_db() -> sqlite3.Connection:
             try:
                 _all_db_connections.append(weakref.ref(conn))
             except TypeError:
-                pass  # sqlite3.Connection doesn't support weakref on some platforms
+                _all_db_connections.append(conn)  # fallback: direct ref if weakref unsupported
         # Auto-create tables on first connection per thread
         conn.execute("""CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,6 +122,7 @@ def audit_log_cleanup(days: int = 30) -> None:
     cutoff = (datetime.now(KST) - timedelta(days=days)).isoformat()  # noqa: F405
     try:
         conn = _get_db()
+        from salmalm.core.audit import _ensure_audit_v2_table
         _ensure_audit_v2_table()
         deleted = conn.execute("DELETE FROM audit_log_v2 WHERE timestamp < ?", (cutoff,)).rowcount
         conn.commit()

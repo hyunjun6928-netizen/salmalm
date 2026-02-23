@@ -67,6 +67,7 @@ class Session:
         self.model_override = "auto"  # Multi-model routing: 'auto'|'haiku'|'sonnet'|'opus'|full model string
         self.tts_enabled = False  # TTS toggle
         self.tts_voice = "alloy"  # TTS voice selection
+        self._thinking_suggested = False  # Track if thinking suggestion shown this session
         self.last_model = "auto"  # Last used model (for UI display)
         self.last_complexity = "auto"  # Last complexity level
 

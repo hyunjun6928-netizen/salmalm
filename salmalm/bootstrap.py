@@ -60,8 +60,8 @@ def _check_for_updates() -> str:
                     f"   Download: https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
                 )
             return f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
-    except Exception as e:  # noqa: broad-except
-        pass  # silently skip if no network
+    except (OSError, ValueError, KeyError, ImportError):
+        pass  # network/parse errors — silently skip
     return ""
 
 

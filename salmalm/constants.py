@@ -135,7 +135,7 @@ _EXEC_TIER_DATABASE = {
 def _build_exec_allowlist() -> set:
     """Build effective allowlist from tiers + env vars."""
     allowed = set(_EXEC_TIER_BASIC)
-    if _os.environ.get("SALMALM_EXEC_NETWORK", "1") == "1":
+    if _os.environ.get("SALMALM_EXEC_NETWORK", "0") == "1":
         allowed |= _EXEC_TIER_NETWORK
     if _os.environ.get("SALMALM_EXEC_DATABASE", "1") == "1":
         allowed |= _EXEC_TIER_DATABASE

@@ -110,9 +110,8 @@ def _classify_task(session, user_message: str) -> dict:
     classification["thinking_budget"] = _get_thinking_budget_map().get(level or "medium", 10000) if thinking_on else 0
 
     if not thinking_on and classification["tier"] >= 3 and classification["score"] >= 4:
-        _suggest_key = f"_thinking_suggested_{getattr(session, 'id', '')}"
-        if not getattr(session, _suggest_key, False):
-            setattr(session, _suggest_key, True)
+        if not getattr(session, "_thinking_suggested", False):
+            session._thinking_suggested = True
             session._thinking_hint = (
                 "\n\n💡 *이 작업은 복잡해 보입니다. 🧠 Extended Thinking을 켜면 더 정확한 결과를 얻을 수 있습니다.* "
                 "`/thinking on` 또는 🧠 버튼을 눌러주세요."

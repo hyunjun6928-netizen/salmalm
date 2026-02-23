@@ -5,7 +5,7 @@ try:
     from importlib.metadata import version as _pkg_version
     __version__ = _pkg_version("salmalm")
 except Exception:
-    __version__ = "0.19.35"  # fallback for editable/dev installs
+    __version__ = "0.19.36"  # fallback for editable/dev installs
 
 log = logging.getLogger("salmalm")
 log.addHandler(logging.NullHandler())  # Prevent "No handlers" warning at import
@@ -18,16 +18,16 @@ def _register_services() -> None:
         return
     app.register("vault", lambda: __import__("salmalm.security.crypto", fromlist=["vault"]).vault)
     app.register("router", lambda: __import__("salmalm.core", fromlist=["router"]).router)
-    app.register("auth_manager", lambda: __import__("salmalm.auth", fromlist=["auth_manager"]).auth_manager)
-    app.register("rate_limiter", lambda: __import__("salmalm.auth", fromlist=["rate_limiter"]).rate_limiter)
-    app.register("rag_engine", lambda: __import__("salmalm.rag", fromlist=["rag_engine"]).rag_engine)
-    app.register("mcp_manager", lambda: __import__("salmalm.mcp", fromlist=["mcp_manager"]).mcp_manager)
-    app.register("node_manager", lambda: __import__("salmalm.nodes", fromlist=["node_manager"]).node_manager)
-    app.register("health_monitor", lambda: __import__("salmalm.stability", fromlist=["health_monitor"]).health_monitor)
-    app.register("telegram_bot", lambda: __import__("salmalm.telegram", fromlist=["telegram_bot"]).telegram_bot)
-    app.register("user_manager", lambda: __import__("salmalm.users", fromlist=["user_manager"]).user_manager)
-    app.register("discord_bot", lambda: __import__("salmalm.discord_bot", fromlist=["discord_bot"]).discord_bot)
-    app.register("ws_server", lambda: __import__("salmalm.ws", fromlist=["ws_server"]).ws_server)
+    app.register("auth_manager", lambda: __import__("salmalm.web.auth", fromlist=["auth_manager"]).auth_manager)
+    app.register("rate_limiter", lambda: __import__("salmalm.web.auth", fromlist=["rate_limiter"]).rate_limiter)
+    app.register("rag_engine", lambda: __import__("salmalm.features.rag", fromlist=["rag_engine"]).rag_engine)
+    app.register("mcp_manager", lambda: __import__("salmalm.features.mcp", fromlist=["mcp_manager"]).mcp_manager)
+    app.register("node_manager", lambda: __import__("salmalm.features.nodes", fromlist=["node_manager"]).node_manager)
+    app.register("health_monitor", lambda: __import__("salmalm.features.stability", fromlist=["health_monitor"]).health_monitor)
+    app.register("telegram_bot", lambda: __import__("salmalm.channels.telegram", fromlist=["telegram_bot"]).telegram_bot)
+    app.register("user_manager", lambda: __import__("salmalm.features.users", fromlist=["user_manager"]).user_manager)
+    app.register("discord_bot", lambda: __import__("salmalm.channels.discord_bot", fromlist=["discord_bot"]).discord_bot)
+    app.register("ws_server", lambda: __import__("salmalm.web.ws", fromlist=["ws_server"]).ws_server)
 
 
 _logging_initialized = False

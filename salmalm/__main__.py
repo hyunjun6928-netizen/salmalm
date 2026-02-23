@@ -27,7 +27,14 @@ def main() -> None:
 
     from salmalm.bootstrap import run_server
 
-    asyncio.run(run_server())
+    try:
+        asyncio.run(run_server())
+    except RuntimeError as e:
+        if "running event loop" in str(e):
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(run_server())
+        else:
+            raise
 
 
 if __name__ == "__main__":
