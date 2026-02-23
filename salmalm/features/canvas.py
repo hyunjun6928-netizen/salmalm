@@ -37,6 +37,7 @@ class CanvasServer:
     """Lightweight HTTP server for previewing generated content."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._server: Optional[socketserver.TCPServer] = None
         self._thread: Optional[threading.Thread] = None
         self._pages: Dict[str, dict] = {}  # page_id -> {html, title, created}
@@ -52,9 +53,11 @@ class CanvasServer:
 
         class Handler(http.server.SimpleHTTPRequestHandler):
             def __init__(self, *args, **kwargs) -> None:
+                """Init  ."""
                 super().__init__(*args, directory=str(_CANVAS_DIR), **kwargs)
 
             def do_GET(self) -> None:
+                """Do get."""
                 path = self.path.strip("/")
                 if not path or path == "index":
                     self._serve_index()
@@ -94,6 +97,7 @@ li{{margin:8px 0}}a{{color:#2563eb}}</style></head>
                 self.wfile.write(page["html"].encode())
 
             def log_message(self, format, *args) -> None:
+                """Log message."""
                 pass  # Suppress request logs
 
         try:

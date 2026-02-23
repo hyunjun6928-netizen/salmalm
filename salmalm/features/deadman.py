@@ -37,6 +37,7 @@ class DeadManSwitch:
     """Monitors user activity and triggers emergency actions on prolonged inactivity."""
 
     def __init__(self, config_path: Optional[Path] = None, state_path: Optional[Path] = None) -> None:
+        """Init  ."""
         self.config_path = config_path or DEADMAN_CONFIG
         self.state_path = state_path or DEADMAN_STATE
         self.config = self._load_config()
@@ -45,6 +46,7 @@ class DeadManSwitch:
     # -- persistence ----------------------------------------------------------
 
     def _load_config(self) -> Dict[str, Any]:
+        """Load config."""
         from salmalm.config_manager import ConfigManager
 
         if self.config_path != DEADMAN_CONFIG:
@@ -56,6 +58,7 @@ class DeadManSwitch:
         return ConfigManager.load("deadman", defaults=DEFAULT_CONFIG)
 
     def _save_config(self) -> None:
+        """Save config."""
         from salmalm.config_manager import ConfigManager
 
         if self.config_path != DEADMAN_CONFIG:
@@ -66,6 +69,7 @@ class DeadManSwitch:
         ConfigManager.save("deadman", self.config)
 
     def _load_state(self) -> Dict[str, Any]:
+        """Load state."""
         if self.state_path.exists():
             with open(self.state_path, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -77,6 +81,7 @@ class DeadManSwitch:
         }
 
     def _save_state(self) -> None:
+        """Save state."""
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.state_path, "w", encoding="utf-8") as f:
             json.dump(self.state, f, ensure_ascii=False, indent=2)
@@ -114,6 +119,7 @@ class DeadManSwitch:
         }
 
     def format_status(self) -> str:
+        """Format status."""
         s = self.status()
         state_str = "🟢 활성" if s["enabled"] else "⚪ 비활성"
         lines = [
@@ -137,6 +143,7 @@ class DeadManSwitch:
         actions: Optional[List[Dict]] = None,
         confirmation_required: bool = True,
     ) -> str:
+        """Setup."""
         self.config["enabled"] = True
         self.config["inactivityDays"] = inactivity_days
         self.config["warningHours"] = warning_hours
@@ -148,6 +155,7 @@ class DeadManSwitch:
         return f"✅ Dead Man's Switch 설정 완료 (비활동 {inactivity_days}일, 경고 {warning_hours}시간 전)"
 
     def disable(self) -> str:
+        """Disable."""
         self.config["enabled"] = False
         self._save_config()
         return "⏹️ Dead Man's Switch 비활성화됨."
@@ -190,6 +198,7 @@ class DeadManSwitch:
         return "✅ 확인되었습니다. 타이머가 리셋되었습니다."
 
     def _send_warning(self, send_fn=None) -> Dict[str, Any]:
+        """Send warning."""
         self.state["warning_sent"] = True
         self._save_state()
         msg = "⚠️ Dead Man's Switch: 아직 계신가요? `/deadman reset` 으로 확인해주세요."
@@ -198,6 +207,7 @@ class DeadManSwitch:
         return {"action": "warning", "message": msg}
 
     def _activate(self, user_name: str = "사용자") -> Dict[str, Any]:
+        """Activate."""
         self.state["activated"] = True
         self._save_state()
         results = []
@@ -210,6 +220,7 @@ class DeadManSwitch:
     def _execute_action(
         self, action: Dict, user_name: str = "사용자", days: int = 3, dry_run: bool = False
     ) -> Dict[str, Any]:
+        """Execute action."""
         atype = action.get("type", "unknown")
         if atype == "message":
             content = action.get("content", "").format(user_name=user_name, days=days)
@@ -243,6 +254,7 @@ class DeadManSwitch:
         return {"type": atype, "error": "unknown action type"}
 
     def _run_backup(self, dest: str) -> Dict[str, Any]:
+        """Run backup."""
         dest_path = Path(dest)
         dest_path.mkdir(parents=True, exist_ok=True)
         src = DATA_DIR
@@ -256,6 +268,7 @@ class DeadManSwitch:
         return {"type": "backup", "destination": dest, "files_copied": count}
 
     def _run_cleanup(self, paths: List[str]) -> Dict[str, Any]:
+        """Run cleanup."""
         removed = []
         for p in paths:
             fp = Path(os.path.expanduser(p))

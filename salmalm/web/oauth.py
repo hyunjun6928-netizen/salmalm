@@ -43,6 +43,7 @@ def _xor_bytes(data: bytes, key: bytes) -> bytes:
 
 def _encrypt_tokens(data: dict) -> str:
     # Prefer vault (AES-GCM) — ONLY secure storage path
+    """Encrypt tokens."""
     try:
         from salmalm.security.crypto import vault
 
@@ -62,6 +63,7 @@ def _encrypt_tokens(data: dict) -> str:
 
 
 def _decrypt_tokens(encoded: str) -> dict:
+    """Decrypt tokens."""
     if encoded == "__VAULT__":
         try:
             from salmalm.security.crypto import vault
@@ -82,10 +84,12 @@ class AnthropicOAuth:
     TOKEN_URL = "https://console.anthropic.com/oauth/token"
 
     def __init__(self, client_id: str = "", client_secret: str = "") -> None:
+        """Init  ."""
         self.client_id = client_id or os.environ.get("ANTHROPIC_OAUTH_CLIENT_ID", "")
         self.client_secret = client_secret or os.environ.get("ANTHROPIC_OAUTH_CLIENT_SECRET", "")
 
     def get_auth_url(self, redirect_uri: str, state: str = "") -> str:
+        """Get auth url."""
         if not state:
             state = secrets.token_urlsafe(16)
         params = urllib.parse.urlencode(
@@ -100,6 +104,7 @@ class AnthropicOAuth:
         return f"{self.AUTH_URL}?{params}"
 
     def exchange_code(self, code: str, redirect_uri: str) -> dict:
+        """Exchange code."""
         data = urllib.parse.urlencode(
             {
                 "grant_type": "authorization_code",
@@ -120,6 +125,7 @@ class AnthropicOAuth:
         return result
 
     def refresh_token(self, refresh_token: str) -> dict:
+        """Refresh token."""
         data = urllib.parse.urlencode(
             {
                 "grant_type": "refresh_token",
@@ -140,17 +146,20 @@ class AnthropicOAuth:
 
     @staticmethod
     def is_expired(token_data: dict) -> bool:
+        """Is expired."""
         obtained = token_data.get("obtained_at", 0)
         expires_in = token_data.get("expires_in", 3600)
         return time.time() > obtained + expires_in
 
     @staticmethod
     def is_expiring_soon(token_data: dict, threshold: int = 86400) -> bool:
+        """Is expiring soon."""
         obtained = token_data.get("obtained_at", 0)
         expires_in = token_data.get("expires_in", 3600)
         return time.time() > obtained + expires_in - threshold
 
     def auto_refresh(self, token_data: dict) -> dict:
+        """Auto refresh."""
         if self.is_expiring_soon(token_data) and token_data.get("refresh_token"):
             try:
                 return self.refresh_token(token_data["refresh_token"])
@@ -164,10 +173,12 @@ class OpenAIOAuth:
     TOKEN_URL = "https://auth.openai.com/oauth/token"
 
     def __init__(self, client_id: str = "", client_secret: str = "") -> None:
+        """Init  ."""
         self.client_id = client_id or os.environ.get("OPENAI_OAUTH_CLIENT_ID", "")
         self.client_secret = client_secret or os.environ.get("OPENAI_OAUTH_CLIENT_SECRET", "")
 
     def get_auth_url(self, redirect_uri: str, state: str = "") -> str:
+        """Get auth url."""
         if not state:
             state = secrets.token_urlsafe(16)
         params = urllib.parse.urlencode(
@@ -182,6 +193,7 @@ class OpenAIOAuth:
         return f"{self.AUTH_URL}?{params}"
 
     def exchange_code(self, code: str, redirect_uri: str) -> dict:
+        """Exchange code."""
         data = urllib.parse.urlencode(
             {
                 "grant_type": "authorization_code",
@@ -202,6 +214,7 @@ class OpenAIOAuth:
         return result
 
     def refresh_token(self, refresh_token: str) -> dict:
+        """Refresh token."""
         data = urllib.parse.urlencode(
             {
                 "grant_type": "refresh_token",
@@ -222,6 +235,7 @@ class OpenAIOAuth:
 
     @staticmethod
     def is_expired(token_data: dict) -> bool:
+        """Is expired."""
         obtained = token_data.get("obtained_at", 0)
         expires_in = token_data.get("expires_in", 3600)
         return time.time() > obtained + expires_in
@@ -231,6 +245,7 @@ class OAuthManager:
     """Manages OAuth tokens for multiple providers."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self.anthropic = AnthropicOAuth()
         self.openai = OpenAIOAuth()
         self._tokens: Dict[str, dict] = {}
@@ -238,6 +253,7 @@ class OAuthManager:
         self._load()
 
     def _load(self):
+        """Load."""
         try:
             if _TOKENS_PATH.exists():
                 encrypted = _TOKENS_PATH.read_text().strip()
@@ -248,10 +264,12 @@ class OAuthManager:
             self._tokens = {}
 
     def _save(self):
+        """Save."""
         _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         _TOKENS_PATH.write_text(_encrypt_tokens(self._tokens))
 
     def setup(self, provider: str, redirect_uri: str = "http://localhost:8080/oauth/callback") -> str:
+        """Setup."""
         state = secrets.token_urlsafe(16)
         self._pending_states[state] = provider
         if provider == "anthropic":
@@ -263,6 +281,7 @@ class OAuthManager:
         return f"🔑 Open this URL to authorize:\n{url}"
 
     def handle_callback(self, code: str, state: str, redirect_uri: str = "http://localhost:8080/oauth/callback") -> str:
+        """Handle callback."""
         provider = self._pending_states.pop(state, None)
         if not provider:
             return "❌ Invalid or expired OAuth state."
@@ -280,6 +299,7 @@ class OAuthManager:
             return f"❌ Token exchange failed: {e}"
 
     def status(self) -> str:
+        """Status."""
         if not self._tokens:
             return "🔑 No OAuth tokens configured. Use `/oauth setup anthropic|openai`."
         lines = ["🔑 **OAuth Status:**"]
@@ -294,6 +314,7 @@ class OAuthManager:
         return "\n".join(lines)
 
     def revoke(self, provider: str = "") -> str:
+        """Revoke."""
         if provider:
             self._tokens.pop(provider, None)
         else:
@@ -303,6 +324,7 @@ class OAuthManager:
         return f"🗑️ OAuth tokens revoked ({target})."
 
     def refresh(self, provider: str = "") -> str:
+        """Refresh."""
         providers = [provider] if provider else list(self._tokens.keys())
         results = []
         for p in providers:

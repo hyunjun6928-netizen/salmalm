@@ -45,6 +45,7 @@ def _hash_password(password: str, salt: Optional[bytes] = None) -> Tuple[bytes, 
 
 
 def _verify_password(password: str, stored_hash: bytes, salt: bytes) -> bool:
+    """Verify password."""
     dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PBKDF2_ITER)
     return hmac.compare_digest(dk, stored_hash)
 
@@ -64,6 +65,7 @@ class TokenManager:
     _SECRET_FILE = DATA_DIR / ".token_secret"  # Legacy location
 
     def __init__(self, secret: Optional[bytes] = None) -> None:
+        """Init  ."""
         self._keys: Dict[str, bytes] = {}  # kid -> secret
         self._current_kid: str = ""
         if secret:
@@ -271,6 +273,7 @@ class TokenManager:
 
 class RateLimitExceeded(Exception):
     def __init__(self, retry_after: float = 0) -> None:
+        """Init  ."""
         self.retry_after = retry_after
         super().__init__(f"Rate limit exceeded. Retry after {retry_after:.0f}s")
 
@@ -279,6 +282,7 @@ class RateLimiter:
     """Token bucket rate limiter per key (user_id or IP)."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._buckets: Dict[str, dict] = {}
         self._lock = threading.Lock()
         # Default limits
@@ -355,6 +359,7 @@ class AuthManager:
     ROLES = ("admin", "user", "readonly")
 
     def __init__(self) -> None:
+        """Init  ."""
         self._token_mgr = TokenManager()
         self._lock = threading.Lock()
         self._lockout_duration = 300  # 5 min lockout
@@ -362,6 +367,7 @@ class AuthManager:
         self._initialized = False
 
     def _ensure_db(self):
+        """Ensure db."""
         if self._initialized:
             return
         conn = sqlite3.connect(str(AUTH_DB))

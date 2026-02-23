@@ -46,6 +46,7 @@ class CDPConnection:
     """Low-level CDP WebSocket connection to Chrome."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
         self._connected = False
@@ -232,6 +233,7 @@ class BrowserController:
     """High-level browser automation API over CDP."""
 
     def __init__(self, debug_host: str = "127.0.0.1", debug_port: int = 9222) -> None:
+        """Init  ."""
         self.debug_host = debug_host
         self.debug_port = debug_port
         self._cdp: Optional[CDPConnection] = None
@@ -482,6 +484,7 @@ class BrowserManager:
     ]
 
     def __init__(self) -> None:
+        """Init  ."""
         self._browser: Optional[BrowserController] = None
         self._process: Optional[Any] = None  # subprocess.Popen
         self._chrome_path: Optional[str] = None
@@ -578,10 +581,12 @@ class BrowserManager:
 
     @property
     def controller(self) -> Optional[BrowserController]:
+        """Controller."""
         return self._browser
 
     @property
     def connected(self) -> bool:
+        """Connected."""
         return self._browser is not None and self._browser.connected
 
     async def close(self) -> None:

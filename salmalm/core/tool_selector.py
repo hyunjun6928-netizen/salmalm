@@ -12,6 +12,7 @@ from salmalm.constants import TOOL_HINT_KEYWORDS
 from salmalm.security.crypto import log
 
 def get_tools_for_provider(provider: str, intent: str = None, user_message: str = "") -> list:
+    """Get tools for provider."""
     from salmalm.tools import TOOL_DEFINITIONS
     from salmalm.core import PluginLoader
     from salmalm.features.mcp import mcp_manager
@@ -77,6 +78,7 @@ def get_tools_for_provider(provider: str, intent: str = None, user_message: str 
 
     # ── Schema compression: strip param descriptions, keep only required + type ──
     def _compress_schema(schema) -> dict:
+        """Compress schema."""
         if not schema or not isinstance(schema, dict):
             return schema
         props = schema.get("properties", {})

@@ -63,6 +63,7 @@ class _TagStripper(HTMLParser):
     )
 
     def __init__(self) -> None:
+        """Init  ."""
         super().__init__()
         self.result: List[str] = []
         self._skip_depth = 0
@@ -70,6 +71,7 @@ class _TagStripper(HTMLParser):
         self._in_title = False
 
     def handle_starttag(self, tag: str, attrs) -> None:
+        """Handle starttag."""
         tag = tag.lower()
         if tag in self._SKIP_TAGS:
             self._skip_depth += 1
@@ -79,6 +81,7 @@ class _TagStripper(HTMLParser):
             self.result.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
+        """Handle endtag."""
         tag = tag.lower()
         if tag in self._SKIP_TAGS and self._skip_depth > 0:
             self._skip_depth -= 1
@@ -88,6 +91,7 @@ class _TagStripper(HTMLParser):
             self.result.append("\n")
 
     def handle_data(self, data: str) -> None:
+        """Handle data."""
         if self._in_title:
             self._title += data
         if self._skip_depth > 0:
@@ -95,6 +99,7 @@ class _TagStripper(HTMLParser):
         self.result.append(data)
 
     def get_text(self) -> str:
+        """Get text."""
         raw = "".join(self.result)
         # Collapse whitespace
         lines = []
@@ -105,6 +110,7 @@ class _TagStripper(HTMLParser):
         return "\n".join(lines)
 
     def get_title(self) -> str:
+        """Get title."""
         return self._title.strip()
 
 
@@ -143,6 +149,7 @@ class WebClip:
     __slots__ = ("id", "url", "title", "content", "created_at", "word_count")
 
     def __init__(self, *, id: str, url: str, title: str, content: str, created_at: float = 0) -> None:
+        """Init  ."""
         self.id = id
         self.url = url
         self.title = title
@@ -151,6 +158,7 @@ class WebClip:
         self.word_count = len(content.split())
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
         return {
             "id": self.id,
             "url": self.url,
@@ -162,6 +170,7 @@ class WebClip:
 
     @classmethod
     def from_dict(cls, d: Dict) -> "WebClip":
+        """From dict."""
         return cls(
             id=d["id"],
             url=d["url"],
@@ -175,6 +184,7 @@ class ClipManager:
     """Manage web clips."""
 
     def __init__(self, storage_dir: Optional[Path] = None) -> None:
+        """Init  ."""
         self._dir = storage_dir or CLIPS_DIR
         self._dir.mkdir(parents=True, exist_ok=True)
         self._db_path = self._dir / "clips.json"
@@ -182,6 +192,7 @@ class ClipManager:
         self._load()
 
     def _load(self):
+        """Load."""
         if self._db_path.exists():
             try:
                 data = json.loads(self._db_path.read_text(encoding="utf-8"))
@@ -192,6 +203,7 @@ class ClipManager:
                 log.warning(f"Failed to load clips: {e}")
 
     def _save(self):
+        """Save."""
         try:
             self._db_path.write_text(
                 json.dumps([c.to_dict() for c in self._clips.values()], ensure_ascii=False, indent=2), encoding="utf-8"
@@ -200,6 +212,7 @@ class ClipManager:
             log.warning(f"Failed to save clips: {e}")
 
     def _make_id(self, url: str) -> str:
+        """Make id."""
         return hashlib.sha256(url.encode()).hexdigest()[:12]
 
     def clip_url(self, url: str) -> WebClip:
@@ -225,9 +238,11 @@ class ClipManager:
         return clip
 
     def get(self, clip_id: str) -> Optional[WebClip]:
+        """Get."""
         return self._clips.get(clip_id)
 
     def list_all(self, limit: int = 50) -> List[WebClip]:
+        """List all."""
         clips = sorted(self._clips.values(), key=lambda c: c.created_at, reverse=True)
         return clips[:limit]
 
@@ -245,6 +260,7 @@ class ClipManager:
         return [c for _, c in scored[:20]]
 
     def remove(self, clip_id: str) -> bool:
+        """Remove."""
         if clip_id in self._clips:
             del self._clips[clip_id]
             self._save()
@@ -265,6 +281,7 @@ class ClipManager:
 
     @property
     def count(self) -> int:
+        """Count."""
         return len(self._clips)
 
 

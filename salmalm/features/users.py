@@ -34,6 +34,7 @@ class QuotaExceeded(Exception):
     """Raised when a user exceeds their daily or monthly cost quota."""
 
     def __init__(self, message: str = "사용량 한도를 초과했습니다 / Quota exceeded") -> None:
+        """Init  ."""
         super().__init__(message)
         self.message = message
 
@@ -51,6 +52,7 @@ class UserManager:
     DEFAULT_MONTHLY_LIMIT = 50.0
 
     def _ensure_db(self):
+        """Ensure db."""
         if self._initialized:
             return
         conn = sqlite3.connect(str(USERS_DB))

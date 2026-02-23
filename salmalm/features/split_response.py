@@ -58,6 +58,7 @@ class SplitResponder:
 
     @staticmethod
     def available_modes() -> List[str]:
+        """Available modes."""
         return list(SPLIT_MODES.keys()) + ["custom"]
 
     @staticmethod
@@ -66,9 +67,11 @@ class SplitResponder:
         return bool(_AUTO_DETECT_RE.search(text))
 
     def set_custom(self, label_a: str, label_b: str, prompt_a: str, prompt_b: str) -> None:
+        """Set custom."""
         self._custom_perspectives = (label_a, label_b, prompt_a, prompt_b)
 
     def _get_mode_config(self, mode: str) -> Tuple[str, str, str, str]:
+        """Get mode config."""
         if mode == "custom":
             return self._custom_perspectives
         return SPLIT_MODES.get(mode, SPLIT_MODES["conservative_bold"])

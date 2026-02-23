@@ -7,6 +7,7 @@ from salmalm.tools.tools_common import _resolve_path
 
 @register("read_file")
 def handle_read_file(args: dict) -> str:
+    """Handle read file."""
     p = _resolve_path(args["path"])
     if not p.exists():
         return f"File not found: {p}"
@@ -38,6 +39,7 @@ def handle_read_file(args: dict) -> str:
 
 @register("write_file")
 def handle_write_file(args: dict) -> str:
+    """Handle write file."""
     p = _resolve_path(args["path"], writing=True)
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -51,6 +53,7 @@ def handle_write_file(args: dict) -> str:
 
 @register("edit_file")
 def handle_edit_file(args: dict) -> str:
+    """Handle edit file."""
     p = _resolve_path(args["path"], writing=True)
     text = p.read_text(encoding="utf-8")
     if args["old_text"] not in text:
@@ -62,6 +65,7 @@ def handle_edit_file(args: dict) -> str:
 
 @register("diff_files")
 def handle_diff_files(args: dict) -> str:
+    """Handle diff files."""
     f1 = args.get("file1", "")
     f2 = args.get("file2", "")
     ctx = args.get("context_lines", 3)

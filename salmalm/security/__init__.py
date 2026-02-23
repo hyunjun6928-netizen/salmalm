@@ -8,6 +8,7 @@ _SUBMODULES = {"security", "crypto", "exec_approvals", "sandbox", "container"}
 
 
 def _get_real():
+    """Get real."""
     global _real_mod
     if _real_mod is None:
         _real_mod = _importlib.import_module("salmalm.security.security")

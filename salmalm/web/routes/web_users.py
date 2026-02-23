@@ -10,6 +10,7 @@ class WebUsersMixin:
     """Mixin providing users route handlers."""
     def _get_api_users(self):
         # Admin: full user list with stats (멀티테넌트 사용자 관리)
+        """Get api users."""
         user = extract_auth(dict(self.headers))
         if not user:
             ip = self._get_client_ip()
@@ -30,6 +31,7 @@ class WebUsersMixin:
 
     def _get_api_users_quota(self):
         # Get own quota (사용량 확인)
+        """Get api users quota."""
         user = extract_auth(dict(self.headers))
         if not user:
             self._json({"error": "Authentication required"}, 401)
@@ -42,6 +44,7 @@ class WebUsersMixin:
 
     def _get_api_users_settings(self):
         # Get own settings
+        """Get api users settings."""
         user = extract_auth(dict(self.headers))
         if not user:
             self._json({"error": "Authentication required"}, 401)
@@ -54,6 +57,7 @@ class WebUsersMixin:
 
     def _get_api_tenant_config(self):
         # Admin: get multi-tenant config
+        """Get api tenant config."""
         user = extract_auth(dict(self.headers))
         if not user or user.get("role") != "admin":
             self._json({"error": "Admin access required"}, 403)
@@ -69,6 +73,7 @@ class WebUsersMixin:
             )
 
     def _post_api_users_delete(self):
+        """Post api users delete."""
         body = self._body
         requester = extract_auth(dict(self.headers))
         if not requester or requester.get("role") != "admin":
@@ -90,6 +95,7 @@ class WebUsersMixin:
         return
 
     def _post_api_users_toggle(self):
+        """Post api users toggle."""
         body = self._body
         # Enable/disable user (admin only)
         requester = extract_auth(dict(self.headers))
@@ -108,6 +114,7 @@ class WebUsersMixin:
         return
 
     def _post_api_users_quota_set(self):
+        """Post api users quota set."""
         body = self._body
         # Set user quota (admin only)
         requester = extract_auth(dict(self.headers))
@@ -129,6 +136,7 @@ class WebUsersMixin:
         return
 
     def _post_api_users_settings(self):
+        """Post api users settings."""
         body = self._body
         # Update own settings
         user = extract_auth(dict(self.headers))
@@ -146,6 +154,7 @@ class WebUsersMixin:
         return
 
     def _post_api_tenant_config(self):
+        """Post api tenant config."""
         body = self._body
         # Admin: update multi-tenant config
         requester = extract_auth(dict(self.headers))

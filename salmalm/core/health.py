@@ -84,6 +84,7 @@ def get_health_report() -> dict:
 
 
 def _format_uptime() -> str:
+    """Format uptime."""
     secs = int(time.time() - _start_time)
     days, rem = divmod(secs, 86400)
     hours, rem = divmod(rem, 3600)

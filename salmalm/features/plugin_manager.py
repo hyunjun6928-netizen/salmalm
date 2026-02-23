@@ -28,6 +28,7 @@ class PluginInfo:
     """Metadata and runtime state for a loaded plugin."""
 
     def __init__(self, name: str, path: Path, metadata: dict) -> None:
+        """Init  ."""
         self.name = name
         self.path = path
         self.metadata = metadata
@@ -40,6 +41,7 @@ class PluginInfo:
         self.error: Optional[str] = None
 
     def to_dict(self) -> dict:
+        """To dict."""
         return {
             "name": self.name,
             "version": self.version,
@@ -56,6 +58,7 @@ class PluginManager:
     """Manages directory-based plugins with tool registration and hook integration."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._plugins: Dict[str, PluginInfo] = {}
         self._state: Dict[str, bool] = {}  # name -> enabled
         self._lock = threading.Lock()

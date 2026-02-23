@@ -39,12 +39,14 @@ _rpc_id = 0
 
 
 def _next_id() -> int:
+    """Next id."""
     global _rpc_id
     _rpc_id += 1
     return _rpc_id
 
 
 def _rpc_request(method: str, params: Optional[dict] = None, id: Optional[int] = None) -> dict:
+    """Rpc request."""
     msg = {"jsonrpc": "2.0", "method": method}
     if params:
         msg["params"] = params  # type: ignore[assignment]
@@ -54,6 +56,7 @@ def _rpc_request(method: str, params: Optional[dict] = None, id: Optional[int] =
 
 
 def _rpc_response(id: int, result: Optional[Any] = None, error: Optional[dict] = None) -> dict:
+    """Rpc response."""
     msg = {"jsonrpc": "2.0", "id": id}
     if error:
         msg["error"] = error
@@ -81,6 +84,7 @@ class MCPServer:
     }
 
     def __init__(self) -> None:
+        """Init  ."""
         self._tools: List[dict] = []
         self._tool_executor = None  # async fn(name, args) -> result
         self._resources: List[dict] = []
@@ -342,6 +346,7 @@ class MCPClientConnection:
     """A connection to a single external MCP server (stdio transport)."""
 
     def __init__(self, name: str, command: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None) -> None:
+        """Init  ."""
         self.name = name
         self.command = command
         self.env = env or {}
@@ -521,6 +526,7 @@ class MCPManager:
     """Manages multiple MCP client connections + the server instance."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._clients: Dict[str, MCPClientConnection] = {}
         self._server = MCPServer()
         self._config_path = BASE_DIR / "mcp_servers.json"

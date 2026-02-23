@@ -104,6 +104,7 @@ class SubAgent:
         }
 
         def _run():
+            """Run."""
             try:
                 session_id = f"subagent-{agent_id}"
                 session = _core().get_session(session_id)
@@ -198,6 +199,7 @@ class SubAgent:
         """Schedule auto-archive after _ARCHIVE_DELAY_SEC."""
 
         def _do_archive():
+            """Do archive."""
             agent = cls._agents.get(agent_id)
             if agent and not agent.get("archived"):
                 agent["archived"] = True
@@ -762,6 +764,7 @@ class AgentConfig:
     """Configuration and paths for a single agent (에이전트 설정)."""
 
     def __init__(self, agent_id: str) -> None:
+        """Init  ."""
         self.agent_id = agent_id
         self.base_dir = AGENTS_DIR / agent_id
         self.workspace_dir = self.base_dir / "workspace"
@@ -771,6 +774,7 @@ class AgentConfig:
         self._load()
 
     def _load(self):
+        """Load."""
         try:
             if self.config_file.exists():
                 self._config = json.loads(self.config_file.read_text(encoding="utf-8"))
@@ -778,6 +782,7 @@ class AgentConfig:
             self._config = {}
 
     def save(self) -> None:
+        """Save."""
         try:
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
             self.config_file.write_text(json.dumps(self._config, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -786,18 +791,22 @@ class AgentConfig:
 
     @property
     def display_name(self) -> str:
+        """Display name."""
         return self._config.get("display_name", self.agent_id)
 
     @property
     def model(self) -> Optional[str]:
+        """Model."""
         return self._config.get("model")
 
     @property
     def soul_file(self) -> Path:
+        """Soul file."""
         return self.workspace_dir / "SOUL.md"
 
     @property
     def api_key(self) -> Optional[str]:
+        """Api key."""
         return self._config.get("api_key")
 
     @property
@@ -806,6 +815,7 @@ class AgentConfig:
         return self._config.get("allowed_tools")
 
     def to_dict(self) -> dict:
+        """To dict."""
         return {
             "id": self.agent_id,
             "display_name": self.display_name,
@@ -823,6 +833,7 @@ class AgentManager:
     """
 
     def __init__(self) -> None:
+        """Init  ."""
         self._agents: dict = {}  # agent_id -> AgentConfig
         self._bindings: dict = {}  # "telegram:chatid" -> agent_id
         self._lock = threading.Lock()
@@ -849,6 +860,7 @@ class AgentManager:
             self._bindings = {}
 
     def _save_bindings(self):
+        """Save bindings."""
         try:
             BINDINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
             BINDINGS_FILE.write_text(json.dumps(self._bindings, indent=2, ensure_ascii=False), encoding="utf-8")

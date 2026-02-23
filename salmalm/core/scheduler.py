@@ -14,6 +14,7 @@ class CronScheduler:
     """OpenClaw-style cron scheduler with isolated session execution."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self.jobs = []
         self._running = False
 

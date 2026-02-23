@@ -35,6 +35,7 @@ class WebChatMixin:
             self.end_headers()
 
             def send_sse(event, data) -> None:
+                """Send sse."""
                 try:
                     payload = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
                     self.wfile.write(payload.encode())
@@ -46,6 +47,7 @@ class WebChatMixin:
             tool_count = [0]
 
             def on_tool_sse(name, args) -> None:
+                """On tool sse."""
                 tool_count[0] += 1
                 send_sse("tool", {"name": name, "args": str(args)[:200], "count": tool_count[0]})
                 send_sse("status", {"text": f"🔧 Running {name}..."})
@@ -53,6 +55,7 @@ class WebChatMixin:
             streamed_text = [""]
 
             def on_token_sse(event) -> None:
+                """On token sse."""
                 try:
                     etype = event.get("type", "")
                     if etype == "text_delta":
@@ -153,6 +156,7 @@ class WebChatMixin:
             )
 
     def _post_api_chat_abort(self):
+        """Post api chat abort."""
         body = self._body
         # Abort generation — LibreChat style (생성 중지)
         if not self._require_auth("user"):
@@ -165,6 +169,7 @@ class WebChatMixin:
         return
 
     def _post_api_chat_regenerate(self):
+        """Post api chat regenerate."""
         body = self._body
         # Regenerate response — LibreChat style (응답 재생성)
         if not self._require_auth("user"):
@@ -189,6 +194,7 @@ class WebChatMixin:
         return
 
     def _post_api_chat_compare(self):
+        """Post api chat compare."""
         body = self._body
         # Compare models — BIG-AGI style (응답 비교)
         if not self._require_auth("user"):
@@ -211,6 +217,7 @@ class WebChatMixin:
         return
 
     def _post_api_alternatives_switch(self):
+        """Post api alternatives switch."""
         body = self._body
         # Switch alternative — LibreChat style (대안 전환)
         if not self._require_auth("user"):
@@ -243,6 +250,7 @@ class WebChatMixin:
         return
 
     def _post_api_messages_edit(self):
+        """Post api messages edit."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -264,6 +272,7 @@ class WebChatMixin:
         self._json(result)
 
     def _post_api_messages_delete(self):
+        """Post api messages delete."""
         body = self._body
         if not self._require_auth("user"):
             return

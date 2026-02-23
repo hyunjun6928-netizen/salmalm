@@ -38,9 +38,11 @@ class WebSetupMixin:
 
     def _get_setup(self):
         # Allow re-running the setup wizard anytime
+        """Get setup."""
         from salmalm.web import templates as _tmpl; self._html(_tmpl.ONBOARDING_HTML)
 
     def _post_api_setup(self):
+        """Post api setup."""
         body = self._body
         # First-run setup — create vault with or without password
         if VAULT_FILE.exists():  # noqa: F405
@@ -89,6 +91,7 @@ class WebSetupMixin:
         return
 
     def _post_api_onboarding(self):
+        """Post api onboarding."""
         try:
             return self._post_api_onboarding_inner()
         except Exception as e:
@@ -96,6 +99,7 @@ class WebSetupMixin:
             self._json({"error": f"Internal error: {str(e)[:200]}"}, 500)
 
     def _post_api_onboarding_inner(self):
+        """Post api onboarding inner."""
         body = self._body
         if not vault.is_unlocked:
             # Fresh install: auto-create vault with empty password
@@ -229,6 +233,7 @@ class WebSetupMixin:
         return
 
     def _post_api_onboarding_preferences(self):
+        """Post api onboarding preferences."""
         body = self._body
         # Save model + persona preferences from setup wizard
         model = body.get("model", "auto")

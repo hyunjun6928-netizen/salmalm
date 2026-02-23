@@ -12,6 +12,7 @@ class TelegramCommandsMixin:
     """Mixin for /command handling in Telegram bot."""
 
     async def _handle_command(self, chat_id, text: str, tenant_user=None):
+        """Handle command."""
         cmd = text.split()[0].lower()
 
         # Multi-tenant commands (available even when not registered)

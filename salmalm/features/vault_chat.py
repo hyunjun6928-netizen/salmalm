@@ -73,6 +73,7 @@ class VaultChat:
     """
 
     def __init__(self, db_path: Optional[Path] = None, meta_path: Optional[Path] = None) -> None:
+        """Init  ."""
         self.db_path = db_path or VAULT_CHAT_DB
         self.meta_path = meta_path or VAULT_CHAT_META
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -201,6 +202,7 @@ class VaultChat:
         return "🔒 볼트가 잠겼습니다."
 
     def is_open(self) -> bool:
+        """Is open."""
         return self._key is not None and self._conn is not None
 
     def _check_auto_lock(self) -> bool:

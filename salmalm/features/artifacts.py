@@ -53,6 +53,7 @@ class Artifact:
         created_at: float = 0,
         metadata: Optional[Dict] = None,
     ):
+        """Init  ."""
         self.id = id
         self.type = type
         self.language = language
@@ -63,6 +64,7 @@ class Artifact:
         self.metadata = metadata or {}
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
         return {
             "id": self.id,
             "type": self.type,
@@ -76,6 +78,7 @@ class Artifact:
 
     @classmethod
     def from_dict(cls, d: Dict) -> "Artifact":
+        """From dict."""
         return cls(
             id=d["id"],
             type=d["type"],
@@ -91,6 +94,7 @@ class ArtifactManager:
     """Manage conversation artifacts."""
 
     def __init__(self, storage_dir: Optional[Path] = None) -> None:
+        """Init  ."""
         self._dir = storage_dir or ARTIFACTS_DIR
         self._dir.mkdir(parents=True, exist_ok=True)
         self._db_path = self._dir / "artifacts.json"
@@ -98,6 +102,7 @@ class ArtifactManager:
         self._load()
 
     def _load(self):
+        """Load."""
         if self._db_path.exists():
             try:
                 data = json.loads(self._db_path.read_text(encoding="utf-8"))
@@ -108,6 +113,7 @@ class ArtifactManager:
                 log.warning(f"Failed to load artifacts: {e}")
 
     def _save(self):
+        """Save."""
         try:
             self._db_path.write_text(
                 json.dumps([a.to_dict() for a in self._artifacts.values()], ensure_ascii=False, indent=2),
@@ -117,6 +123,7 @@ class ArtifactManager:
             log.warning(f"Failed to save artifacts: {e}")
 
     def _make_id(self, content: str) -> str:
+        """Make id."""
         return hashlib.sha256(content.encode()).hexdigest()[:12]
 
     def add(
@@ -130,13 +137,16 @@ class ArtifactManager:
         return a
 
     def get(self, artifact_id: str) -> Optional[Artifact]:
+        """Get."""
         return self._artifacts.get(artifact_id)
 
     def list_all(self, limit: int = 50) -> List[Artifact]:
+        """List all."""
         arts = sorted(self._artifacts.values(), key=lambda a: a.created_at, reverse=True)
         return arts[:limit]
 
     def remove(self, artifact_id: str) -> bool:
+        """Remove."""
         if artifact_id in self._artifacts:
             del self._artifacts[artifact_id]
             self._save()
@@ -181,6 +191,7 @@ class ArtifactManager:
 
     @property
     def count(self) -> int:
+        """Count."""
         return len(self._artifacts)
 
 

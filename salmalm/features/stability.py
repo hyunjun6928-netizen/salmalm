@@ -35,6 +35,7 @@ class CircuitBreaker:
     """Track error rates per component. Trip after threshold."""
 
     def __init__(self, threshold: int = 5, window_sec: int = 300, cooldown_sec: int = 60) -> None:
+        """Init  ."""
         self.threshold = threshold
         self.window_sec = window_sec
         self.cooldown_sec = cooldown_sec
@@ -103,6 +104,7 @@ class HealthMonitor:
     """Comprehensive health monitoring and auto-recovery."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self.circuit_breaker = CircuitBreaker()
         self._start_time = time.time()
         self._checks: Dict[str, dict] = {}
@@ -157,6 +159,7 @@ class HealthMonitor:
         return report
 
     def _format_uptime(self) -> str:
+        """Format uptime."""
         secs = int(time.time() - self._start_time)
         hours, remainder = divmod(secs, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -197,6 +200,7 @@ class HealthMonitor:
         return info
 
     def _check_vault(self) -> dict:
+        """Check vault."""
         from salmalm.security.crypto import vault
 
         return {
@@ -205,6 +209,7 @@ class HealthMonitor:
         }
 
     def _check_telegram(self) -> dict:
+        """Check telegram."""
         try:
             from salmalm.core import _tg_bot
 
@@ -215,6 +220,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_websocket(self) -> dict:
+        """Check websocket."""
         try:
             from salmalm.web.ws import ws_server
 
@@ -228,6 +234,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_rag(self) -> dict:
+        """Check rag."""
         try:
             from salmalm.features.rag import rag_engine
 
@@ -240,6 +247,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_mcp(self) -> dict:
+        """Check mcp."""
         try:
             from salmalm.features.mcp import mcp_manager
 
@@ -255,6 +263,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_cron(self) -> dict:
+        """Check cron."""
         try:
             from salmalm.core import cron
 
@@ -267,6 +276,7 @@ class HealthMonitor:
             return {"status": "error", "error": str(e)[:100]}
 
     def _check_database(self) -> dict:
+        """Check database."""
         import sqlite3
 
         try:

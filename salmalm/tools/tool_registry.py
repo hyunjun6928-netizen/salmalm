@@ -43,6 +43,7 @@ def register(name):
     """Decorator to register a tool handler function."""
 
     def decorator(fn):
+        """Decorator."""
         _HANDLERS[name] = fn
         return fn
 

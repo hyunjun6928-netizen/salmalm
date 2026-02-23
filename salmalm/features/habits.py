@@ -20,6 +20,7 @@ HABIT_DB = BASE_DIR / "habits.db"
 
 
 def _get_db(db_path: Optional[Path] = None) -> sqlite3.Connection:
+    """Get db."""
     conn = _connect_db(db_path or HABIT_DB, wal=True)
     conn.execute("""CREATE TABLE IF NOT EXISTS habits (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,16 +43,19 @@ class HabitTracker:
     """습관 추적기."""
 
     def __init__(self, db_path: Optional[Path] = None) -> None:
+        """Init  ."""
         self._db_path = db_path
         self._conn: Optional[sqlite3.Connection] = None
 
     @property
     def conn(self) -> sqlite3.Connection:
+        """Conn."""
         if self._conn is None:
             self._conn = _get_db(self._db_path)
         return self._conn
 
     def close(self) -> None:
+        """Close."""
         if self._conn:
             self._conn.close()
             self._conn = None
@@ -217,6 +221,7 @@ _tracker: Optional[HabitTracker] = None
 
 
 def get_tracker(db_path: Optional[Path] = None) -> HabitTracker:
+    """Get tracker."""
     global _tracker
     if _tracker is None:
         _tracker = HabitTracker(db_path)
@@ -297,6 +302,7 @@ def register_habit_tools():
     from salmalm.tools.tool_registry import register_dynamic
 
     async def _habit_tool(args):
+        """Habit tool."""
         sub = args.get("subcommand", "remind")
         name = args.get("name", "")
         cmd = f"/habit {sub} {name}".strip()

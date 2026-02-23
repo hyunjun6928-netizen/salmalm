@@ -30,6 +30,7 @@ def _run_checkpoint(interval_seconds: float) -> None:
 
 
 def _schedule(interval_seconds: float) -> None:
+    """Schedule."""
     global _timer
     with _lock:
         _timer = threading.Timer(interval_seconds, _run_checkpoint, args=(interval_seconds,))

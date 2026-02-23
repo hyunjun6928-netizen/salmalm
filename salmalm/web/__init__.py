@@ -9,6 +9,7 @@ _SUBMODULES = {"web", "auth", "oauth", "templates", "ws"}
 
 
 def _get_real():
+    """Get real."""
     global _real_mod
     if _real_mod is None:
         _real_mod = _importlib.import_module("salmalm.web.web")

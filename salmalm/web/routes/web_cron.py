@@ -6,6 +6,7 @@ from salmalm.core import cron
 class WebCronMixin:
     """Mixin providing cron route handlers."""
     def _get_cron(self):
+        """Get cron."""
         if not self._require_auth("user"):
             return
         from salmalm.core import _llm_cron
@@ -13,6 +14,7 @@ class WebCronMixin:
         self._json({"jobs": _llm_cron.list_jobs() if _llm_cron else []})
 
     def _post_api_cron_add(self):
+        """Post api cron add."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -43,6 +45,7 @@ class WebCronMixin:
         self._json({"ok": True, "job": job})
 
     def _post_api_cron_delete(self):
+        """Post api cron delete."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -55,6 +58,7 @@ class WebCronMixin:
             self._json({"ok": False, "error": "Job not found"}, 404)
 
     def _post_api_cron_toggle(self):
+        """Post api cron toggle."""
         body = self._body
         if not self._require_auth("user"):
             return

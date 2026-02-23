@@ -38,6 +38,7 @@ class MessageQueue:
     """Per-session message queue with configurable modes."""
 
     def __init__(self, mode: str = "collect", max_size: int = 50) -> None:
+        """Init  ."""
         self._mode = QueueMode(mode) if isinstance(mode, str) else mode
         self._queue: deque[QueuedMessage] = deque(maxlen=max_size)
         self._backlog: list[QueuedMessage] = []
@@ -47,23 +48,28 @@ class MessageQueue:
 
     @property
     def mode(self) -> str:
+        """Mode."""
         return self._mode.value
 
     @mode.setter
     def mode(self, value: str) -> None:
+        """Mode."""
         self._mode = QueueMode(value)
         logger.info("Queue mode changed to: %s", value)
 
     @property
     def is_processing(self) -> bool:
+        """Is processing."""
         return self._processing
 
     @is_processing.setter
     def is_processing(self, value: bool) -> None:
+        """Is processing."""
         self._processing = value
 
     @property
     def cancel_requested(self) -> bool:
+        """Cancel requested."""
         return self._cancel_flag.is_set()
 
     def enqueue(self, text: str, session_id: str = "", user_id: str = "") -> dict:
@@ -130,15 +136,18 @@ class MessageQueue:
 
     @property
     def pending_count(self) -> int:
+        """Pending count."""
         return len(self._queue)
 
     def clear(self) -> None:
+        """Clear."""
         with self._lock:
             self._queue.clear()
             self._backlog.clear()
             self._cancel_flag.clear()
 
     def status(self) -> dict:
+        """Status."""
         return {
             "mode": self._mode.value,
             "pending": len(self._queue),

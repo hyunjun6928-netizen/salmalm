@@ -80,6 +80,7 @@ class LoginRateLimiter:
     로그인 시도에 대한 지수 백오프 제한."""
 
     def __init__(self, max_attempts: int = 5, lockout_seconds: int = 300) -> None:
+        """Init  ."""
         self._attempts: Dict[str, List[float]] = {}
         self._lockouts: Dict[str, float] = {}  # key -> lockout_until
         self._lock = threading.Lock()

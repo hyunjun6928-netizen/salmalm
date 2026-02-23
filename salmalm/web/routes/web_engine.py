@@ -10,6 +10,7 @@ from salmalm.constants import COMPACTION_THRESHOLD, MODEL_COSTS
 class WebEngineMixin:
     """Mixin providing engine route handlers."""
     def _get_sla(self):
+        """Get sla."""
         from salmalm.features.sla import uptime_monitor, latency_tracker, watchdog, sla_config
 
         self._json(
@@ -22,11 +23,13 @@ class WebEngineMixin:
         )
 
     def _get_sla_config(self):
+        """Get sla config."""
         from salmalm.features.sla import sla_config
 
         self._json(sla_config.get_all())
 
     def _get_routing(self):
+        """Get routing."""
         if not self._require_auth("user"):
             return
         from salmalm.core.engine import get_routing_config
@@ -51,6 +54,7 @@ class WebEngineMixin:
         self._json({"config": config, "available_models": MODELS})
 
     def _get_failover(self):
+        """Get failover."""
         if not self._require_auth("user"):
             return
         from salmalm.core.engine import get_failover_config
@@ -59,6 +63,7 @@ class WebEngineMixin:
         self._json({"config": get_failover_config(), "cooldowns": get_cooldown_status()})
 
     def _post_api_routing(self):
+        """Post api routing."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -104,6 +109,7 @@ class WebEngineMixin:
         self._json({"ok": True, "config": config, "summary": summary, "keys_used": available_keys})
 
     def _post_api_failover(self):
+        """Post api failover."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -114,6 +120,7 @@ class WebEngineMixin:
         return
 
     def _post_api_sla_config(self):
+        """Post api sla config."""
         body = self._body
         # Update SLA config (SLA 설정 업데이트)
         if not self._require_auth("admin"):

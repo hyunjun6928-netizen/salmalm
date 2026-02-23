@@ -13,9 +13,11 @@ class ConversationFork:
     """Manage alternative responses at the same message index."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._ensure_table()
 
     def _ensure_table(self):
+        """Ensure table."""
         try:
             from salmalm.core import _get_db
 
@@ -36,6 +38,7 @@ class ConversationFork:
             log.warning(f"Alternatives table init: {e}")
 
     def save_alternative(self, session_id: str, message_index: int, content: str, model: str = "", active: bool = True) -> None:
+        """Save alternative."""
         try:
             from salmalm.core import _get_db
 
@@ -57,6 +60,7 @@ class ConversationFork:
             log.warning(f"Save alternative error: {e}")
 
     def get_alternatives(self, session_id: str, message_index: int) -> List[Dict]:
+        """Get alternatives."""
         try:
             from salmalm.core import _get_db
 
@@ -74,6 +78,7 @@ class ConversationFork:
             return []
 
     def switch_alternative(self, session_id: str, message_index: int, alt_id: int) -> Optional[str]:
+        """Switch alternative."""
         try:
             from salmalm.core import _get_db
 
@@ -90,6 +95,7 @@ class ConversationFork:
             return None
 
     async def regenerate(self, session_id: str, message_index: int) -> Optional[str]:
+        """Regenerate."""
         from salmalm.core import get_session
 
         session = get_session(session_id)

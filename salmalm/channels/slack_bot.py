@@ -16,6 +16,7 @@ class SlackBot:
     """Minimal Slack bot using Event API (webhook) + Web API (urllib)."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self.bot_token: Optional[str] = None
         self.signing_secret: Optional[str] = None
         self.bot_user_id: Optional[str] = None

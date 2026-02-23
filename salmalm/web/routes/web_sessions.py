@@ -11,6 +11,7 @@ from salmalm.core import audit_log
 class WebSessionsMixin:
     """Mixin providing sessions route handlers."""
     def _get_api_sessions(self):
+        """Get api sessions."""
         _auth_user = self._require_auth("user")
         if not _auth_user:
             return
@@ -66,6 +67,7 @@ class WebSessionsMixin:
         self._json({"sessions": sessions})
 
     def _post_api_sessions_create(self):
+        """Post api sessions create."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -111,6 +113,7 @@ class WebSessionsMixin:
         self._json({"ok": True, "session_id": sid})
 
     def _post_api_sessions_delete(self):
+        """Post api sessions delete."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -129,6 +132,7 @@ class WebSessionsMixin:
         self._json({"ok": True})
 
     def _post_api_sessions_rename(self):
+        """Post api sessions rename."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -145,6 +149,7 @@ class WebSessionsMixin:
         self._json({"ok": True})
 
     def _post_api_sessions_rollback(self):
+        """Post api sessions rollback."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -159,6 +164,7 @@ class WebSessionsMixin:
         self._json(result)
 
     def _post_api_sessions_branch(self):
+        """Post api sessions branch."""
         body = self._body
         if not self._require_auth("user"):
             return

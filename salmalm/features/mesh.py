@@ -36,6 +36,7 @@ class MeshPeer:
     """Represents a remote SalmAlm instance."""
 
     def __init__(self, peer_id: str, url: str, name: str = "", secret: str = "") -> None:
+        """Init  ."""
         self.peer_id = peer_id
         self.url = url.rstrip("/")
         self.name = name or peer_id
@@ -129,6 +130,7 @@ class MeshPeer:
             return {"error": str(e), "status": "offline"}
 
     def to_dict(self) -> dict:
+        """To dict."""
         return {
             "peer_id": self.peer_id,
             "url": self.url,
@@ -147,6 +149,7 @@ class MeshManager:
     _MAX_PEERS = 20
 
     def __init__(self) -> None:
+        """Init  ."""
         self._peers: Dict[str, MeshPeer] = {}
         self._lock = threading.Lock()
         self._clipboard: str = ""

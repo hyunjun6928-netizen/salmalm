@@ -8,6 +8,7 @@ from typing import Any, Dict
 
 
 def detect_paste_type(text: str) -> Dict[str, Any]:
+    """Detect paste type."""
     text = text.strip()
 
     url_pattern = re.compile(r"^https?://\S+$")

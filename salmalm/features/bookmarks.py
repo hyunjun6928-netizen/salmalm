@@ -13,9 +13,11 @@ class BookmarkManager:
     """Manage message bookmarks across sessions."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._ensure_table()
 
     def _ensure_table(self):
+        """Ensure table."""
         try:
             from salmalm.core import _get_db
 
@@ -37,6 +39,7 @@ class BookmarkManager:
     def add(
         self, session_id: str, message_index: int, content_preview: str = "", note: str = "", role: str = "assistant"
     ) -> bool:
+        """Add."""
         try:
             from salmalm.core import _get_db
 
@@ -54,6 +57,7 @@ class BookmarkManager:
             return False
 
     def remove(self, session_id: str, message_index: int) -> bool:
+        """Remove."""
         try:
             from salmalm.core import _get_db
 
@@ -65,6 +69,7 @@ class BookmarkManager:
             return False
 
     def list_all(self, limit: int = 50) -> List[Dict]:
+        """List all."""
         try:
             from salmalm.core import _get_db
 
@@ -90,6 +95,7 @@ class BookmarkManager:
             return []
 
     def list_session(self, session_id: str) -> List[Dict]:
+        """List session."""
         try:
             from salmalm.core import _get_db
 
@@ -107,6 +113,7 @@ class BookmarkManager:
             return []
 
     def is_bookmarked(self, session_id: str, message_index: int) -> bool:
+        """Is bookmarked."""
         try:
             from salmalm.core import _get_db
 

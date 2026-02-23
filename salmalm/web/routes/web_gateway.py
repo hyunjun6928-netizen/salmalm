@@ -9,11 +9,13 @@ import json
 class WebGatewayMixin:
     """Mixin providing gateway route handlers."""
     def _get_gateway_nodes(self):
+        """Get gateway nodes."""
         from salmalm.features.nodes import gateway
 
         self._json({"nodes": gateway.list_nodes()})
 
     def _post_api_config_telegram(self):
+        """Post api config telegram."""
         body = self._body
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
@@ -23,6 +25,7 @@ class WebGatewayMixin:
         self._json({"ok": True, "message": "Telegram config saved. Restart required."})
 
     def _post_api_gateway_register(self):
+        """Post api gateway register."""
         body = self._body
         from salmalm.features.nodes import gateway
 
@@ -41,6 +44,7 @@ class WebGatewayMixin:
         self._json(result)  # type: ignore[arg-type]
 
     def _post_api_gateway_heartbeat(self):
+        """Post api gateway heartbeat."""
         body = self._body
         from salmalm.features.nodes import gateway
 
@@ -48,6 +52,7 @@ class WebGatewayMixin:
         self._json(gateway.heartbeat(node_id))
 
     def _post_api_gateway_dispatch(self):
+        """Post api gateway dispatch."""
         body = self._body
         from salmalm.features.nodes import gateway
 
@@ -63,6 +68,7 @@ class WebGatewayMixin:
         self._json(result)  # type: ignore[arg-type]
 
     def _post_api_gateway_unregister(self):
+        """Post api gateway unregister."""
         body = self._body
         from salmalm.features.nodes import gateway
 
@@ -70,6 +76,7 @@ class WebGatewayMixin:
         self._json(gateway.unregister(node_id))
 
     def _post_webhook_slack(self):
+        """Post webhook slack."""
         body = self._body
         # Slack Event API webhook
         from salmalm.channels.slack_bot import slack_bot
@@ -91,6 +98,7 @@ class WebGatewayMixin:
             self._json({"ok": True})
 
     def _post_webhook_telegram(self):
+        """Post webhook telegram."""
         body = self._body
         # Telegram webhook endpoint
         from salmalm.channels.telegram import telegram_bot

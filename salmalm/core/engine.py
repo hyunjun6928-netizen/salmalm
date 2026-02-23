@@ -173,9 +173,11 @@ Then execute the plan."""
 If the answer is insufficient, improve it now. If satisfactory, return it as-is."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._tool_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tool")
 
     def _get_tools_for_provider(self, provider: str, intent: str = None, user_message: str = "") -> list:
+        """Get tools for provider."""
         from salmalm.core.tool_selector import get_tools_for_provider
         return get_tools_for_provider(provider, intent, user_message)
 
@@ -532,6 +534,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     async def _execute_loop(
         self, session, user_message, model_override, on_tool, classification, tier, on_token=None, on_status=None
     ):
+        """Execute loop."""
         from salmalm.core.loop_helpers import (
             auto_log_conversation,
             check_abort,
@@ -945,6 +948,7 @@ async def _process_message_inner(
     _abort_ctl.start_streaming(session_id)
 
     def _sla_on_token(event) -> None:
+        """Sla on token."""
         if _sla_first_token_time[0] == 0.0:
             _sla_first_token_time[0] = _time.time()
         # Accumulate tokens for abort recovery

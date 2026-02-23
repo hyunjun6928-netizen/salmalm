@@ -208,6 +208,7 @@ def handle_browser(args: dict) -> str:
 
     # SSRF: block internal/private URLs when externally bound
     def _check_url_safe(url: str):
+        """Check url safe."""
         if url.startswith("about:"):
             return None
         if _is_internal_url(url):

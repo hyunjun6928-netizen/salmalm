@@ -22,6 +22,7 @@ class AsyncHTTPResponse:
     def __init__(
         self, status: int, headers: Dict[str, str], reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
+        """Init  ."""
         self.status = status
         self.headers = headers
         self._reader = reader
@@ -46,9 +47,11 @@ class AsyncHTTPResponse:
         return self._body
 
     async def json(self) -> dict:
+        """Json."""
         return json.loads(await self.read())
 
     async def text(self) -> str:
+        """Text."""
         return (await self.read()).decode("utf-8", errors="replace")
 
     # -- streaming ----------------------------------------------------------
@@ -102,6 +105,7 @@ class AsyncHTTPResponse:
         return bytes(body)
 
     def _close(self):
+        """Close."""
         try:
             if not self._writer.is_closing():
                 self._writer.close()
@@ -120,6 +124,7 @@ class AsyncHTTPClient:
     """
 
     def __init__(self, default_timeout: float = 30) -> None:
+        """Init  ."""
         self._default_timeout = default_timeout
 
     async def request(
@@ -186,12 +191,15 @@ class AsyncHTTPClient:
     # -- convenience wrappers -----------------------------------------------
 
     async def get(self, url: str, **kw) -> AsyncHTTPResponse:
+        """Get."""
         return await self.request("GET", url, **kw)
 
     async def post(self, url: str, **kw) -> AsyncHTTPResponse:
+        """Post."""
         return await self.request("POST", url, **kw)
 
     async def post_json(self, url: str, data, *, headers: Optional[Dict[str, str]] = None, **kw) -> AsyncHTTPResponse:
+        """Post json."""
         body = json.dumps(data).encode("utf-8")
         h = dict(headers) if headers else {}
         h["Content-Type"] = "application/json"

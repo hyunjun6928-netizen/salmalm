@@ -26,6 +26,7 @@ class MessageQueue:
     RETRY_BACKOFF = [5, 30, 120]  # seconds between retries
 
     def __init__(self) -> None:
+        """Init  ."""
         self._queue: List[dict] = []
         self._dead_letter: List[dict] = []
         self._lock = threading.Lock()

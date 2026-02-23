@@ -97,10 +97,12 @@ class ConfigManager:
 
     @classmethod
     def exists(cls, name: str) -> bool:
+        """Exists."""
         return (cls.BASE_DIR / f"{name}.json").exists()
 
     @classmethod
     def delete(cls, name: str) -> bool:
+        """Delete."""
         path = cls.BASE_DIR / f"{name}.json"
         if path.exists():
             path.unlink()

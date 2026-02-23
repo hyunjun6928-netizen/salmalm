@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def is_windows() -> bool:
+    """Is windows."""
     return sys.platform == "win32"
 
 
@@ -142,6 +143,7 @@ def _run_windows_tray(port: int = 18800):
     nid_ref = [None]
 
     def show_menu(hwnd) -> None:
+        """Show menu."""
         menu = user32.CreatePopupMenu()
         user32.AppendMenuW(menu, MF_STRING, ID_OPEN_UI, "🌐 Open Web UI")
         user32.AppendMenuW(menu, MF_STRING, ID_NEW_CHAT, "💬 New Chat")
@@ -166,12 +168,14 @@ def _run_windows_tray(port: int = 18800):
             _cleanup_and_quit(hwnd)
 
     def _cleanup_and_quit(hwnd):
+        """Cleanup and quit."""
         if nid_ref[0]:
             shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid_ref[0]))
         user32.PostMessageW(hwnd, WM_DESTROY, 0, 0)
         user32.PostQuitMessage(0)
 
     def wnd_proc(hwnd, msg, wparam, lparam):
+        """Wnd proc."""
         if msg == WM_TRAYICON:
             if lparam == WM_RBUTTONUP:
                 show_menu(hwnd)

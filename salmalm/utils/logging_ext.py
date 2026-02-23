@@ -103,6 +103,7 @@ class RequestLogger:
     """Middleware-style request/response logger."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._logger = logging.getLogger("salmalm.requests")
         self._metrics: dict = {
             "total_requests": 0,

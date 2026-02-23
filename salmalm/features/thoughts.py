@@ -15,6 +15,7 @@ THOUGHTS_DB = THOUGHTS_DIR / "thoughts.db"
 
 
 def _ensure_dir():
+    """Ensure dir."""
     THOUGHTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -28,11 +29,13 @@ class ThoughtStream:
     """Quick thought capture with SQLite storage."""
 
     def __init__(self, db_path: Optional[Path] = None) -> None:
+        """Init  ."""
         _ensure_dir()
         self.db_path = db_path or THOUGHTS_DB
         self._ensure_db()
 
     def _ensure_db(self):
+        """Ensure db."""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS thoughts (

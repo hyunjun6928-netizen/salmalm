@@ -45,6 +45,7 @@ class SSHNode:
     """Remote node accessible via SSH."""
 
     def __init__(self, name: str, host: str, user: str = "root", port: int = 22, key: Optional[str] = None) -> None:
+        """Init  ."""
         self.name = name
         self.host = host
         self.user = user
@@ -165,6 +166,7 @@ class HTTPNode:
     """Remote node accessible via HTTP agent protocol."""
 
     def __init__(self, name: str, url: str, token: str = "") -> None:
+        """Init  ."""
         self.name = name
         self.url = url.rstrip("/")
         self.token = token
@@ -230,6 +232,7 @@ class NodeManager:
     """Manages all remote nodes."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._nodes: Dict[str, object] = {}
 
     def load_config(self) -> None:
@@ -369,6 +372,7 @@ class GatewayRegistry:
     """Gateway side: manages registered nodes that can execute tools remotely."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._nodes: Dict[str, dict] = {}  # node_id → {url, token, capabilities, last_heartbeat, status}
         self._gateway_token: str = ""  # Set via config to require auth for registration
 
@@ -526,6 +530,7 @@ class NodeAgent:
     def __init__(
         self, gateway_url: str, node_id: str, token: str = "", capabilities: Optional[list] = None, name: str = ""
     ):
+        """Init  ."""
         self.gateway_url = gateway_url.rstrip("/")
         self.node_id = node_id
         self.token = token
@@ -581,6 +586,7 @@ class NodeAgent:
         import threading
 
         def _beat():
+            """Beat."""
             while self._running:
                 try:
                     payload = json.dumps({"node_id": self.node_id}).encode()

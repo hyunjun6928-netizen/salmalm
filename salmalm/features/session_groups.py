@@ -13,9 +13,11 @@ class SessionGroupManager:
     """Manage session groups/folders for organizing conversations."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._ensure_tables()
 
     def _ensure_tables(self):
+        """Ensure tables."""
         try:
             from salmalm.core import _get_db
 
@@ -44,6 +46,7 @@ class SessionGroupManager:
             log.warning(f"Session groups init: {e}")
 
     def list_groups(self) -> List[Dict]:
+        """List groups."""
         try:
             from salmalm.core import _get_db
 
@@ -70,6 +73,7 @@ class SessionGroupManager:
             return []
 
     def create_group(self, name: str, color: str = "#6366f1") -> Dict:
+        """Create group."""
         from salmalm.core import _get_db
 
         conn = _get_db()
@@ -84,6 +88,7 @@ class SessionGroupManager:
         return {"id": gid, "name": name, "color": color, "ok": True}
 
     def update_group(self, group_id: int, **kwargs) -> bool:
+        """Update group."""
         from salmalm.core import _get_db
 
         conn = _get_db()
@@ -101,6 +106,7 @@ class SessionGroupManager:
         return True
 
     def delete_group(self, group_id: int) -> bool:
+        """Delete group."""
         from salmalm.core import _get_db
 
         conn = _get_db()
@@ -110,6 +116,7 @@ class SessionGroupManager:
         return True
 
     def move_session(self, session_id: str, group_id: Optional[int]) -> bool:
+        """Move session."""
         from salmalm.core import _get_db
 
         conn = _get_db()

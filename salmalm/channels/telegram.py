@@ -24,6 +24,7 @@ from salmalm.channels.telegram_commands import TelegramCommandsMixin
 
 class TelegramBot(TelegramCommandsMixin):
     def __init__(self) -> None:
+        """Init  ."""
         self.token: Optional[str] = None
         self.owner_id: Optional[str] = None
         self.offset = 0
@@ -51,6 +52,7 @@ class TelegramBot(TelegramCommandsMixin):
         self._register_commands()
 
     def _api(self, method: str, data: Optional[dict] = None) -> dict:
+        """Api."""
         url = f"https://api.telegram.org/bot{self.token}/{method}"
         if data:
             return _http_post(url, {"Content-Type": "application/json"}, data)
@@ -62,6 +64,7 @@ class TelegramBot(TelegramCommandsMixin):
         import re as _re2
 
         def _repl(m):
+            """Repl."""
             try:
                 import json as _j2
 
@@ -389,6 +392,7 @@ class TelegramBot(TelegramCommandsMixin):
         """
 
         async def _loop():
+            """Loop."""
             try:
                 while True:
                     await asyncio.to_thread(self.send_typing, chat_id)
@@ -547,6 +551,7 @@ class TelegramBot(TelegramCommandsMixin):
 
     async def _handle_update(self, update: dict):
         # Handle inline button callback queries
+        """Handle update."""
         cb = update.get("callback_query")
         if cb:
             cb_data = cb.get("data", "")

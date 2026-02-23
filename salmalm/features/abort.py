@@ -25,6 +25,7 @@ class AbortController:
     """
 
     def __init__(self) -> None:
+        """Init  ."""
         self._flags: Dict[str, bool] = {}
         self._lock = threading.Lock()
         self._partial_responses: Dict[str, str] = {}
@@ -32,6 +33,7 @@ class AbortController:
         self._abort_times: Dict[str, float] = {}
 
     def set_abort(self, session_id: str) -> None:
+        """Set abort."""
         with self._lock:
             self._flags[session_id] = True
             self._abort_times[session_id] = time.time()
@@ -42,20 +44,24 @@ class AbortController:
             log.info(f"[ABORT] Generation abort requested: session={session_id}")
 
     def is_aborted(self, session_id: str) -> bool:
+        """Is aborted."""
         with self._lock:
             return self._flags.get(session_id, False)
 
     def clear(self, session_id: str) -> None:
+        """Clear."""
         with self._lock:
             self._flags.pop(session_id, None)
             self._accumulators.pop(session_id, None)
             self._abort_times.pop(session_id, None)
 
     def save_partial(self, session_id: str, text: str) -> None:
+        """Save partial."""
         with self._lock:
             self._partial_responses[session_id] = text
 
     def get_partial(self, session_id: str) -> Optional[str]:
+        """Get partial."""
         with self._lock:
             return self._partial_responses.pop(session_id, None)
 

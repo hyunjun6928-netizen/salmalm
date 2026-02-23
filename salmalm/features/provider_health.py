@@ -18,6 +18,7 @@ class ProviderHealthCheck:
     _CACHE_TTL = 300
 
     def check_all(self, force: bool = False) -> Dict[str, Any]:
+        """Check all."""
         now = time.time()
         if not force and self._cache and (now - self._cache_ts) < self._CACHE_TTL:
             return self._cache
@@ -65,6 +66,7 @@ class ProviderHealthCheck:
         return result
 
     def _test_anthropic(self, key: str) -> str:
+        """Test anthropic."""
         try:
             from salmalm.core.llm import _http_post
 
@@ -83,6 +85,7 @@ class ProviderHealthCheck:
             return f"error: {str(e)[:100]}"
 
     def _test_openai(self, key: str) -> str:
+        """Test openai."""
         try:
             from salmalm.core.llm import _http_post
 
@@ -97,6 +100,7 @@ class ProviderHealthCheck:
             return f"error: {str(e)[:100]}"
 
     def _test_xai(self, key: str) -> str:
+        """Test xai."""
         try:
             from salmalm.core.llm import _http_post
 
@@ -111,6 +115,7 @@ class ProviderHealthCheck:
             return f"error: {str(e)[:100]}"
 
     def _test_google(self, key: str) -> str:
+        """Test google."""
         try:
             import urllib.request
 
@@ -125,6 +130,7 @@ class ProviderHealthCheck:
             return f"error: {str(e)[:100]}"
 
     def _test_deepseek(self, key: str) -> str:
+        """Test deepseek."""
         try:
             from salmalm.core.llm import _http_post
 
@@ -139,6 +145,7 @@ class ProviderHealthCheck:
             return f"error: {str(e)[:100]}"
 
     def _test_ollama(self, url: str, api_key: str = None) -> str:
+        """Test ollama."""
         try:
             import urllib.request
 

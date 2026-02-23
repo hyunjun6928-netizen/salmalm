@@ -183,16 +183,19 @@ class LLMRouter:
     """Multi-provider LLM router with fallback."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._current_model: Optional[str] = None
         self._fallback_order: List[str] = ["anthropic", "openai", "google", "groq", "ollama"]
         self._call_history: List[Dict[str, Any]] = []
 
     @property
     def current_model(self) -> Optional[str]:
+        """Current model."""
         return self._current_model
 
     @current_model.setter
     def current_model(self, model: str) -> None:
+        """Current model."""
         self._current_model = model
 
     def switch_model(self, model: str) -> str:

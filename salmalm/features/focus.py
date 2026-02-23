@@ -18,6 +18,7 @@ class FocusSession:
     """Single focus session data."""
 
     def __init__(self, topic: str) -> None:
+        """Init  ."""
         self.topic = topic
         self.start_time = time.time()
         self.end_time: Optional[float] = None
@@ -27,15 +28,18 @@ class FocusSession:
 
     @property
     def active(self) -> bool:
+        """Active."""
         return self.end_time is None
 
     @property
     def duration_seconds(self) -> float:
+        """Duration seconds."""
         end = self.end_time or time.time()
         return end - self.start_time
 
     @property
     def duration_str(self) -> str:
+        """Duration str."""
         s = int(self.duration_seconds)
         h, m = divmod(s, 3600)
         m, sec = divmod(m, 60)
@@ -46,9 +50,11 @@ class FocusSession:
         return f"{sec}초"
 
     def end(self) -> None:
+        """End."""
         self.end_time = time.time()
 
     def to_dict(self) -> Dict:
+        """To dict."""
         return {
             "topic": self.topic,
             "start_time": self.start_time,
@@ -64,6 +70,7 @@ class FocusManager:
     """집중 모드 관리자."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._sessions: Dict[str, FocusSession] = {}  # user_id -> session
         self._history: list = []
 
@@ -184,6 +191,7 @@ _manager: Optional[FocusManager] = None
 
 
 def get_focus_manager() -> FocusManager:
+    """Get focus manager."""
     global _manager
     if _manager is None:
         _manager = FocusManager()
@@ -242,6 +250,7 @@ def register_focus_tools():
     from salmalm.tools.tool_registry import register_dynamic
 
     async def _focus_tool(args):
+        """Focus tool."""
         sub = args.get("subcommand", "status")
         topic = args.get("topic", "")
         cmd = f"/focus {sub} {topic}".strip()

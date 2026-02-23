@@ -20,6 +20,7 @@ class FileLogger:
     LOG_DIR = DATA_DIR / "logs"
 
     def __init__(self, log_dir: Optional[Path] = None) -> None:
+        """Init  ."""
         if log_dir is not None:
             self.LOG_DIR = log_dir
         self.LOG_DIR.mkdir(parents=True, exist_ok=True)

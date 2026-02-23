@@ -24,10 +24,12 @@ _db_lock = threading.Lock()
 
 
 def _get_db() -> sqlite3.Connection:
+    """Get db."""
     return _connect_db(_DB_PATH, wal=True, row_factory=True, check_same_thread=False)
 
 
 def _init_db():
+    """Init db."""
     conn = _get_db()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS notes (
@@ -176,6 +178,7 @@ _EXPENSE_CATEGORIES = {
 
 
 def _auto_categorize(description: str) -> str:
+    """Auto categorize."""
     desc_lower = description.lower()
     for category, keywords in _EXPENSE_CATEGORIES.items():
         for kw in keywords:
@@ -535,6 +538,7 @@ _DEFAULT_ROUTINES = {
 
 
 def _load_routines() -> dict:
+    """Load routines."""
     config_path = DATA_DIR / "routines.json"
     if config_path.exists():
         try:

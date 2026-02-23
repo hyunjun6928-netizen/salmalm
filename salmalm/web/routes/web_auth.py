@@ -85,6 +85,7 @@ class WebAuthMixin:
         return True
 
     def _get_api_auth_users(self):
+        """Get api auth users."""
         user = extract_auth(dict(self.headers))
         if not user or user.get("role") != "admin":
             self._json({"error": "Admin access required"}, 403)
@@ -92,6 +93,7 @@ class WebAuthMixin:
             self._json({"users": auth_manager.list_users()})
 
     def _get_api_google_auth(self):
+        """Get api google auth."""
         if not self._require_auth("user"):
             return
         client_id = vault.get("google_client_id") or ""
@@ -125,6 +127,7 @@ class WebAuthMixin:
         self.end_headers()
 
     def _post_api_users_register(self):
+        """Post api users register."""
         body = self._body
         # Register new user (admin or open registration)
         from salmalm.features.users import user_manager
@@ -151,6 +154,7 @@ class WebAuthMixin:
         return
 
     def _post_api_auth_login(self):
+        """Post api auth login."""
         body = self._body
         username = body.get("username", "")
         password = body.get("password", "")
@@ -173,6 +177,7 @@ class WebAuthMixin:
         return
 
     def _post_api_auth_register(self):
+        """Post api auth register."""
         body = self._body
         requester = extract_auth(dict(self.headers))
         if not requester or requester.get("role") != "admin":
@@ -190,6 +195,7 @@ class WebAuthMixin:
         return
 
     def _post_api_unlock(self):
+        """Post api unlock."""
         body = self._body
         password = body.get("password", "")
         if VAULT_FILE.exists():  # noqa: F405

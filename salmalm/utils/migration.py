@@ -51,10 +51,12 @@ _DATA_FILES_ALT = {
 
 
 def _sha256_bytes(data: bytes) -> str:
+    """Sha256 bytes."""
     return hashlib.sha256(data).hexdigest()
 
 
 def _now_kst() -> str:
+    """Now kst."""
     return datetime.now(KST).isoformat()
 
 
@@ -82,6 +84,7 @@ class AgentExporter:
     """Export agent state to a ZIP file."""
 
     def __init__(self, include_vault: bool = False, include_sessions: bool = True, include_data: bool = True) -> None:
+        """Init  ."""
         self.include_vault = include_vault
         self.include_sessions = include_sessions
         self.include_data = include_data
@@ -308,6 +311,7 @@ class ImportResult:
     """Result of an import operation."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self.ok: bool = True
         self.imported: List[str] = []
         self.skipped: List[str] = []
@@ -316,6 +320,7 @@ class ImportResult:
         self.manifest: Dict[str, Any] = {}
 
     def to_dict(self) -> dict:
+        """To dict."""
         return {
             "ok": self.ok,
             "imported": self.imported,
@@ -344,6 +349,7 @@ class AgentImporter:
 
     # conflict_mode: 'overwrite' | 'merge' | 'skip'
     def __init__(self, conflict_mode: str = "overwrite") -> None:
+        """Init  ."""
         self.conflict_mode = conflict_mode
 
     def preview(self, zip_data: bytes) -> Dict[str, Any]:
@@ -437,6 +443,7 @@ class AgentImporter:
         return result
 
     def _import_soul(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import soul."""
         try:
             soul_content = zf.read("soul/SOUL.md").decode("utf-8")
             from salmalm.core.prompt import set_user_soul
@@ -447,6 +454,7 @@ class AgentImporter:
             result.errors.append(f"soul: {e}")
 
     def _import_personas(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import personas."""
         try:
             _PERSONAS_DIR.mkdir(parents=True, exist_ok=True)
             count = 0
@@ -464,6 +472,7 @@ class AgentImporter:
             result.errors.append(f"personas: {e}")
 
     def _import_memory(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import memory."""
         try:
             count = 0
             for name in zf.namelist():
@@ -496,6 +505,7 @@ class AgentImporter:
             result.errors.append(f"memory: {e}")
 
     def _import_sessions(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import sessions."""
         try:
             from salmalm.core import _get_db
 
@@ -529,6 +539,7 @@ class AgentImporter:
             result.errors.append(f"sessions: {e}")
 
     def _import_config(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import config."""
         try:
             _HOME_DIR.mkdir(parents=True, exist_ok=True)
             count = 0
@@ -546,6 +557,7 @@ class AgentImporter:
             result.errors.append(f"config: {e}")
 
     def _import_data(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import data."""
         try:
             count = 0
             for name in zf.namelist():
@@ -566,6 +578,7 @@ class AgentImporter:
             result.errors.append(f"data: {e}")
 
     def _import_plugins(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import plugins."""
         try:
             _PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
             count = 0
@@ -583,6 +596,7 @@ class AgentImporter:
             result.errors.append(f"plugins: {e}")
 
     def _import_skills(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import skills."""
         try:
             _SKILLS_DIR.mkdir(parents=True, exist_ok=True)
             count = 0
@@ -600,6 +614,7 @@ class AgentImporter:
             result.errors.append(f"skills: {e}")
 
     def _import_vault(self, zf: zipfile.ZipFile, result: ImportResult):
+        """Import vault."""
         if "vault/vault.enc" not in zf.namelist():
             return
         if VAULT_FILE.exists() and self.conflict_mode == "skip":

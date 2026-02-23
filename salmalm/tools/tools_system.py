@@ -13,6 +13,7 @@ except ImportError:
 
 @register("system_monitor")
 def handle_system_monitor(args: dict) -> str:
+    """Handle system monitor."""
     detail = args.get("detail", "overview")
     lines = []
     try:
@@ -77,6 +78,7 @@ def handle_system_monitor(args: dict) -> str:
 
 @register("health_check")
 def handle_health_check(args: dict) -> str:
+    """Handle health check."""
     from salmalm.features.stability import health_monitor
 
     action = args.get("action", "check")

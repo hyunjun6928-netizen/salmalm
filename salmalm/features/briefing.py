@@ -26,6 +26,7 @@ def _load_config() -> dict:
 
 
 def _save_config(config: dict):
+    """Save config."""
     ConfigManager.save("briefing", config)
 
 
@@ -33,6 +34,7 @@ class DailyBriefing:
     """Generate daily briefing summaries."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self.config = _load_config()
 
     def generate(self, sections: list = None) -> str:

@@ -184,6 +184,7 @@ class Template:
         tools: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
     ):
+        """Init  ."""
         self.name = name
         self.display_name = display_name or name
         self.description = description
@@ -192,6 +193,7 @@ class Template:
         self.tags = tags or []
 
     def to_dict(self) -> Dict[str, Any]:
+        """To dict."""
         return {
             "name": self.name,
             "display_name": self.display_name,
@@ -203,6 +205,7 @@ class Template:
 
     @classmethod
     def from_dict(cls, d: Dict) -> "Template":
+        """From dict."""
         return cls(
             name=d.get("name", ""),
             display_name=d.get("display_name", ""),
@@ -236,6 +239,7 @@ class TemplateManager:
     """Manage conversation templates."""
 
     def __init__(self, templates_dir: Optional[Path] = None) -> None:
+        """Init  ."""
         self._dir = templates_dir or TEMPLATES_DIR
         self._dir.mkdir(parents=True, exist_ok=True)
         self._templates: Dict[str, Template] = {}
@@ -244,6 +248,7 @@ class TemplateManager:
         self._load_custom()
 
     def _load_builtins(self):
+        """Load builtins."""
         for name, data in _BUILTIN_TEMPLATES.items():
             self._templates[name] = Template.from_dict(data)
 
@@ -266,9 +271,11 @@ class TemplateManager:
                 log.warning(f"Failed to load template {f}: {e}")
 
     def list_templates(self) -> List[Template]:
+        """List templates."""
         return sorted(self._templates.values(), key=lambda t: t.name)
 
     def get(self, name: str) -> Optional[Template]:
+        """Get."""
         return self._templates.get(name)
 
     def use(self, name: str) -> Optional[Template]:
@@ -280,11 +287,13 @@ class TemplateManager:
 
     @property
     def active(self) -> Optional[Template]:
+        """Active."""
         if self._active:
             return self._templates.get(self._active)
         return None
 
     def deactivate(self) -> None:
+        """Deactivate."""
         self._active = None
 
     def create(
@@ -311,6 +320,7 @@ class TemplateManager:
         return t
 
     def remove(self, name: str) -> bool:
+        """Remove."""
         if name in self._templates and name not in _BUILTIN_TEMPLATES:
             del self._templates[name]
             path = self._dir / f"{name}.yaml"

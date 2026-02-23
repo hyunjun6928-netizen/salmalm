@@ -40,6 +40,7 @@ class WSClient:
     """Represents a single WebSocket connection."""
 
     def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, session_id: str = "web") -> None:
+        """Init  ."""
         self.reader = reader
         self.writer = writer
         self.session_id = session_id
@@ -142,6 +143,7 @@ class WebSocketServer:
     """Async WebSocket server that handles upgrade from raw TCP."""
 
     def __init__(self, host: str = "127.0.0.1", port: int = 18801) -> None:
+        """Init  ."""
         self.host = host
         self.port = port
         self.clients: Dict[int, WSClient] = {}
@@ -427,6 +429,7 @@ class StreamingResponse:
     """Helper to stream LLM response chunks to a WS client."""
 
     def __init__(self, client: WSClient, request_id: Optional[str] = None) -> None:
+        """Init  ."""
         self.client = client
         self.request_id = request_id or str(int(time.time() * 1000))
         self._chunks: list = []

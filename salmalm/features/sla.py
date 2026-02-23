@@ -52,6 +52,7 @@ class SLAConfig:
     """Runtime-reloadable SLA configuration from ~/.salmalm/sla.json."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._config: dict = dict(_DEFAULT_SLA_CONFIG)
         self._lock = threading.Lock()
         self._mtime: float = 0.0
@@ -93,21 +94,25 @@ class SLAConfig:
             log.warning(f"[SLA] Config save error: {e}")
 
     def get(self, key: str, default=None):
+        """Get."""
         self._maybe_reload()
         with self._lock:
             return self._config.get(key, default)
 
     def set(self, key: str, value) -> None:
+        """Set."""
         with self._lock:
             self._config[key] = value
         self.save()
 
     def get_all(self) -> dict:
+        """Get all."""
         self._maybe_reload()
         with self._lock:
             return dict(self._config)
 
     def update(self, data: dict) -> None:
+        """Update."""
         with self._lock:
             self._config.update(data)
         self.save()
@@ -143,11 +148,13 @@ class UptimeMonitor:
     """
 
     def __init__(self) -> None:
+        """Init  ."""
         self._start_time = time.time()
         self._start_dt = datetime.now(KST)
         self._lock = threading.Lock()
 
     def _get_db(self) -> sqlite3.Connection:
+        """Get db."""
         conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=True)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
@@ -236,9 +243,11 @@ class UptimeMonitor:
             log.error(f"[SLA] Record downtime error: {e}")
 
     def get_uptime_seconds(self) -> float:
+        """Get uptime seconds."""
         return time.time() - self._start_time
 
     def get_uptime_human(self) -> str:
+        """Get uptime human."""
         secs = int(self.get_uptime_seconds())
         days, rem = divmod(secs, 86400)
         hours, rem = divmod(rem, 3600)
@@ -361,6 +370,7 @@ class LatencyTracker:
     """
 
     def __init__(self, max_size: int = 100) -> None:
+        """Init  ."""
         self._max_size = max_size
         self._records: deque = deque(maxlen=max_size)
         self._lock = threading.Lock()
@@ -402,10 +412,12 @@ class LatencyTracker:
             return self._consecutive_timeouts >= self._timeout_threshold
 
     def reset_timeout_counter(self) -> None:
+        """Reset timeout counter."""
         with self._lock:
             self._consecutive_timeouts = 0
 
     def _percentile(self, values: list, p: float) -> float:
+        """Percentile."""
         if not values:
             return 0.0
         sorted_vals = sorted(values)
@@ -491,6 +503,7 @@ class Watchdog:
     """
 
     def __init__(self, uptime_monitor: UptimeMonitor, latency_tracker: LatencyTracker) -> None:
+        """Init  ."""
         self._uptime = uptime_monitor
         self._latency = latency_tracker
         self._thread: Optional[threading.Thread] = None
@@ -516,6 +529,7 @@ class Watchdog:
 
     def _run(self):
         # Wait a bit after startup before first check
+        """Run."""
         time.sleep(10)
         while not self._stop_event.is_set():
             interval = sla_config.get("watchdog_interval_sec", 30)

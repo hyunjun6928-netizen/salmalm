@@ -41,6 +41,7 @@ def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120
     from salmalm.utils.retry import retry_call
 
     def _do_post():
+        """Do post."""
         data = json.dumps(body).encode("utf-8")
         headers.setdefault("User-Agent", _UA)
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
@@ -64,6 +65,7 @@ def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120
 
 
 def _http_get(url: str, headers: Optional[Dict[str, str]] = None, timeout: int = 30) -> dict:
+    """Http get."""
     h: Dict[str, str] = headers or {}
     h.setdefault("User-Agent", _UA)
     req = urllib.request.Request(url, headers=h)
@@ -236,6 +238,7 @@ def _call_provider(
     thinking: bool = False,
     timeout: int = 0,
 ) -> Dict[str, Any]:
+    """Call provider."""
     if not timeout:
         timeout = _LLM_TIMEOUT
     if provider == "anthropic":
@@ -270,6 +273,7 @@ def _call_anthropic(
     thinking: bool = False,
     timeout: int = 0,
 ) -> Dict[str, Any]:
+    """Call anthropic."""
     system_msgs = [m["content"] for m in messages if m["role"] == "system"]
     chat_msgs = [m for m in messages if m["role"] != "system"]
 
@@ -363,6 +367,7 @@ def _call_openai(
     thinking: Any = False,
 ) -> Dict[str, Any]:
     # Convert Anthropic-style image blocks to OpenAI format
+    """Call openai."""
     converted_msgs = []
     for m in messages:
         if isinstance(m.get("content"), list):
@@ -413,6 +418,7 @@ def _call_google(
     api_key: str, model_id: str, messages: List[Dict[str, Any]], max_tokens: int, tools: Optional[List[dict]] = None
 ) -> Dict[str, Any]:
     # Gemini API — with optional tool support
+    """Call google."""
     merged = _build_gemini_contents(messages)
     body: dict = {"contents": merged, "generationConfig": {"maxOutputTokens": max_tokens, "temperature": _get_temperature(tools)}}
     gemini_tools = _build_gemini_tools(tools)

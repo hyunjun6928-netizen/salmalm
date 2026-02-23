@@ -16,11 +16,13 @@ class ShutdownManager:
     """Coordinates graceful shutdown across all subsystems."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._shutting_down = False
         self._lock = threading.Lock()
 
     @property
     def is_shutting_down(self) -> bool:
+        """Is shutting down."""
         return self._shutting_down
 
     async def execute(self, timeout: float = 30.0) -> None:

@@ -6,6 +6,7 @@ from typing import Dict, Optional
 
 
 def get_summary_card(session_id: str) -> Optional[Dict]:
+    """Get summary card."""
     from salmalm.core import get_session
 
     session = get_session(session_id)

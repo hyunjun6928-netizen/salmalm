@@ -92,6 +92,7 @@ class CircuitState:
     recovery_timeout: float = 60.0  # seconds before trying again
 
     def record_failure(self) -> None:
+        """Record failure."""
         self.failures += 1
         self.last_failure = time.time()
         if self.failures >= self.failure_threshold and self.state == "closed":
@@ -100,10 +101,12 @@ class CircuitState:
             log.warning(f"[CIRCUIT] Opened after {self.failures} failures")
 
     def record_success(self) -> None:
+        """Record success."""
         self.failures = 0
         self.state = "closed"
 
     def is_available(self) -> bool:
+        """Is available."""
         if self.state == "closed":
             return True
         if self.state == "open":
@@ -120,25 +123,31 @@ class CircuitBreakerRegistry:
     """Per-provider circuit breakers."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._circuits: Dict[str, CircuitState] = {}
         self._lock = threading.Lock()
 
     def get(self, provider: str) -> CircuitState:
+        """Get."""
         with self._lock:
             if provider not in self._circuits:
                 self._circuits[provider] = CircuitState()
             return self._circuits[provider]
 
     def record_failure(self, provider: str) -> None:
+        """Record failure."""
         self.get(provider).record_failure()
 
     def record_success(self, provider: str) -> None:
+        """Record success."""
         self.get(provider).record_success()
 
     def is_available(self, provider: str) -> bool:
+        """Is available."""
         return self.get(provider).is_available()
 
     def status(self) -> Dict[str, dict]:
+        """Status."""
         with self._lock:
             return {
                 p: {"state": c.state, "failures": c.failures, "last_failure": c.last_failure}
@@ -261,29 +270,35 @@ class StreamBuffer:
     """
 
     def __init__(self) -> None:
+        """Init  ."""
         self._chunks: list = []
         self._total_tokens: int = 0
         self._model: str = ""
         self._started_at: float = 0
 
     def start(self, model: str = "") -> None:
+        """Start."""
         self._chunks = []
         self._total_tokens = 0
         self._model = model
         self._started_at = time.time()
 
     def add_chunk(self, text: str) -> None:
+        """Add chunk."""
         self._chunks.append(text)
 
     def set_tokens(self, tokens: int) -> None:
+        """Set tokens."""
         self._total_tokens = tokens
 
     @property
     def content(self) -> str:
+        """Content."""
         return "".join(self._chunks)
 
     @property
     def has_content(self) -> bool:
+        """Has content."""
         return len(self._chunks) > 0
 
     def recover(self) -> Dict[str, Any]:

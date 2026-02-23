@@ -73,6 +73,7 @@ def _load_cooldowns() -> dict:
 
 
 def _save_cooldowns(cd: dict) -> None:
+    """Save cooldowns."""
     try:
         _COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
         _COOLDOWN_FILE.write_text(json.dumps(cd), encoding="utf-8")
@@ -195,6 +196,7 @@ async def _call_google_streaming(messages, model=None, tools=None, max_tokens=40
     """
 
     def _run():
+        """Run."""
         final_result = None
         accumulated_text = []
         try:
@@ -244,6 +246,7 @@ async def _call_llm_streaming(messages, model=None, tools=None, max_tokens=4096,
     """
 
     def _run():
+        """Run."""
         import os as _os
 
         _early_stop = _os.environ.get("SALMALM_EARLY_STOP", "0") == "1"

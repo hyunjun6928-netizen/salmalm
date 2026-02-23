@@ -11,6 +11,7 @@ from salmalm.core import router
 class WebModelMixin:
     """Mixin providing model route handlers."""
     def _get_usage_models(self):
+        """Get usage models."""
         if not self._require_auth("user"):
             return
         from salmalm.features.edge_cases import usage_tracker
@@ -18,6 +19,7 @@ class WebModelMixin:
         self._json({"breakdown": usage_tracker.model_breakdown()})
 
     def _get_models(self):
+        """Get models."""
         if not self._require_auth("user"):
             return
         from salmalm.features.edge_cases import model_detector
@@ -27,6 +29,7 @@ class WebModelMixin:
         self._json({"models": models, "count": len(models)})
 
     def _get_llm_router_providers(self):
+        """Get llm router providers."""
         if not self._require_auth("user"):
             return
         from salmalm.core.llm_router import (
@@ -89,6 +92,7 @@ class WebModelMixin:
         )
 
     def _get_llm_router_current(self):
+        """Get llm router current."""
         if not self._require_auth("user"):
             return
         from salmalm.core.llm_router import llm_router
@@ -97,6 +101,7 @@ class WebModelMixin:
 
     def _get_api_health_providers(self):
         # Provider health check — Open WebUI style (프로바이더 상태 확인)
+        """Get api health providers."""
         if not self._require_auth("user"):
             return
         from salmalm.features.edge_cases import provider_health
@@ -105,6 +110,7 @@ class WebModelMixin:
         self._json(provider_health.check_all(force=force))
 
     def _post_api_test_key(self):
+        """Post api test key."""
         body = self._body
         if not self._require_auth("user"):
             return

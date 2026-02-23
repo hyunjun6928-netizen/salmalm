@@ -8,6 +8,7 @@ class TFIDFSearch:
     """Lightweight TF-IDF + cosine similarity search. No external deps."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._docs: list = []  # [(label, line_no, text, tokens)]
         self._idf: dict = {}  # term -> IDF score
         self._built = False

@@ -28,6 +28,7 @@ MAX_OUTPUT = 4096  # chars
 
 
 def _get_db(db_path: Optional[Path] = None) -> sqlite3.Connection:
+    """Get db."""
     conn = _connect_db(db_path or PLAYGROUND_DB, wal=True)
     conn.execute("""CREATE TABLE IF NOT EXISTS play_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,17 +49,20 @@ class CodePlayground:
     """격리된 코드 실행 환경."""
 
     def __init__(self, db_path: Optional[Path] = None, timeout: int = EXEC_TIMEOUT) -> None:
+        """Init  ."""
         self._db_path = db_path
         self._conn: Optional[sqlite3.Connection] = None
         self.timeout = timeout
 
     @property
     def conn(self) -> sqlite3.Connection:
+        """Conn."""
         if self._conn is None:
             self._conn = _get_db(self._db_path)
         return self._conn
 
     def close(self) -> None:
+        """Close."""
         if self._conn:
             self._conn.close()
             self._conn = None
@@ -175,6 +179,7 @@ class CodePlayground:
                 pass
 
     def _save_history(self, record: Dict):
+        """Save history."""
         try:
             now = datetime.now(KST).isoformat()
             self.conn.execute(
@@ -249,6 +254,7 @@ _playground: Optional[CodePlayground] = None
 
 
 def get_playground(db_path: Optional[Path] = None) -> CodePlayground:
+    """Get playground."""
     global _playground
     if _playground is None:
         _playground = CodePlayground(db_path)
@@ -316,6 +322,7 @@ def register_play_tools():
     from salmalm.tools.tool_registry import register_dynamic
 
     async def _play_tool(args):
+        """Play tool."""
         lang = args.get("language", "python")
         code = args.get("code", "")
         cmd = f"/play {lang} {code}"

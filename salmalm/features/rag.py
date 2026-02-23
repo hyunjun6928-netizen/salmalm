@@ -354,6 +354,7 @@ class RAGEngine:
     """Hybrid BM25 + TF-IDF vector retrieval engine with persistent SQLite index."""
 
     def __init__(self, db_path: Optional[Path] = None, config_path: Optional[Path] = None) -> None:
+        """Init  ."""
         self._db_path = db_path or (BASE_DIR / "rag.db")
         self._config_path = config_path
         self._conn: Optional[sqlite3.Connection] = None
@@ -367,11 +368,13 @@ class RAGEngine:
 
     @property
     def config(self) -> dict:
+        """Config."""
         if self._config is None:
             self._config = load_rag_config(self._config_path)
         return self._config
 
     def _ensure_db(self):
+        """Ensure db."""
         if self._conn:
             return
         self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
@@ -667,6 +670,7 @@ class RAGEngine:
         doc_freq: Dict[str, int] = {}
 
         def process_text(label: str, text: str, mtime: float) -> None:
+            """Process text."""
             lines = text.splitlines()
             step = max(1, chunk_size - chunk_overlap)
             for i in range(0, len(lines), step):

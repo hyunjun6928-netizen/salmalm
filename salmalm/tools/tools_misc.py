@@ -117,10 +117,12 @@ def _parse_relative_time(s: str) -> datetime:
 
 
 def _reminders_file() -> Path:
+    """Reminders file."""
     return WORKSPACE_DIR / "reminders.json"
 
 
 def _load_reminders():
+    """Load reminders."""
     global _reminders
     fp = _reminders_file()
     if fp.exists():
@@ -131,6 +133,7 @@ def _load_reminders():
 
 
 def _save_reminders():
+    """Save reminders."""
     fp = _reminders_file()
     fp.write_text(json.dumps(_reminders, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 
@@ -213,6 +216,7 @@ def _send_notification_impl(
 
 
 def _reminder_check_loop():
+    """Reminder check loop."""
     while True:
         time.sleep(30)
         now = datetime.now()
@@ -251,6 +255,7 @@ def _reminder_check_loop():
 
 
 def _ensure_reminder_thread():
+    """Ensure reminder thread."""
     global _reminder_thread_started
     if not _reminder_thread_started:
         _reminder_thread_started = True
@@ -261,6 +266,7 @@ def _ensure_reminder_thread():
 
 @register("reminder")
 def handle_reminder(args: dict) -> str:
+    """Handle reminder."""
     _ensure_reminder_thread()
     action = args.get("action", "set")
 
@@ -315,6 +321,7 @@ _workflows_file = WORKSPACE_DIR / "workflows.json"
 
 
 def _load_workflows() -> dict:
+    """Load workflows."""
     if _workflows_file.exists():
         try:
             return json.loads(_workflows_file.read_text(encoding="utf-8"))
@@ -324,11 +331,13 @@ def _load_workflows() -> dict:
 
 
 def _save_workflows(wf: dict):
+    """Save workflows."""
     _workflows_file.write_text(json.dumps(wf, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 @register("workflow")
 def handle_workflow(args: dict) -> str:
+    """Handle workflow."""
     from salmalm.tools.tool_registry import execute_tool
 
     action = args.get("action", "list")
@@ -400,6 +409,7 @@ _file_index_lock = threading.Lock()
 
 @register("file_index")
 def handle_file_index(args: dict) -> str:
+    """Handle file index."""
     action = args.get("action", "search")
 
     if action == "index" or action == "status":
@@ -463,6 +473,7 @@ def handle_file_index(args: dict) -> str:
 
 @register("notification")
 def handle_notification(args: dict) -> str:
+    """Handle notification."""
     message = args.get("message", "")
     if not message:
         return "❌ message is required"
@@ -476,6 +487,7 @@ def handle_notification(args: dict) -> str:
 
 @register("weather")
 def handle_weather(args: dict) -> str:
+    """Handle weather."""
     location = args.get("location", "")
     if not location:
         return "❌ location is required"
@@ -552,6 +564,7 @@ _feeds_file = WORKSPACE_DIR / "rss_feeds.json"
 
 
 def _load_feeds() -> dict:
+    """Load feeds."""
     if _feeds_file.exists():
         try:
             return json.loads(_feeds_file.read_text(encoding="utf-8"))
@@ -561,10 +574,12 @@ def _load_feeds() -> dict:
 
 
 def _save_feeds(feeds: dict):
+    """Save feeds."""
     _feeds_file.write_text(json.dumps(feeds, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _parse_rss(xml_text: str) -> list:
+    """Parse rss."""
     from xml.etree import ElementTree as ET
 
     articles = []
@@ -608,6 +623,7 @@ def _parse_rss(xml_text: str) -> list:
 
 @register("rss_reader")
 def handle_rss_reader(args: dict) -> str:
+    """Handle rss reader."""
     action = args.get("action", "fetch")
 
     if action == "list":

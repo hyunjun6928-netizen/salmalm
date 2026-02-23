@@ -50,6 +50,7 @@ def _check_for_updates() -> str:
         latest = data.get("info", {}).get("version", "")
 
         def _ver_tuple(v):
+            """Ver tuple."""
             return tuple(int(x) for x in v.split("."))
 
         if latest and _ver_tuple(latest) > _ver_tuple(VERSION):
@@ -257,6 +258,7 @@ async def run_server():
 
     @ws_server.on_message
     async def handle_ws_message(client, data) -> None:
+        """Handle ws message."""
         msg_type = data.get("type", "message")
         if msg_type == "ping":
             await client.send_json({"type": "pong"})
@@ -274,6 +276,7 @@ async def run_server():
             await client.send_json({"type": "typing", "status": "typing"})
 
             async def on_tool(name, args) -> None:
+                """On tool."""
                 await stream.send_tool_call(name, args)
 
             async def on_status(status_type, detail) -> None:
@@ -305,6 +308,7 @@ async def run_server():
 
     @ws_server.on_connect
     async def handle_ws_connect(client) -> None:
+        """Handle ws connect."""
         await client.send_json(
             {
                 "type": "welcome",
@@ -325,6 +329,7 @@ async def run_server():
         from salmalm.tools import TOOL_DEFINITIONS, execute_tool
 
         async def mcp_tool_executor(name, args):
+            """Mcp tool executor."""
             return execute_tool(name, args)
 
         mcp_manager.server.set_tools(TOOL_DEFINITIONS, mcp_tool_executor)
@@ -384,6 +389,7 @@ async def run_server():
 
                 # Register message handler → core engine
                 async def _discord_message_handler(content, raw_data, on_token=None):
+                    """Discord message handler."""
                     import time as _t
 
                     _channel_id = raw_data.get("channel_id", "")
@@ -429,6 +435,7 @@ async def run_server():
     _shutdown_count = [0]
 
     def _handle_shutdown(signum, frame):
+        """Handle shutdown."""
         _shutdown_count[0] += 1
         if _shutdown_count[0] >= 2:
             log.warning("[SHUTDOWN] Forced exit (second signal)")

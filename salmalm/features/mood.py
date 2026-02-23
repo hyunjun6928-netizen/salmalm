@@ -190,6 +190,7 @@ MOOD_TONE_MAP: Dict[str, Dict[str, str]] = {
 
 
 def _ensure_dir():
+    """Ensure dir."""
     MOOD_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -197,15 +198,18 @@ class MoodDetector:
     """Detects user mood from text using keywords, patterns, and emoji."""
 
     def __init__(self) -> None:
+        """Init  ."""
         _ensure_dir()
         self.config = self._load_config()
 
     def _load_config(self) -> Dict[str, Any]:
+        """Load config."""
         from salmalm.config_manager import ConfigManager
 
         return ConfigManager.load("mood", defaults={"enabled": True, "sensitivity": "normal"})
 
     def _save_config(self):
+        """Save config."""
         from salmalm.config_manager import ConfigManager
 
         _ensure_dir()
@@ -213,10 +217,12 @@ class MoodDetector:
 
     @property
     def enabled(self) -> bool:
+        """Enabled."""
         return self.config.get("enabled", True)
 
     @property
     def sensitivity(self) -> str:
+        """Sensitivity."""
         return self.config.get("sensitivity", "normal")
 
     def set_mode(self, mode: str) -> str:

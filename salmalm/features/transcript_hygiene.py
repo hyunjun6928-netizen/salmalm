@@ -37,6 +37,7 @@ class TranscriptHygiene:
     """Clean conversation history per provider rules before LLM API calls."""
 
     def __init__(self, provider: str = "anthropic") -> None:
+        """Init  ."""
         self.provider = provider.lower()
         self.rules = PROVIDER_RULES.get(self.provider, {})
 
@@ -240,6 +241,7 @@ class TranscriptHygiene:
                 else:
                     # Convert to list and merge
                     def _to_list(c):
+                        """To list."""
                         if isinstance(c, list):
                             return c
                         return [{"type": "text", "text": str(c)}]

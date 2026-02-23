@@ -20,6 +20,7 @@ class DiscordBot:
     """Minimal Discord bot using Gateway WebSocket + REST API."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self.token: Optional[str] = None
         self.owner_id: Optional[str] = None
         self._running = False
@@ -43,6 +44,7 @@ class DiscordBot:
     # ── REST API ──
 
     def _api(self, method: str, path: str, body: Optional[dict] = None) -> dict:
+        """Api."""
         url = f"{API_BASE}{path}"
         data = json.dumps(body).encode() if body else None
         req = urllib.request.Request(url, data=data, method=method)
@@ -100,6 +102,7 @@ class DiscordBot:
         """
 
         async def _loop():
+            """Loop."""
             try:
                 while True:
                     await asyncio.to_thread(self.send_typing, channel_id)
@@ -324,6 +327,7 @@ class DiscordBot:
                     _STREAM_THRESHOLD = 200
 
                     def _on_stream_token(event):
+                        """On stream token."""
                         etype = event.get("type", "")
                         if etype == "content_delta":
                             delta = event.get("text", "")

@@ -7,6 +7,7 @@ from salmalm.core import SubAgent, SkillLoader
 
 @register("sub_agent")
 def handle_sub_agent(args: dict) -> str:
+    """Handle sub agent."""
     action = args.get("action", "list")
     if action == "spawn":
         task = args.get("task", "")
@@ -73,6 +74,7 @@ def handle_sub_agent(args: dict) -> str:
 
 @register("skill_manage")
 def handle_skill_manage(args: dict) -> str:
+    """Handle skill manage."""
     action = args.get("action", "list")
     if action == "list":
         skills = SkillLoader.scan()
@@ -109,6 +111,7 @@ def handle_skill_manage(args: dict) -> str:
 
 @register("plugin_manage")
 def handle_plugin_manage(args: dict) -> str:
+    """Handle plugin manage."""
     from salmalm.core import PluginLoader
 
     action = args.get("action", "list")
@@ -131,6 +134,7 @@ def handle_plugin_manage(args: dict) -> str:
 
 @register("cron_manage")
 def handle_cron_manage(args: dict) -> str:
+    """Handle cron manage."""
     from salmalm.core import _llm_cron
 
     if not _llm_cron:
@@ -174,6 +178,7 @@ def handle_cron_manage(args: dict) -> str:
 
 @register("mcp_manage")
 def handle_mcp_manage(args: dict) -> str:
+    """Handle mcp manage."""
     from salmalm.features.mcp import mcp_manager
 
     action = args.get("action", "list")
@@ -217,6 +222,7 @@ def handle_mcp_manage(args: dict) -> str:
 
 @register("node_manage")
 def handle_node_manage(args: dict) -> str:
+    """Handle node manage."""
     from salmalm.features.nodes import node_manager
 
     action = args.get("action", "list")
@@ -279,6 +285,7 @@ def handle_node_manage(args: dict) -> str:
 
 @register("rag_search")
 def handle_rag_search(args: dict) -> str:
+    """Handle rag search."""
     from salmalm.features.rag import rag_engine
 
     query = args.get("query", "")

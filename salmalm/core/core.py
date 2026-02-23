@@ -99,6 +99,7 @@ def _get_db() -> sqlite3.Connection:
 
 
 def _init_audit_db():
+    """Init audit db."""
     conn = _get_db()
     conn.execute("""CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -331,12 +332,14 @@ class ResponseCache:
     """Simple TTL cache for LLM responses to avoid duplicate calls."""
 
     def __init__(self, max_size=100, ttl=CACHE_TTL):  # noqa: F405
+        """Init  ."""
         self._cache: OrderedDict = OrderedDict()
         self._max_size = max_size
         self._ttl = ttl
 
     def _key(self, model: str, messages: list, session_id: str = "") -> str:
         # Include last 5 messages for better session isolation even without explicit session_id
+        """Key."""
         content = json.dumps({"s": session_id, "m": model, "msgs": messages[-5:]}, sort_keys=True)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
@@ -510,6 +513,7 @@ class ModelRouter:
     _MODEL_PREF_FILE = DATA_DIR / ".model_pref"  # noqa: F405
 
     def __init__(self) -> None:
+        """Init  ."""
         self.default_tier = 2
         self.force_model: Optional[str] = None
         # Restore persisted model preference
@@ -565,6 +569,7 @@ class ModelRouter:
     _OR_PROVIDERS = frozenset(["deepseek", "meta-llama", "mistralai", "qwen"])
 
     def _has_key(self, provider: str) -> bool:
+        """Has key."""
         if provider == "ollama":
             return True  # Ollama always available (local)
         if provider in self._OR_PROVIDERS:
@@ -572,6 +577,7 @@ class ModelRouter:
         return bool(vault.get(f"{provider}_api_key"))
 
     def _pick_available(self, tier: int) -> str:
+        """Pick available."""
         models = self.TIERS.get(tier, self.TIERS[2])
         for m in models:
             provider = m.split("/")[0]

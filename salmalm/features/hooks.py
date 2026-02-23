@@ -37,6 +37,7 @@ class HookManager:
     """Manages event hooks — loads config, fires hooks asynchronously."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._hooks: Dict[str, List[str]] = {}
         self._plugin_hooks: Dict[str, List[callable]] = {}  # from plugins
         self.reload()

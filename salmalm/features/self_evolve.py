@@ -20,6 +20,7 @@ MAX_AUTO_RULES = 20
 
 
 def _ensure_dir():
+    """Ensure dir."""
     EVOLUTION_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -269,11 +270,13 @@ class PromptEvolver:
     """Learns user preferences and evolves the system prompt over time."""
 
     def __init__(self) -> None:
+        """Init  ."""
         _ensure_dir()
         self.analyzer = PatternAnalyzer()
         self.state = self._load_state()
 
     def _load_state(self) -> Dict[str, Any]:
+        """Load state."""
         if EVOLUTION_FILE.exists():
             try:
                 return json.loads(EVOLUTION_FILE.read_text(encoding="utf-8"))
@@ -288,6 +291,7 @@ class PromptEvolver:
         }
 
     def _save_state(self):
+        """Save state."""
         _ensure_dir()
         EVOLUTION_FILE.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -412,6 +416,7 @@ class PromptEvolver:
         return f"✅ {len(rules)}개 규칙이 SOUL.md에 반영되었습니다."
 
     def _record_history(self, rules: List[str]):
+        """Record history."""
         history = []
         if EVOLUTION_HISTORY_FILE.exists():
             try:

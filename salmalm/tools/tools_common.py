@@ -250,6 +250,7 @@ def _is_private_url_follow_redirects(url: str, max_redirects: int = 5):
 
             class _NoRedirect(urllib.request.HTTPRedirectHandler):
                 def redirect_request(self, req, fp, code, msg, headers, newurl) -> None:
+                    """Redirect request."""
                     raise urllib.error.HTTPError(newurl, code, msg, headers, fp)
 
             opener = urllib.request.build_opener(_NoRedirect)
@@ -282,6 +283,7 @@ def _make_pinned_opener(resolved_ip: str, hostname: str):
 
     class _PinnedHTTPConnection(http.client.HTTPConnection):
         def connect(self) -> None:
+            """Connect."""
             self.host = resolved_ip
             super().connect()
             self.host = hostname  # Restore for Host header
@@ -289,6 +291,7 @@ def _make_pinned_opener(resolved_ip: str, hostname: str):
     class _PinnedHTTPSConnection(http.client.HTTPSConnection):
         def connect(self) -> None:
             # Connect TCP to pinned IP, but use original hostname for SNI + cert check
+            """Connect."""
             import socket as _sock
             self.sock = _sock.create_connection((resolved_ip, self.port or 443), self.timeout)
             ctx = ssl.create_default_context()
@@ -297,10 +300,12 @@ def _make_pinned_opener(resolved_ip: str, hostname: str):
 
     class _PinnedHTTPHandler(urllib.request.HTTPHandler):
         def http_open(self, req):
+            """Http open."""
             return self.do_open(_PinnedHTTPConnection, req)
 
     class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):
         def https_open(self, req):
+            """Https open."""
             return self.do_open(_PinnedHTTPSConnection, req)
 
     return urllib.request.build_opener(_PinnedHTTPHandler, _PinnedHTTPSHandler)

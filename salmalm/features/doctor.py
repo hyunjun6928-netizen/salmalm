@@ -22,6 +22,7 @@ _SALMALM_DIR = DATA_DIR
 
 
 def _status(ok: bool, msg: str, fixable: bool = False, issue_id: str = "") -> dict:
+    """Status."""
     return {
         "status": "ok" if ok else "issue",
         "message": msg,

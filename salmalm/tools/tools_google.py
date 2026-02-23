@@ -54,6 +54,7 @@ def _google_oauth_headers() -> dict:
 
 @register("google_calendar")
 def handle_google_calendar(args: dict) -> str:
+    """Handle google calendar."""
     action = args.get("action", "list")
     cal_id = args.get("calendar_id", "primary")
     base_url = f"https://www.googleapis.com/calendar/v3/calendars/{cal_id}"
@@ -121,6 +122,7 @@ def handle_google_calendar(args: dict) -> str:
 
 @register("gmail")
 def handle_gmail(args: dict) -> str:
+    """Handle gmail."""
     action = args.get("action", "list")
     base_url = "https://www.googleapis.com/gmail/v1/users/me"
     headers = _google_oauth_headers()
@@ -178,6 +180,7 @@ def handle_gmail(args: dict) -> str:
         payload = msg.get("payload", {})
 
         def _extract_body(part: dict) -> str:
+            """Extract body."""
             if part.get("mimeType", "").startswith("text/plain"):
                 data = part.get("body", {}).get("data", "")
                 if data:

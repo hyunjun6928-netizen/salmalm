@@ -35,6 +35,7 @@ class A2AProtocol:
     """SalmAlm instance-to-instance negotiation protocol."""
 
     def __init__(self, instance_name: str = "SalmAlm", instance_id: Optional[str] = None) -> None:
+        """Init  ."""
         self.instance_name = instance_name
         self.instance_id = instance_id or uuid.uuid4().hex[:12]
         self.peers: Dict[str, Dict[str, Any]] = {}
@@ -45,6 +46,7 @@ class A2AProtocol:
     # ── Persistence ──────────────────────────────────────────
 
     def _load(self) -> None:
+        """Load."""
         try:
             if _PEERS_PATH.exists():
                 self.peers = json.loads(_PEERS_PATH.read_text("utf-8"))
@@ -54,10 +56,12 @@ class A2AProtocol:
             log.warning("a2a: load error: %s", exc)
 
     def _save_peers(self) -> None:
+        """Save peers."""
         _DATA_DIR.mkdir(parents=True, exist_ok=True)
         _PEERS_PATH.write_text(json.dumps(self.peers, ensure_ascii=False, indent=2), "utf-8")
 
     def _save_inbox(self) -> None:
+        """Save inbox."""
         _DATA_DIR.mkdir(parents=True, exist_ok=True)
         _INBOX_PATH.write_text(json.dumps(self.inbox, ensure_ascii=False, indent=2), "utf-8")
 
@@ -71,6 +75,7 @@ class A2AProtocol:
 
     @staticmethod
     def verify(payload: dict, signature: str, secret: str) -> bool:
+        """Verify."""
         expected = A2AProtocol.sign(payload, secret)
         return hmac.compare_digest(expected, signature)
 
@@ -89,6 +94,7 @@ class A2AProtocol:
         return peer_id
 
     def unpair(self, peer_id: str) -> bool:
+        """Unpair."""
         if peer_id in self.peers:
             del self.peers[peer_id]
             self._save_peers()
@@ -96,6 +102,7 @@ class A2AProtocol:
         return False
 
     def list_peers(self) -> List[Dict[str, Any]]:
+        """List peers."""
         return [{"id": pid, "name": p.get("name", ""), "url": p["url"]} for pid, p in self.peers.items()]
 
     # ── Sending ──────────────────────────────────────────────
@@ -202,6 +209,7 @@ class A2AProtocol:
         return {"status": "error", "message": "Request not found or already processed"}
 
     def get_inbox(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get inbox."""
         if status:
             return [i for i in self.inbox if i.get("status") == status]
         return list(self.inbox)

@@ -97,6 +97,7 @@ class Vault:
     """
 
     def __init__(self) -> None:
+        """Init  ."""
         self._data: Dict[str, Any] = {}
         self._password: Optional[str] = None
         self._salt: Optional[bytes] = None

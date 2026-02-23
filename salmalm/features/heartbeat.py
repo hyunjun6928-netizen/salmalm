@@ -49,6 +49,7 @@ class CacheWarmer:
     """Periodically warm Anthropic prompt cache to prevent TTL expiry."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._last_warm: float = 0.0
@@ -146,6 +147,7 @@ class CacheWarmer:
 
     @property
     def stats(self) -> dict:
+        """Stats."""
         return {
             "warm_count": self._warm_count,
             "last_warm": self._last_warm,
@@ -168,9 +170,11 @@ class HeartbeatManager:
     }
 
     def __init__(self) -> None:
+        """Init  ."""
         self._config = self._load_config()
 
     def _load_config(self) -> dict:
+        """Load config."""
         cfg = dict(self._DEFAULT_CONFIG)
         try:
             if self._CONFIG_FILE.exists():
@@ -181,10 +185,12 @@ class HeartbeatManager:
         return cfg
 
     def reload(self) -> None:
+        """Reload."""
         self._config = self._load_config()
 
     @property
     def config(self) -> dict:
+        """Config."""
         return dict(self._config)
 
     def is_active_hours(self) -> bool:

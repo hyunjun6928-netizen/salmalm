@@ -332,6 +332,7 @@ def render_plain(ir: MarkdownIR) -> str:
 
 
 def _esc(s: str) -> str:
+    """Esc."""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 

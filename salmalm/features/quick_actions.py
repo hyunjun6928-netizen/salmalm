@@ -20,6 +20,7 @@ QA_DB = BASE_DIR / "quick_actions.db"
 
 
 def _get_db(db_path: Optional[Path] = None) -> sqlite3.Connection:
+    """Get db."""
     conn = _connect_db(db_path or QA_DB, wal=True)
     conn.execute("""CREATE TABLE IF NOT EXISTS quick_actions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,17 +39,20 @@ class QuickActionManager:
     """단축 액션 관리자."""
 
     def __init__(self, db_path: Optional[Path] = None) -> None:
+        """Init  ."""
         self._db_path = db_path
         self._conn: Optional[sqlite3.Connection] = None
         self._command_dispatcher: Optional[Callable] = None
 
     @property
     def conn(self) -> sqlite3.Connection:
+        """Conn."""
         if self._conn is None:
             self._conn = _get_db(self._db_path)
         return self._conn
 
     def close(self) -> None:
+        """Close."""
         if self._conn:
             self._conn.close()
             self._conn = None
@@ -215,6 +219,7 @@ _qa: Optional[QuickActionManager] = None
 
 
 def get_qa(db_path: Optional[Path] = None) -> QuickActionManager:
+    """Get qa."""
     global _qa
     if _qa is None:
         _qa = QuickActionManager(db_path)
@@ -295,6 +300,7 @@ def register_qa_tools():
     from salmalm.tools.tool_registry import register_dynamic
 
     async def _qa_tool(args):
+        """Qa tool."""
         sub = args.get("subcommand", "list")
         name = args.get("name", "")
         commands = args.get("commands", "")

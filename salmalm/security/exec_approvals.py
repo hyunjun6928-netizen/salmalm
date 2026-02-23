@@ -120,6 +120,7 @@ class BackgroundSession:
     _lock = threading.Lock()
 
     def __init__(self, command: str, timeout: int = 1800, notify_on_exit: bool = False, env: dict = None) -> None:
+        """Init  ."""
         with BackgroundSession._lock:
             BackgroundSession._counter += 1
             self.session_id = f"bg-{BackgroundSession._counter}"
@@ -162,6 +163,7 @@ class BackgroundSession:
         from salmalm.constants import WORKSPACE_DIR as _ws
 
         def _run():
+            """Run."""
             try:
                 if needs_shell:
                     popen_args = {"args": self.command, "shell": True}

@@ -73,6 +73,7 @@ def handle_email_read(args: dict) -> str:
     payload = msg.get("payload", {})
 
     def _extract_body(part: dict) -> str:
+        """Extract body."""
         if part.get("mimeType", "").startswith("text/plain"):
             data = part.get("body", {}).get("data", "")
             if data:

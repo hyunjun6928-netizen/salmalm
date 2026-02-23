@@ -41,6 +41,7 @@ class ShadowMode:
     """Learn user messaging style and generate proxy replies when absent."""
 
     def __init__(self) -> None:
+        """Init  ."""
         self.active: bool = False
         self.confidence_threshold: int = 70
         self.suffix: str = " [Shadow Mode]"
@@ -50,6 +51,7 @@ class ShadowMode:
     # ── Profile persistence ──────────────────────────────────
 
     def _load_profile(self) -> None:
+        """Load profile."""
         try:
             if _PROFILE_PATH.exists():
                 self.profile = json.loads(_PROFILE_PATH.read_text("utf-8"))
@@ -58,6 +60,7 @@ class ShadowMode:
             log.warning("shadow: failed to load profile: %s", exc)
 
     def _save_profile(self) -> None:
+        """Save profile."""
         try:
             _PROFILE_DIR.mkdir(parents=True, exist_ok=True)
             self.profile["confidence_threshold"] = self.confidence_threshold

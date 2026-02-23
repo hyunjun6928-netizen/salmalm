@@ -8,6 +8,7 @@ from typing import Dict, List
 
 
 async def compare_models(session_id: str, message: str, models: List[str] = None) -> List[Dict]:
+    """Compare models."""
     from salmalm.core.engine import _call_llm_async
     from salmalm.core.prompt import build_system_prompt
     from salmalm.core import get_session
@@ -23,6 +24,7 @@ async def compare_models(session_id: str, message: str, models: List[str] = None
     messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": message}]
 
     async def _call_one(model_id: str) -> Dict:
+        """Call one."""
         t0 = time.time()
         try:
             result = await _call_llm_async(messages, model=model_id, max_tokens=4096)

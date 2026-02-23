@@ -17,6 +17,7 @@ class ModelDetector:
     _CACHE_TTL = 600
 
     def detect_all(self, force: bool = False) -> List[Dict]:
+        """Detect all."""
         now = time.time()
         if not force and self._cache and (now - self._cache_ts) < self._CACHE_TTL:
             return self._cache

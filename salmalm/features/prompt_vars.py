@@ -8,6 +8,7 @@ from salmalm.constants import KST, VERSION
 
 
 def substitute_prompt_variables(text: str, session_id: str = "", model: str = "", user: str = "") -> str:
+    """Substitute prompt variables."""
     now = datetime.now(KST)
     replacements = {
         "{{date}}": now.strftime("%Y-%m-%d"),

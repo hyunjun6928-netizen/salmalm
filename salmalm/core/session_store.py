@@ -19,16 +19,19 @@ from salmalm.security.crypto import log, vault
 # ── Lazy accessors for core.py globals (break circular import) ──
 
 def _get_db():
+    """Get db."""
     from salmalm.core.core import _get_db as _impl
     return _impl()
 
 
 def _audit_log(*args, **kwargs):
+    """Audit log."""
     from salmalm.core.core import audit_log as _impl
     return _impl(*args, **kwargs)
 
 
 def _restore_compaction_summary(session_id: str) -> Optional[str]:
+    """Restore compaction summary."""
     from salmalm.core.compaction import _restore_compaction_summary as _impl
     return _impl(session_id)
 
@@ -44,6 +47,7 @@ class Session:
     """
 
     def __init__(self, session_id: str, user_id: Optional[int] = None) -> None:
+        """Init  ."""
         self.id = session_id
         self.user_id = user_id  # Multi-tenant: owning user (None = legacy/local)
         self.messages: list = []

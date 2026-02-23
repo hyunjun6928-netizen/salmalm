@@ -75,6 +75,7 @@ class WebHandler(
     }
 
     def _cors(self):
+        """Cors."""
         origin = self.headers.get("Origin", "")
         if origin in self._ALLOWED_ORIGINS:
             self.send_header("Access-Control-Allow-Origin", origin)
@@ -98,6 +99,7 @@ class WebHandler(
         return body
 
     def _json(self, data: dict, status=200):
+        """Json."""
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -143,6 +145,7 @@ class WebHandler(
         )
 
     def _html(self, content: str):
+        """Html."""
         body_raw = content
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -289,6 +292,7 @@ class WebHandler(
             )
 
     def _do_put_inner(self):
+        """Do put inner."""
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length)) if length else {}
         # PUT /api/sessions/{id}/title
@@ -347,16 +351,19 @@ class WebHandler(
             )
 
     def _get_uptime(self):
+        """Get uptime."""
         from salmalm.features.sla import uptime_monitor
 
         self._json(uptime_monitor.get_stats())
 
     def _get_latency(self):
+        """Get latency."""
         from salmalm.features.sla import latency_tracker
 
         self._json(latency_tracker.get_stats())
 
     def _get_nodes(self):
+        """Get nodes."""
         from salmalm.features.nodes import node_manager
 
         self._json({"nodes": node_manager.list_nodes()})
@@ -427,6 +434,7 @@ class WebHandler(
 
     @staticmethod
     def _vault_type_label():
+        """Vault type label."""
         try:
             from salmalm.security.crypto import HAS_CRYPTO
             return "AES-256-GCM" if HAS_CRYPTO else "HMAC-CTR (obfuscation only)"
@@ -434,6 +442,7 @@ class WebHandler(
             return "unknown"
 
     def _get_status(self):
+        """Get status."""
         channels = {}
         if vault.is_unlocked:
             channels["telegram"] = bool(vault.get("telegram_token"))
@@ -451,6 +460,7 @@ class WebHandler(
         )
 
     def _get_metrics(self):
+        """Get metrics."""
         from salmalm.core import _metrics
 
         usage = get_usage_report()
@@ -459,11 +469,13 @@ class WebHandler(
         self._json(merged)
 
     def _get_cert(self):
+        """Get cert."""
         from salmalm.utils.tls import get_cert_info
 
         self._json(get_cert_info())
 
     def _get_ws_status(self):
+        """Get ws status."""
         from salmalm.web.ws import ws_server
 
         self._json(
@@ -475,6 +487,7 @@ class WebHandler(
         )
 
     def _get_usage_daily(self):
+        """Get usage daily."""
         if not self._require_auth("user"):
             return
         from salmalm.features.edge_cases import usage_tracker
@@ -482,6 +495,7 @@ class WebHandler(
         self._json({"report": usage_tracker.daily_report()})
 
     def _get_usage_monthly(self):
+        """Get usage monthly."""
         if not self._require_auth("user"):
             return
         from salmalm.features.edge_cases import usage_tracker
@@ -489,6 +503,7 @@ class WebHandler(
         self._json({"report": usage_tracker.monthly_report()})
 
     def _get_groups(self):
+        """Get groups."""
         if not self._require_auth("user"):
             return
         from salmalm.features.edge_cases import session_groups
@@ -496,6 +511,7 @@ class WebHandler(
         self._json({"groups": session_groups.list_groups()})
 
     def _get_soul(self):
+        """Get soul."""
         if not self._require_auth("user"):
             return
         from salmalm.core.prompt import get_user_soul, USER_SOUL_FILE
@@ -577,6 +593,7 @@ class WebHandler(
         self._json({"ok": True, "message": f"Restored {len(zf.namelist())} files to {DATA_DIR}"})
 
     def _get_doctor(self):
+        """Get doctor."""
         if not self._require_auth("user"):
             return
         from salmalm.features.doctor import doctor
@@ -586,6 +603,7 @@ class WebHandler(
         self._json({"checks": results, "passed": ok, "total": len(results)})
 
     def _get_memory_files(self):
+        """Get memory files."""
         if not self._require_auth("user"):
             return
         mem_dir = BASE_DIR / "memory"
@@ -618,6 +636,7 @@ class WebHandler(
         self._json({"files": files})
 
     def _get_mcp(self):
+        """Get mcp."""
         if not self._require_auth("user"):
             return
         from salmalm.features.mcp import mcp_manager
@@ -627,6 +646,7 @@ class WebHandler(
         self._json({"servers": servers, "total_tools": len(all_tools)})
 
     def _get_rag(self):
+        """Get rag."""
         if not self._require_auth("user"):
             return
         from salmalm.features.rag import rag_engine
@@ -634,6 +654,7 @@ class WebHandler(
         self._json(rag_engine.get_stats())
 
     def _get_personas(self):
+        """Get personas."""
         from salmalm.core.prompt import list_personas, get_active_persona
 
         session_id = self.headers.get("X-Session-Id", "web")
@@ -642,6 +663,7 @@ class WebHandler(
         self._json({"personas": personas, "active": active})
 
     def _get_thoughts(self):
+        """Get thoughts."""
         from salmalm.features.thoughts import thought_stream
         import urllib.parse as _up
 
@@ -655,11 +677,13 @@ class WebHandler(
         self._json({"thoughts": results})
 
     def _get_thoughts_stats(self):
+        """Get thoughts stats."""
         from salmalm.features.thoughts import thought_stream
 
         self._json(thought_stream.stats())
 
     def _get_features(self):
+        """Get features."""
         cats = [
             {
                 "id": "core",
@@ -1031,6 +1055,7 @@ class WebHandler(
         self._json({"categories": cats})
 
     def _get_tools_list(self):
+        """Get tools list."""
         tools = []
         try:
             from salmalm.tools.tool_registry import _HANDLERS, _ensure_modules
@@ -1068,6 +1093,7 @@ class WebHandler(
         self._json({"tools": tools, "count": len(tools)})
 
     def _get_commands(self):
+        """Get commands."""
         cmds = [
             {"name": "/help", "desc": "Show help"},
             {"name": "/status", "desc": "Session status"},
@@ -1171,6 +1197,7 @@ class WebHandler(
     }
 
     def _get_api_notifications(self):
+        """Get api notifications."""
         if not self._require_auth("user"):
             return
         from salmalm.core import _sessions
@@ -1183,6 +1210,7 @@ class WebHandler(
         self._json({"notifications": notifications})
 
     def _get_api_presence(self):
+        """Get api presence."""
         if not self._require_auth("user"):
             return
         from salmalm.features.presence import presence_manager
@@ -1196,6 +1224,7 @@ class WebHandler(
         )
 
     def _get_api_channels(self):
+        """Get api channels."""
         if not self._require_auth("user"):
             return
         from salmalm.channels.channel_router import channel_router
@@ -1207,6 +1236,7 @@ class WebHandler(
         )
 
     def _get_api_dashboard(self):
+        """Get api dashboard."""
         if not self._require_auth("user"):
             return
         # Dashboard data: sessions, costs, tools, cron jobs
@@ -1252,6 +1282,7 @@ class WebHandler(
         )
 
     def _get_api_plugins(self):
+        """Get api plugins."""
         if not self._require_auth("user"):
             return
         from salmalm.core import PluginLoader
@@ -1271,6 +1302,7 @@ class WebHandler(
         )
 
     def _get_api_agents(self):
+        """Get api agents."""
         if not self._require_auth("user"):
             return
         from salmalm.features.agents import agent_manager
@@ -1283,6 +1315,7 @@ class WebHandler(
         )
 
     def _get_api_hooks(self):
+        """Get api hooks."""
         if not self._require_auth("user"):
             return
         from salmalm.features.hooks import hook_manager, VALID_EVENTS
@@ -1295,6 +1328,7 @@ class WebHandler(
         )
 
     def _get_api_security_report(self):
+        """Get api security report."""
         if not self._require_auth("admin"):
             return
         from salmalm.security import security_auditor
@@ -1303,6 +1337,7 @@ class WebHandler(
 
     def _get_api_bookmarks(self):
         # Message bookmarks — LobeChat style (메시지 북마크)
+        """Get api bookmarks."""
         if not self._require_auth("user"):
             return
         from salmalm.features.edge_cases import bookmark_manager
@@ -1319,6 +1354,7 @@ class WebHandler(
     def _get_api_paste_detect(self):
         # Smart paste detection — BIG-AGI style (스마트 붙여넣기)
         # GET version reads from query param
+        """Get api paste detect."""
         if not self._require_auth("user"):
             return
         import urllib.parse
@@ -1335,6 +1371,7 @@ class WebHandler(
 
     def _get_api_health(self):
         # K8s readiness/liveness probe compatible: 200=healthy, 503=unhealthy
+        """Get api health."""
         from salmalm.core.health import get_health_report
 
         report = get_health_report()
@@ -1342,6 +1379,7 @@ class WebHandler(
         self._json(report, status=status_code)
 
     def _get_api_check_update(self):
+        """Get api check update."""
         try:
             import urllib.request
 
@@ -1358,6 +1396,7 @@ class WebHandler(
 
     def _get_api_update_check(self):
         # Alias for /api/check-update
+        """Get api update check."""
         try:
             import urllib.request
 
@@ -1378,6 +1417,7 @@ class WebHandler(
             self._json({"current": VERSION, "latest": None, "error": str(e)[:100]})  # noqa: F405
 
     def _get_manifest_json(self):
+        """Get manifest json."""
         manifest = {
             "name": "SalmAlm — Personal AI Gateway",
             "short_name": "SalmAlm",
@@ -1412,6 +1452,7 @@ class WebHandler(
 
     def _get_sw_js(self):
         # Return self-uninstalling SW — clears old caches and unregisters itself
+        """Get sw js."""
         sw_js = """self.addEventListener("install",()=>self.skipWaiting());
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).then(()=>self.registration.unregister()))});"""
         self.send_response(200)
@@ -1447,17 +1488,20 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         self.wfile.write(content)
 
     def _get_dashboard(self):
+        """Get dashboard."""
         if not self._require_auth("user"):
             return
         self._html(_tmpl.DASHBOARD_HTML)
 
     def _get_docs(self):
+        """Get docs."""
         from salmalm.features.docs import generate_api_docs_html
 
         self._html(generate_api_docs_html())
 
     def _do_get_inner(self):
         # Route table dispatch for simple API endpoints
+        """Do get inner."""
         _clean_path = self.path.split("?")[0]
         _handler_name = self._GET_ROUTES.get(_clean_path)
         if _handler_name:
@@ -1985,6 +2029,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
     _MAX_POST_SIZE = 10 * 1024 * 1024
 
     def _post_api_do_update(self):
+        """Post api do update."""
         if not self._require_auth("admin"):
             return
         if self._get_client_ip() not in ("127.0.0.1", "::1", "localhost"):
@@ -2030,6 +2075,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_restart(self):
+        """Post api restart."""
         if not self._require_auth("admin"):
             return
         if self._get_client_ip() not in ("127.0.0.1", "::1", "localhost"):
@@ -2044,6 +2090,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         import sys as _sys
 
         def _do_restart():
+            """Do restart."""
             import time
 
             time.sleep(0.5)  # Let HTTP response flush
@@ -2054,6 +2101,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
     def _post_api_update(self):
         # Alias for /api/do-update with WebSocket progress
+        """Post api update."""
         if not self._require_auth("admin"):
             return
         if self._get_client_ip() not in ("127.0.0.1", "::1", "localhost"):
@@ -2107,6 +2155,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_persona_switch(self):
+        """Post api persona switch."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2125,6 +2174,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_persona_create(self):
+        """Post api persona create."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2143,6 +2193,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_persona_delete(self):
+        """Post api persona delete."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2160,6 +2211,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_stt(self):
+        """Post api stt."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2178,6 +2230,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"ok": False, "error": str(e)}, 500)
 
     def _post_api_agent_sync(self):
+        """Post api agent sync."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2207,6 +2260,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"ok": False, "error": "Unknown action"}, 400)
 
     def _post_api_agent_import_preview(self):
+        """Post api agent import preview."""
         if not self._require_auth("user"):
             return
         # Read multipart file
@@ -2248,6 +2302,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"ok": False, "error": str(e)}, 400)
 
     def _post_api_queue_mode(self):
+        """Post api queue mode."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2262,6 +2317,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"ok": False, "error": str(e)}, 400)
 
     def _post_api_soul(self):
+        """Post api soul."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2277,6 +2333,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_agents(self):
+        """Post api agents."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2299,6 +2356,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"error": "Unknown action. Use: create, delete, bind, switch"}, 400)
 
     def _post_api_hooks(self):
+        """Post api hooks."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2321,6 +2379,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"error": "Unknown action"}, 400)
 
     def _post_api_plugins_manage(self):
+        """Post api plugins manage."""
         body = self._body
         if not self._require_auth("user"):
             return
@@ -2354,6 +2413,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         self._json({"thoughts": results})
 
     def _post_api_bookmarks(self):
+        """Post api bookmarks."""
         body = self._body
         # Add/remove bookmark — LobeChat style (북마크 추가/제거)
         if not self._require_auth("user"):
@@ -2383,6 +2443,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_groups(self):
+        """Post api groups."""
         body = self._body
         # Session group CRUD — LobeChat style (그룹 관리)
         if not self._require_auth("user"):
@@ -2422,6 +2483,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_paste_detect(self):
+        """Post api paste detect."""
         body = self._body
         # Smart paste detection — BIG-AGI style (스마트 붙여넣기 감지)
         if not self._require_auth("user"):
@@ -2436,6 +2498,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         return
 
     def _post_api_vault(self):
+        """Post api vault."""
         body = self._body
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
@@ -2488,6 +2551,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"error": "Unknown action"}, 400)
 
     def _post_api_upload(self):
+        """Post api upload."""
         length = self._content_length
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
@@ -2607,6 +2671,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             return
 
     def _post_api_presence(self):
+        """Post api presence."""
         body = self._body
         # Register/heartbeat presence
         instance_id = body.get("instanceId", "")
@@ -2625,6 +2690,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         self._json({"ok": True, "state": entry.state})
 
     def _post_api_node_execute(self):
+        """Post api node execute."""
         body = self._body
         # Node endpoint: execute a tool locally (called by gateway)
         from salmalm.tools.tool_handlers import execute_tool
@@ -2641,6 +2707,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self._json({"error": str(e)[:500]}, 500)
 
     def _post_api_thoughts(self):
+        """Post api thoughts."""
         body = self._body
         from salmalm.features.thoughts import thought_stream
 
@@ -2721,6 +2788,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
     }
 
     def _do_post_inner(self):
+        """Do post inner."""
         from salmalm.core.engine import process_message  # noqa: F401
 
         length = int(self.headers.get("Content-Length", 0))

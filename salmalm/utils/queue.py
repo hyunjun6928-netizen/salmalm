@@ -134,6 +134,7 @@ class QueueLane:
     """
 
     def __init__(self, session_id: str, global_semaphore: asyncio.Semaphore) -> None:
+        """Init  ."""
         self.session_id = session_id
         self._global_sem = global_semaphore
         self._session_sem = asyncio.Semaphore(1)  # serial per session
@@ -202,6 +203,7 @@ class QueueLane:
         self._collect_futures.append(future)
 
         async def _debounce():
+            """Debounce."""
             await asyncio.sleep(debounce_s)
             async with self._session_sem:
                 async with _SemaphoreContext(self._global_sem):
@@ -307,6 +309,7 @@ class _SemaphoreContext:
     """Async context manager for semaphore."""
 
     def __init__(self, sem: asyncio.Semaphore) -> None:
+        """Init  ."""
         self._sem = sem
 
     async def __aenter__(self):
@@ -318,6 +321,7 @@ class _SemaphoreContext:
 
 
 def _merge_messages(messages: List[QueuedMessage]) -> str:
+    """Merge messages."""
     if len(messages) == 1:
         return messages[0].text
     return "\n".join(m.text for m in messages)
@@ -335,6 +339,7 @@ class MessageQueue:
     """
 
     def __init__(self, config: Optional[dict] = None) -> None:
+        """Init  ."""
         self._config = config or load_config()
         self._lanes: Dict[str, QueueLane] = {}
         self._lock = threading.Lock()
@@ -346,17 +351,21 @@ class MessageQueue:
 
     @property
     def config(self) -> dict:
+        """Config."""
         return self._config
 
     def reload_config(self) -> None:
+        """Reload config."""
         self._config = load_config()
 
     def _get_semaphore(self, session_id: str) -> asyncio.Semaphore:
+        """Get semaphore."""
         if "subagent" in session_id:
             return self._subagent_sem
         return self._main_sem
 
     def _get_lane(self, session_id: str) -> QueueLane:
+        """Get lane."""
         with self._lock:
             if session_id not in self._lanes:
                 sem = self._get_semaphore(session_id)
@@ -445,6 +454,7 @@ class MessageQueue:
         return f"✅ Queue updated: {', '.join(changes)}"
 
     def _show_status(self, lane: QueueLane) -> str:
+        """Show status."""
         cfg = self._config
         mode = lane.options.mode.value if lane.options.mode else cfg.get("mode", "collect")
         debounce = lane.options.debounce_ms if lane.options.debounce_ms is not None else cfg.get("debounceMs", 1000)
@@ -477,14 +487,17 @@ class MessageQueue:
 
     @property
     def active_sessions(self) -> int:
+        """Active sessions."""
         return len(self._lanes)
 
     @property
     def main_semaphore(self) -> asyncio.Semaphore:
+        """Main semaphore."""
         return self._main_sem
 
     @property
     def subagent_semaphore(self) -> asyncio.Semaphore:
+        """Subagent semaphore."""
         return self._subagent_sem
 
 

@@ -52,6 +52,7 @@ def _sanitized_env(extra_env: dict | None = None) -> dict:
 
 @register("exec")
 def handle_exec(args: dict) -> str:
+    """Handle exec."""
     cmd = args.get("command", "")
     background = args.get("background", False)
     yield_ms = args.get("yieldMs", 0)
@@ -144,6 +145,7 @@ def handle_exec(args: dict) -> str:
 
         # Resource limits for sandboxing (Linux/macOS only)
         def _set_exec_limits():
+            """Set exec limits."""
             try:
                 import resource
 
@@ -220,6 +222,7 @@ def handle_exec_session(args: dict) -> str:
 
 @register("python_eval")
 def handle_python_eval(args: dict) -> str:
+    """Handle python eval."""
     code = args.get("code", "")
     timeout_sec = min(args.get("timeout", 15), 30)
     _EVAL_BLOCKLIST = [
@@ -316,6 +319,7 @@ else:
 """
 
     def _set_limits():
+        """Set limits."""
         try:
             import resource
 
