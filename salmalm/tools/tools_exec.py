@@ -51,6 +51,58 @@ def _sanitized_env(extra_env: dict | None = None) -> dict:
     return clean
 
 
+def _run_foreground(cmd: str, timeout: int, env) -> str:
+    """Run command in foreground with resource limits and output truncation."""
+    import shlex
+    run_env = _sanitized_env(env)
+    needs_shell = any(c in cmd for c in ["|", ">", "<", "&&", "||", ";"])
+    if needs_shell:
+        if not os.environ.get("SALMALM_ALLOW_SHELL"):
+            return ("❌ Shell operators (|, >, <, &&, ;) require explicit opt-in.\n"
+                    "Set SALMALM_ALLOW_SHELL=1 or use individual commands.")
+        run_args = {"args": cmd, "shell": True}
+    else:
+        try:
+            run_args = {"args": shlex.split(cmd), "shell": False}
+        except ValueError:
+            return "❌ Failed to parse command. Check quoting/escaping."
+    extra_kwargs = {"env": run_env}
+    if sys.platform != "win32" and not needs_shell:
+        extra_kwargs["preexec_fn"] = lambda: _set_exec_limits(timeout)
+    try:
+        result = subprocess.run(
+            **run_args, capture_output=True, text=True, timeout=timeout, cwd=str(WORKSPACE_DIR), **extra_kwargs
+        )
+        return _format_exec_output(result)
+    except subprocess.TimeoutExpired:
+        return f"Timeout ({timeout}s)"
+
+
+def _set_exec_limits(timeout: int) -> None:
+    """Set resource limits for sandboxed execution (Linux/macOS)."""
+    try:
+        import resource
+        resource.setrlimit(resource.RLIMIT_CPU, (timeout + 5, timeout + 10))
+        resource.setrlimit(resource.RLIMIT_AS, (1024**3, 1024**3))
+        resource.setrlimit(resource.RLIMIT_NOFILE, (100, 100))
+        resource.setrlimit(resource.RLIMIT_FSIZE, (50 * 1024 * 1024, 50 * 1024 * 1024))
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
+
+
+def _format_exec_output(result) -> str:
+    """Format subprocess result with truncation."""
+    MAX_OUTPUT = 50 * 1024
+    output = result.stdout[-MAX_OUTPUT:] if result.stdout else ""
+    if len(result.stdout or "") > MAX_OUTPUT:
+        output = f"[truncated: {len(result.stdout)} chars total, showing last {MAX_OUTPUT}]\n" + output
+    if result.stderr:
+        output += f"\n[stderr]: {result.stderr[-2000:]}"
+    if result.returncode != 0:
+        output += f"\n[exit code]: {result.returncode}"
+    return output or "(no output)"
+
+
 @register("exec")
 def handle_exec(args: dict) -> str:
     """Handle exec."""
@@ -115,70 +167,7 @@ def handle_exec(args: dict) -> str:
             f"Use `exec_session poll {sid}` to check progress."
         )
 
-    # Foreground execution (original behavior)
-    try:
-        import shlex
-
-        # Build environment
-        run_env = None
-        # Secret isolation: strip API keys/tokens from subprocess env
-        run_env = _sanitized_env(env)
-
-        # shell=True is OFF by default. Pipe/redirect syntax is blocked by
-        # EXEC_BLOCKLIST_PATTERNS ($(...), backticks) and _is_safe_command.
-        # If shlex.split fails, reject rather than falling back to shell=True.
-        needs_shell = any(c in cmd for c in ["|", ">", "<", "&&", "||", ";"])
-        if needs_shell:
-            # Validate: _is_safe_command already checked pipeline stages,
-            # but we still require SALMALM_ALLOW_SHELL=1 for shell mode.
-            if not os.environ.get("SALMALM_ALLOW_SHELL"):
-                return (
-                    "❌ Shell operators (|, >, <, &&, ;) require explicit opt-in.\n"
-                    "Set SALMALM_ALLOW_SHELL=1 or use individual commands."
-                )
-            run_args = {"args": cmd, "shell": True}
-        else:
-            try:
-                run_args = {"args": shlex.split(cmd), "shell": False}
-            except ValueError:
-                return "❌ Failed to parse command. Check quoting/escaping."
-        extra_kwargs = {"env": run_env}
-
-        # Resource limits for sandboxing (Linux/macOS only)
-        def _set_exec_limits():
-            """Set exec limits."""
-            try:
-                import resource
-
-                # CPU: match timeout
-                resource.setrlimit(resource.RLIMIT_CPU, (timeout + 5, timeout + 10))
-                # Memory: 1GB max
-                resource.setrlimit(resource.RLIMIT_AS, (1024 * 1024 * 1024, 1024 * 1024 * 1024))
-                # File descriptors: 100
-                resource.setrlimit(resource.RLIMIT_NOFILE, (100, 100))
-                # Max file size: 50MB
-                resource.setrlimit(resource.RLIMIT_FSIZE, (50 * 1024 * 1024, 50 * 1024 * 1024))
-            except Exception as e:  # noqa: broad-except
-                log.debug(f"Suppressed: {e}")
-
-        if sys.platform != "win32" and not needs_shell:
-            extra_kwargs["preexec_fn"] = _set_exec_limits
-
-        result = subprocess.run(
-            **run_args, capture_output=True, text=True, timeout=timeout, cwd=str(WORKSPACE_DIR), **extra_kwargs
-        )
-        # Output truncation: 50KB max
-        MAX_OUTPUT = 50 * 1024
-        output = result.stdout[-MAX_OUTPUT:] if result.stdout else ""
-        if len(result.stdout or "") > MAX_OUTPUT:
-            output = f"[truncated: {len(result.stdout)} chars total, showing last {MAX_OUTPUT}]\n" + output
-        if result.stderr:
-            output += f"\n[stderr]: {result.stderr[-2000:]}"
-        if result.returncode != 0:
-            output += f"\n[exit code]: {result.returncode}"
-        return output or "(no output)"
-    except subprocess.TimeoutExpired:
-        return f"Timeout ({timeout}s)"
+    return _run_foreground(cmd, timeout, env)
 
 
 @register("exec_session")

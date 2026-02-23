@@ -151,6 +151,68 @@ class LLMCronManager:
 
         return False
 
+    def _notify_completion(self, job: dict, response: str) -> None:
+        """Route cron job completion notification to configured channels."""
+        notify_cfg = job.get("notify")
+        if not notify_cfg:
+            return
+        summary = response[:800] + ("..." if len(response) > 800 else "")
+        notify_text = f"⏰ SalmAlm scheduled task completed: {job['name']}\n\n{summary}"
+        notified = False
+        if isinstance(notify_cfg, dict):
+            notified = self._send_to_channel(notify_cfg, notify_text, job["name"])
+        elif _tg_bot and _tg_bot.token and _tg_bot.owner_id:
+            try:
+                _tg_bot.send_message(_tg_bot.owner_id, notify_text)
+                notified = True
+            except Exception as e:
+                log.warning(f"[CRON] Telegram notify failed: {e}")
+        # Always store in web for visibility
+        self._store_web_notification(job["name"], response)
+
+    def _send_to_channel(self, notify_cfg: dict, text: str, job_name: str) -> bool:
+        """Send notification to a specific channel. Returns True if sent."""
+        ch = notify_cfg.get("channel", "")
+        try:
+            if ch == "telegram":
+                chat_id = notify_cfg.get("chat_id", "")
+                if chat_id and _tg_bot and _tg_bot.token:
+                    _tg_bot.send_message(chat_id, text)
+                    return True
+            elif ch == "discord":
+                channel_id = notify_cfg.get("channel_id", "")
+                if channel_id:
+                    import salmalm.channels.discord_bot as _dmod
+                    dbot = getattr(_dmod, "_bot", None)
+                    if dbot and hasattr(dbot, "send_message"):
+                        dbot.send_message(channel_id, text)
+                        return True
+        except Exception as e:
+            log.warning(f"[CRON] Notification routing failed for {job_name}: {e}")
+        return False
+
+    def _store_web_notification(self, job_name: str, response: str) -> None:
+        """Store notification in web session for UI visibility."""
+        web_session = _sessions.get("web")
+        if not web_session:
+            return
+        if not hasattr(web_session, "_notifications"):
+            web_session._notifications = []
+        web_session._notifications.append({"time": time.time(), "text": f"⏰ Cron [{job_name}]: {response[:200]}"})
+
+    def _handle_cron_failure(self, job: dict, error) -> None:
+        """Handle cron job failure: notify owner, auto-disable after 5 failures."""
+        error_text = f"⚠️ Cron job failed: {job['name']}\nError: {str(error)[:200]}"
+        try:
+            if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
+                _tg_bot.send_message(_tg_bot.owner_id, error_text)
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
+        if job.get("error_count", 0) >= 5:
+            job["enabled"] = False
+            self.save_jobs()
+            log.warning(f"[CRON] Job {job['name']} disabled after 5 consecutive failures")
+
     async def tick(self) -> None:
         """Check and execute due jobs. Also runs heartbeat if due."""
         # OpenClaw-style heartbeat check
@@ -182,60 +244,8 @@ class LLMCronManager:
                 self.save_jobs()
                 log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
 
-                # Notification routing
-                notify_cfg = job.get("notify")
-                notified = False
-                summary = response[:800] + ("..." if len(response) > 800 else "")
-                notify_text = f"⏰ SalmAlm scheduled task completed: {job['name']}\n\n{summary}"
-
-                if isinstance(notify_cfg, dict):
-                    ch = notify_cfg.get("channel", "")
-                    try:
-                        if ch == "telegram":
-                            chat_id = notify_cfg.get("chat_id", "")
-                            if chat_id and _tg_bot and _tg_bot.token:
-                                _tg_bot.send_message(chat_id, notify_text)
-                                notified = True
-                        elif ch == "discord":
-                            channel_id = notify_cfg.get("channel_id", "")
-                            if channel_id:
-                                try:
-                                    import salmalm.channels.discord_bot as _dmod
-
-                                    dbot = getattr(_dmod, "_bot", None)
-                                    if dbot and hasattr(dbot, "send_message"):
-                                        dbot.send_message(channel_id, notify_text)
-                                        notified = True
-                                except Exception as e:
-                                    log.debug(f"Suppressed: {e}")
-                    except Exception as e:
-                        log.warning(f"[CRON] Notification routing failed for {job['name']}: {e}")
-                elif notify_cfg:
-                    if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
-                        try:
-                            _tg_bot.send_message(_tg_bot.owner_id, notify_text)
-                            notified = True
-                        except Exception as e:
-                            log.warning(f"[CRON] Telegram notify failed: {e}")
-
-                # Fallback to web notification on failure, or always store for UI
-                if notify_cfg:
-                    web_session = _sessions.get("web")
-                    if web_session:
-                        if not notified or True:  # Always store in web for visibility
-                            if not hasattr(web_session, "_notifications"):
-                                web_session._notifications = []
-                            web_session._notifications.append(
-                                {
-                                    "time": time.time(),
-                                    "text": f"⏰ Cron [{job['name']}]: {response[:200]}",
-                                }
-                            )
-
-                # Log to daily memory
+                self._notify_completion(job, response)
                 write_daily_log(f"[CRON] {job['name']}: {response[:150]}")
-
-                # One-shot jobs: auto-disable
                 if job["schedule"]["kind"] == "at":
                     job["enabled"] = False
                     self.save_jobs()
@@ -247,19 +257,7 @@ class LLMCronManager:
                 job["error_count"] = job.get("error_count", 0) + 1
                 self.save_jobs()
 
-                # Notify owner about cron failure
-                error_text = f"⚠️ Cron job failed: {job['name']}\nError: {str(e)[:200]}"
-                try:
-                    if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
-                        _tg_bot.send_message(_tg_bot.owner_id, error_text)
-                except Exception as e:
-                    log.debug(f"Suppressed: {e}")
-
-                # Auto-disable after 5 consecutive failures
-                if job.get("error_count", 0) >= 5:
-                    job["enabled"] = False
-                    self.save_jobs()
-                    log.warning(f"[CRON] Job {job['name']} disabled after 5 consecutive failures")
+                self._handle_cron_failure(job, e)
 
 
 # ============================================================
