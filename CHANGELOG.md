@@ -1,5 +1,35 @@
 # Changelog
 
+> **Note:** Versions v0.10.x through v0.18.x were rapid iteration releases during initial development (2026-02-19 ~ 2026-02-23). Daily version bumps reflect active development, not production releases. Stable releases begin from v0.19.x.
+
+## v0.19.24 (2026-02-24)
+### ✨ Features
+- **PWA Service Worker** — offline cache + install prompt for mobile
+- **Cloudflare Tunnel** — `salmalm --tunnel` for external access with QR code
+- **Desktop Launcher** — PyInstaller one-file build, double-click to run
+- **Max Tokens UI** — configurable per-intent (Chat/Code), 0 = Auto dynamic allocation
+- **Friendly Error Messages** — bilingual KR/EN user-facing errors instead of tracebacks
+- **`/help` Categories** — 7 organized sections (Chat, Reasoning, Status, Security, Agents, Personalization, Tools)
+- **Beginners Guide** — `docs/beginners-guide.md` for non-developers
+
+### 🐛 Fixes
+- `web_fetch` / `web_search` HTTP errors no longer crash circuit breaker
+- `shell=True` removed from 2 exec paths → `shlex.split` + `shell=False`
+- Security approval failure now **denies** exec (fail-closed)
+- `engine.py` 827→795 lines (under 800 limit)
+- Flaky `test_loop_stops_at_max_iterations` fixed
+- `compaction.py` missing `datetime`/`KST` imports fixed
+- Audit log buffer now flushes on exit via `atexit` (crash data loss prevention)
+- DB connection list capped at 100 (memory leak prevention)
+- Tool count comments updated (32→67)
+- PyPI description: "56+ tools" → "67 tools"
+
+### 📝 Changes
+- README/README_KR 5-minute quickstart rewritten
+- Feature comparison table updated (12 items)
+- MkDocs nav includes beginners guide
+- OpenClaw comparison on every Engine setting
+
 ## v0.12.4 (2026-02-19)
 
 ### ✨ Features

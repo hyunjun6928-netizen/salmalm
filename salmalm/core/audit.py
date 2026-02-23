@@ -1,5 +1,6 @@
 """Audit logging subsystem."""
 
+import atexit
 import hashlib
 import json
 import logging
@@ -94,6 +95,8 @@ def _init_audit_db():
         reason TEXT DEFAULT 'rollback'
     )""")
     conn.commit()
+    # Ensure buffered entries are flushed on exit (prevents crash data loss)
+    atexit.register(_flush_audit_buffer)
 
 
 _AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush

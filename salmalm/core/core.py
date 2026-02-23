@@ -54,8 +54,11 @@ def _get_db() -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
-        # Track for shutdown cleanup
+        # Track for shutdown cleanup (cap to prevent unbounded growth)
         with _db_connections_lock:
+            if len(_all_db_connections) > 100:
+                # Prune closed connections
+                _all_db_connections[:] = [c for c in _all_db_connections if c is not None]
             _all_db_connections.append(conn)
         # Auto-create tables on first connection per thread
         conn.execute("""CREATE TABLE IF NOT EXISTS audit_log (
