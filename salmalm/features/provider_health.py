@@ -77,7 +77,7 @@ class ProviderHealthCheck:
                 "https://api.anthropic.com/v1/messages",
                 {"x-api-key": key, "content-type": "application/json", "anthropic-version": "2023-06-01"},
                 {
-                    "model": "claude-haiku-4-5-20251001",
+                    "model": "claude-3-5-haiku-20241022",
                     "max_tokens": 5,
                     "messages": [{"role": "user", "content": "ping"}],
                 },

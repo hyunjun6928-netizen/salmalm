@@ -31,31 +31,31 @@ _DEFAULT_FALLBACKS = {
     # Same-provider fallbacks + cross-provider fallbacks
     "anthropic/claude-opus-4-6": [
         "anthropic/claude-sonnet-4-6",
-        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-3-5-haiku-20241022",
         "google/gemini-2.5-pro",
         "openai/gpt-4.1",
     ],
     "anthropic/claude-sonnet-4-6": [
-        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-3-5-haiku-20241022",
         "anthropic/claude-opus-4-6",
         "google/gemini-2.5-flash",
         "openai/gpt-4.1-mini",
     ],
-    "anthropic/claude-haiku-4-5-20251001": [
+    "anthropic/claude-3-5-haiku-20241022": [
         "anthropic/claude-sonnet-4-6",
         "google/gemini-2.0-flash",
         "openai/gpt-4.1-mini",
     ],
     "openai/gpt-5.2": ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
     "openai/gpt-4.1": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
-    "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.0-flash", "anthropic/claude-3-5-haiku-20241022"],
     "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.0-flash", "anthropic/claude-sonnet-4-6"],
     "google/gemini-2.5-flash": [
         "google/gemini-2.0-flash",
         "google/gemini-2.5-pro",
-        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-3-5-haiku-20241022",
     ],
-    "google/gemini-2.0-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.0-flash": ["google/gemini-2.5-flash", "anthropic/claude-3-5-haiku-20241022"],
     "google/gemini-3-pro-preview": [
         "google/gemini-2.5-pro",
         "google/gemini-3-flash-preview",
@@ -64,7 +64,7 @@ _DEFAULT_FALLBACKS = {
     "google/gemini-3-flash-preview": [
         "google/gemini-2.0-flash",
         "google/gemini-2.5-flash",
-        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-3-5-haiku-20241022",
     ],
     "xai/grok-4": ["xai/grok-3", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
     "xai/grok-3": ["xai/grok-4", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],

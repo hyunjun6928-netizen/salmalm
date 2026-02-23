@@ -29,7 +29,7 @@ PRICING_VERSION = "2026-02-21"
 MODEL_PRICING: Dict[str, dict] = {
     "claude-opus-4": {"input": 15.0, "output": 75.0, "cache_read": 1.5, "cache_write": 18.75},
     "claude-sonnet-4": {"input": 3.0, "output": 15.0, "cache_read": 0.3, "cache_write": 3.75},
-    "claude-haiku-4-5": {"input": 1.0, "output": 5.0, "cache_read": 0.1, "cache_write": 1.25},
+    "claude-3-5-haiku": {"input": 1.0, "output": 5.0, "cache_read": 0.1, "cache_write": 1.25},
     "gemini-2.5-pro": {"input": 1.25, "output": 10.0, "cache_read": 0.315, "cache_write": 1.25},
     "gemini-2.5-flash": {"input": 0.15, "output": 0.60, "cache_read": 0.0375, "cache_write": 0.15},
     "gemini-2.0-flash": {"input": 0.10, "output": 0.40, "cache_read": 0.025, "cache_write": 0.10},

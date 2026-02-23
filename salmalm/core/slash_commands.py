@@ -378,7 +378,7 @@ def _cmd_model(cmd: str, session, **_) -> str:
         if model_name == "auto":
             _get_router().set_force_model(None)
             return "Model: **auto** (cost-optimized routing) — saved ✅\n• simple → haiku ⚡ • moderate → sonnet • complex → opus 💎"
-        labels = {"opus": "claude-opus-4-6 💎", "sonnet": "claude-sonnet-4-6", "haiku": "claude-haiku-4-5 ⚡"}
+        labels = {"opus": "claude-opus-4-6 💎", "sonnet": "claude-sonnet-4-6", "haiku": "claude-3-5-haiku ⚡"}
         return f"Model: **{model_name}** ({labels[model_name]}) — saved ✅"
     if "/" in model_name:
         _get_router().set_force_model(model_name)
