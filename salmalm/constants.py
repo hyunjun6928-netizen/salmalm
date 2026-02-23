@@ -297,7 +297,7 @@ MODELS = {
     # Anthropic
     "opus": "anthropic/claude-opus-4-6",
     "sonnet": "anthropic/claude-sonnet-4-20250514",
-    "haiku": "anthropic/claude-haiku-3.5-20241022",
+    "haiku": "anthropic/claude-haiku-4-5-20251001",
     # OpenAI
     "gpt5.3": "openai/gpt-5.3-codex",
     "gpt5.1": "openai/gpt-5.1-codex",
@@ -356,7 +356,7 @@ FALLBACK_MODELS = {
 
 # API validation test models (lightweight, for key testing)
 TEST_MODELS = {
-    "anthropic": "claude-3-5-haiku-20241022",
+    "anthropic": "claude-haiku-4-5-20251001",
     "openai": "gpt-4.1-nano",
     "xai": "grok-3-mini",
     "google": "gemini-2.0-flash",
@@ -426,9 +426,9 @@ TOOL_HINT_KEYWORDS = ["file", "exec", "run", "search", "web", "image", "memory",
 # ── Model name corrections (deprecated → current API IDs) ──
 # Single source of truth for model ID fixes. Used by model_selection.fix_model_name().
 MODEL_NAME_FIXES: dict = {
-    "claude-haiku-3.5-20241022": "claude-3-5-haiku-20241022",
-    "anthropic/claude-haiku-3.5-20241022": "anthropic/claude-3-5-haiku-20241022",
-    "claude-3-5-haiku-20241022": "claude-3-5-haiku-20241022",
+    "claude-haiku-3.5-20241022": "claude-haiku-4-5-20251001",
+    "anthropic/claude-haiku-3.5-20241022": "anthropic/claude-haiku-4-5-20251001",
+    "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
     "claude-sonnet-4-20250514": "claude-sonnet-4-6",
     "anthropic/claude-sonnet-4-20250514": "anthropic/claude-sonnet-4-6",
     "gpt-5.3-codex": "gpt-5.2-codex",

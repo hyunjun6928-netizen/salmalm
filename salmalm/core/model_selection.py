@@ -94,7 +94,7 @@ def save_routing_config(config: dict) -> None:
 # ── Cost-per-1M-token table (input/output) for auto-optimization ──
 _MODEL_COSTS = {
     # Anthropic
-    "anthropic/claude-haiku-3.5-20241022": (1.0, 5.0),
+    "anthropic/claude-haiku-4-5-20251001": (1.0, 5.0),
     "anthropic/claude-sonnet-4-20250514": (3.0, 15.0),
     "anthropic/claude-opus-4-6": (5.0, 25.0),
     # OpenAI
@@ -129,7 +129,7 @@ _TIER_CANDIDATES = {
         ("google/gemini-2.5-flash", "google_api_key"),  # $0.15/$0.6
         ("xai/grok-3-mini", "xai_api_key"),  # $0.3/$0.5
         ("openai/gpt-4.1-mini", "openai_api_key"),  # $0.4/$1.6
-        ("anthropic/claude-haiku-3.5-20241022", "anthropic_api_key"),  # $1/$5
+        ("anthropic/claude-haiku-4-5-20251001", "anthropic_api_key"),  # $1/$5
     ],
     "moderate": [
         # Goal: balanced — must be stronger than simple tier pick
@@ -140,7 +140,7 @@ _TIER_CANDIDATES = {
         ("openai/gpt-4.1", "openai_api_key"),  # $2/$8
         ("xai/grok-3", "xai_api_key"),  # $3/$15
         ("anthropic/claude-sonnet-4-20250514", "anthropic_api_key"),  # $3/$15
-        ("anthropic/claude-haiku-3.5-20241022", "anthropic_api_key"),  # $1/$5 (last resort)
+        ("anthropic/claude-haiku-4-5-20251001", "anthropic_api_key"),  # $1/$5 (last resort)
     ],
     "complex": [
         # Goal: strongest model per provider
