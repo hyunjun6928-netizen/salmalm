@@ -55,11 +55,14 @@ def _get_db() -> sqlite3.Connection:
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
         # Track for shutdown cleanup (cap to prevent unbounded growth)
+        import weakref as _weakref
         with _db_connections_lock:
-            if len(_all_db_connections) > 100:
-                # Prune closed connections
-                _all_db_connections[:] = [c for c in _all_db_connections if c is not None]
-            _all_db_connections.append(conn)
+            # Prune dead weak refs
+            _all_db_connections[:] = [r for r in _all_db_connections if (not isinstance(r, _weakref.ref)) or r() is not None]
+            try:
+                _all_db_connections.append(_weakref.ref(conn))
+            except TypeError:
+                _all_db_connections.append(conn)
         # Auto-create tables on first connection per thread
         conn.execute("""CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,6 +93,10 @@ def _get_db() -> sqlite3.Connection:
             log.debug(f"Suppressed: {e}")
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
+        try:
+            conn.execute("ALTER TABLE session_store ADD COLUMN session_meta TEXT DEFAULT '{}'")
         except Exception as e:
             log.debug(f"Suppressed: {e}")
         conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (
@@ -127,10 +134,13 @@ def audit_log_cleanup(days: int = 30) -> None:
 
 def close_all_db_connections() -> None:
     """Close all tracked SQLite connections (for graceful shutdown)."""
+    import weakref as _weakref
     with _db_connections_lock:
-        for conn in _all_db_connections:
+        for ref in _all_db_connections:
             try:
-                conn.close()
+                conn = ref() if isinstance(ref, _weakref.ref) else ref
+                if conn is not None:
+                    conn.close()
             except Exception as e:
                 log.debug(f"Suppressed: {e}")
         _all_db_connections.clear()

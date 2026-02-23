@@ -90,18 +90,31 @@ class Session:
                 elif isinstance(m.get("content"), str):
                     saveable.append(m)
             conn = _get_db()
-            # Ensure user_id column exists
-            try:
-                conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-            except Exception as e:
-                log.debug(f"Suppressed: {e}")
+            # Ensure columns exist
+            for _col_sql in [
+                "ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL",
+                "ALTER TABLE session_store ADD COLUMN session_meta TEXT DEFAULT '{}'",
+            ]:
+                try:
+                    conn.execute(_col_sql)
+                except Exception as e:
+                    log.debug(f"Suppressed: {e}")
+            # Persist session metadata (model_override, thinking, tts)
+            _meta = json.dumps({
+                "model_override": self.model_override,
+                "thinking_enabled": self.thinking_enabled,
+                "thinking_level": self.thinking_level,
+                "tts_enabled": self.tts_enabled,
+                "tts_voice": self.tts_voice,
+            }, ensure_ascii=False)
             conn.execute(
-                "INSERT OR REPLACE INTO session_store (session_id, messages, updated_at, user_id) VALUES (?,?,?,?)",
+                "INSERT OR REPLACE INTO session_store (session_id, messages, updated_at, user_id, session_meta) VALUES (?,?,?,?,?)",
                 (
                     self.id,
                     json.dumps(saveable, ensure_ascii=False),
                     datetime.now(KST).isoformat(),
                     self.user_id,
+                    _meta,
                 ),
             )  # noqa: F405
             conn.commit()
@@ -217,7 +230,7 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
             try:
                 conn = _get_db()
                 row = conn.execute(
-                    "SELECT messages FROM session_store WHERE session_id=?",
+                    "SELECT messages, session_meta FROM session_store WHERE session_id=?",
                     (session_id,),
                 ).fetchone()
                 if row:
@@ -231,6 +244,22 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                         # Corrupted session JSON — start fresh
                         log.warning(f"[SESSION] Corrupt session JSON for {session_id}: {je}")
                         _sessions[session_id].messages = []
+                    # Restore session metadata (model_override, thinking, tts)
+                    try:
+                        _meta_json = row[1] if len(row) > 1 and row[1] else "{}"
+                        _meta = json.loads(_meta_json)
+                        if _meta.get("model_override"):
+                            _sessions[session_id].model_override = _meta["model_override"]
+                        if _meta.get("thinking_enabled") is not None:
+                            _sessions[session_id].thinking_enabled = _meta["thinking_enabled"]
+                        if _meta.get("thinking_level"):
+                            _sessions[session_id].thinking_level = _meta["thinking_level"]
+                        if _meta.get("tts_enabled") is not None:
+                            _sessions[session_id].tts_enabled = _meta["tts_enabled"]
+                        if _meta.get("tts_voice"):
+                            _sessions[session_id].tts_voice = _meta["tts_voice"]
+                    except (json.JSONDecodeError, IndexError, TypeError) as me:
+                        log.debug(f"Session meta restore: {me}")
                     # Refresh system prompt
                     from salmalm.core.prompt import build_system_prompt
 

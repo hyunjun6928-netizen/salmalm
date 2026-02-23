@@ -235,8 +235,14 @@ class TelegramMediaMixin:
         _start = time.time()
         from salmalm.core.engine import process_message
 
+        # Pass session-level model override (same as web_chat.py)
+        _model_ov = getattr(_sess_obj, "model_override", None)
+        if _model_ov == "auto":
+            _model_ov = None
+
         response = await process_message(
-            session_id, text, image_data=_image_data, on_token=_on_stream_token, on_status=_on_status
+            session_id, text, model_override=_model_ov, image_data=_image_data,
+            on_token=_on_stream_token, on_status=_on_status,
         )
         _elapsed = time.time() - _start
 

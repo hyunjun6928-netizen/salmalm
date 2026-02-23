@@ -203,6 +203,7 @@ def select_model(message: str, session) -> Tuple[str, str]:
     Respects session-level model_override (from /model command).
     """
     override = getattr(session, "model_override", None)
+    log.info(f"[MODEL-SELECT] session.model_override={override!r}, session.id={getattr(session, 'id', '?')}")
     if override and override != "auto":
         _OVERRIDE_MAP = {"haiku": ("simple", "haiku"), "sonnet": ("moderate", "sonnet"), "opus": ("complex", "opus")}
         if override in _OVERRIDE_MAP:
