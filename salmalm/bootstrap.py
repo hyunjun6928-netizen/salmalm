@@ -188,15 +188,11 @@ def _auto_unlock_vault() -> None:
     if vault.unlock(""):
         log.info("[UNLOCK] Vault auto-unlocked (no password)")
         return
-    # 5. All methods failed on localhost → reset vault
-    if not _is_external_bind:
-        log.warning("[VAULT] All auto-unlock failed — resetting vault for setup wizard")
-        try:
-            VAULT_FILE.unlink(missing_ok=True)
-            (VAULT_FILE.parent / ".vault_auto").unlink(missing_ok=True)
-            log.info("[VAULT] Vault reset — setup wizard will run on next page load")
-        except Exception as _e:
-            log.error(f"[VAULT] Reset failed: {_e}")
+    # 5. All methods failed — warn but DO NOT delete vault data
+    log.warning(
+        "[VAULT] All auto-unlock methods failed. "
+        "Visit the web UI to unlock manually, or reset with: salmalm doctor --reset-vault"
+    )
 
 
 def _try_vault_auto_file() -> None:

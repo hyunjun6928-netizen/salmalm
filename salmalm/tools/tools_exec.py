@@ -216,7 +216,10 @@ def handle_exec_session(args: dict) -> str:
 
 @register("python_eval")
 def handle_python_eval(args: dict) -> str:
-    """Handle python eval."""
+    """Handle python eval. Disabled by default — enable with SALMALM_PYTHON_EVAL=1."""
+    import os as _os
+    if _os.environ.get("SALMALM_PYTHON_EVAL", "0") != "1":
+        return "⚠️ python_eval is disabled by default for security. Enable with SALMALM_PYTHON_EVAL=1"
     code = args.get("code", "")
     timeout_sec = min(args.get("timeout", 15), 30)
     _EVAL_BLOCKLIST = [

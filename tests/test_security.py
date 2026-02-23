@@ -536,6 +536,7 @@ class TestSecurityHeaders(unittest.TestCase):
 class TestPythonEvalSandbox(unittest.TestCase):
     """A03: Python eval sandbox tests — Python 평가 샌드박스 테스트."""
 
+    @patch.dict(os.environ, {"SALMALM_PYTHON_EVAL": "1"})
     def test_blocked_imports(self):
         """Dangerous imports should be blocked in python_eval."""
         from salmalm.tools.tools_exec import handle_python_eval
@@ -551,6 +552,7 @@ class TestPythonEvalSandbox(unittest.TestCase):
             self.assertIn('blocked', result.lower(),
                           f"Dangerous code not blocked: {code[:50]}")
 
+    @patch.dict(os.environ, {"SALMALM_PYTHON_EVAL": "1"})
     def test_dunder_access_blocked(self):
         """Dunder attribute access should be blocked."""
         from salmalm.tools.tools_exec import handle_python_eval

@@ -5,6 +5,7 @@ These tests catch regressions in security-critical paths.
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 # Ensure DATA_DIR isolation
 os.environ.setdefault('SALMALM_HOME', '/tmp/test_security_regression')
@@ -325,6 +326,7 @@ class TestSecretIsolation(unittest.TestCase):
         env = _sanitized_env({'MY_CUSTOM_TOKEN': 'explicit'})
         self.assertEqual(env['MY_CUSTOM_TOKEN'], 'explicit')
 
+    @patch.dict(os.environ, {"SALMALM_PYTHON_EVAL": "1"})
     def test_python_eval_blocks_vault_access(self):
         from salmalm.tools.tools_exec import handle_python_eval
         dangerous_codes = [

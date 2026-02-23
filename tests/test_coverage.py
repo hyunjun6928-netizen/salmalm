@@ -89,11 +89,20 @@ class TestToolHandlers(unittest.TestCase):
         self.assertTrue(len(result) > 0)
         os.unlink(f1); os.unlink(f2)
 
+    @patch.dict(os.environ, {"SALMALM_PYTHON_EVAL": "1"})
     def test_execute_tool_python_eval(self):
-        """python_eval tool should execute code."""
+        """python_eval tool should execute code (requires opt-in)."""
         from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('python_eval', {'code': 'print(2+2)'})
         self.assertIn('4', result)
+
+    def test_python_eval_disabled_by_default(self):
+        """python_eval should be disabled without env var."""
+        from salmalm.tools.tool_handlers import execute_tool
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SALMALM_PYTHON_EVAL", None)
+            result = execute_tool('python_eval', {'code': 'print(1)'})
+            self.assertIn('disabled', result.lower())
 
     def test_execute_tool_system_monitor(self):
         """system_monitor tool should return stats."""

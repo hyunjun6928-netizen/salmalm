@@ -262,11 +262,13 @@ class TestToolHandlersEdgeCases(unittest.TestCase):
         if os.path.exists(path):
             os.unlink(path)
 
+    @patch.dict(os.environ, {"SALMALM_PYTHON_EVAL": "1"})
     def test_python_eval_error(self):
         from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('python_eval', {'code': 'raise ValueError("test")'})
         self.assertIsInstance(result, str)
 
+    @patch.dict(os.environ, {"SALMALM_PYTHON_EVAL": "1"})
     def test_python_eval_timeout(self):
         from salmalm.tools.tool_handlers import execute_tool
         result = execute_tool('python_eval', {'code': 'import time; time.sleep(0.1); print("ok")'})
