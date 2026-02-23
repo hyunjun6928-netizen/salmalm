@@ -649,7 +649,68 @@ class TelegramBot(TelegramCommandsMixin):
         text = msg.get("text", "") or msg.get("caption", "") or ""
         file_info = None
 
-        # Handle photos (with vision support)
+        text, file_info, _image_data = self._extract_media(msg)
+        if file_info == "__HANDLED__":
+            return  # Agent import handled inline
+
+        # Build final message
+        if file_info:
+            text = f"{file_info}\n{text}" if text else file_info
+
+        if not text:
+            return
+
+        await self._handle_update_continued(chat_id, msg, text, _image_data, _tenant_user)
+
+    def _send_llm_response(self, chat_id, response: str, model_short: str, elapsed: float,
+                           draft_sent: bool, msg_id, session_obj) -> None:
+        """Send LLM response with media detection, draft finalization, and TTS."""
+        import re as _re
+        img_match = _re.search(r"uploads/[\w.-]+\.(png|jpg|jpeg|gif|webp)", response)
+        audio_match = _re.search(r"uploads/[\w.-]+\.(mp3|wav|ogg)", response)
+        suffix = f"\n\n🤖 {model_short} · ⏱️ {elapsed:.1f}s"
+        if img_match:
+            img_path = WORKSPACE_DIR / img_match.group(0)  # noqa: F405
+            if img_path.exists():
+                if draft_sent:
+                    self._draft_messages.pop(str(chat_id), None)
+                self._send_photo(chat_id, img_path, response[:1000])
+            else:
+                self._finalize_or_send(chat_id, response, suffix, draft_sent)
+        elif audio_match:
+            audio_path = WORKSPACE_DIR / audio_match.group(0)  # noqa: F405
+            if audio_path.exists():
+                if draft_sent:
+                    self._draft_messages.pop(str(chat_id), None)
+                self._send_audio(chat_id, audio_path, response[:1000])
+            else:
+                self._finalize_or_send(chat_id, response, suffix, draft_sent)
+        else:
+            if draft_sent:
+                self._finalize_draft(chat_id, response, suffix)
+            else:
+                self.send_message(chat_id, f"{response}{suffix}", reply_to_message_id=msg_id)
+        self.clear_reaction(chat_id, msg_id)
+        if getattr(session_obj, "tts_enabled", False):
+            try:
+                self._send_tts_voice(chat_id, response, session_obj)
+            except Exception as e:
+                log.error(f"TTS error: {e}")
+
+    def _finalize_or_send(self, chat_id, response: str, suffix: str, draft_sent: bool) -> None:
+        """Finalize draft or send fresh message."""
+        if draft_sent:
+            self._finalize_draft(chat_id, response, suffix)
+        else:
+            self.send_message(chat_id, f"{response}{suffix}")
+
+    def _extract_media(self, msg: dict) -> tuple:
+        """Extract media (photo/doc/voice/sticker) from Telegram message.
+
+        Returns (text, file_info, image_data). file_info="__HANDLED__" if message was fully handled.
+        """
+        text = msg.get("text", "") or msg.get("caption", "") or ""
+        file_info = None
         _image_data = None
         if msg.get("photo"):
             photo = msg["photo"][-1]  # Largest size
@@ -680,7 +741,7 @@ class TelegramBot(TelegramCommandsMixin):
 
                     result = import_agent(data)
                     self.send_message(chat_id, f"📦 **Agent Import / 에이전트 가져오기**\n\n{result.summary()}")
-                    return
+                    return (text, "__HANDLED__", None)
                 save_path = WORKSPACE_DIR / "uploads" / doc_fname  # noqa: F405
                 save_path.parent.mkdir(exist_ok=True)
                 save_path.write_bytes(data)
@@ -749,13 +810,10 @@ class TelegramBot(TelegramCommandsMixin):
             except Exception as e:
                 file_info = f"[🎤 Voice download failed: {e}]"
 
-        # Build final message
-        if file_info:
-            text = f"{file_info}\n{text}" if text else file_info
+        return (text, file_info, _image_data)
 
-        if not text:
-            return
-
+    async def _handle_update_continued(self, chat_id, msg, text, _image_data, _tenant_user) -> None:
+        """Handle update after auth + media extraction (LLM call + response)."""
         audit_log("telegram_msg", text[:100])
 
         # Commands
@@ -831,52 +889,7 @@ class TelegramBot(TelegramCommandsMixin):
         _model_short = (getattr(session_obj, "last_model", "") or "auto").split("/")[-1][:20]
         __complexity = getattr(session_obj, "last_complexity", "")  # noqa: F841
 
-        # Send response (check for generated files to send)
-        import re as _re
-
-        img_match = _re.search(r"uploads/[\w.-]+\.(png|jpg|jpeg|gif|webp)", response)
-        audio_match = _re.search(r"uploads/[\w.-]+\.(mp3|wav|ogg)", response)
-        suffix = f"\n\n🤖 {_model_short} · ⏱️ {_elapsed:.1f}s"
-        if img_match:
-            img_path = WORKSPACE_DIR / img_match.group(0)  # noqa: F405
-            if img_path.exists():
-                # Finalize any draft first
-                if _draft_sent[0]:
-                    key = str(chat_id)
-                    self._draft_messages.pop(key, None)
-                self._send_photo(chat_id, img_path, response[:1000])
-            else:
-                if _draft_sent[0]:
-                    self._finalize_draft(chat_id, response, suffix)
-                else:
-                    self.send_message(chat_id, f"{response}{suffix}")
-        elif audio_match:
-            audio_path = WORKSPACE_DIR / audio_match.group(0)  # noqa: F405
-            if audio_path.exists():
-                if _draft_sent[0]:
-                    key = str(chat_id)
-                    self._draft_messages.pop(key, None)
-                self._send_audio(chat_id, audio_path, response[:1000])
-            else:
-                if _draft_sent[0]:
-                    self._finalize_draft(chat_id, response, suffix)
-                else:
-                    self.send_message(chat_id, f"{response}{suffix}")
-        else:
-            if _draft_sent[0]:
-                self._finalize_draft(chat_id, response, suffix)
-            else:
-                self.send_message(chat_id, f"{response}{suffix}", reply_to_message_id=_msg_id)
-
-        # Clear ack reaction after response
-        self.clear_reaction(chat_id, _msg_id)
-
-        # TTS: send voice message if enabled
-        if getattr(session_obj, "tts_enabled", False):
-            try:
-                self._send_tts_voice(chat_id, response, session_obj)
-            except Exception as e:
-                log.error(f"TTS error: {e}")
+        self._send_llm_response(chat_id, response, _model_short, _elapsed, _draft_sent[0], _msg_id, session_obj)
 
 
     def stop(self) -> None:

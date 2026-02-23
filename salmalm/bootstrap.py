@@ -65,134 +65,8 @@ def _check_for_updates() -> str:
     return ""
 
 
-async def run_server():
-    """Main async entry point — boot all services."""
-    # ── Phase 1: Database & Core State ──
-    _init_audit_db()
-    _restore_usage()
-    audit_log("startup", f"{APP_NAME} v{VERSION}")
-    MEMORY_DIR.mkdir(exist_ok=True)
-
-    # ── Audit checkpoint cron (every 6 hours) ──
-    from salmalm.features.audit_cron import start_audit_cron
-
-    start_audit_cron(interval_hours=6)
-
-    # ── Phase 2: SLA Monitoring ──
-    try:
-        from .sla import uptime_monitor, watchdog
-
-        uptime_monitor.on_startup()
-        watchdog.start()
-        log.info("[SLA] Uptime monitor + watchdog initialized")
-    except Exception as e:
-        log.warning(f"[SLA] Init error: {e}")
-
-    # ── Phase 3: Extensions (hooks → plugins → agents) ──
-    try:
-        from .hooks import hook_manager
-
-        hook_manager.fire("on_startup", {"message": f"{APP_NAME} v{VERSION} starting"})
-    except Exception as e:  # noqa: broad-except
-        log.debug(f"Suppressed: {e}")
-    # Plugins: OFF by default (arbitrary code execution risk)
-    # Enable with SALMALM_PLUGINS=1
-    if os.environ.get("SALMALM_PLUGINS", "0") == "1":
-        try:
-            from .plugin_manager import plugin_manager
-
-            plugin_manager.scan_and_load()
-            log.warning("[PLUGINS] ⚠️ Plugins enabled — arbitrary code execution is possible")
-        except Exception as e:
-            log.warning(f"Plugin scan error: {e}")
-    else:
-        log.info("[PLUGINS] Disabled (set SALMALM_PLUGINS=1 to enable)")
-    try:
-        from .agents import agent_manager
-
-        agent_manager.scan()
-    except Exception as e:
-        log.warning(f"Agent scan error: {e}")
-
-    # ── Phase 4: HTTP Server ──
-    port = int(os.environ.get("SALMALM_PORT", 18800))
-    # Always default to 127.0.0.1 (loopback only).
-    # WSL users: set SALMALM_BIND=0.0.0.0 to allow Windows browser access.
-    bind_addr = os.environ.get("SALMALM_BIND", "127.0.0.1")
-    if bind_addr == "0.0.0.0":
-        log.warning(
-            "[WARN] Binding to 0.0.0.0 — server is accessible from LAN. "
-            "Set SALMALM_BIND=127.0.0.1 to restrict to localhost."
-        )
-        # External exposure safety checks
-        from salmalm.web.middleware import check_external_exposure_safety
-
-        exposure_warnings = check_external_exposure_safety(bind_addr, WebHandler)
-        for w in exposure_warnings:
-            log.warning(w)
-    server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
-
-    # Auto-generate self-signed cert for HTTPS (enables microphone, camera, etc.)
-    https_port = int(os.environ.get("SALMALM_HTTPS_PORT", 0))
-    if https_port or os.environ.get("SALMALM_HTTPS", "").lower() in ("1", "true", "yes"):
-        https_port = https_port or 18443
-        try:
-            import ssl
-
-            cert_dir = DATA_DIR / ".certs"
-            cert_dir.mkdir(exist_ok=True)
-            cert_file = cert_dir / "salmalm.pem"
-            key_file = cert_dir / "salmalm-key.pem"
-            if not cert_file.exists():
-                # Generate self-signed cert using stdlib
-                import subprocess
-
-                subprocess.run(
-                    [
-                        "openssl",
-                        "req",
-                        "-x509",
-                        "-newkey",
-                        "rsa:2048",
-                        "-keyout",
-                        str(key_file),
-                        "-out",
-                        str(cert_file),
-                        "-days",
-                        "3650",
-                        "-nodes",
-                        "-batch",
-                        "-subj",
-                        "/CN=localhost",
-                    ],
-                    capture_output=True,
-                    timeout=30,
-                )
-                log.info("[HTTPS] Self-signed certificate generated")
-            if cert_file.exists() and key_file.exists():
-                ssl_server = http.server.ThreadingHTTPServer((bind_addr, https_port), WebHandler)
-                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-                ctx.load_cert_chain(str(cert_file), str(key_file))
-                ssl_server.socket = ctx.wrap_socket(ssl_server.socket, server_side=True)
-                ssl_thread = threading.Thread(target=ssl_server.serve_forever, daemon=True)
-                ssl_thread.start()
-                log.info(f"[HTTPS] Secure UI: https://localhost:{https_port}")
-        except Exception as e:
-            log.warning(f"[HTTPS] Failed to start: {e}")
-
-    web_thread = threading.Thread(target=server.serve_forever, daemon=True)
-    web_thread.start()
-    url = f"http://{bind_addr}:{port}"
-    log.info(f"[WEB] Web UI: {url}")
-    # Always print to stdout so users see the URL even without logging config
-    print(f"\n  😈 SalmAlm v{VERSION} running at {url}\n  Press Ctrl+C to stop.\n", flush=True)
-
-    # Auto-open browser if requested (--open flag or SALMALM_OPEN_BROWSER=1)
-    if os.environ.get("SALMALM_OPEN_BROWSER", "") == "1":
-        import webbrowser
-
-        webbrowser.open(url)
-
+async def _setup_services(host: str, port: int, httpd, server_thread, url: str) -> None:
+    """Setup vault, channels, background services (phases 5-12)."""
     # ── Phase 5: Vault Auto-unlock ──
     _bind_addr = os.environ.get("SALMALM_BIND", "127.0.0.1")
     _is_external_bind = _bind_addr not in ("127.0.0.1", "::1", "localhost")
@@ -444,6 +318,139 @@ async def run_server():
         asyncio.get_event_loop().call_soon_threadsafe(_trigger_shutdown.set)
 
     _trigger_shutdown = asyncio.Event()
+
+
+
+async def run_server():
+    """Main async entry point — boot all services."""
+    # ── Phase 1: Database & Core State ──
+    _init_audit_db()
+    _restore_usage()
+    audit_log("startup", f"{APP_NAME} v{VERSION}")
+    MEMORY_DIR.mkdir(exist_ok=True)
+
+    # ── Audit checkpoint cron (every 6 hours) ──
+    from salmalm.features.audit_cron import start_audit_cron
+
+    start_audit_cron(interval_hours=6)
+
+    # ── Phase 2: SLA Monitoring ──
+    try:
+        from .sla import uptime_monitor, watchdog
+
+        uptime_monitor.on_startup()
+        watchdog.start()
+        log.info("[SLA] Uptime monitor + watchdog initialized")
+    except Exception as e:
+        log.warning(f"[SLA] Init error: {e}")
+
+    # ── Phase 3: Extensions (hooks → plugins → agents) ──
+    try:
+        from .hooks import hook_manager
+
+        hook_manager.fire("on_startup", {"message": f"{APP_NAME} v{VERSION} starting"})
+    except Exception as e:  # noqa: broad-except
+        log.debug(f"Suppressed: {e}")
+    # Plugins: OFF by default (arbitrary code execution risk)
+    # Enable with SALMALM_PLUGINS=1
+    if os.environ.get("SALMALM_PLUGINS", "0") == "1":
+        try:
+            from .plugin_manager import plugin_manager
+
+            plugin_manager.scan_and_load()
+            log.warning("[PLUGINS] ⚠️ Plugins enabled — arbitrary code execution is possible")
+        except Exception as e:
+            log.warning(f"Plugin scan error: {e}")
+    else:
+        log.info("[PLUGINS] Disabled (set SALMALM_PLUGINS=1 to enable)")
+    try:
+        from .agents import agent_manager
+
+        agent_manager.scan()
+    except Exception as e:
+        log.warning(f"Agent scan error: {e}")
+
+    # ── Phase 4: HTTP Server ──
+    port = int(os.environ.get("SALMALM_PORT", 18800))
+    # Always default to 127.0.0.1 (loopback only).
+    # WSL users: set SALMALM_BIND=0.0.0.0 to allow Windows browser access.
+    bind_addr = os.environ.get("SALMALM_BIND", "127.0.0.1")
+    if bind_addr == "0.0.0.0":
+        log.warning(
+            "[WARN] Binding to 0.0.0.0 — server is accessible from LAN. "
+            "Set SALMALM_BIND=127.0.0.1 to restrict to localhost."
+        )
+        # External exposure safety checks
+        from salmalm.web.middleware import check_external_exposure_safety
+
+        exposure_warnings = check_external_exposure_safety(bind_addr, WebHandler)
+        for w in exposure_warnings:
+            log.warning(w)
+    server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
+
+    # Auto-generate self-signed cert for HTTPS (enables microphone, camera, etc.)
+    https_port = int(os.environ.get("SALMALM_HTTPS_PORT", 0))
+    if https_port or os.environ.get("SALMALM_HTTPS", "").lower() in ("1", "true", "yes"):
+        https_port = https_port or 18443
+        try:
+            import ssl
+
+            cert_dir = DATA_DIR / ".certs"
+            cert_dir.mkdir(exist_ok=True)
+            cert_file = cert_dir / "salmalm.pem"
+            key_file = cert_dir / "salmalm-key.pem"
+            if not cert_file.exists():
+                # Generate self-signed cert using stdlib
+                import subprocess
+
+                subprocess.run(
+                    [
+                        "openssl",
+                        "req",
+                        "-x509",
+                        "-newkey",
+                        "rsa:2048",
+                        "-keyout",
+                        str(key_file),
+                        "-out",
+                        str(cert_file),
+                        "-days",
+                        "3650",
+                        "-nodes",
+                        "-batch",
+                        "-subj",
+                        "/CN=localhost",
+                    ],
+                    capture_output=True,
+                    timeout=30,
+                )
+                log.info("[HTTPS] Self-signed certificate generated")
+            if cert_file.exists() and key_file.exists():
+                ssl_server = http.server.ThreadingHTTPServer((bind_addr, https_port), WebHandler)
+                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                ctx.load_cert_chain(str(cert_file), str(key_file))
+                ssl_server.socket = ctx.wrap_socket(ssl_server.socket, server_side=True)
+                ssl_thread = threading.Thread(target=ssl_server.serve_forever, daemon=True)
+                ssl_thread.start()
+                log.info(f"[HTTPS] Secure UI: https://localhost:{https_port}")
+        except Exception as e:
+            log.warning(f"[HTTPS] Failed to start: {e}")
+
+    web_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    web_thread.start()
+    url = f"http://{bind_addr}:{port}"
+    log.info(f"[WEB] Web UI: {url}")
+    # Always print to stdout so users see the URL even without logging config
+    print(f"\n  😈 SalmAlm v{VERSION} running at {url}\n  Press Ctrl+C to stop.\n", flush=True)
+
+    # Auto-open browser if requested (--open flag or SALMALM_OPEN_BROWSER=1)
+    if os.environ.get("SALMALM_OPEN_BROWSER", "") == "1":
+        import webbrowser
+
+        webbrowser.open(url)
+
+
+    await _setup_services(host, port, httpd, server_thread, url)
 
     # Register signal handlers
     for sig in (signal.SIGINT, signal.SIGTERM):
