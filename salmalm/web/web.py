@@ -1510,6 +1510,15 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 if not self._require_auth("user"):
                     return
             return getattr(self, _handler_name)()
+        # Prefix-based route dispatch
+        for _prefix, _method, _extra in self._GET_PREFIX_ROUTES:
+            if self.path.startswith(_prefix):
+                if _extra and _extra not in self.path:
+                    continue
+                if _clean_path.startswith("/api/") and _clean_path not in self._PUBLIC_PATHS:
+                    if not self._require_auth("user"):
+                        return
+                return getattr(self, _method)()
         if self.path == "/" or self.path == "/index.html":
             if self._needs_first_run():
                 self._html(_tmpl.SETUP_HTML)
@@ -1522,277 +1531,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             else:
                 self._html(_tmpl.WEB_HTML)
 
-        elif self.path.startswith("/api/search"):
-            if not self._require_auth("user"):
-                return
-            import urllib.parse
-
-            parsed = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed.query)
-            query = params.get("q", [""])[0]
-            if not query:
-                self._json({"error": "Missing q parameter"}, 400)
-                return
-            lim = int(params.get("limit", ["20"])[0])
-            from salmalm.core import search_messages
-
-            results = search_messages(query, limit=lim)
-            self._json({"query": query, "results": results, "count": len(results)})
-
-        elif self.path.startswith("/api/sessions/") and "/export" in self.path:
-            if not self._require_auth("user"):
-                return
-            import urllib.parse
-
-            m = re.match(r"^/api/sessions/([^/]+)/export", self.path)
-            if not m:
-                self._json({"error": "Invalid path"}, 400)
-                return
-            sid = m.group(1)
-            parsed = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed.query)
-            fmt = params.get("format", ["json"])[0]
-            from salmalm.core import _get_db
-
-            conn = _get_db()
-            row = conn.execute(
-                "SELECT messages, updated_at FROM session_store WHERE session_id=?",
-                (sid,),
-            ).fetchone()
-            if not row:
-                self._json({"error": "Session not found"}, 404)
-                return
-            msgs = json.loads(row[0])
-            updated_at = row[1]
-            if fmt == "md":
-                lines = [
-                    "# SalmAlm Chat Export",
-                    "Session: {sid}",
-                    "Date: {updated_at}",
-                    "",
-                ]
-                for msg in msgs:
-                    role = msg.get("role", "")
-                    if role == "system":
-                        continue
-                    content = msg.get("content", "")
-                    if isinstance(content, list):
-                        content = " ".join(
-                            b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"
-                        )
-                    icon = "## 👤 User" if role == "user" else "## 😈 Assistant"
-                    lines.append(icon)
-                    lines.append(str(content))
-                    lines.append("")
-                    lines.append("---")
-                    lines.append("")
-                body = "\n".join(lines).encode("utf-8")
-                fname = f"salmalm_{sid}_{updated_at[:10]}.md"
-                self.send_response(200)
-                self.send_header("Content-Type", "text/markdown; charset=utf-8")
-                self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
-                self.send_header("Content-Length", str(len(body)))
-                self._cors()
-                self.end_headers()
-                self.wfile.write(body)
-            else:
-                export_data = {
-                    "session_id": sid,
-                    "updated_at": updated_at,
-                    "messages": msgs,
-                }
-                body = json.dumps(export_data, ensure_ascii=False, indent=2).encode("utf-8")
-                fname = f"salmalm_{sid}_{updated_at[:10]}.json"
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json; charset=utf-8")
-                self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
-                self.send_header("Content-Length", str(len(body)))
-                self._cors()
-                self.end_headers()
-                self.wfile.write(body)
-            return
-
-        elif self.path.startswith("/api/rag/search"):
-            if not self._require_auth("user"):
-                return
-            from salmalm.features.rag import rag_engine
-            import urllib.parse
-
-            parsed = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed.query)
-            query = params.get("q", [""])[0]
-            if not query:
-                self._json({"error": "Missing q parameter"}, 400)
-            else:
-                results = rag_engine.search(query, max_results=int(params.get("n", ["5"])[0]))
-                self._json({"query": query, "results": results})
-        elif self.path.startswith("/api/audit"):
-            if not self._require_auth("user"):
-                return
-            import urllib.parse
-
-            parsed = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed.query)
-            limit = int(params.get("limit", ["50"])[0])
-            event_type = params.get("type", [None])[0]
-            sid = params.get("session_id", [None])[0]
-            from salmalm.core import query_audit_log
-
-            entries = query_audit_log(limit=limit, event_type=event_type, session_id=sid)
-            self._json({"entries": entries, "count": len(entries)})
-
-        elif self.path.startswith("/api/sessions/") and "/summary" in self.path:
-            # Conversation summary card — BIG-AGI style (대화 요약 카드)
-            if not self._require_auth("user"):
-                return
-            m = re.match(r"^/api/sessions/([^/]+)/summary", self.path)
-            if m:
-                from salmalm.features.edge_cases import get_summary_card
-
-                card = get_summary_card(m.group(1))
-                self._json({"summary": card})
-            else:
-                self._json({"error": "Invalid path"}, 400)
-        elif self.path.startswith("/api/sessions/") and "/alternatives" in self.path:
-            # Conversation fork alternatives — LibreChat style (대화 포크)
-            if not self._require_auth("user"):
-                return
-            m = re.match(r"^/api/sessions/([^/]+)/alternatives/(\d+)", self.path)
-            if m:
-                from salmalm.features.edge_cases import conversation_fork
-
-                alts = conversation_fork.get_alternatives(m.group(1), int(m.group(2)))
-                self._json({"alternatives": alts})
-            else:
-                self._json({"error": "Invalid path"}, 400)
-
-        elif self.path.startswith("/api/logs"):
-            if not self._require_auth("user"):
-                return
-            from urllib.parse import parse_qs, urlparse
-
-            qs = parse_qs(urlparse(self.path).query)
-            lines = int(qs.get("lines", ["100"])[0])
-            level = qs.get("level", [""])[0].upper()
-            log_path = DATA_DIR / "salmalm.log"
-            entries = []
-            if log_path.exists():
-                all_lines = log_path.read_text(encoding="utf-8", errors="replace").strip().split("\n")
-                for ln in all_lines[-lines:]:
-                    if level and f"[{level}]" not in ln:
-                        continue
-                    entries.append(ln)
-            self._json({"logs": entries, "total": len(entries)})
-
-        elif self.path.startswith("/api/memory/read?"):
-            if not self._require_auth("user"):
-                return
-            import urllib.parse as _up
-
-            qs = _up.parse_qs(_up.urlparse(self.path).query)
-            fpath = qs.get("file", [""])[0]
-            if not fpath or ".." in fpath:
-                self._json({"error": "Invalid path"}, 400)
-                return
-            # P0-1: Block absolute paths and resolve to prevent path traversal
-            from pathlib import PurePosixPath
-
-            if PurePosixPath(fpath).is_absolute() or "\\" in fpath:
-                self._json({"error": "Invalid path"}, 400)
-                return
-            full = (BASE_DIR / fpath).resolve()
-            if not full.is_relative_to(BASE_DIR.resolve()):
-                self._json({"error": "Path outside allowed directory"}, 403)
-                return
-            if not full.exists() or not full.is_file():
-                self._json({"error": "File not found"}, 404)
-                return
-            try:
-                content = full.read_text(encoding="utf-8")[:50000]
-                self._json({"file": fpath, "content": content, "size": full.stat().st_size})
-            except Exception as e:
-                self._json({"error": str(e)}, 500)
-
-        elif self.path.startswith("/api/google/callback"):
-            import urllib.parse
-
-            parsed = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed.query)
-            code = params.get("code", [""])[0]
-            state = params.get("state", [""])[0]
-            error = params.get("error", [""])[0]
-            # CSRF: validate state token
-            if not state or state not in _google_oauth_pending_states:
-                self._html(
-                    '<html><body><h2>Invalid OAuth State</h2>'
-                    "<p>CSRF protection: state token missing or invalid.</p>"
-                    '<p><a href="/">Back</a></p></body></html>'
-                )
-                return
-            issued_at = _google_oauth_pending_states.pop(state)
-            # Expire states older than 10 minutes
-            if time.time() - issued_at > 600:
-                self._html(
-                    '<html><body><h2>OAuth State Expired</h2>'
-                    '<p>Please try again.</p><p><a href="/">Back</a></p></body></html>'
-                )
-                return
-            # Cleanup stale states (older than 15 min)
-            cutoff = time.time() - 900
-            stale = [k for k, v in _google_oauth_pending_states.items() if v < cutoff]
-            for k in stale:
-                _google_oauth_pending_states.pop(k, None)
-            if error:
-                self._html(
-                    f'<html><body><h2>Google OAuth Error</h2><p>{error}</p><p><a href="/">Back</a></p></body></html>'
-                )
-                return
-            if not code:
-                self._html('<html><body><h2>No code received</h2><p><a href="/">Back</a></p></body></html>')
-                return
-            client_id = vault.get("google_client_id") or ""
-            client_secret = vault.get("google_client_secret") or ""
-            port = self.server.server_address[1]
-            redirect_uri = f"http://localhost:{port}/api/google/callback"
-            try:
-                data = json.dumps(
-                    {
-                        "code": code,
-                        "client_id": client_id,
-                        "client_secret": client_secret,
-                        "redirect_uri": redirect_uri,
-                        "grant_type": "authorization_code",
-                    }
-                ).encode()
-                req = urllib.request.Request(
-                    "https://oauth2.googleapis.com/token",
-                    data=data,
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    result = json.loads(resp.read())
-                access_token = result.get("access_token", "")
-                refresh_token = result.get("refresh_token", "")
-                if refresh_token:
-                    vault.set("google_refresh_token", refresh_token)
-                if access_token:
-                    vault.set("google_access_token", access_token)
-                scopes = result.get("scope", "")
-                self._html(f"""<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
-                    <h2 style="color:#22c55e">\\u2705 Google Connected!</h2>
-                    <p>Refresh token saved to vault.</p>
-                    <p style="font-size:0.85em;color:#666">Scopes: {scopes}</p>
-                    <p><a href="/" style="color:#6366f1">\\u2190 Back to SalmAlm</a></p>
-                    </body></html>""")
-                log.info(f"[OK] Google OAuth2 connected (scopes: {scopes})")
-            except Exception as e:
-                log.error(f"Google OAuth2 token exchange failed: {e}")
-                self._html(f"""<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
-                    <h2 style="color:#ef4444">\\u274c Token Exchange Failed</h2>
-                    <p>{str(e)[:200]}</p>
-                    <p><a href="/" style="color:#6366f1">\\u2190 Back</a></p>
-                    </body></html>""")
         elif self.path in ("/icon-192.svg", "/icon-512.svg"):
             size = 192 if "192" in self.path else 512
             svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}">
@@ -1805,162 +1543,6 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             self.end_headers()
             self.wfile.write(svg.encode())
 
-        elif self.path.startswith("/api/agent/export"):
-            # Vault export requires admin role
-            from urllib.parse import parse_qs, urlparse
-
-            qs = parse_qs(urlparse(self.path).query)
-            inc_vault = qs.get("vault", ["0"])[0] == "1"
-            _min_role = "admin" if inc_vault else "user"
-            _export_user = self._require_auth(_min_role)
-            if not _export_user:
-                return
-            inc_sessions = qs.get("sessions", ["1"])[0] == "1"
-            inc_data = qs.get("data", ["1"])[0] == "1"
-            import zipfile
-            import io
-            import json as _json
-            import datetime
-
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                # Soul / personality
-                soul_path = DATA_DIR / "soul.md"
-                if soul_path.exists():
-                    zf.writestr("soul.md", soul_path.read_text(encoding="utf-8"))
-                # Memory files
-                from salmalm.constants import MEMORY_DIR as _mem_dir
-
-                if _mem_dir.exists():
-                    for f in _mem_dir.glob("*"):
-                        if f.is_file():
-                            zf.writestr(f"memory/{f.name}", f.read_text(encoding="utf-8"))
-                # Also include memory.md from DATA_DIR
-                mem_md = DATA_DIR / "memory.md"
-                if mem_md.exists():
-                    zf.writestr("memory.md", mem_md.read_text(encoding="utf-8"))
-                # Config
-                config_path = DATA_DIR / "config.json"
-                if config_path.exists():
-                    zf.writestr("config.json", config_path.read_text(encoding="utf-8"))
-                routing_path = DATA_DIR / "routing.json"
-                if routing_path.exists():
-                    zf.writestr("routing.json", routing_path.read_text(encoding="utf-8"))
-                # Sessions
-                if inc_sessions:
-                    from salmalm.core import _get_db
-
-                    conn = _get_db()
-                    _export_uid = _export_user.get("id", 0)
-                    if _export_uid and _export_uid > 0:
-                        rows = conn.execute(
-                            "SELECT session_id, messages, title FROM session_store WHERE user_id=? OR user_id IS NULL",
-                            (_export_uid,),
-                        ).fetchall()
-                    else:
-                        rows = conn.execute("SELECT session_id, messages, title FROM session_store").fetchall()
-                    sessions = []
-                    for r in rows:
-                        sessions.append(
-                            {
-                                "id": r[0],
-                                "data": r[1],
-                                "title": r[2] if len(r) > 2 else "",
-                            }
-                        )
-                    zf.writestr(
-                        "sessions.json",
-                        _json.dumps(sessions, ensure_ascii=False, indent=2),
-                    )
-                # Data (notes, expenses, habits, etc.)
-                if inc_data:
-                    for name in (
-                        "notes.json",
-                        "expenses.json",
-                        "habits.json",
-                        "journal.json",
-                        "dashboard.json",
-                    ):
-                        p = DATA_DIR / name
-                        if p.exists():
-                            zf.writestr(f"data/{name}", p.read_text(encoding="utf-8"))
-                # Vault (API keys) — only if explicitly requested
-                if inc_vault:
-                    from salmalm.security.crypto import vault as _vault_mod
-
-                    if _vault_mod.is_unlocked:
-                        keys = {}
-                        # Use internal vault key names (lowercase)
-                        for k in _vault_mod.keys():
-                            v = _vault_mod.get(k)
-                            if v:
-                                keys[k] = v
-                        if keys:
-                            zf.writestr("vault_keys.json", _json.dumps(keys, indent=2))
-                # Manifest
-                zf.writestr(
-                    "manifest.json",
-                    _json.dumps(
-                        {
-                            "version": VERSION,
-                            "exported_at": datetime.datetime.now().isoformat(),
-                            "includes": {
-                                "sessions": inc_sessions,
-                                "data": inc_data,
-                                "vault": inc_vault,
-                            },
-                        },
-                        indent=2,
-                    ),
-                )
-            buf.seek(0)
-            data = buf.getvalue()
-            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.send_response(200)
-            self._cors()
-            self.send_header("Content-Type", "application/zip")
-            self.send_header("Content-Disposition", f'attachment; filename="salmalm-export-{ts}.zip"')
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
-
-        elif self.path.startswith("/uploads/"):
-            # Serve uploaded files (images, audio) — basename-only to prevent traversal
-            fname = Path(self.path.split("/uploads/", 1)[-1]).name
-            if not fname:
-                self.send_error(400)
-                return
-            upload_dir = (WORKSPACE_DIR / "uploads").resolve()  # noqa: F405
-            fpath = (upload_dir / fname).resolve()
-            if not fpath.is_relative_to(upload_dir) or not fpath.exists():
-                self.send_error(404)
-                return
-            mime_map = {
-                ".png": "image/png",
-                ".jpg": "image/jpeg",
-                ".jpeg": "image/jpeg",
-                ".gif": "image/gif",
-                ".webp": "image/webp",
-                ".mp3": "audio/mpeg",
-                ".wav": "audio/wav",
-                ".ogg": "audio/ogg",
-            }
-            ext = fpath.suffix.lower()
-            mime = mime_map.get(ext, "application/octet-stream")
-            # ETag caching for static uploads
-            stat = fpath.stat()
-            etag = f'"{int(stat.st_mtime)}-{stat.st_size}"'
-            if self.headers.get("If-None-Match") == etag:
-                self.send_response(304)
-                self.end_headers()
-                return
-            self.send_response(200)
-            self.send_header("Content-Type", mime)
-            self.send_header("Content-Length", str(stat.st_size))
-            self.send_header("ETag", etag)
-            self.send_header("Cache-Control", "public, max-age=86400")
-            self.end_headers()
-            self.wfile.write(fpath.read_bytes())
         else:
             self.send_error(404)
 
@@ -2841,3 +2423,466 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             return self._post_api_thoughts_search()
         else:
             self._json({"error": "Not found"}, 404)
+    _GET_PREFIX_ROUTES = [
+        ("/api/search", "_get_api_search", None),
+        ("/api/sessions/", "_get_api_sessions_export", """and "/export" in self.path"""),
+        ("/api/rag/search", "_get_api_rag_search", None),
+        ("/api/audit", "_get_api_audit", None),
+        ("/api/sessions/", "_get_api_sessions_summary", """and "/summary" in self.path"""),
+        ("/api/sessions/", "_get_api_sessions_alternatives", """and "/alternatives" in self.path"""),
+        ("/api/logs", "_get_api_logs", None),
+        ("/api/memory/read?", "_get_api_memory_read", None),
+        ("/api/google/callback", "_get_api_google_callback", None),
+        ("/api/agent/export", "_get_api_agent_export", None),
+        ("/uploads/", "_get_uploads", None),
+    ]
+
+    def _get_api_search(self) -> None:
+        """Handle GET /api/search routes."""
+        if not self._require_auth("user"):
+            return
+        import urllib.parse
+
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        query = params.get("q", [""])[0]
+        if not query:
+            self._json({"error": "Missing q parameter"}, 400)
+            return
+        lim = int(params.get("limit", ["20"])[0])
+        from salmalm.core import search_messages
+
+        results = search_messages(query, limit=lim)
+        self._json({"query": query, "results": results, "count": len(results)})
+
+
+    def _get_api_sessions_export(self) -> None:
+        """Handle GET /api/sessions/ routes."""
+        if not self._require_auth("user"):
+            return
+        import urllib.parse
+
+        m = re.match(r"^/api/sessions/([^/]+)/export", self.path)
+        if not m:
+            self._json({"error": "Invalid path"}, 400)
+            return
+        sid = m.group(1)
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        fmt = params.get("format", ["json"])[0]
+        from salmalm.core import _get_db
+
+        conn = _get_db()
+        row = conn.execute(
+            "SELECT messages, updated_at FROM session_store WHERE session_id=?",
+            (sid,),
+        ).fetchone()
+        if not row:
+            self._json({"error": "Session not found"}, 404)
+            return
+        msgs = json.loads(row[0])
+        updated_at = row[1]
+        if fmt == "md":
+            lines = [
+                "# SalmAlm Chat Export",
+                "Session: {sid}",
+                "Date: {updated_at}",
+                "",
+            ]
+            for msg in msgs:
+                role = msg.get("role", "")
+                if role == "system":
+                    continue
+                content = msg.get("content", "")
+                if isinstance(content, list):
+                    content = " ".join(
+                        b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"
+                    )
+                icon = "## 👤 User" if role == "user" else "## 😈 Assistant"
+                lines.append(icon)
+                lines.append(str(content))
+                lines.append("")
+                lines.append("---")
+                lines.append("")
+            body = "\n".join(lines).encode("utf-8")
+            fname = f"salmalm_{sid}_{updated_at[:10]}.md"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/markdown; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+            self.send_header("Content-Length", str(len(body)))
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            export_data = {
+                "session_id": sid,
+                "updated_at": updated_at,
+                "messages": msgs,
+            }
+            body = json.dumps(export_data, ensure_ascii=False, indent=2).encode("utf-8")
+            fname = f"salmalm_{sid}_{updated_at[:10]}.json"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+            self.send_header("Content-Length", str(len(body)))
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
+        return
+
+
+    def _get_api_rag_search(self) -> None:
+        """Handle GET /api/rag/search routes."""
+        if not self._require_auth("user"):
+            return
+        from salmalm.features.rag import rag_engine
+        import urllib.parse
+
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        query = params.get("q", [""])[0]
+        if not query:
+            self._json({"error": "Missing q parameter"}, 400)
+        else:
+            results = rag_engine.search(query, max_results=int(params.get("n", ["5"])[0]))
+            self._json({"query": query, "results": results})
+
+    def _get_api_audit(self) -> None:
+        """Handle GET /api/audit routes."""
+        if not self._require_auth("user"):
+            return
+        import urllib.parse
+
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        limit = int(params.get("limit", ["50"])[0])
+        event_type = params.get("type", [None])[0]
+        sid = params.get("session_id", [None])[0]
+        from salmalm.core import query_audit_log
+
+        entries = query_audit_log(limit=limit, event_type=event_type, session_id=sid)
+        self._json({"entries": entries, "count": len(entries)})
+
+
+    def _get_api_sessions_summary(self) -> None:
+        """Handle GET /api/sessions/ routes."""
+        # Conversation summary card — BIG-AGI style (대화 요약 카드)
+        if not self._require_auth("user"):
+            return
+        m = re.match(r"^/api/sessions/([^/]+)/summary", self.path)
+        if m:
+            from salmalm.features.edge_cases import get_summary_card
+
+            card = get_summary_card(m.group(1))
+            self._json({"summary": card})
+        else:
+            self._json({"error": "Invalid path"}, 400)
+
+    def _get_api_sessions_alternatives(self) -> None:
+        """Handle GET /api/sessions/ routes."""
+        # Conversation fork alternatives — LibreChat style (대화 포크)
+        if not self._require_auth("user"):
+            return
+        m = re.match(r"^/api/sessions/([^/]+)/alternatives/(\d+)", self.path)
+        if m:
+            from salmalm.features.edge_cases import conversation_fork
+
+            alts = conversation_fork.get_alternatives(m.group(1), int(m.group(2)))
+            self._json({"alternatives": alts})
+        else:
+            self._json({"error": "Invalid path"}, 400)
+
+
+    def _get_api_logs(self) -> None:
+        """Handle GET /api/logs routes."""
+        if not self._require_auth("user"):
+            return
+        from urllib.parse import parse_qs, urlparse
+
+        qs = parse_qs(urlparse(self.path).query)
+        lines = int(qs.get("lines", ["100"])[0])
+        level = qs.get("level", [""])[0].upper()
+        log_path = DATA_DIR / "salmalm.log"
+        entries = []
+        if log_path.exists():
+            all_lines = log_path.read_text(encoding="utf-8", errors="replace").strip().split("\n")
+            for ln in all_lines[-lines:]:
+                if level and f"[{level}]" not in ln:
+                    continue
+                entries.append(ln)
+        self._json({"logs": entries, "total": len(entries)})
+
+
+    def _get_api_memory_read(self) -> None:
+        """Handle GET /api/memory/read? routes."""
+        if not self._require_auth("user"):
+            return
+        import urllib.parse as _up
+
+        qs = _up.parse_qs(_up.urlparse(self.path).query)
+        fpath = qs.get("file", [""])[0]
+        if not fpath or ".." in fpath:
+            self._json({"error": "Invalid path"}, 400)
+            return
+        # P0-1: Block absolute paths and resolve to prevent path traversal
+        from pathlib import PurePosixPath
+
+        if PurePosixPath(fpath).is_absolute() or "\\" in fpath:
+            self._json({"error": "Invalid path"}, 400)
+            return
+        full = (BASE_DIR / fpath).resolve()
+        if not full.is_relative_to(BASE_DIR.resolve()):
+            self._json({"error": "Path outside allowed directory"}, 403)
+            return
+        if not full.exists() or not full.is_file():
+            self._json({"error": "File not found"}, 404)
+            return
+        try:
+            content = full.read_text(encoding="utf-8")[:50000]
+            self._json({"file": fpath, "content": content, "size": full.stat().st_size})
+        except Exception as e:
+            self._json({"error": str(e)}, 500)
+
+
+    def _get_api_google_callback(self) -> None:
+        """Handle GET /api/google/callback routes."""
+        import urllib.parse
+
+        parsed = urllib.parse.urlparse(self.path)
+        params = urllib.parse.parse_qs(parsed.query)
+        code = params.get("code", [""])[0]
+        state = params.get("state", [""])[0]
+        error = params.get("error", [""])[0]
+        # CSRF: validate state token
+        if not state or state not in _google_oauth_pending_states:
+            self._html(
+                '<html><body><h2>Invalid OAuth State</h2>'
+                "<p>CSRF protection: state token missing or invalid.</p>"
+                '<p><a href="/">Back</a></p></body></html>'
+            )
+            return
+        issued_at = _google_oauth_pending_states.pop(state)
+        # Expire states older than 10 minutes
+        if time.time() - issued_at > 600:
+            self._html(
+                '<html><body><h2>OAuth State Expired</h2>'
+                '<p>Please try again.</p><p><a href="/">Back</a></p></body></html>'
+            )
+            return
+        # Cleanup stale states (older than 15 min)
+        cutoff = time.time() - 900
+        stale = [k for k, v in _google_oauth_pending_states.items() if v < cutoff]
+        for k in stale:
+            _google_oauth_pending_states.pop(k, None)
+        if error:
+            self._html(
+                f'<html><body><h2>Google OAuth Error</h2><p>{error}</p><p><a href="/">Back</a></p></body></html>'
+            )
+            return
+        if not code:
+            self._html('<html><body><h2>No code received</h2><p><a href="/">Back</a></p></body></html>')
+            return
+        client_id = vault.get("google_client_id") or ""
+        client_secret = vault.get("google_client_secret") or ""
+        port = self.server.server_address[1]
+        redirect_uri = f"http://localhost:{port}/api/google/callback"
+        try:
+            data = json.dumps(
+                {
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                }
+            ).encode()
+            req = urllib.request.Request(
+                "https://oauth2.googleapis.com/token",
+                data=data,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read())
+            access_token = result.get("access_token", "")
+            refresh_token = result.get("refresh_token", "")
+            if refresh_token:
+                vault.set("google_refresh_token", refresh_token)
+            if access_token:
+                vault.set("google_access_token", access_token)
+            scopes = result.get("scope", "")
+            self._html(f"""<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
+                <h2 style="color:#22c55e">\\u2705 Google Connected!</h2>
+                <p>Refresh token saved to vault.</p>
+                <p style="font-size:0.85em;color:#666">Scopes: {scopes}</p>
+                <p><a href="/" style="color:#6366f1">\\u2190 Back to SalmAlm</a></p>
+                </body></html>""")
+            log.info(f"[OK] Google OAuth2 connected (scopes: {scopes})")
+        except Exception as e:
+            log.error(f"Google OAuth2 token exchange failed: {e}")
+            self._html(f"""<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
+                <h2 style="color:#ef4444">\\u274c Token Exchange Failed</h2>
+                <p>{str(e)[:200]}</p>
+                <p><a href="/" style="color:#6366f1">\\u2190 Back</a></p>
+                </body></html>""")
+
+    def _get_api_agent_export(self) -> None:
+        """Handle GET /api/agent/export routes."""
+        # Vault export requires admin role
+        from urllib.parse import parse_qs, urlparse
+
+        qs = parse_qs(urlparse(self.path).query)
+        inc_vault = qs.get("vault", ["0"])[0] == "1"
+        _min_role = "admin" if inc_vault else "user"
+        _export_user = self._require_auth(_min_role)
+        if not _export_user:
+            return
+        inc_sessions = qs.get("sessions", ["1"])[0] == "1"
+        inc_data = qs.get("data", ["1"])[0] == "1"
+        import zipfile
+        import io
+        import json as _json
+        import datetime
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Soul / personality
+            soul_path = DATA_DIR / "soul.md"
+            if soul_path.exists():
+                zf.writestr("soul.md", soul_path.read_text(encoding="utf-8"))
+            # Memory files
+            from salmalm.constants import MEMORY_DIR as _mem_dir
+
+            if _mem_dir.exists():
+                for f in _mem_dir.glob("*"):
+                    if f.is_file():
+                        zf.writestr(f"memory/{f.name}", f.read_text(encoding="utf-8"))
+            # Also include memory.md from DATA_DIR
+            mem_md = DATA_DIR / "memory.md"
+            if mem_md.exists():
+                zf.writestr("memory.md", mem_md.read_text(encoding="utf-8"))
+            # Config
+            config_path = DATA_DIR / "config.json"
+            if config_path.exists():
+                zf.writestr("config.json", config_path.read_text(encoding="utf-8"))
+            routing_path = DATA_DIR / "routing.json"
+            if routing_path.exists():
+                zf.writestr("routing.json", routing_path.read_text(encoding="utf-8"))
+            # Sessions
+            if inc_sessions:
+                from salmalm.core import _get_db
+
+                conn = _get_db()
+                _export_uid = _export_user.get("id", 0)
+                if _export_uid and _export_uid > 0:
+                    rows = conn.execute(
+                        "SELECT session_id, messages, title FROM session_store WHERE user_id=? OR user_id IS NULL",
+                        (_export_uid,),
+                    ).fetchall()
+                else:
+                    rows = conn.execute("SELECT session_id, messages, title FROM session_store").fetchall()
+                sessions = []
+                for r in rows:
+                    sessions.append(
+                        {
+                            "id": r[0],
+                            "data": r[1],
+                            "title": r[2] if len(r) > 2 else "",
+                        }
+                    )
+                zf.writestr(
+                    "sessions.json",
+                    _json.dumps(sessions, ensure_ascii=False, indent=2),
+                )
+            # Data (notes, expenses, habits, etc.)
+            if inc_data:
+                for name in (
+                    "notes.json",
+                    "expenses.json",
+                    "habits.json",
+                    "journal.json",
+                    "dashboard.json",
+                ):
+                    p = DATA_DIR / name
+                    if p.exists():
+                        zf.writestr(f"data/{name}", p.read_text(encoding="utf-8"))
+            # Vault (API keys) — only if explicitly requested
+            if inc_vault:
+                from salmalm.security.crypto import vault as _vault_mod
+
+                if _vault_mod.is_unlocked:
+                    keys = {}
+                    # Use internal vault key names (lowercase)
+                    for k in _vault_mod.keys():
+                        v = _vault_mod.get(k)
+                        if v:
+                            keys[k] = v
+                    if keys:
+                        zf.writestr("vault_keys.json", _json.dumps(keys, indent=2))
+            # Manifest
+            zf.writestr(
+                "manifest.json",
+                _json.dumps(
+                    {
+                        "version": VERSION,
+                        "exported_at": datetime.datetime.now().isoformat(),
+                        "includes": {
+                            "sessions": inc_sessions,
+                            "data": inc_data,
+                            "vault": inc_vault,
+                        },
+                    },
+                    indent=2,
+                ),
+            )
+        buf.seek(0)
+        data = buf.getvalue()
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.send_response(200)
+        self._cors()
+        self.send_header("Content-Type", "application/zip")
+        self.send_header("Content-Disposition", f'attachment; filename="salmalm-export-{ts}.zip"')
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+
+    def _get_uploads(self) -> None:
+        """Handle GET /uploads/ routes."""
+        # Serve uploaded files (images, audio) — basename-only to prevent traversal
+        fname = Path(self.path.split("/uploads/", 1)[-1]).name
+        if not fname:
+            self.send_error(400)
+            return
+        upload_dir = (WORKSPACE_DIR / "uploads").resolve()  # noqa: F405
+        fpath = (upload_dir / fname).resolve()
+        if not fpath.is_relative_to(upload_dir) or not fpath.exists():
+            self.send_error(404)
+            return
+        mime_map = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".ogg": "audio/ogg",
+        }
+        ext = fpath.suffix.lower()
+        mime = mime_map.get(ext, "application/octet-stream")
+        # ETag caching for static uploads
+        stat = fpath.stat()
+        etag = f'"{int(stat.st_mtime)}-{stat.st_size}"'
+        if self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Content-Length", str(stat.st_size))
+        self.send_header("ETag", etag)
+        self.send_header("Cache-Control", "public, max-age=86400")
+        self.end_headers()
+        self.wfile.write(fpath.read_bytes())
+
