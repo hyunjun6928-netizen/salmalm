@@ -65,11 +65,9 @@
     var chatBody={message:msg,session:_currentSession,lang:_lang};
     if(imgData){chatBody.image_base64=imgData;chatBody.image_mime=imgMime}
     try{
-      /* Try WebSocket first, fall back to SSE */
-      var wsResult=await _sendViaWs(msg,_currentSession);
-      if(wsResult.fallback){
-        await _sendViaSse(chatBody,_sendStart);
-      }
+      /* SSE primary (HTTP POST + stream) — no connection dependency
+       * WS remains connected for real-time typing/thinking indicators only */
+      await _sendViaSse(chatBody,_sendStart);
     }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ Error: '+se.message)}
     finally{btn.disabled=false;input.focus();var _sb2=document.getElementById('stop-btn');var _sb3=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb3)_sb3.style.display='flex'}
   }
