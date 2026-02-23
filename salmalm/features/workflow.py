@@ -31,7 +31,7 @@ _VAR_RE = re.compile(r"\{\{(\w+)\.(\w+)\}\}")
 def _substitute(template: str, context: Dict[str, Any]) -> str:
     """Replace {{step_id.field}} with values from context."""
 
-    def _repl(m):
+    def _repl(m) -> str:
         """Repl."""
         step_id, field = m.group(1), m.group(2)
         step_data = context.get(step_id, {})
@@ -86,7 +86,7 @@ def _eval_condition(cond: str, context: Dict[str, Any]) -> bool:
         return False
 
 
-def _to_num(s: str):
+def _to_num(s: str) -> float:
     """To num."""
     try:
         return float(s)

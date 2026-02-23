@@ -127,7 +127,7 @@ class ContextChunk:
         self.tokens = estimate_tokens(content)
         self.timestamp = timestamp or time.time()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ContextChunk({self.source}, rel={self.relevance:.2f}, tok={self.tokens})"
 
 

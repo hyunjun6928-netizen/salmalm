@@ -49,7 +49,7 @@ def _check_for_updates() -> str:
         )
         latest = data.get("info", {}).get("version", "")
 
-        def _ver_tuple(v):
+        def _ver_tuple(v) -> tuple:
             """Ver tuple."""
             return tuple(int(x) for x in v.split("."))
 

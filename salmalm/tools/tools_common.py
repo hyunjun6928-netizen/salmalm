@@ -22,7 +22,7 @@ from salmalm.security.crypto import log
 _clipboard_lock = threading.Lock()
 
 
-def _is_safe_command(cmd: str):
+def _is_safe_command(cmd: str) -> tuple:
     """Check if command is safe to execute (allowlist + blocklist double defense)."""
     if not cmd.strip():
         return False, "Empty command"
@@ -156,7 +156,7 @@ def _is_subpath(path: Path, parent: Path) -> bool:
         return False
 
 
-def _is_private_url(url: str):
+def _is_private_url(url: str) -> tuple:
     """Check if URL resolves to a private/internal IP.
 
     Defends against: SSRF, DNS rebinding (pre-connect check), redirect bypass,
@@ -224,7 +224,7 @@ def _is_private_url(url: str):
     return False, ""
 
 
-def _is_private_url_follow_redirects(url: str, max_redirects: int = 5):
+def _is_private_url_follow_redirects(url: str, max_redirects: int = 5) -> tuple:
     """Validate URL + follow redirects, re-checking each hop for SSRF.
 
     Returns (blocked: bool, reason: str, final_url: str).

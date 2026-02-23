@@ -189,13 +189,13 @@ async def _call_llm_async(*args, **kwargs):
     return await asyncio.to_thread(_call_llm_sync, *args, **kwargs)
 
 
-async def _call_google_streaming(messages, model=None, tools=None, max_tokens=4096, on_token=None):
+async def _call_google_streaming(messages, model=None, tools=None, max_tokens=4096, on_token=None) -> dict:
     """Streaming Google Gemini call — yields tokens via on_token callback, returns final result.
 
     Handles streaming interruptions gracefully — preserves partial content.
     """
 
-    def _run():
+    def _run() -> dict:
         """Run."""
         final_result = None
         accumulated_text = []
@@ -237,7 +237,7 @@ async def _call_google_streaming(messages, model=None, tools=None, max_tokens=40
     return await asyncio.to_thread(_run)
 
 
-async def _call_llm_streaming(messages, model=None, tools=None, max_tokens=4096, thinking=False, on_token=None):
+async def _call_llm_streaming(messages, model=None, tools=None, max_tokens=4096, thinking=False, on_token=None) -> dict:
     """Streaming LLM call — yields tokens via on_token callback, returns final result.
 
     on_token: callback(event_dict) called for each streaming event.
@@ -245,7 +245,7 @@ async def _call_llm_streaming(messages, model=None, tools=None, max_tokens=4096,
     Handles streaming interruptions gracefully — preserves partial content.
     """
 
-    def _run():
+    def _run() -> dict:
         """Run."""
         import os as _os
 

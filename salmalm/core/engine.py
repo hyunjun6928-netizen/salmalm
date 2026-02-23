@@ -498,7 +498,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     MAX_TOOL_ITERATIONS = 15
     MAX_CONSECUTIVE_ERRORS = 3
 
-    async def _handle_token_overflow(self, session, model, tools, max_tokens, thinking, on_status):
+    async def _handle_token_overflow(self, session, model, tools, max_tokens, thinking, on_status) -> tuple:
         """Handle token overflow with 3-stage recovery. Returns (result, error_msg_or_None)."""
         log.warning(f"[CUT] Token overflow with {len(session.messages)} messages — running compaction")
 

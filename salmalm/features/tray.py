@@ -34,7 +34,7 @@ def run_tray(port: int = 18800) -> None:
     _run_windows_tray(port)
 
 
-def _run_windows_tray(port: int = 18800):
+def _run_windows_tray(port: int = 18800) -> int:
     """Windows system tray implementation using ctypes."""
     import ctypes
     import ctypes.wintypes as wt
@@ -174,7 +174,7 @@ def _run_windows_tray(port: int = 18800):
         user32.PostMessageW(hwnd, WM_DESTROY, 0, 0)
         user32.PostQuitMessage(0)
 
-    def wnd_proc(hwnd, msg, wparam, lparam):
+    def wnd_proc(hwnd, msg, wparam, lparam) -> int:
         """Wnd proc."""
         if msg == WM_TRAYICON:
             if lparam == WM_RBUTTONUP:

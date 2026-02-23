@@ -240,7 +240,7 @@ class TranscriptHygiene:
                     prev["content"] = pc + "\n" + nc
                 else:
                     # Convert to list and merge
-                    def _to_list(c):
+                    def _to_list(c) -> list:
                         """To list."""
                         if isinstance(c, list):
                             return c

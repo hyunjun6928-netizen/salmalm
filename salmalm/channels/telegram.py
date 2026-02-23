@@ -63,7 +63,7 @@ class TelegramBot(TelegramCommandsMixin):
         buttons = []
         import re as _re2
 
-        def _repl(m):
+        def _repl(m) -> str:
             """Repl."""
             try:
                 import json as _j2
@@ -550,37 +550,39 @@ class TelegramBot(TelegramCommandsMixin):
             data = resp.read()
         return data, filename
 
+    async def _handle_callback_query(self, cb: dict) -> None:
+        """Handle inline button callback query."""
+        cb_data = cb.get("data", "")
+        cb_chat_id = cb.get("message", {}).get("chat", {}).get("id")
+        cb_user_id = str(cb.get("from", {}).get("id", ""))
+        try:
+            self._api("answerCallbackQuery", {"callback_query_id": cb["id"]})
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+        from salmalm.features.users import user_manager as _um_cb
+
+        _cb_allowed = False
+        if _um_cb.multi_tenant_enabled:
+            _cb_tenant = _um_cb.get_user_by_telegram(str(cb_chat_id))
+            _cb_allowed = bool(_cb_tenant and _cb_tenant.get("enabled"))
+        else:
+            _cb_allowed = cb_user_id == self.owner_id
+        if _cb_allowed and cb_chat_id and cb_data.startswith("btn:"):
+            btn_text = cb_data[4:]
+            self.send_typing(cb_chat_id)
+            session_id = f"telegram_{cb_chat_id}"
+            _start = time.time()
+            from salmalm.core.engine import process_message
+
+            response = await process_message(session_id, btn_text)
+            _elapsed = time.time() - _start
+            self.send_message(cb_chat_id, f"{response}\n\n⏱️ {_elapsed:.1f}s")
+
     async def _handle_update(self, update: dict):
-        # Handle inline button callback queries
         """Handle update."""
         cb = update.get("callback_query")
         if cb:
-            cb_data = cb.get("data", "")
-            cb_chat_id = cb.get("message", {}).get("chat", {}).get("id")
-            cb_user_id = str(cb.get("from", {}).get("id", ""))
-            try:
-                self._api("answerCallbackQuery", {"callback_query_id": cb["id"]})
-            except Exception as e:  # noqa: broad-except
-                log.debug(f"Suppressed: {e}")
-            # Multi-tenant: allow registered users; legacy: owner only
-            from salmalm.features.users import user_manager as _um_cb
-
-            _cb_allowed = False
-            if _um_cb.multi_tenant_enabled:
-                _cb_tenant = _um_cb.get_user_by_telegram(str(cb_chat_id))
-                _cb_allowed = bool(_cb_tenant and _cb_tenant.get("enabled"))
-            else:
-                _cb_allowed = cb_user_id == self.owner_id
-            if _cb_allowed and cb_chat_id and cb_data.startswith("btn:"):
-                btn_text = cb_data[4:]
-                self.send_typing(cb_chat_id)
-                session_id = f"telegram_{cb_chat_id}"
-                _start = time.time()
-                from salmalm.core.engine import process_message
-
-                response = await process_message(session_id, btn_text)
-                _elapsed = time.time() - _start
-                self.send_message(cb_chat_id, f"{response}\n\n⏱️ {_elapsed:.1f}s")
+            await self._handle_callback_query(cb)
             return
 
         msg = update.get("message")

@@ -433,7 +433,7 @@ class WebHandler(
         self._json(queue_status(session_id))
 
     @staticmethod
-    def _vault_type_label():
+    def _vault_type_label() -> str:
         """Vault type label."""
         try:
             from salmalm.security.crypto import HAS_CRYPTO

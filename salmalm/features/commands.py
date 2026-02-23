@@ -299,20 +299,20 @@ class CommandRouter:
         return "**All commands:**\n" + " ".join(f"`{c}`" for c in cmds)
 
     @staticmethod
-    def _cmd_whoami(cmd, session, **_):
+    def _cmd_whoami(cmd, session, **_) -> str:
         """Cmd whoami."""
         uid = getattr(session, "user_id", None) or "unknown"
         sid = getattr(session, "session_id", None) or "unknown"
         return f"👤 User: `{uid}`\nSession: `{sid}`"
 
     @staticmethod
-    def _cmd_setup(cmd, session, **_):
+    def _cmd_setup(cmd, session, **_) -> str:
         """Cmd setup."""
         from salmalm.constants import PORT
         return f"🔧 Setup Wizard: Open http://localhost:{PORT}/setup in your browser to re-run the setup wizard."
 
     @staticmethod
-    def _cmd_restart(cmd, session, **_):
+    def _cmd_restart(cmd, session, **_) -> str:
         """Cmd restart."""
         log.info("Restart requested via /restart")
         # Schedule restart after response (skip in test environments)
@@ -330,14 +330,14 @@ class CommandRouter:
         return "🔄 Restarting server..."
 
     @staticmethod
-    def _cmd_reset(cmd, session, **_):
+    def _cmd_reset(cmd, session, **_) -> str:
         """Cmd reset."""
         if session and hasattr(session, "messages"):
             session.messages.clear()
         return "🗑️ Session reset."
 
     @staticmethod
-    def _cmd_stop(cmd, session, **_):
+    def _cmd_stop(cmd, session, **_) -> str:
         """Cmd stop."""
         return "🛑 Stop signal sent."
 
@@ -356,7 +356,7 @@ class CommandRouter:
     # -- debug --
 
     @staticmethod
-    def _cmd_debug(cmd, session, **_):
+    def _cmd_debug(cmd, session, **_) -> str:
         """Cmd debug."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "show"
@@ -383,7 +383,7 @@ class CommandRouter:
     # -- config --
 
     @staticmethod
-    def _cmd_config(cmd, session, **_):
+    def _cmd_config(cmd, session, **_) -> str:
         """Cmd config."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "show"
@@ -426,7 +426,7 @@ class CommandRouter:
     # -- bash --
 
     @staticmethod
-    def _cmd_bash(cmd, session, **_):
+    def _cmd_bash(cmd, session, **_) -> str:
         """Cmd bash."""
         shell_cmd = cmd[len("/bash ") :].strip()
         if not shell_cmd:
@@ -456,7 +456,7 @@ class CommandRouter:
     # -- channel --
 
     @staticmethod
-    def _cmd_dock(cmd, session, **_):
+    def _cmd_dock(cmd, session, **_) -> str:
         """Cmd dock."""
         parts = cmd.split()
         channel = parts[1] if len(parts) > 1 else None
@@ -468,7 +468,7 @@ class CommandRouter:
         return f"📡 Response channel set to `{channel}`."
 
     @staticmethod
-    def _cmd_activation(cmd, session, **_):
+    def _cmd_activation(cmd, session, **_) -> str:
         """Cmd activation."""
         parts = cmd.split()
         mode = parts[1] if len(parts) > 1 else None
@@ -479,7 +479,7 @@ class CommandRouter:
         return f"🔔 Activation mode: `{mode}`"
 
     @staticmethod
-    def _cmd_send(cmd, session, **_):
+    def _cmd_send(cmd, session, **_) -> str:
         """Cmd send."""
         parts = cmd.split()
         toggle = parts[1] if len(parts) > 1 else None
@@ -492,7 +492,7 @@ class CommandRouter:
     # -- ACL --
 
     @staticmethod
-    def _cmd_allowlist(cmd, session, **_):
+    def _cmd_allowlist(cmd, session, **_) -> str:
         """Cmd allowlist."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "list"
@@ -521,7 +521,7 @@ class CommandRouter:
         return "❓ Usage: /allowlist list|add|remove <id>"
 
     @staticmethod
-    def _cmd_approve(cmd, session, **_):
+    def _cmd_approve(cmd, session, **_) -> str:
         """Cmd approve."""
         parts = cmd.split()
         if len(parts) < 3:
@@ -541,7 +541,7 @@ class CommandRouter:
     # -- thinking / verbose --
 
     @staticmethod
-    def _cmd_think(cmd, session, **_):
+    def _cmd_think(cmd, session, **_) -> str:
         """Cmd think."""
         parts = cmd.replace("/t ", "/think ").split()
         level = parts[1] if len(parts) > 1 else None
@@ -559,7 +559,7 @@ class CommandRouter:
         return f"🧠 Thinking: `{level}`" + (" (OFF)" if level == "off" else f" (budget: {_budgets[level]}tok)")
 
     @staticmethod
-    def _cmd_verbose(cmd, session, **_):
+    def _cmd_verbose(cmd, session, **_) -> str:
         """Cmd verbose."""
         parts = cmd.replace("/v ", "/verbose ").split()
         level = parts[1] if len(parts) > 1 else None
@@ -570,7 +570,7 @@ class CommandRouter:
         return f"📝 Verbose mode: `{level}`"
 
     @staticmethod
-    def _cmd_reasoning(cmd, session, **_):
+    def _cmd_reasoning(cmd, session, **_) -> str:
         """Cmd reasoning."""
         parts = cmd.split()
         mode = parts[1] if len(parts) > 1 else None
@@ -583,7 +583,7 @@ class CommandRouter:
     # -- skill --
 
     @staticmethod
-    def _cmd_skill(cmd, session, **_):
+    def _cmd_skill(cmd, session, **_) -> str:
         """Cmd skill."""
         parts = cmd.split(maxsplit=2)
         if len(parts) < 2:
@@ -595,7 +595,7 @@ class CommandRouter:
     # -- oauth (delegates to oauth module) --
 
     @staticmethod
-    def _cmd_oauth(cmd, session, **_):
+    def _cmd_oauth(cmd, session, **_) -> str:
         """Cmd oauth."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "status"
@@ -620,7 +620,7 @@ class CommandRouter:
     # -- screen (delegates to screen_capture module) --
 
     @staticmethod
-    def _cmd_screen(cmd, session, **_):
+    def _cmd_screen(cmd, session, **_) -> str:
         """Cmd screen."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "capture"
@@ -647,7 +647,7 @@ class CommandRouter:
     # -- mcp (delegates to mcp_marketplace module) --
 
     @staticmethod
-    def _cmd_mcp(cmd, session, **_):
+    def _cmd_mcp(cmd, session, **_) -> str:
         """Cmd mcp."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "status"
@@ -673,7 +673,7 @@ class CommandRouter:
             return f"❌ MCP error: {e}"
         return "❓ Usage: /mcp install|list|catalog|remove|status|search"
 
-    def _cmd_brave(cmd, session, **_):
+    def _cmd_brave(cmd, session, **_) -> str:
         """Quick Brave web search."""
         query = cmd[len("/brave") :].strip()
         if not query:
@@ -686,7 +686,7 @@ class CommandRouter:
             return f"❌ Brave search error: {e}"
 
     @staticmethod
-    def _cmd_queue(cmd, session, **_):
+    def _cmd_queue(cmd, session, **_) -> str:
         """Message queue management."""
         from salmalm.features.queue import get_queue, set_queue_mode, queue_status, QueueMode
 

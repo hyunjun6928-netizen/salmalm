@@ -13,7 +13,7 @@ from salmalm.web.auth import auth_manager, extract_auth
 
 class WebAuthMixin:
     """Mixin providing auth route handlers."""
-    def _auto_unlock_localhost(self):
+    def _auto_unlock_localhost(self) -> bool:
         """Auto-unlock vault for localhost connections.
 
         Priority: OS keychain → env var (deprecated) → empty password → prompt.

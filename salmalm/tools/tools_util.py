@@ -73,7 +73,7 @@ def handle_regex_test(args: dict) -> str:
     except re.error as e:
         return f"❌ Regex error: {e}"
 
-    def _run_regex():
+    def _run_regex() -> str:
         """Run regex."""
         if action == "match":
             m = compiled.fullmatch(text)

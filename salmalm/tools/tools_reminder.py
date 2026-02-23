@@ -192,7 +192,7 @@ def _days_until_weekday(now: datetime, target_wd: int, next_week: bool = False) 
     return days_ahead
 
 
-def _extract_time_kr(s: str):
+def _extract_time_kr(s: str) -> tuple:
     """Extract time from Korean text. Returns (hour, minute) or (None, None)."""
     # "오후 3시 30분", "오전 10시", "3시", "15시 30분"
     m = re.search(r"(오전|오후)?\s*(\d{1,2})\s*시\s*(\d{1,2})?\s*분?", s)
@@ -212,7 +212,7 @@ def _extract_time_kr(s: str):
     return None, None
 
 
-def _extract_time_en(s: str):
+def _extract_time_en(s: str) -> tuple:
     """Extract time from English text. Returns (hour, minute) or (None, None)."""
     # "at 3pm", "at 3:30pm", "3:00", "15:30"
     m = re.search(r"(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", s)
