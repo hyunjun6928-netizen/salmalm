@@ -38,7 +38,7 @@ def _get_engine_deps():
     from salmalm.core.core import auto_title_session, router, track_usage, set_current_user_id
     from salmalm.core.slash_commands import _dispatch_slash_command
     from salmalm.core.classifier import TaskClassifier
-    from salmalm.core.model_selection import _select_model
+    from salmalm.core.model_selection import select_model as _select_model
     from salmalm.security.crypto import vault
 
     return locals()
@@ -124,7 +124,7 @@ def _classify_task(session, user_message: str) -> dict:
 
 def _route_model(model_override, user_message: str, session) -> tuple:
     """Select model via routing or override. Returns (model, complexity)."""
-    from salmalm.core.model_selection import _select_model
+    from salmalm.core.model_selection import select_model as _select_model
     if model_override:
         return _fix_model_name(model_override), "auto"
     selected, complexity = _select_model(user_message, session)
