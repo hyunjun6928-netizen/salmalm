@@ -211,116 +211,140 @@ class WebSocketServer:
         """Get the number of connected WebSocket clients."""
         return len(self.clients)
 
-    async def _handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        """Handle incoming TCP connection — perform WS upgrade, then message loop."""
-        # Read HTTP upgrade request
+    async def _resume_and_register(self, client, writer, headers: dict) -> None:
+        """Resume buffered messages from prior connection and register presence."""
+        session_id = client.session_id
+        for old_id, old_client in list(self.clients.items()):
+            if old_id != client._id and old_client.session_id == session_id and not old_client.connected and old_client._buffer:
+                log.info(f"[WS] Resuming {len(old_client._buffer)} buffered messages for session={session_id}")
+                for buffered_msg in old_client._buffer:
+                    try:
+                        await client.send_json(buffered_msg)
+                    except Exception:
+                        break
+                old_client._buffer.clear()
+                self.clients.pop(old_id, None)
+        try:
+            from salmalm.features.presence import presence_manager
+            peer = writer.get_extra_info("peername")
+            ip = peer[0] if peer else ""
+            presence_manager.register(f"ws_{client._id}", ip=ip, mode="websocket",
+                                      host=headers.get("host", ""), user_agent=headers.get("user-agent", ""))
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+
+    async def _cleanup_client(self, client, writer) -> None:
+        """Clean up disconnected WebSocket client."""
+        client.connected = False
+        self.clients.pop(client._id, None)
+        try:
+            from salmalm.features.presence import presence_manager
+            presence_manager.unregister(f"ws_{client._id}")
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+        if self._on_disconnect:
+            try:
+                await self._on_disconnect(client)
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
+        try:
+            writer.close()
+        except Exception as e:  # noqa: broad-except
+            log.debug(f"Suppressed: {e}")
+        log.info(f"[FAST] WS client disconnected (total={len(self.clients)})")
+
+    async def _handle_text_frame(self, client, payload: bytes) -> None:
+        """Handle a WebSocket text frame (JSON message)."""
+        text = payload.decode("utf-8", errors="replace")
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            log.warning(f"[WS] Invalid JSON from client {client._id}")
+            await client.send_json({"type": "error", "error": "Invalid JSON format / 잘못된 JSON 형식"})
+            return
+        if data.get("type") == "abort":
+            try:
+                from salmalm.features.edge_cases import abort_controller
+                sid = data.get("session", client.session_id)
+                abort_controller.set_abort(sid)
+                await client.send_json({"type": "aborted", "session": sid})
+            except Exception as e:
+                log.warning(f"WS abort error: {e}")
+            return
+        if self._on_message:
+            try:
+                await self._on_message(client, data)
+            except Exception as e:
+                log.error(f"WS message handler error: {e}")
+                await client.send_json({"type": "error", "error": str(e)[:200]})
+
+    async def _ws_handshake(self, reader, writer) -> Optional[dict]:
+        """Perform WebSocket HTTP upgrade handshake. Returns headers dict or None on failure."""
         try:
             request_lines = []
             while True:
                 line = await asyncio.wait_for(reader.readline(), timeout=10)
-                if line == b"\r\n" or line == b"\n" or not line:
+                if line in (b"\r\n", b"\n", b""):
                     break
                 request_lines.append(line.decode("utf-8", errors="replace").strip())
         except (asyncio.TimeoutError, ConnectionError):
             writer.close()
-            return
-
+            return None
         if not request_lines:
             writer.close()
-            return
-
-        # Parse headers
+            return None
         headers = {}
-        for line in request_lines[1:]:  # type: ignore[assignment]
-            if ":" in line:  # type: ignore[operator]
-                k, v = line.split(":", 1)  # type: ignore[arg-type]
+        for line in request_lines[1:]:
+            if ":" in line:
+                k, v = line.split(":", 1)
                 headers[k.strip().lower()] = v.strip()
-
-        # Validate Origin (prevent cross-origin WS hijack when bound to 0.0.0.0)
+        # Validate Origin
         origin = headers.get("origin", "")
         if origin:
             from urllib.parse import urlparse
-
             o = urlparse(origin)
-            allowed_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
-            if o.hostname and o.hostname not in allowed_hosts:
+            if o.hostname and o.hostname not in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
                 log.warning("WS rejected: origin %s not in allowlist", origin)
                 writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
                 await writer.drain()
                 writer.close()
-                return
-
-        # Validate WebSocket upgrade
-        ws_key = headers.get("sec-websocket-key", "")  # type: ignore[call-overload]
-        if not ws_key or "upgrade" not in headers.get("connection", "").lower():  # type: ignore[call-overload]
-            # Not a WS request — send 400
-            response = b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n"
-            writer.write(response)
+                return None
+        # Extract session from request line (GET /ws?session=xxx HTTP/1.1)
+        if request_lines and "?session=" in request_lines[0]:
+            try:
+                headers["_session_id"] = request_lines[0].split("?session=")[1].split()[0].split("&")[0]
+            except Exception:
+                pass
+        ws_key = headers.get("sec-websocket-key", "")
+        if not ws_key or "upgrade" not in headers.get("connection", "").lower():
+            writer.write(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n")
             await writer.drain()
             writer.close()
-            return
-
-        # Perform handshake
+            return None
         accept_val = base64.b64encode(hashlib.sha1(ws_key.encode() + WS_MAGIC).digest()).decode()
         handshake = (
-            "HTTP/1.1 101 Switching Protocols\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            f"Sec-WebSocket-Accept: {accept_val}\r\n"
-            f"X-Server: SalmAlm/{VERSION}\r\n"
-            "\r\n"
+            "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n"
+            f"Connection: Upgrade\r\nSec-WebSocket-Accept: {accept_val}\r\n"
+            f"X-Server: SalmAlm/{VERSION}\r\n\r\n"
         )
         writer.write(handshake.encode())
         await writer.drain()
+        return headers
 
-        # Parse session from URL query if present
-        # e.g., GET /ws?session=web HTTP/1.1
-        session_id = "web"
-        if request_lines:
-            first_line = request_lines[0]
-            if "?session=" in first_line:
-                try:
-                    session_id = first_line.split("?session=")[1].split()[0].split("&")[0]
-                except Exception as e:  # noqa: broad-except
-                    log.debug(f"Suppressed: {e}")
+    async def _handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        """Handle incoming TCP connection — perform WS upgrade, then message loop."""
+        headers = await self._ws_handshake(reader, writer)
+        if headers is None:
+            return
+
+        # Parse session from headers (set by handshake)
+        session_id = headers.get("_session_id", "web")
 
         client = WSClient(reader, writer, session_id)
         self.clients[client._id] = client
         log.info(f"[FAST] WS client connected (session={session_id}, total={len(self.clients)})")
 
-        # SSE resume: flush buffered messages from previous connection
-        # Find any disconnected client with same session that has buffered messages
-        for old_id, old_client in list(self.clients.items()):
-            if (
-                old_id != client._id
-                and old_client.session_id == session_id
-                and not old_client.connected
-                and old_client._buffer
-            ):
-                log.info(f"[WS] Resuming {len(old_client._buffer)} buffered messages for session={session_id}")
-                for buffered_msg in old_client._buffer:
-                    try:
-                        await client.send_json(buffered_msg)
-                    except Exception as e:  # noqa: broad-except
-                        break
-                old_client._buffer.clear()
-                self.clients.pop(old_id, None)
-
-        # Auto-register presence
-        try:
-            from salmalm.features.presence import presence_manager
-
-            peer = writer.get_extra_info("peername")
-            ip = peer[0] if peer else ""
-            presence_manager.register(
-                f"ws_{client._id}",
-                ip=ip,
-                mode="websocket",
-                host=headers.get("host", ""),
-                user_agent=headers.get("user-agent", ""),
-            )
-        except Exception as e:  # noqa: broad-except
-            log.debug(f"Suppressed: {e}")
+        await self._resume_and_register(client, writer, headers)
 
         if self._on_connect:
             try:
@@ -338,41 +362,12 @@ class WebSocketServer:
                 opcode, payload = frame
 
                 if opcode == OP_TEXT:
-                    text = payload.decode("utf-8", errors="replace")
-                    try:
-                        data = json.loads(text)
-                    except json.JSONDecodeError:
-                        # Invalid JSON — send error but keep connection alive
-                        log.warning(f"[WS] Invalid JSON from client {client._id}")
-                        await client.send_json({"type": "error", "error": "Invalid JSON format / 잘못된 JSON 형식"})
-                        continue
-
-                    # Abort handling — LibreChat style (생성 중지)
-                    if data.get("type") == "abort":
-                        try:
-                            from salmalm.features.edge_cases import abort_controller
-
-                            sid = data.get("session", client.session_id)
-                            abort_controller.set_abort(sid)
-                            await client.send_json({"type": "aborted", "session": sid})
-                        except Exception as e:
-                            log.warning(f"WS abort error: {e}")
-                        continue
-
-                    if self._on_message:
-                        try:
-                            await self._on_message(client, data)
-                        except Exception as e:
-                            log.error(f"WS message handler error: {e}")
-                            await client.send_json({"type": "error", "error": str(e)[:200]})
-
+                    await self._handle_text_frame(client, payload)
                 elif opcode == OP_PING:
                     await client._send_frame(OP_PONG, payload)
                     client.last_ping = time.time()
-
                 elif opcode == OP_PONG:
                     client.last_ping = time.time()
-
                 elif opcode == OP_CLOSE:
                     break
 
@@ -381,25 +376,7 @@ class WebSocketServer:
         except Exception as e:
             log.error(f"WS client error: {e}")
         finally:
-            client.connected = False
-            self.clients.pop(client._id, None)
-            # Unregister presence
-            try:
-                from salmalm.features.presence import presence_manager
-
-                presence_manager.unregister(f"ws_{client._id}")
-            except Exception as e:  # noqa: broad-except
-                log.debug(f"Suppressed: {e}")
-            if self._on_disconnect:
-                try:
-                    await self._on_disconnect(client)
-                except Exception as e:  # noqa: broad-except
-                    log.debug(f"Suppressed: {e}")
-            try:
-                writer.close()
-            except Exception as e:  # noqa: broad-except
-                log.debug(f"Suppressed: {e}")
-            log.info(f"[FAST] WS client disconnected (total={len(self.clients)})")
+            await self._cleanup_client(client, writer)
 
     async def _keepalive_loop(self):
         """Ping clients every 30s, drop dead ones."""

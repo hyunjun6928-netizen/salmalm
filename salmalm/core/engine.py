@@ -531,6 +531,72 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             return result, "⚠️ Context too large. Use /clear to reset."
         return result, None
 
+    async def _handle_tool_calls(self, result, session, provider, on_tool, on_status,
+                                 consecutive_errors: int, recent_tool_calls: list) -> Optional[str]:
+        """Execute tool calls, check circuit breaker and loop detection. Returns break message or None."""
+        from salmalm.core.loop_helpers import validate_tool_calls, check_circuit_breaker, check_loop_detection
+        if on_status:
+            tool_names = ", ".join(tc["name"] for tc in result["tool_calls"][:3])
+            _safe_callback(on_status, STATUS_TOOL_RUNNING, f"🔧 Running {tool_names}...")
+
+        valid_tools, tool_outputs = validate_tool_calls(result["tool_calls"])
+        if valid_tools:
+            exec_outputs = await asyncio.to_thread(self._execute_tools_parallel, valid_tools, on_tool)
+            tool_outputs.update(exec_outputs)
+
+        consecutive_errors, break_msg = check_circuit_breaker(tool_outputs, consecutive_errors, self.MAX_CONSECUTIVE_ERRORS)
+        if break_msg:
+            session.add_assistant(break_msg)
+            return break_msg
+
+        loop_msg = check_loop_detection(result.get("tool_calls", []), recent_tool_calls)
+        if loop_msg:
+            session.add_assistant(loop_msg)
+            return loop_msg
+
+        self._append_tool_results(session, provider, result, result["tool_calls"], tool_outputs)
+        return None
+
+    async def _finalize_loop_response(self, result, session, pruned_messages, model: str, tools,
+                                       user_message: str, classification: dict, iteration: int,
+                                       failover_warn) -> str:
+        """Finalize LLM response: empty retry, reflection, logging."""
+        from salmalm.core.loop_helpers import handle_empty_response, finalize_response, auto_log_conversation
+        response = result.get("content", "")
+        if not response or not response.strip():
+            response = await handle_empty_response(self._call_with_failover, pruned_messages, model, tools)
+        response = finalize_response(result, response)
+
+        if self._should_reflect(classification, response, iteration):
+            response = await self._run_reflection(user_message, response)
+
+        if failover_warn:
+            response = f"{failover_warn}\n\n{response}"
+
+        session.add_assistant(response)
+        log.info(f"[CHAT] Response ({result.get('model', '?')}): {len(response)} chars, iteration {iteration + 1}, intent={classification['intent']}")
+        auto_log_conversation(user_message, response, classification)
+        session.messages = [m for m in session.messages if not m.get("_plan_injected")]
+        return response
+
+    async def _run_reflection(self, user_message: str, response: str) -> str:
+        """Run reflection pass to improve response quality."""
+        log.info(f"[SEARCH] Reflection pass")
+        reflect_msgs = [
+            {"role": "system", "content": self.REFLECT_PROMPT},
+            {"role": "user", "content": f"Original question: {user_message[:REFLECT_SNIPPET_LEN]}"},
+            {"role": "assistant", "content": response},
+            {"role": "user", "content": "Evaluate and improve if needed."},
+        ]
+        reflect_result = await _call_llm_async(reflect_msgs, model=router._pick_available(2), max_tokens=4000)
+        improved = reflect_result.get("content", "")
+        if improved and len(improved) > len(response) * 0.5 and len(improved) > 50:
+            skip_phrases = ["satisfactory", "sufficient", "correct"]
+            if not any(p in improved[:100].lower() for p in skip_phrases):
+                response = improved
+            log.info(f"[SEARCH] Reflection improved: {len(response)} chars")
+        return response
+
     async def _execute_loop(
         self, session, user_message, model_override, on_tool, classification, tier, on_token=None, on_status=None
     ):
@@ -622,79 +688,24 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             # ── Tool execution branch ──
             if result.get("tool_calls"):
-                if on_status:
-                    tool_names = ", ".join(tc["name"] for tc in result["tool_calls"][:3])
-                    _safe_callback(on_status, STATUS_TOOL_RUNNING, f"🔧 Running {tool_names}...")
-
-                valid_tools, tool_outputs = validate_tool_calls(result["tool_calls"])
-
-                if valid_tools:
-                    exec_outputs = await asyncio.to_thread(self._execute_tools_parallel, valid_tools, on_tool)
-                    tool_outputs.update(exec_outputs)
-
-                # Circuit breaker
-                consecutive_errors, break_msg = check_circuit_breaker(
-                    tool_outputs, consecutive_errors, self.MAX_CONSECUTIVE_ERRORS
+                break_msg = await self._handle_tool_calls(
+                    result, session, provider, on_tool, on_status,
+                    consecutive_errors, _recent_tool_calls,
                 )
                 if break_msg:
-                    session.add_assistant(break_msg)
                     return break_msg
-
-                # Loop detection
-                loop_msg = check_loop_detection(result.get("tool_calls", []), _recent_tool_calls)
-                if loop_msg:
-                    session.add_assistant(loop_msg)
-                    return loop_msg
-
-                self._append_tool_results(session, provider, result, result["tool_calls"], tool_outputs)
-
                 # Mid-loop compaction
                 if len(session.messages) > 40:
                     session.messages = compact_messages(session.messages, session=session, on_status=on_status)
                     log.info(f"[CUT] Mid-loop compaction: -> {len(session.messages)} msgs")
-
                 iteration += 1
                 continue
 
             # ── Final response branch ──
-            response = result.get("content", "")
-
-            # Empty response retry
-            if not response or not response.strip():
-                response = await handle_empty_response(self._call_with_failover, pruned_messages, model, tools)
-
-            # Edge cases (truncation, content filter)
-            response = finalize_response(result, response)
-
-            # Reflection pass
-            if self._should_reflect(classification, response, iteration):
-                log.info(f"[SEARCH] Reflection pass on {classification['intent']} response")
-                reflect_msgs = [
-                    {"role": "system", "content": self.REFLECT_PROMPT},
-                    {"role": "user", "content": f"Original question: {user_message[:REFLECT_SNIPPET_LEN]}"},
-                    {"role": "assistant", "content": response},
-                    {"role": "user", "content": "Evaluate and improve if needed."},
-                ]
-                reflect_result = await _call_llm_async(reflect_msgs, model=router._pick_available(2), max_tokens=4000)
-                improved = reflect_result.get("content", "")
-                if improved and len(improved) > len(response) * 0.5 and len(improved) > 50:
-                    skip_phrases = ["satisfactory", "sufficient", "correct"]
-                    if not any(p in improved[:100].lower() for p in skip_phrases):
-                        response = improved
-                    log.info(f"[SEARCH] Reflection improved: {len(response)} chars")
-
-            if _failover_warn:
-                response = f"{_failover_warn}\n\n{response}"
-
-            session.add_assistant(response)
-            log.info(
-                f"[CHAT] Response ({result.get('model', '?')}): {len(response)} chars, "
-                f"iteration {iteration + 1}, intent={classification['intent']}"
+            return await self._finalize_loop_response(
+                result, session, pruned_messages, model, tools, user_message,
+                classification, iteration, _failover_warn,
             )
-            # Auto-log significant conversations to daily memory
-            auto_log_conversation(user_message, response, classification)
-            session.messages = [m for m in session.messages if not m.get("_plan_injected")]
-            return response
 
         # Loop exhausted
         log.warning(f"[BREAK] Max iterations ({_max_iter}) reached")
@@ -785,6 +796,129 @@ from salmalm.core.slash_commands import (  # noqa: F401, E402
 )
 
 
+_THINKING_BUDGET_MAP = {"low": 4000, "medium": 10000, "high": 16000, "xhigh": 32000}
+
+
+def _classify_task(session, user_message: str) -> dict:
+    """Classify task and apply thinking settings."""
+    classification = TaskClassifier.classify(user_message, len(session.messages))
+    thinking_on = getattr(session, "thinking_enabled", False)
+    classification["thinking"] = thinking_on
+    level = getattr(session, "thinking_level", "medium") if thinking_on else None
+    classification["thinking_level"] = level
+    classification["thinking_budget"] = _THINKING_BUDGET_MAP.get(level or "medium", 10000) if thinking_on else 0
+
+    if not thinking_on and classification["tier"] >= 3 and classification["score"] >= 4:
+        _suggest_key = f"_thinking_suggested_{getattr(session, 'id', '')}"
+        if not getattr(session, _suggest_key, False):
+            setattr(session, _suggest_key, True)
+            session._thinking_hint = (
+                "\n\n💡 *이 작업은 복잡해 보입니다. 🧠 Extended Thinking을 켜면 더 정확한 결과를 얻을 수 있습니다.* "
+                "`/thinking on` 또는 🧠 버튼을 눌러주세요."
+                "\n💡 *This looks complex. Enable 🧠 Extended Thinking for better results.* "
+                "Use `/thinking on` or the 🧠 button."
+            )
+    return classification
+
+
+def _route_model(model_override, user_message: str, session) -> tuple:
+    """Select model via routing or override. Returns (model, complexity)."""
+    if model_override:
+        return _fix_model_name(model_override), "auto"
+    selected, complexity = _select_model(user_message, session)
+    log.info(f"[ROUTE] Multi-model: {complexity} → {selected}")
+    return _fix_model_name(selected), complexity
+
+
+def _prepare_context(session, user_message: str, lang, on_status) -> None:
+    """Prepare session context: language, compaction, RAG, mood, self-evolve."""
+    if lang and lang in ("en", "ko"):
+        lang_directive = "Respond in English." if lang == "en" else "한국어로 응답하세요."
+        session.messages.append({"role": "system", "content": f"[Language: {lang_directive}]"})
+
+    session.messages = compact_messages(session.messages, session=session, on_status=on_status)
+    if len(session.messages) % 20 == 0:
+        session.add_system(build_system_prompt(full=False))
+
+    try:
+        from salmalm.features.rag import inject_rag_context
+        for i, m in enumerate(session.messages):
+            if m.get("role") == "system":
+                session.messages[i] = dict(m)
+                session.messages[i]["content"] = inject_rag_context(session.messages, m["content"], max_chars=2500)
+                break
+    except Exception as e:
+        log.warning(f"RAG injection skipped: {e}")
+
+    try:
+        from salmalm.features.mood import mood_detector
+        if mood_detector.enabled:
+            _detected_mood, _mood_conf = mood_detector.detect(user_message)
+            if _detected_mood != "neutral" and _mood_conf > 0.3:
+                _tone_hint = mood_detector.get_tone_injection(_detected_mood)
+                if _tone_hint:
+                    for i, m in enumerate(session.messages):
+                        if m.get("role") == "system":
+                            session.messages[i] = dict(m)
+                            session.messages[i]["content"] = m["content"] + f"\n\n[감정 감지: {_detected_mood}] {_tone_hint}"
+                            break
+                mood_detector.record_mood(_detected_mood, _mood_conf)
+    except Exception as _mood_err:
+        log.debug(f"Mood detection skipped: {_mood_err}")
+
+    try:
+        from salmalm.features.self_evolve import prompt_evolver
+        if len(session.messages) > 4 and len(session.messages) % 10 == 0:
+            prompt_evolver.record_conversation(session.messages)
+    except Exception as _exc:
+        log.debug(f"Suppressed: {_exc}")
+
+
+def _record_sla(sla_start: float, first_token_time: float, model: str, session_id: str) -> None:
+    """Record SLA latency metrics."""
+    try:
+        from salmalm.features.sla import latency_tracker, sla_config as _sla_cfg
+        sla_end = _time.time()
+        ttft_ms = (first_token_time - sla_start) * 1000 if first_token_time > 0 else (sla_end - sla_start) * 1000
+        total_ms = (sla_end - sla_start) * 1000
+        timed_out = total_ms > _sla_cfg.get("response_target_ms", 30000)
+        latency_tracker.record(ttft_ms=ttft_ms, total_ms=total_ms, model=model or "auto", timed_out=timed_out, session_id=session_id)
+        if latency_tracker.should_failover():
+            log.warning("[SLA] Consecutive timeout threshold reached — failover recommended")
+            latency_tracker.reset_timeout_counter()
+    except Exception as e:
+        log.debug(f"[SLA] Latency tracking error: {e}")
+
+
+def _post_process(session, session_id: str, user_message: str, response: str, classification: dict) -> str:
+    """Post-process: auto-title, notification, hooks, thinking hint."""
+    try:
+        user_msgs = [m for m in session.messages if m.get("role") == "user" and isinstance(m.get("content"), str)]
+        assistant_msgs = [m for m in session.messages if m.get("role") == "assistant"]
+        if len(assistant_msgs) == 1 and user_msgs:
+            from salmalm.core import auto_title_session
+            auto_title_session(session_id, user_msgs[0]["content"])
+    except Exception as e:
+        log.warning(f"Auto-title hook error: {e}")
+
+    try:
+        _notify_completion(session_id, user_message, response, classification)
+    except Exception as e:
+        log.error(f"Notification hook error: {e}")
+
+    try:
+        from salmalm.features.hooks import hook_manager
+        hook_manager.fire("on_response", {"session_id": session_id, "message": response})
+    except Exception as _exc:
+        log.debug(f"Suppressed: {_exc}")
+
+    _hint = getattr(session, "_thinking_hint", None)
+    if _hint:
+        response = response + _hint
+        del session._thinking_hint
+    return response
+
+
 async def _process_message_inner(
     session_id: str,
     user_message: str,
@@ -852,90 +986,10 @@ async def _process_message_inner(
     else:
         session.add_user(user_message)
 
-    # Language directive — match UI language setting
-    if lang and lang in ("en", "ko"):
-        lang_directive = "Respond in English." if lang == "en" else "한국어로 응답하세요."
-        # Inject as lightweight system hint (not persisted)
-        session.messages.append({"role": "system", "content": f"[Language: {lang_directive}]"})
+    _prepare_context(session, user_message, lang, on_status)
 
-    # Context management
-    session.messages = compact_messages(session.messages, session=session, on_status=on_status)
-    if len(session.messages) % 20 == 0:
-        session.add_system(build_system_prompt(full=False))
-
-    # RAG context injection — augment with relevant memory/docs
-    try:
-        from salmalm.features.rag import inject_rag_context
-
-        for i, m in enumerate(session.messages):
-            if m.get("role") == "system":
-                session.messages[i] = dict(m)
-                session.messages[i]["content"] = inject_rag_context(session.messages, m["content"], max_chars=2500)
-                break
-    except Exception as e:
-        log.warning(f"RAG injection skipped: {e}")
-
-    # Mood-aware tone injection
-    try:
-        from salmalm.features.mood import mood_detector
-
-        if mood_detector.enabled:
-            _detected_mood, _mood_conf = mood_detector.detect(user_message)
-            if _detected_mood != "neutral" and _mood_conf > 0.3:
-                _tone_hint = mood_detector.get_tone_injection(_detected_mood)
-                if _tone_hint:
-                    for i, m in enumerate(session.messages):
-                        if m.get("role") == "system":
-                            session.messages[i] = dict(m)
-                            session.messages[i]["content"] = (
-                                m["content"] + f"\n\n[감정 감지: {_detected_mood}] {_tone_hint}"
-                            )
-                            break
-                mood_detector.record_mood(_detected_mood, _mood_conf)
-    except Exception as _mood_err:
-        log.debug(f"Mood detection skipped: {_mood_err}")
-
-    # Self-evolving prompt — record conversation periodically
-    try:
-        from salmalm.features.self_evolve import prompt_evolver
-
-        if len(session.messages) > 4 and len(session.messages) % 10 == 0:
-            prompt_evolver.record_conversation(session.messages)
-    except Exception as _exc:
-        log.debug(f"Suppressed: {_exc}")
-
-    # Classify and run through Intelligence Engine
-    classification = TaskClassifier.classify(user_message, len(session.messages))
-
-    # Thinking is user-controlled only (via /thinking toggle or 🧠 button)
-    classification["thinking"] = getattr(session, "thinking_enabled", False)
-    classification["thinking_level"] = getattr(session, "thinking_level", "medium") if classification["thinking"] else None
-    _BUDGET_MAP = {"low": 4000, "medium": 10000, "high": 16000, "xhigh": 32000}
-    classification["thinking_budget"] = _BUDGET_MAP.get(classification["thinking_level"] or "medium", 10000) if classification["thinking"] else 0
-
-    # Suggest thinking mode for complex tasks when it's OFF
-    if not classification["thinking"] and classification["tier"] >= 3 and classification["score"] >= 4:
-        _suggest_key = f"_thinking_suggested_{getattr(session, 'id', '')}"
-        if not getattr(session, _suggest_key, False):
-            setattr(session, _suggest_key, True)  # Only suggest once per session
-            _hint = (
-                "\n\n💡 *이 작업은 복잡해 보입니다. "
-                "🧠 Extended Thinking을 켜면 더 정확한 결과를 얻을 수 있습니다.* "
-                "`/thinking on` 또는 🧠 버튼을 눌러주세요."
-                "\n💡 *This looks complex. Enable 🧠 Extended Thinking for better results.* "
-                "Use `/thinking on` or the 🧠 button."
-            )
-            # Inject as a system hint that will be appended to the response later
-            session._thinking_hint = _hint
-
-    # Multi-model routing: select optimal model if no override
-    selected_model = model_override
-    complexity = "auto"
-    if not model_override:
-        selected_model, complexity = _select_model(user_message, session)
-        log.info(f"[ROUTE] Multi-model: {complexity} → {selected_model}")
-    # Fix outdated model names to actual API IDs
-    selected_model = _fix_model_name(selected_model)
+    classification = _classify_task(session, user_message)
+    selected_model, complexity = _route_model(model_override, user_message, session)
 
     # ── SLA: Measure latency (레이턴시 측정) + abort token accumulation ──
     _sla_start = _time.time()
@@ -971,76 +1025,10 @@ async def _process_message_inner(
         on_status=on_status,
     )
 
-    # ── SLA: Record latency (레이턴시 기록) ──
-    try:
-        from salmalm.features.sla import latency_tracker
-
-        _sla_end = _time.time()
-        _ttft_ms = (
-            (_sla_first_token_time[0] - _sla_start) * 1000
-            if _sla_first_token_time[0] > 0
-            else (_sla_end - _sla_start) * 1000
-        )
-        _total_ms = (_sla_end - _sla_start) * 1000
-        from salmalm.features.sla import sla_config as _sla_cfg
-
-        _timed_out = _total_ms > _sla_cfg.get("response_target_ms", 30000)
-        latency_tracker.record(
-            ttft_ms=_ttft_ms,
-            total_ms=_total_ms,
-            model=selected_model or "auto",
-            timed_out=_timed_out,
-            session_id=session_id,
-        )
-        # Check failover trigger
-        if latency_tracker.should_failover():
-            log.warning("[SLA] Consecutive timeout threshold reached — failover recommended")
-            latency_tracker.reset_timeout_counter()
-    except Exception as _sla_err:
-        log.debug(f"[SLA] Latency tracking error: {_sla_err}")
-
-    # Store model metadata on session for API consumers
+    _record_sla(_sla_start, _sla_first_token_time[0], selected_model, session_id)
     session.last_model = selected_model or "auto"
     session.last_complexity = complexity
-
-    # ── Auto-title session after first assistant response ──
-    try:
-        user_msgs = [m for m in session.messages if m.get("role") == "user" and isinstance(m.get("content"), str)]
-        assistant_msgs = [m for m in session.messages if m.get("role") == "assistant"]
-        if len(assistant_msgs) == 1 and user_msgs:
-            from salmalm.core import auto_title_session
-
-            auto_title_session(session_id, user_msgs[0]["content"])
-    except Exception as e:
-        log.warning(f"Auto-title hook error: {e}")
-
-    # ── Completion Notification Hook ──
-    # Notify other channels when a task completes
-    try:
-        _notify_completion(session_id, user_message, response, classification)
-    except Exception as e:
-        log.error(f"Notification hook error: {e}")
-
-    # Fire on_response hook (응답 완료 훅)
-    try:
-        from salmalm.features.hooks import hook_manager
-
-        hook_manager.fire(
-            "on_response",
-            {
-                "session_id": session_id,
-                "message": response,
-            },
-        )
-    except Exception as _exc:
-        log.debug(f"Suppressed: {_exc}")
-
-    # Append thinking mode suggestion if flagged
-    _hint = getattr(session, "_thinking_hint", None)
-    if _hint:
-        response = response + _hint
-        del session._thinking_hint
-
+    response = _post_process(session, session_id, user_message, response, classification)
     return response
 
 
