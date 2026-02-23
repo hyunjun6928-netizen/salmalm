@@ -47,8 +47,16 @@
 
   function _wsHandleMessage(data){
     var typingEl=document.getElementById('typing-row');
+    if(data.type==='thinking'){
+      if(typingEl){var tb0=typingEl.querySelector('.bubble');if(tb0){
+        var thinkEl=tb0.querySelector('.think-stream');
+        if(!thinkEl){tb0.innerHTML='<details class="think-stream" open style="font-size:12px;color:var(--text2);margin-bottom:6px"><summary style="cursor:pointer;font-weight:600">🧠 Thinking...</summary><pre class="think-content" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;margin:4px 0;font-size:11px;opacity:0.7"></pre></details>';thinkEl=tb0.querySelector('.think-stream')}
+        var tc=thinkEl.querySelector('.think-content');if(tc){tc.textContent+=data.text||'';tc.scrollTop=tc.scrollHeight}
+      }}
+      return;
+    }
     if(data.type==='chunk'){
-      if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb){if(!tb._streaming){tb._streaming=true;tb.innerHTML=''}tb.innerHTML+=data.text.replace(/</g,'&lt;')}}
+      if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb){if(!tb._streaming){tb._streaming=true;var thinkKeep=tb.querySelector('.think-stream');tb.innerHTML='';if(thinkKeep)tb.appendChild(thinkKeep)}tb.insertAdjacentHTML('beforeend',data.text.replace(/</g,'&lt;'))}}
     }else if(data.type==='tool'){
       if(typingEl){
         var tb2=typingEl.querySelector('.bubble');

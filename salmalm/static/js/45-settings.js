@@ -6,7 +6,7 @@
   var cronView=document.getElementById('cron-view');
   var memView=document.getElementById('memory-view');
   function _hideAll(){settingsEl.style.display='none';dashView.style.display='none';sessView.style.display='none';docsView.style.display='none';cronView.style.display='none';memView.style.display='none';chat.style.display='none';inputArea.style.display='none'}
-  window.showChat=function(){_hideAll();chat.style.display='flex';inputArea.style.display='block'};
+  window.showChat=function(){_hideAll();chat.style.display='flex';inputArea.style.display='block';chat.scrollTop=chat.scrollHeight};
   window.showSessions=function(){_hideAll();sessView.style.display='block';window._loadSessions()};
   window.showChannels=function(){window.showSettings()};
   window.showDocs=function(){_hideAll();docsView.style.display='block';try{window._renderDocs('')}catch(e){console.error('Docs render error:',e);document.getElementById('docs-content').innerHTML='<p style="color:#f87171">Render error: '+e.message+'</p>'}};

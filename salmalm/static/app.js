@@ -579,8 +579,16 @@
 
   function _wsHandleMessage(data){
     var typingEl=document.getElementById('typing-row');
+    if(data.type==='thinking'){
+      if(typingEl){var tb0=typingEl.querySelector('.bubble');if(tb0){
+        var thinkEl=tb0.querySelector('.think-stream');
+        if(!thinkEl){tb0.innerHTML='<details class="think-stream" open style="font-size:12px;color:var(--text2);margin-bottom:6px"><summary style="cursor:pointer;font-weight:600">🧠 Thinking...</summary><pre class="think-content" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;margin:4px 0;font-size:11px;opacity:0.7"></pre></details>';thinkEl=tb0.querySelector('.think-stream')}
+        var tc=thinkEl.querySelector('.think-content');if(tc){tc.textContent+=data.text||'';tc.scrollTop=tc.scrollHeight}
+      }}
+      return;
+    }
     if(data.type==='chunk'){
-      if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb){if(!tb._streaming){tb._streaming=true;tb.innerHTML=''}tb.innerHTML+=data.text.replace(/</g,'&lt;')}}
+      if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb){if(!tb._streaming){tb._streaming=true;var thinkKeep=tb.querySelector('.think-stream');tb.innerHTML='';if(thinkKeep)tb.appendChild(thinkKeep)}tb.insertAdjacentHTML('beforeend',data.text.replace(/</g,'&lt;'))}}
     }else if(data.type==='tool'){
       if(typingEl){
         var tb2=typingEl.querySelector('.bubble');
@@ -667,8 +675,14 @@
               if(!tb2._toolLog){tb2._toolLog='';tb2.innerHTML=''}
               tb2._toolLog+=toolH;tb2.innerHTML=tb2._toolLog;
             }}
+          }else if(etype==='thinking'){
+            if(typingEl){var tb5=typingEl.querySelector('.bubble');if(tb5){
+              var thinkEl2=tb5.querySelector('.think-stream');
+              if(!thinkEl2){tb5.innerHTML='<details class="think-stream" open style="font-size:12px;color:var(--text2);margin-bottom:6px"><summary style="cursor:pointer;font-weight:600">🧠 Thinking...</summary><pre class="think-content" style="white-space:pre-wrap;max-height:200px;overflow-y:auto;margin:4px 0;font-size:11px;opacity:0.7"></pre></details>';thinkEl2=tb5.querySelector('.think-stream')}
+              var tc2=thinkEl2.querySelector('.think-content');if(tc2){tc2.textContent+=edata.text||'';tc2.scrollTop=tc2.scrollHeight}
+            }}
           }else if(etype==='chunk'){
-            if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4.innerHTML=''}tb4.innerHTML+=edata.text.replace(/</g,'&lt;')}}
+            if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;var thinkKeep2=tb4.querySelector('.think-stream');tb4.innerHTML='';if(thinkKeep2)tb4.appendChild(thinkKeep2)}tb4.insertAdjacentHTML('beforeend',edata.text.replace(/</g,'&lt;'))}}
           }else if(etype==='ui_cmd'){
             /* AI-driven UI control */
             var act=edata.action,val=edata.value||'';
@@ -1185,7 +1199,7 @@ window._i18n={
   var cronView=document.getElementById('cron-view');
   var memView=document.getElementById('memory-view');
   function _hideAll(){settingsEl.style.display='none';dashView.style.display='none';sessView.style.display='none';docsView.style.display='none';cronView.style.display='none';memView.style.display='none';chat.style.display='none';inputArea.style.display='none'}
-  window.showChat=function(){_hideAll();chat.style.display='flex';inputArea.style.display='block'};
+  window.showChat=function(){_hideAll();chat.style.display='flex';inputArea.style.display='block';chat.scrollTop=chat.scrollHeight};
   window.showSessions=function(){_hideAll();sessView.style.display='block';window._loadSessions()};
   window.showChannels=function(){window.showSettings()};
   window.showDocs=function(){_hideAll();docsView.style.display='block';try{window._renderDocs('')}catch(e){console.error('Docs render error:',e);document.getElementById('docs-content').innerHTML='<p style="color:#f87171">Render error: '+e.message+'</p>'}};
