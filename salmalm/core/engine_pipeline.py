@@ -245,6 +245,7 @@ async def _process_message_inner(
     lang: Optional[str] = None,
 ) -> str:
     """Inner implementation of process_message."""
+    from salmalm.core.engine import _engine  # singleton
     # Input sanitization
     if not _SESSION_ID_RE.match(session_id):
         return "❌ Invalid session ID format (alphanumeric and hyphens only)."
