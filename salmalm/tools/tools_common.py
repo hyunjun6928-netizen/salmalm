@@ -71,6 +71,44 @@ def _is_safe_command(cmd: str):
                 for ba in blocked_args:
                     if ba.startswith("-") and w.startswith(ba) and len(w) > len(ba):
                         return False, f"Blocked argument for {first_word}: {w}"
+    # ── Path safety: block access to sensitive paths outside workspace ──
+    _SENSITIVE_PATHS = (
+        "/etc/shadow", "/etc/passwd", "/etc/sudoers", "/proc/", "/sys/",
+        ".ssh/", ".gnupg/", ".aws/", ".kube/", ".docker/",
+        ".pypirc", ".netrc", ".env",
+    )
+    _ARCHIVE_CMDS = {"tar", "unzip", "zip", "gzip", "gunzip"}
+    for stage in stages:
+        try:
+            words = shlex.split(stage.strip())
+        except ValueError:
+            pass
+        else:
+            cmd_name = os.path.basename(words[0]) if words else ""
+            for arg in words[1:]:
+                if arg.startswith("-"):
+                    continue
+                # Block sensitive system/user files
+                try:
+                    expanded = os.path.expanduser(arg)
+                    resolved = str(Path(expanded).resolve())
+                    home = str(Path.home())
+                    for sp in _SENSITIVE_PATHS:
+                        if sp.startswith("/"):
+                            # Absolute system paths
+                            if resolved.startswith(sp) or resolved == sp.rstrip("/"):
+                                return False, f"Access to sensitive path blocked: {arg}"
+                        else:
+                            # Relative to home (e.g. .ssh/, .pypirc)
+                            sensitive_full = os.path.join(home, sp)
+                            if resolved.startswith(sensitive_full) or resolved == sensitive_full.rstrip("/"):
+                                return False, f"Access to sensitive path blocked: {arg}"
+                except (OSError, ValueError):
+                    pass
+                # Archive commands: block path traversal (../)
+                if cmd_name in _ARCHIVE_CMDS and ".." in arg:
+                    return False, f"Path traversal in archive argument blocked: {arg}"
+
     if re.search(r"`.*`|\$\(.*\)|<\(|>\(", cmd):
         inner = re.findall(r"`([^`]+)`|\$\(([^)]+)\)", cmd)
         for groups in inner:
