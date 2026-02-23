@@ -717,6 +717,80 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         reset_cooldowns()
         self._json({"ok": True, "message": "All cooldowns cleared"})
 
+    def _get_backup(self):
+        """GET /api/backup — download ~/SalmAlm as zip."""
+        if not self._require_auth("admin"):
+            return
+        import zipfile
+        import io
+        import time as _time
+
+        buf = io.BytesIO()
+        skip_ext = {".pyc"}
+        skip_dirs = {"__pycache__", ".git", "node_modules"}
+        max_file_size = 50 * 1024 * 1024  # 50MB
+
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(str(DATA_DIR)):
+                dirs[:] = [d for d in dirs if d not in skip_dirs]
+                for fname in files:
+                    fpath = os.path.join(root, fname)
+                    if any(fname.endswith(e) for e in skip_ext):
+                        continue
+                    try:
+                        if os.path.getsize(fpath) > max_file_size:
+                            continue
+                    except OSError:
+                        continue
+                    arcname = os.path.relpath(fpath, str(DATA_DIR))
+                    zf.write(fpath, arcname)
+
+        body = buf.getvalue()
+        ts = _time.strftime("%Y%m%d_%H%M%S")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/zip")
+        self.send_header("Content-Disposition", f'attachment; filename="salmalm_backup_{ts}.zip"')
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _post_api_backup_restore(self):
+        """POST /api/backup/restore — restore from uploaded zip."""
+        if not self._require_auth("admin"):
+            return
+        import zipfile
+        import io
+
+        content_length = int(self.headers.get("Content-Length", 0))
+        if content_length > 100 * 1024 * 1024:  # 100MB limit
+            self._json({"ok": False, "error": "File too large (max 100MB)"}, 400)
+            return
+        body = self.rfile.read(content_length)
+        try:
+            zf = zipfile.ZipFile(io.BytesIO(body))
+        except zipfile.BadZipFile:
+            self._json({"ok": False, "error": "Invalid zip file"}, 400)
+            return
+
+        # Safety: check for path traversal
+        for name in zf.namelist():
+            if name.startswith("/") or ".." in name:
+                self._json({"ok": False, "error": f"Unsafe path in zip: {name}"}, 400)
+                return
+
+        zf.extractall(str(DATA_DIR))
+        zf.close()
+        self._json({"ok": True, "message": f"Restored {len(zf.namelist())} files to {DATA_DIR}"})
+
+    def _get_doctor(self):
+        if not self._require_auth("user"):
+            return
+        from salmalm.features.doctor import doctor
+
+        results = doctor.run_all()
+        ok = sum(1 for r in results if r["status"] == "ok")
+        self._json({"checks": results, "passed": ok, "total": len(results)})
+
     def _get_memory_files(self):
         if not self._require_auth("user"):
             return
@@ -1267,6 +1341,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         "/api/onboarding": "_get_api_onboarding",
         "/api/routing": "_get_routing",
         "/api/failover": "_get_failover",
+        "/api/doctor": "_get_doctor",
+        "/api/backup": "_get_backup",
         "/api/cron": "_get_cron",
         "/api/memory/files": "_get_memory_files",
         "/api/mcp": "_get_mcp",
@@ -2916,6 +2992,23 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     return
         self._json({"ok": False, "error": "Job not found"}, 404)
 
+    def _post_api_cron_run(self):
+        """POST /api/cron/run — Execute a cron job immediately."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        from salmalm.core import _llm_cron
+
+        job_id = body.get("id", "")
+        if _llm_cron:
+            for j in _llm_cron.jobs:
+                if j["id"] == job_id:
+                    import threading
+                    threading.Thread(target=_llm_cron._execute_job, args=(j,), daemon=True).start()
+                    self._json({"ok": True, "message": "Job triggered"})
+                    return
+        self._json({"ok": False, "error": "Job not found"}, 404)
+
     def _post_api_sessions_create(self):
         body = self._body
         if not self._require_auth("user"):
@@ -4200,6 +4293,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         "/api/cron/add": "_post_api_cron_add",
         "/api/cron/delete": "_post_api_cron_delete",
         "/api/cron/toggle": "_post_api_cron_toggle",
+        "/api/cron/run": "_post_api_cron_run",
         "/api/sessions/create": "_post_api_sessions_create",
         "/api/sessions/delete": "_post_api_sessions_delete",
         "/api/sessions/import": "_post_api_sessions_import",
@@ -4208,6 +4302,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
         "/api/routing/optimize": "_post_api_routing_optimize",
         "/api/failover": "_post_api_failover",
         "/api/cooldowns/reset": "_post_api_cooldowns_reset",
+        "/api/backup/restore": "_post_api_backup_restore",
         "/api/sessions/rename": "_post_api_sessions_rename",
         "/api/sessions/rollback": "_post_api_sessions_rollback",
         "/api/messages/edit": "_post_api_messages_edit",

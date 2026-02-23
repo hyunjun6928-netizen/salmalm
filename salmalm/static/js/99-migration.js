@@ -84,7 +84,7 @@
         h+='<div style="padding:10px 14px;color:var(--text2)">'+interval+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+j.run_count+'</div>';
         h+='<div style="padding:10px 14px"><button data-action="toggleCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:13px">'+(j.enabled?'🟢 '+(kr?'활성':'On'):'🔴 '+(kr?'비활성':'Off'))+'</button></div>';
-        h+='<div style="padding:10px 14px"><button data-action="deleteCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Delete">🗑️</button></div>';
+        h+='<div style="padding:10px 14px;display:flex;gap:4px"><button data-action="runCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Run Now">▶️</button><button data-action="deleteCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Delete">🗑️</button></div>';
         h+='</div>';
       });
       h+='</div>';

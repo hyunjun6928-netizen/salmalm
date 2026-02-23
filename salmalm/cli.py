@@ -250,4 +250,38 @@ def dispatch_cli() -> bool:
     if "--open" in sys.argv:
         # Auto-open browser after server starts
         os.environ["SALMALM_OPEN_BROWSER"] = "1"
+    if "doctor" in sys.argv[1:2] or "--doctor" in sys.argv:
+        _run_doctor()
+        return True
     return False
+
+
+def _run_doctor():
+    """Run self-diagnostics and print colorful report."""
+    from salmalm.features.doctor import doctor
+
+    print("\n🏥 SalmAlm Doctor\n" + "=" * 40)
+    results = doctor.run_all()
+    for r in results:
+        icon = "✅" if r["status"] == "ok" else "❌"
+        fix = " (🔧 fixable)" if r.get("fixable") else ""
+        print(f"  {icon} {r['message']}{fix}")
+    ok = sum(1 for r in results if r["status"] == "ok")
+    total = len(results)
+    print(f"\n📊 {ok}/{total} checks passed")
+    if ok == total:
+        print("🎉 All systems operational!")
+    else:
+        print("💡 Run 'salmalm doctor --fix' to auto-repair fixable issues")
+    if "--fix" in sys.argv:
+        fixable = [r for r in results if r.get("fixable") and r.get("issue_id")]
+        if fixable:
+            print(f"\n🔧 Auto-fixing {len(fixable)} issues...")
+            for r in fixable:
+                try:
+                    doctor.repair(r["issue_id"])
+                    print(f"  ✅ Fixed: {r['issue_id']}")
+                except Exception as e:
+                    print(f"  ❌ Failed: {r['issue_id']} — {e}")
+        else:
+            print("\n✨ Nothing to fix!")

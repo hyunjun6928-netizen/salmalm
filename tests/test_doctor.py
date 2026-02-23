@@ -48,7 +48,7 @@ def test_check_config_integrity():
 def test_run_all():
     d = Doctor()
     results = d.run_all()
-    assert len(results) == 8
+    assert len(results) == 11
     assert all('status' in r for r in results)
 
 

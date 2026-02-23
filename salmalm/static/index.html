@@ -706,6 +706,20 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
     </div>
     <div id="update-result" style="margin-top:8px;font-size:12px"></div>
   </div>
+  <div class="settings-card">
+    <h3><span class="eng-en">🏥 Self-Diagnostics</span><span class="eng-kr">🏥 자가 진단</span></h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:10px"><span class="eng-en">Check system health: API keys, vault, database, disk space.</span><span class="eng-kr">시스템 상태 확인: API 키, 볼트, 데이터베이스, 디스크 공간.</span></p>
+    <button class="btn" data-action="runDoctor" style="margin-bottom:12px"><span class="eng-en">🔍 Run Diagnostics</span><span class="eng-kr">🔍 진단 실행</span></button>
+    <div id="doctor-content"></div>
+  </div>
+  <div class="settings-card">
+    <h3><span class="eng-en">💾 Backup & Restore</span><span class="eng-kr">💾 백업 & 복원</span></h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:10px"><span class="eng-en">Download all SalmAlm data as zip, or restore from backup.</span><span class="eng-kr">SalmAlm 데이터를 zip으로 다운로드하거나 백업에서 복원합니다.</span></p>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="backup-btn" data-action="doBackup">📥 <span class="eng-en">Backup</span><span class="eng-kr">백업</span></button>
+      <button class="btn" id="restore-btn" style="background:var(--bg3);color:var(--text2)" data-action="doRestore">📤 <span class="eng-en">Restore</span><span class="eng-kr">복원</span></button>
+    </div>
+  </div>
   </div><!-- end settings-general -->
   <div id="settings-features" style="display:none">
     <div class="settings-card" id="engine-opt-card">

@@ -33,13 +33,71 @@ def _status(ok: bool, msg: str, fixable: bool = False, issue_id: str = "") -> di
 class Doctor:
     """SalmAlm 자가 진단 + 수복 도구."""
 
+    def check_python_version(self) -> dict:
+        """Python 버전 확인 (3.9+ 필수)."""
+        import sys
+        v = sys.version_info
+        if v >= (3, 9):
+            return _status(True, f"Python {v.major}.{v.minor}.{v.micro}")
+        return _status(False, f"Python {v.major}.{v.minor} — 3.9+ required")
+
+    def check_crypto(self) -> dict:
+        """cryptography 패키지 설치 여부."""
+        try:
+            from salmalm.security.crypto import HAS_CRYPTO
+            if HAS_CRYPTO:
+                return _status(True, "Vault: AES-256-GCM (cryptography installed)")
+            return _status(True, "Vault: HMAC-CTR fallback (install 'salmalm[crypto]' for AES-256-GCM)")
+        except Exception as e:
+            return _status(False, f"Vault check failed: {e}")
+
+    def check_channels(self) -> dict:
+        """Telegram/Discord 봇 토큰 유효성."""
+        import urllib.request
+        import urllib.error
+        try:
+            from salmalm.security.crypto import vault
+        except Exception:
+            return _status(True, "Channels: vault unavailable, skipped")
+
+        results = []
+        tg_token = vault.get("telegram_bot_token")
+        if tg_token:
+            try:
+                req = urllib.request.Request(f"https://api.telegram.org/bot{tg_token}/getMe")
+                resp = urllib.request.urlopen(req, timeout=5)
+                data = json.loads(resp.read())
+                bot_name = data.get("result", {}).get("username", "?")
+                results.append(f"Telegram: ✅ @{bot_name}")
+            except Exception:
+                results.append("Telegram: ❌ invalid token")
+        dc_token = vault.get("discord_bot_token")
+        if dc_token:
+            try:
+                req = urllib.request.Request(
+                    "https://discord.com/api/v10/users/@me",
+                    headers={"Authorization": f"Bot {dc_token}"},
+                )
+                resp = urllib.request.urlopen(req, timeout=5)
+                data = json.loads(resp.read())
+                bot_name = data.get("username", "?")
+                results.append(f"Discord: ✅ {bot_name}")
+            except Exception:
+                results.append("Discord: ❌ invalid token")
+        if not results:
+            return _status(True, "Channels: none configured")
+        return _status("❌" not in " ".join(results), f"Channels: {'; '.join(results)}")
+
     def run_all(self, auto_fix: bool = False) -> List[dict]:
         """전체 진단 실행, 결과 리스트 반환."""
         checks = [
+            self.check_python_version,
+            self.check_crypto,
             self.check_config_integrity,
             self.check_database_integrity,
             self.check_session_integrity,
             self.check_api_keys,
+            self.check_channels,
             self.check_port_availability,
             self.check_disk_space,
             self.check_permissions,
@@ -116,19 +174,56 @@ class Doctor:
         return _status(True, f"{len(files)} session files OK")
 
     def check_api_keys(self) -> dict:
-        """API 키 설정 여부."""
+        """API 키 설정 여부 + 실제 유효성 검증."""
+        import urllib.request
+        import urllib.error
+
         try:
             from salmalm.security.crypto import vault
-
-            if not vault.is_unlocked:
-                return _status(False, "Vault is locked", fixable=False)
-            keys = ["anthropic_api_key"]
-            missing = [k for k in keys if not vault.get(k)]
-            if missing:
-                return _status(False, f"Missing keys: {', '.join(missing)}")
-            return _status(True, "API keys present")
         except Exception as e:
-            return _status(False, f"Cannot check keys: {e}")
+            return _status(False, f"Cannot load vault: {e}")
+
+        providers = {
+            "openai_api_key": ("https://api.openai.com/v1/models", "Bearer"),
+            "anthropic_api_key": ("https://api.anthropic.com/v1/models", "x-api-key"),
+            "google_api_key": (None, None),  # Google uses query param
+            "xai_api_key": ("https://api.x.ai/v1/models", "Bearer"),
+        }
+        results = []
+        for key_name, (url, auth_type) in providers.items():
+            provider = key_name.replace("_api_key", "")
+            key = os.environ.get(key_name.upper()) or vault.get(key_name)
+            if not key:
+                results.append(f"{provider}: ⚠️ no key")
+                continue
+            if not url:
+                results.append(f"{provider}: ✅ key set")
+                continue
+            try:
+                headers = {}
+                if auth_type == "Bearer":
+                    headers["Authorization"] = f"Bearer {key}"
+                elif auth_type == "x-api-key":
+                    headers["x-api-key"] = key
+                    headers["anthropic-version"] = "2023-06-01"
+                req = urllib.request.Request(url, headers=headers)
+                urllib.request.urlopen(req, timeout=5)
+                results.append(f"{provider}: ✅ valid")
+            except urllib.error.HTTPError as e:
+                if e.code == 401:
+                    results.append(f"{provider}: ❌ invalid key (401)")
+                else:
+                    results.append(f"{provider}: ⚠️ HTTP {e.code}")
+            except Exception as e:
+                results.append(f"{provider}: ⚠️ {str(e)[:40]}")
+
+        valid = sum(1 for r in results if "✅" in r)
+        invalid = sum(1 for r in results if "❌" in r)
+        if invalid:
+            return _status(False, f"API keys: {'; '.join(results)}")
+        if valid == 0:
+            return _status(False, "No API keys configured")
+        return _status(True, f"API keys: {'; '.join(results)}")
 
     def check_port_availability(self) -> dict:
         """서버 포트 사용 가능 여부."""

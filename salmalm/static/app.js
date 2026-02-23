@@ -1346,6 +1346,26 @@ window._i18n={
   };
 
 
+  /* ═══ 57-doctor-panel.js ═══ */
+  /* ── Doctor / Self-Diagnostics Panel ── */
+  window._loadDoctor=function(){
+    var el=document.getElementById('doctor-content');if(!el)return;
+    var kr=document.documentElement.lang==='kr';
+    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text2)">⏳ '+(kr?'진단 중...':'Running diagnostics...')+'</div>';
+    fetch('/api/doctor',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      var h='<div style="margin-bottom:12px;font-size:14px;font-weight:600">📊 '+d.passed+'/'+d.total+' '+(kr?'통과':'passed')+'</div>';
+      (d.checks||[]).forEach(function(c){
+        var icon=c.status==='ok'?'✅':'❌';
+        var fix=c.fixable?' <span style="color:var(--accent);font-size:11px">(🔧 fixable)</span>':'';
+        h+='<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">'+icon+' '+c.message+fix+'</div>';
+      });
+      el.innerHTML=h;
+    }).catch(function(e){
+      el.innerHTML='<div style="color:var(--red)">Error: '+e+'</div>';
+    });
+  };
+
+
   /* ═══ 58-features-data.js ═══ */
 // Auto-extracted feature categories data
   window.FEATURE_CATEGORIES=[
@@ -1423,6 +1443,49 @@ window._i18n={
       {name:'/mood',desc:'Mood detection',desc_kr:'감정 감지'},{name:'/split',desc:'A/B split',desc_kr:'A/B 분할'}
     ]}
   ];
+
+
+  /* ═══ 59-backup-panel.js ═══ */
+  /* ── Backup / Restore Panel ── */
+  window._doBackup=function(){
+    var btn=document.getElementById('backup-btn');
+    if(btn)btn.textContent='⏳...';
+    var a=document.createElement('a');
+    a.href='/api/backup';a.download='salmalm_backup.zip';
+    // Need auth header — use fetch+blob
+    fetch('/api/backup',{headers:{'X-Session-Token':_tok}}).then(function(r){
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.blob();
+    }).then(function(blob){
+      var url=URL.createObjectURL(blob);
+      a.href=url;a.click();URL.revokeObjectURL(url);
+      if(btn)btn.textContent='✅';
+      setTimeout(function(){if(btn)btn.textContent='📥 Backup'},2000);
+    }).catch(function(e){
+      if(btn)btn.textContent='❌';
+      alert('Backup failed: '+e);
+    });
+  };
+  window._doRestore=function(){
+    var inp=document.createElement('input');
+    inp.type='file';inp.accept='.zip';
+    inp.onchange=function(){
+      if(!inp.files[0])return;
+      var kr=document.documentElement.lang==='kr';
+      if(!confirm(kr?'백업을 복원하시겠습니까? 현재 데이터를 덮어씁니다.':'Restore backup? This will overwrite current data.'))return;
+      var btn=document.getElementById('restore-btn');
+      if(btn)btn.textContent='⏳...';
+      fetch('/api/backup/restore',{
+        method:'POST',
+        headers:{'X-Session-Token':_tok},
+        body:inp.files[0]
+      }).then(function(r){return r.json()}).then(function(d){
+        if(d.ok){if(btn)btn.textContent='✅';alert(d.message||'Restored!')}
+        else{if(btn)btn.textContent='❌';alert(d.error||'Failed')}
+      }).catch(function(e){if(btn)btn.textContent='❌';alert('Restore failed: '+e)});
+    };
+    inp.click();
+  };
 
 
   /* ═══ 60-features.js ═══ */
@@ -2065,6 +2128,10 @@ window._i18n={
     else if(a==='saveCron'){window._saveCron()}
     else if(a==='toggleCronJob'){fetch('/api/cron/toggle',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({id:el.getAttribute('data-cron-id')})}).then(function(){window._loadCron()})}
     else if(a==='deleteCronJob'){if(confirm(_lang==='ko'?'삭제하시겠습니까?':'Delete this job?'))fetch('/api/cron/delete',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({id:el.getAttribute('data-cron-id')})}).then(function(){window._loadCron()})}
+    else if(a==='runCronJob'){el.textContent='⏳';fetch('/api/cron/run',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok,'X-Requested-With':'XMLHttpRequest'},body:JSON.stringify({id:el.getAttribute('data-cron-id')})}).then(function(r){return r.json()}).then(function(d){el.textContent=d.ok?'✅':'❌';setTimeout(function(){el.textContent='▶️'},2000)}).catch(function(){el.textContent='❌'})}
+    else if(a==='runDoctor'){if(typeof window._loadDoctor==='function')window._loadDoctor()}
+    else if(a==='doBackup'){if(typeof window._doBackup==='function')window._doBackup()}
+    else if(a==='doRestore'){if(typeof window._doRestore==='function')window._doRestore()}
     else if(a==='memRead'){window._readMemFile(el.getAttribute('data-mem-path'))}
     else if(a==='showSessions')window.showSessions();
     else if(a==='showChannels')window.showChannels();
@@ -2422,7 +2489,7 @@ window._i18n={
         h+='<div style="padding:10px 14px;color:var(--text2)">'+interval+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+j.run_count+'</div>';
         h+='<div style="padding:10px 14px"><button data-action="toggleCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:13px">'+(j.enabled?'🟢 '+(kr?'활성':'On'):'🔴 '+(kr?'비활성':'Off'))+'</button></div>';
-        h+='<div style="padding:10px 14px"><button data-action="deleteCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Delete">🗑️</button></div>';
+        h+='<div style="padding:10px 14px;display:flex;gap:4px"><button data-action="runCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Run Now">▶️</button><button data-action="deleteCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Delete">🗑️</button></div>';
         h+='</div>';
       });
       h+='</div>';

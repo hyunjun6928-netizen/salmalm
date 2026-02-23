@@ -22,6 +22,10 @@
     else if(a==='saveCron'){window._saveCron()}
     else if(a==='toggleCronJob'){fetch('/api/cron/toggle',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({id:el.getAttribute('data-cron-id')})}).then(function(){window._loadCron()})}
     else if(a==='deleteCronJob'){if(confirm(_lang==='ko'?'삭제하시겠습니까?':'Delete this job?'))fetch('/api/cron/delete',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({id:el.getAttribute('data-cron-id')})}).then(function(){window._loadCron()})}
+    else if(a==='runCronJob'){el.textContent='⏳';fetch('/api/cron/run',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok,'X-Requested-With':'XMLHttpRequest'},body:JSON.stringify({id:el.getAttribute('data-cron-id')})}).then(function(r){return r.json()}).then(function(d){el.textContent=d.ok?'✅':'❌';setTimeout(function(){el.textContent='▶️'},2000)}).catch(function(){el.textContent='❌'})}
+    else if(a==='runDoctor'){if(typeof window._loadDoctor==='function')window._loadDoctor()}
+    else if(a==='doBackup'){if(typeof window._doBackup==='function')window._doBackup()}
+    else if(a==='doRestore'){if(typeof window._doRestore==='function')window._doRestore()}
     else if(a==='memRead'){window._readMemFile(el.getAttribute('data-mem-path'))}
     else if(a==='showSessions')window.showSessions();
     else if(a==='showChannels')window.showChannels();
