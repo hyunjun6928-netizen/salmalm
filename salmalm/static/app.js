@@ -1193,6 +1193,8 @@ window._i18n={
     var _rUri=document.querySelector('.google-redirect-uri');if(_rUri)_rUri.textContent=location.origin+'/api/google/callback';
     /* Load personas */
     if(window.loadPersonas)window.loadPersonas();
+    /* Auto-run doctor */
+    if(window._loadDoctor)window._loadDoctor();
     /* Load users panel */
     if(window.loadUsers)window.loadUsers();
     /* Load routing config */
