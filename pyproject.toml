@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "salmalm"
-version = "0.19.26"
+version = "0.19.27"
 description = "Personal AI Gateway — Pure Python, zero-dependency AI assistant with multi-model routing, web UI, and 67 built-in tools"
 readme = "README.md"
 license = "MIT"
@@ -33,6 +33,7 @@ dependencies = []
 [project.optional-dependencies]
 crypto = ["cryptography>=41.0"]
 browser = ["playwright>=1.40"]
+discord = ["websockets>=12.0"]
 keychain = ["keyring>=24.0"]
 dev = ["pytest", "pytest-asyncio", "pytest-timeout", "pytest-cov", "pytest-forked", "flake8"]
 

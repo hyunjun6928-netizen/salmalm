@@ -1,4 +1,10 @@
-"""SalmAlm Discord Bot — Pure stdlib Discord Gateway + HTTP API."""
+"""SalmAlm Discord Bot — Discord Gateway + HTTP API.
+
+Uses `websockets` library if available for stable WebSocket connections.
+Falls back to raw SSL socket implementation (stdlib-only) if not installed.
+
+Install for best stability: pip install websockets
+"""
 
 from __future__ import annotations
 
@@ -12,6 +18,14 @@ import urllib.parse
 from typing import Optional, Dict, Any, Callable
 
 from salmalm import log
+
+try:
+    import websockets
+    import websockets.client
+
+    _HAS_WEBSOCKETS = True
+except ImportError:
+    _HAS_WEBSOCKETS = False
 
 API_BASE = "https://discord.com/api/v10"
 
@@ -245,12 +259,21 @@ class DiscordBot:
         while self._running:
             await asyncio.sleep(self._heartbeat_interval / 1000)
             if self._running:
-                self._ws_send({"op": 1, "d": self._seq})
+                await self._ws_send_auto({"op": 1, "d": self._seq})
+
+    async def _ws_send_auto(self, data: dict) -> None:
+        """Send via websockets lib or raw SSL depending on mode."""
+        if _HAS_WEBSOCKETS and self._ws is not None:
+            try:
+                await self._ws.send(json.dumps(data))
+            except Exception as e:
+                log.error(f"Discord WS send error: {e}")
+        else:
+            self._ws_send(data)
 
     async def _identify(self):
         """Send IDENTIFY payload."""
-        self._ws_send(
-            {
+        await self._ws_send_auto({
                 "op": 2,
                 "d": {
                     "token": self.token,
@@ -450,33 +473,63 @@ class DiscordBot:
             return f"❌ Command error: {str(e)[:200]}"
         return None
 
-    async def poll(self) -> None:
-        """Main gateway loop."""
-        if not self.token:
-            log.warning("Discord token not configured")
-            return
+    async def _poll_websockets(self) -> None:
+        """Gateway loop using websockets library (stable, recommended)."""
+        import websockets.client
 
-        self._running = True
         retry_delay = 1
+        while self._running:
+            try:
+                gw = await asyncio.to_thread(self._api, "GET", "/gateway/bot")
+                gateway_url = gw.get("url", "wss://gateway.discord.gg") + "/?v=10&encoding=json"
+                async with websockets.client.connect(gateway_url) as ws:
+                    self._ws = ws
+                    retry_delay = 1
+                    log.info("[DISC] Discord Gateway connected (websockets)")
+                    async for raw in ws:
+                        if not self._running:
+                            break
+                        data = json.loads(raw)
+                        await self._handle_event(data)
+                        # Send from queue if needed
+            except Exception as e:
+                log.error(f"Discord gateway error: {e}")
+            if self._running:
+                log.info(f"[DISC] Discord reconnecting in {retry_delay}s...")
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 60)
 
+    async def _poll_raw(self) -> None:
+        """Gateway loop using raw SSL (stdlib fallback)."""
+        retry_delay = 1
         while self._running:
             try:
                 await self._gateway_connect()
                 retry_delay = 1
-
                 while self._running:
                     data = await asyncio.to_thread(self._ws_recv)
                     if data is None:
                         break
                     await self._handle_event(data)
-
             except Exception as e:
                 log.error(f"Discord gateway error: {e}")
-
             if self._running:
                 log.info(f"[DISC] Discord reconnecting in {retry_delay}s...")
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 60)
+
+    async def poll(self) -> None:
+        """Main gateway loop — uses websockets lib if available, raw SSL otherwise."""
+        if not self.token:
+            log.warning("Discord token not configured")
+            return
+        self._running = True
+        if _HAS_WEBSOCKETS:
+            log.info("[DISC] Using websockets library for gateway")
+            await self._poll_websockets()
+        else:
+            log.info("[DISC] Using raw SSL socket for gateway (install websockets for better stability)")
+            await self._poll_raw()
 
     def stop(self) -> None:
         """Stop the Discord bot."""
