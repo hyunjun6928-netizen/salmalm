@@ -128,7 +128,10 @@ if vault.is_unlocked:
             log.warning(f"[DISCORD] Failed to start: {e}")
 
 _rag_stats = rag_engine.get_stats()  # noqa: F841
-st = f"{selftest['passed']}/{selftest['total']}"
+try:
+    st = f"{selftest['passed']}/{selftest['total']}"  # noqa: F821
+except NameError:
+    st = "skipped"
 update_msg = _check_for_updates()
 log.info(
     f"\n╔══════════════════════════════════════════════╗\n"
