@@ -169,30 +169,35 @@ class TestMaxToolIterations(unittest.TestCase):
     def test_loop_stops_at_max_iterations(self):
         """Engine should stop the loop after MAX_TOOL_ITERATIONS."""
         from salmalm.core.engine import IntelligenceEngine as Engine
-        from salmalm.core import get_session
 
         eng = Engine()
-        session = get_session('test_max_iter')
+        max_iter = eng.MAX_TOOL_ITERATIONS
 
-        # Mock _call_llm_async to always return tool_calls
-        fake_tool_call = {
-            'content': '',
-            'tool_calls': [{'name': 'hash_text', 'id': 'tc_1',
-                           'arguments': {'text': 'test', 'algorithm': 'sha256'}}],
-        }
+        # Mock _call_with_failover to always return tool_calls
         call_count = 0
 
-        async def mock_call(*args, **kwargs):
+        async def mock_call(messages, **kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count > Engine.MAX_TOOL_ITERATIONS:
-                return {'content': 'stopped'}
-            return dict(fake_tool_call)
+            if call_count > max_iter:
+                return {'content': 'stopped', 'tool_calls': [], 'usage': {}}, None
+            return {
+                'content': '',
+                'tool_calls': [{'name': 'hash_text', 'id': f'tc_{call_count}',
+                               'arguments': {'text': 'test', 'algorithm': 'sha256'}}],
+                'usage': {'input': 10, 'output': 10},
+            }, None
 
         classification = {'intent': 'code', 'tier': 2, 'thinking': False,
                          'thinking_budget': 0, 'score': 3}
 
-        with patch('salmalm.engine._call_llm_async', side_effect=mock_call):
+        from salmalm.core.session_store import Session
+        session = Session('test_max_iter')
+        session.add_user('test')
+
+        with patch.object(eng, '_call_with_failover', side_effect=mock_call), \
+             patch.object(eng, '_execute_tools_parallel', return_value={}), \
+             patch.object(eng, '_append_tool_results'):
             loop = asyncio.new_event_loop()
             try:
                 result = loop.run_until_complete(
@@ -202,7 +207,7 @@ class TestMaxToolIterations(unittest.TestCase):
                 loop.close()
 
         # Should have stopped, not run forever
-        self.assertLessEqual(call_count, Engine.MAX_TOOL_ITERATIONS + 2)
+        self.assertLessEqual(call_count, max_iter + 2)
 
 
 # ============================================================

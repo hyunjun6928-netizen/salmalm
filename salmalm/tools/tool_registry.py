@@ -15,11 +15,11 @@ def _ensure_modules():
     if _modules_loaded:
         return
     _modules_loaded = True
-    from salmalm import (  # noqa: F401
+    from salmalm.tools import (  # noqa: F401
         tools_file,
         tools_web,
         tools_exec,
-        tools_memory,  # noqa: F401
+        tools_memory,
         tools_misc,
         tools_system,
         tools_util,
@@ -31,7 +31,11 @@ def _ensure_modules():
         tools_email,
         tools_personal,
     )
-    from salmalm.tools import tools_brave, tools_mesh, tools_sandbox, tools_ui  # noqa: F401
+    # Optional tool modules — may not exist in all installations
+    try:
+        from salmalm.tools import tools_brave, tools_mesh, tools_sandbox, tools_ui  # noqa: F401
+    except ImportError:
+        pass
 
     # Register apply_patch tool
     from salmalm.tools.tools_patch import apply_patch as _apply_patch_fn
@@ -72,6 +76,12 @@ def unregister_dynamic(name: str) -> None:
 def get_dynamic_tools() -> list:
     """Return all dynamically registered tool definitions."""
     return list(_DYNAMIC_TOOLS)
+
+
+def get_all_tools() -> list:
+    """Return all tool definitions (static + dynamic)."""
+    from salmalm.tools.tools import TOOL_DEFINITIONS
+    return list(TOOL_DEFINITIONS) + get_dynamic_tools()
 
 
 def execute_tool(name: str, args: dict) -> str:
