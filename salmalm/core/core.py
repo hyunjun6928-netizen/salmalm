@@ -57,11 +57,11 @@ def _get_db() -> sqlite3.Connection:
         conn.execute("PRAGMA synchronous=NORMAL")
         # Track for shutdown cleanup
         with _db_connections_lock:
-            _all_db_connections[:] = [r for r in _all_db_connections if r() is not None]
+            # Append only; defer cleanup to shutdown (weakref deref can trigger cross-thread SQLite errors)
             try:
                 _all_db_connections.append(weakref.ref(conn))
             except TypeError:
-                _all_db_connections.append(conn)  # fallback: direct ref if weakref unsupported
+                _all_db_connections.append(conn)
         # Auto-create tables on first connection per thread
         conn.execute("""CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
