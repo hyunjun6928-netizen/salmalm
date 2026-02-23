@@ -8,8 +8,8 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
-[![Tests](https://img.shields.io/badge/tests-1%2C817%20passed-brightgreen)]()
-[![Tools](https://img.shields.io/badge/tools-66-blueviolet)]()
+[![Tests](https://img.shields.io/badge/tests-1%2C877%20passed-brightgreen)]()
+[![Tools](https://img.shields.io/badge/tools-67-blueviolet)]()
 
 **[English README](README.md)**
 
@@ -19,7 +19,7 @@
 
 ## 삶앎이 뭔가요?
 
-**개인 AI 게이트웨이**입니다. 파이썬 패키지 하나로 웹 UI, 텔레그램/디스코드 봇, 66개 도구를 갖춘 AI 비서가 설치됩니다.
+**개인 AI 게이트웨이**입니다. 파이썬 패키지 하나로 웹 UI, 텔레그램/디스코드 봇, 67개 도구를 갖춘 AI 비서가 설치됩니다.
 
 Docker 없음. Node.js 없음. 설정 파일 없음.
 
@@ -40,40 +40,60 @@ salmalm
 | | 기능 | 삶앎 | ChatGPT | OpenClaw | Open WebUI |
 |---|---|:---:|:---:|:---:|:---:|
 | 🔧 | 설치 난이도 | `pip install` | N/A | npm + 설정 | Docker |
-| 🤖 | 멀티 프로바이더 라우팅 | ✅ | ❌ | ✅ | ✅ |
-| 🧠 | 자기진화 프롬프트 | ✅ | ❌ | ❌ | ❌ |
-| 👻 | 그림자 모드 | ✅ | ❌ | ❌ | ❌ |
-| 💀 | 데드맨 스위치 | ✅ | ❌ | ❌ | ❌ |
-| 🔐 | 암호화 볼트 | ✅ | ❌ | ❌ | ❌ |
+| 🤖 | 멀티 프로바이더 라우팅 | ✅ 자동 3티어 | ❌ | ✅ | ✅ |
+| 🧠 | 메모리 (2계층 + 자동회상) | ✅ | ❌ | ✅ | ❌ |
+| 🤖 | 서브에이전트 (생성/조종/알림) | ✅ | ❌ | ✅ | ❌ |
+| 🌐 | 브라우저 자동화 (Playwright) | ✅ | ❌ | ✅ | ❌ |
+| 🧠 | 확장 사고 (4단계) | ✅ | ❌ | ✅ | ❌ |
+| 🔐 | 암호화 볼트 (AES-256-GCM) | ✅ | ❌ | ❌ | ❌ |
 | 📱 | 텔레그램 + 디스코드 | ✅ | ❌ | ✅ | ❌ |
+| 🧩 | MCP (Model Context Protocol) | ✅ | ❌ | ❌ | ✅ |
 | 🦙 | 로컬 LLM (Ollama/LM Studio/vLLM) | ✅ | ❌ | ✅ | ✅ |
 | 📦 | 제로 의존성* | ✅ | N/A | ❌ | ❌ |
+| 💰 | 비용 최적화 (83% 절감) | ✅ | ❌ | ❌ | ❌ |
 
-*\*stdlib 전용 코어. AES-256-GCM 볼트용 `cryptography`는 선택 설치, 없으면 순수 Python HMAC-CTR 폴백*
+*\*stdlib 전용 코어. AES-256-GCM 볼트용 `cryptography`는 선택 설치*
 
 ---
 
-## ⚡ 빠른 시작
+## ⚡ 빠른 시작 (5분이면 충분합니다)
 
+### Step 1: 설치 (30초)
 ```bash
-# 설치
 pip install salmalm
+```
 
-# 실행 (웹 UI: http://localhost:18800)
-salmalm
-
-# 브라우저 자동 열기
+### Step 2: 실행 (10초)
+```bash
 salmalm --open
+# → 브라우저가 자동으로 열립니다 (http://localhost:18800)
+```
 
-# 바탕화면 바로가기 생성 (더블클릭으로 실행!)
-salmalm --shortcut
+### Step 3: API 키 입력 (2분)
+1. 웹 UI의 **설정 마법사**가 자동으로 뜹니다
+2. AI 제공사의 API 키를 붙여넣기 하세요:
+   - [Anthropic Console](https://console.anthropic.com/) → API Keys
+   - [OpenAI Platform](https://platform.openai.com/api-keys) → API Keys
+   - 또는 [Google AI Studio](https://aistudio.google.com/apikey) → API Keys (무료 티어 있음!)
+3. "Save" 클릭 → 끝!
 
-# 자동 업데이트
-salmalm --update
+### Step 4: 대화 시작 (바로!)
+```
+"오늘 날씨 어때?"          → 웹 검색 + 답변
+"이 코드 리뷰해줘"         → 파일 읽기 + 분석
+"/model sonnet"            → 모델 변경
+"/help"                    → 전체 명령어 보기
+```
 
-# 포트 변경 / 외부 접근
-SALMALM_PORT=8080 salmalm
-SALMALM_BIND=0.0.0.0 salmalm    # LAN 노출 (보안 섹션 참조)
+> 💡 **자연어로 말하면 됩니다.** 67개 도구를 AI가 알아서 선택합니다.
+> 명령어를 외울 필요 없이, 하고 싶은 걸 그냥 말하세요.
+
+### 고급 옵션
+```bash
+salmalm --shortcut          # 바탕화면 바로가기 생성
+salmalm doctor              # 자가진단
+salmalm --update            # 자동 업데이트
+SALMALM_PORT=8080 salmalm   # 포트 변경
 ```
 
 ### 지원 프로바이더
@@ -102,7 +122,7 @@ SALMALM_BIND=0.0.0.0 salmalm    # LAN 노출 (보안 섹션 참조)
 - **무한 루프 감지** — 최근 6회 중 동일 (도구, 인자해시) 3회 반복 시 자동 중단
 - **되돌릴 수 없는 액션 게이트** — 이메일 전송, 캘린더 삭제/생성 시 명시적 확인 필요
 
-### 66개 내장 도구
+### 67개 내장 도구
 웹 검색(Brave), 이메일(Gmail), 캘린더(Google), 파일 읽기/쓰기, 셸 실행, Python eval, 이미지 생성(DALL-E/Aurora), TTS/STT, 브라우저 자동화(Playwright), RAG 검색, QR 코드, 시스템 모니터, OS 네이티브 샌드박스, 메시 네트워킹, 캔버스 미리보기 등.
 
 ### 웹 UI
