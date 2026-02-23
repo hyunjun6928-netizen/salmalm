@@ -136,6 +136,21 @@ def _truncate_file(text: str, limit: int = MAX_FILE_CHARS) -> str:
     return "… [truncated]\n" + text[-limit:]
 
 
+def _inject_session_memory(parts: list) -> None:
+    """Inject session memory context into system prompt parts."""
+    try:
+        from salmalm.core.memory import memory_manager
+        session_ctx = memory_manager.load_session_context()
+        if session_ctx:
+            parts.append(_truncate_file(session_ctx, MAX_SESSION_MEMORY_CHARS))
+    except Exception as e:  # noqa: broad-except
+        today = datetime.now(KST).strftime("%Y-%m-%d")
+        today_log = MEMORY_DIR / f"{today}.md"
+        if today_log.exists():
+            tlog = today_log.read_text(encoding="utf-8")
+            parts.append(f"# Today's Log\n{tlog[-MAX_SESSION_MEMORY_CHARS:]}")
+
+
 def build_system_prompt(full: bool = True, mode: str = "full") -> str:
     """Build system prompt from SOUL.md + context files.
     full=True: load everything (first message / refresh)
@@ -225,18 +240,7 @@ def build_system_prompt(full: bool = True, mode: str = "full") -> str:
             parts.append(f"# Long-term Memory (recent)\n{mem[-2000:]}")
 
     # Session memory context — today only, capped
-    try:
-        from salmalm.core.memory import memory_manager
-
-        session_ctx = memory_manager.load_session_context()
-        if session_ctx:
-            parts.append(_truncate_file(session_ctx, MAX_SESSION_MEMORY_CHARS))
-    except Exception as e:  # noqa: broad-except
-        today = datetime.now(KST).strftime("%Y-%m-%d")
-        today_log = MEMORY_DIR / f"{today}.md"
-        if today_log.exists():
-            tlog = today_log.read_text(encoding="utf-8")
-            parts.append(f"# Today's Log\n{tlog[-MAX_SESSION_MEMORY_CHARS:]}")
+    _inject_session_memory(parts)
 
     # AGENTS.md — full on first load, abbreviated after
     if AGENTS_FILE.exists():

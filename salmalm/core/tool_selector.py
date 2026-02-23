@@ -29,20 +29,8 @@ def get_tools_for_provider(provider: str, intent: str = None, user_message: str 
     import os as _os
 
     if _os.environ.get("SALMALM_ALL_TOOLS", "0") == "1":
-        # Legacy mode: send all tools, skip filtering
-        if provider == "google":
-            return [
-                {"name": t["name"], "description": t["description"], "parameters": t["input_schema"]}
-                for t in all_tools
-            ]
-        elif provider == "anthropic":
-            return [
-                {"name": t["name"], "description": t["description"], "input_schema": t["input_schema"]}
-                for t in all_tools
-            ]
-        return [
-            {"name": t["name"], "description": t["description"], "parameters": t["input_schema"]} for t in all_tools
-        ]
+        sk = "input_schema" if provider == "anthropic" else "parameters"
+        return [{"name": t["name"], "description": t["description"], sk: t["input_schema"]} for t in all_tools]
 
     # chat/memory/creative with no keyword match → NO tools (pure LLM)
     # Other intents → small core set + intent + keyword matched
@@ -110,32 +98,10 @@ def get_tools_for_provider(provider: str, intent: str = None, user_message: str 
                 return desc[: idx + 1]
         return desc[:80].rstrip() + ("…" if len(desc) > 80 else "")
 
-    if provider == "google":
-        return [
-            {
-                "name": t["name"],
-                "description": _compress_desc(t["description"]),
-                "parameters": _compress_schema(t["input_schema"]),
-            }
-            for t in all_tools
-        ]
-    elif provider in ("openai", "xai", "deepseek", "meta-llama"):
-        return [
-            {
-                "name": t["name"],
-                "description": _compress_desc(t["description"]),
-                "parameters": _compress_schema(t["input_schema"]),
-            }
-            for t in all_tools
-        ]
-    elif provider == "anthropic":
-        return [
-            {
-                "name": t["name"],
-                "description": _compress_desc(t["description"]),
-                "input_schema": _compress_schema(t["input_schema"]),
-            }
-            for t in all_tools
-        ]
-    return all_tools
+    schema_key = "input_schema" if provider == "anthropic" else "parameters"
+    return [
+        {"name": t["name"], "description": _compress_desc(t["description"]),
+         schema_key: _compress_schema(t["input_schema"])}
+        for t in all_tools
+    ]
 

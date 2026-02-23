@@ -194,6 +194,14 @@ def _ensure_dir():
     MOOD_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _match_keywords(text_lower: str, keyword_map: dict, scores: dict) -> None:
+    """Match keywords from a mood keyword map and update scores."""
+    for mood, keywords in keyword_map.items():
+        for kw in keywords:
+            if kw in text_lower:
+                scores[mood] += 1
+
+
 class MoodDetector:
     """Detects user mood from text using keywords, patterns, and emoji."""
 
@@ -251,12 +259,8 @@ class MoodDetector:
         text_lower = text.lower()
         scores: Counter = Counter()
 
-        # Keyword matching - Korean
-        for mood, keywords in _KR_MOOD_KEYWORDS.items():
-            for kw in keywords:
-                if kw in text_lower:
-                    scores[mood] += 1
-
+        # Keyword matching
+        _match_keywords(text_lower, _KR_MOOD_KEYWORDS, scores)
         # Keyword matching - English
         for mood, keywords in _EN_MOOD_KEYWORDS.items():
             for kw in keywords:

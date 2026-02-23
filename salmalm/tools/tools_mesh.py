@@ -4,93 +4,96 @@ from salmalm.tools.tool_registry import register
 
 
 @register("mesh")
+def _mesh_status(mgr, args: dict) -> str:
+    peers = mgr.list_peers()
+    if not peers:
+        return "📡 **SalmAlm Mesh** — No peers connected.\nAdd: mesh(action=\"add\", url=\"http://192.168.1.x:18800\")"
+    lines = ["📡 **SalmAlm Mesh**\n"]
+    for p in peers:
+        icon = "🟢" if p["status"] == "online" else "🔴"
+        ver = f" v{p['version']}" if p.get("version") else ""
+        lines.append(f"{icon} **{p['name']}** [{p['peer_id']}] — {p['url']}{ver}")
+    return "\n".join(lines)
+
+
+def _mesh_add(mgr, args: dict) -> str:
+    url = args.get("url", "")
+    if not url:
+        return "❌ url is required"
+    return mgr.add_peer(url, name=args.get("name", ""), secret=args.get("secret", ""))
+
+
+def _mesh_remove(mgr, args: dict) -> str:
+    peer_id = args.get("peer_id", "")
+    return mgr.remove_peer(peer_id) if peer_id else "❌ peer_id is required"
+
+
+def _mesh_ping(mgr, args: dict) -> str:
+    results = mgr.ping_all()
+    if not results:
+        return "📡 No peers to ping."
+    lines = ["📡 **Ping Results**\n"]
+    for pid, r in results.items():
+        icon = "🟢" if r["online"] else "🔴"
+        lines.append(f"{icon} {r['name']} — {'online' if r['online'] else 'offline'}")
+    return "\n".join(lines)
+
+
+def _mesh_task(mgr, args: dict) -> str:
+    peer_id, task = args.get("peer_id", ""), args.get("task", "")
+    if not peer_id or not task:
+        return "❌ peer_id and task are required"
+    result = mgr.delegate_task(peer_id, task, model=args.get("model"))
+    if "error" in result:
+        return f"❌ Task failed: {result['error']}"
+    return f"✅ Task completed:\n\n{result.get('result', '')[:3000]}"
+
+
+def _mesh_broadcast(mgr, args: dict) -> str:
+    task = args.get("task", "")
+    if not task:
+        return "❌ task is required"
+    results = mgr.broadcast_task(task)
+    if not results:
+        return "📡 No online peers for broadcast."
+    lines = ["📡 **Broadcast Results**\n"]
+    for r in results:
+        s = "✅" if r.get("status") == "completed" else "❌"
+        lines.append(f"{s} {r['peer']}: {r.get('result', r.get('error', '?'))[:200]}")
+    return "\n".join(lines)
+
+
+def _mesh_clipboard(mgr, args: dict) -> str:
+    text = args.get("text", "")
+    if text:
+        mgr.share_clipboard(text)
+        return "📋 Clipboard shared with all online peers."
+    clip = mgr.get_clipboard()
+    return f"📋 Shared clipboard:\n{clip['text'][:2000]}" if clip["text"] else "📋 Clipboard is empty."
+
+
+def _mesh_discover(mgr, args: dict) -> str:
+    urls = mgr.discover_lan()
+    if not urls:
+        return "📡 No SalmAlm instances found on LAN."
+    return "📡 **Discovered on LAN**\n" + "\n".join(f"  🔗 {u}" for u in urls)
+
+
+_MESH_DISPATCH = {
+    "status": _mesh_status, "add": _mesh_add, "remove": _mesh_remove,
+    "ping": _mesh_ping, "task": _mesh_task, "broadcast": _mesh_broadcast,
+    "clipboard": _mesh_clipboard, "discover": _mesh_discover,
+}
+
+
 def handle_mesh(args: dict) -> str:
-    """SalmAlm Mesh — peer-to-peer networking. / P2P 인스턴스 네트워킹."""
+    """SalmAlm Mesh — peer-to-peer networking."""
     from salmalm.features.mesh import mesh_manager
-
     action = args.get("action", "status")
-
-    if action == "status":
-        peers = mesh_manager.list_peers()
-        if not peers:
-            return (
-                "📡 **SalmAlm Mesh** — No peers connected. / 연결된 피어 없음\n"
-                'Add: mesh(action="add", url="http://192.168.1.x:18800")'
-            )
-        lines = ["📡 **SalmAlm Mesh**\n"]
-        for p in peers:
-            icon = "🟢" if p["status"] == "online" else "🔴"
-            ver = f" v{p['version']}" if p.get("version") else ""
-            lines.append(f"{icon} **{p['name']}** [{p['peer_id']}] — {p['url']}{ver}")
-        return "\n".join(lines)
-
-    if action == "add":
-        url = args.get("url", "")
-        name = args.get("name", "")
-        secret = args.get("secret", "")
-        if not url:
-            return "❌ url is required / url을 입력하세요"
-        return mesh_manager.add_peer(url, name=name, secret=secret)
-
-    if action == "remove":
-        peer_id = args.get("peer_id", "")
-        if not peer_id:
-            return "❌ peer_id is required / peer_id를 입력하세요"
-        return mesh_manager.remove_peer(peer_id)
-
-    if action == "ping":
-        results = mesh_manager.ping_all()
-        if not results:
-            return "📡 No peers to ping. / 핑할 피어 없음"
-        lines = ["📡 **Ping Results / 핑 결과**\n"]
-        for pid, r in results.items():
-            icon = "🟢" if r["online"] else "🔴"
-            lines.append(f"{icon} {r['name']} — {'online' if r['online'] else 'offline'}")
-        return "\n".join(lines)
-
-    if action == "task":
-        peer_id = args.get("peer_id", "")
-        task = args.get("task", "")
-        if not peer_id or not task:
-            return "❌ peer_id and task are required / peer_id와 task를 입력하세요"
-        result = mesh_manager.delegate_task(peer_id, task, model=args.get("model"))
-        if "error" in result:
-            return f"❌ Task failed / 작업 실패: {result['error']}"
-        return f"✅ Task completed on peer / 피어에서 작업 완료:\n\n{result.get('result', '')[:3000]}"
-
-    if action == "broadcast":
-        task = args.get("task", "")
-        if not task:
-            return "❌ task is required / task를 입력하세요"
-        results = mesh_manager.broadcast_task(task)
-        if not results:
-            return "📡 No online peers for broadcast. / 브로드캐스트할 온라인 피어 없음"
-        lines = ["📡 **Broadcast Results / 브로드캐스트 결과**\n"]
-        for r in results:
-            status = "✅" if r.get("status") == "completed" else "❌"
-            lines.append(f"{status} {r['peer']}: {r.get('result', r.get('error', '?'))[:200]}")
-        return "\n".join(lines)
-
-    if action == "clipboard":
-        text = args.get("text", "")
-        if text:
-            mesh_manager.share_clipboard(text)
-            return "📋 Clipboard shared with all online peers. / 클립보드를 모든 온라인 피어와 공유함"
-        clip = mesh_manager.get_clipboard()
-        if clip["text"]:
-            return f"📋 Shared clipboard / 공유 클립보드:\n{clip['text'][:2000]}"
-        return "📋 Clipboard is empty. / 클립보드가 비어있음"
-
-    if action == "discover":
-        urls = mesh_manager.discover_lan()
-        if not urls:
-            return "📡 No SalmAlm instances found on LAN. / LAN에서 SalmAlm 인스턴스를 찾지 못함"
-        lines = ["📡 **Discovered on LAN / LAN 탐색 결과**\n"]
-        for url in urls:
-            lines.append(f"  🔗 {url}")
-        return "\n".join(lines)
-
-    return f"❌ Unknown action / 알 수 없는 액션: {action}. Use: status, add, remove, ping, task, broadcast, clipboard, discover"
+    handler = _MESH_DISPATCH.get(action)
+    if handler:
+        return handler(mesh_manager, args)
+    return f"❌ Unknown action: {action}. Use: {', '.join(_MESH_DISPATCH)}"
 
 
 @register("canvas")
