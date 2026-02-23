@@ -148,7 +148,8 @@ class TestCommandRouter:
         assert 'Usage' in result
 
     def test_bash_echo(self, router, session):
-        with patch('salmalm.features.commands.subprocess.run') as mock_run:
+        with patch('salmalm.features.commands.subprocess.run') as mock_run, \
+             patch('salmalm.security.exec_approvals.check_approval', return_value=True):
             mock_run.return_value = MagicMock(stdout='hello', stderr='', returncode=0)
             result = _run(router.dispatch('/bash echo hello', session))
             assert 'hello' in result

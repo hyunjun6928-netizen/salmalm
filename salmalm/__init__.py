@@ -5,7 +5,7 @@ try:
     from importlib.metadata import version as _pkg_version
     __version__ = _pkg_version("salmalm")
 except Exception:
-    __version__ = "0.19.11"  # fallback for editable/dev installs
+    __version__ = "0.19.18"  # fallback for editable/dev installs
 
 log = logging.getLogger("salmalm")
 log.addHandler(logging.NullHandler())  # Prevent "No handlers" warning at import

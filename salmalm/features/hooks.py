@@ -115,7 +115,9 @@ class HookManager:
     def _run_cmd(cmd: str, env: dict, event: str):
         """Execute a hook command (runs in background thread)."""
         try:
-            result = subprocess.run(cmd, shell=True, env=env, capture_output=True, text=True, timeout=30)
+            import shlex
+
+            result = subprocess.run(shlex.split(cmd), env=env, capture_output=True, text=True, timeout=30)
             if result.returncode != 0:
                 log.warning(f"[HOOK] {event} command failed (rc={result.returncode}): {result.stderr[:200]}")
             else:

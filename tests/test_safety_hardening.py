@@ -173,7 +173,6 @@ class TestMaxToolIterations(unittest.TestCase):
         eng = Engine()
         max_iter = eng.MAX_TOOL_ITERATIONS
 
-        # Mock _call_with_failover to always return tool_calls
         call_count = 0
 
         async def mock_call(messages, **kwargs):
@@ -188,6 +187,10 @@ class TestMaxToolIterations(unittest.TestCase):
                 'usage': {'input': 10, 'output': 10},
             }, None
 
+        # _handle_tool_calls returns None to continue loop
+        async def mock_handle_tool_calls(*args, **kwargs):
+            return None
+
         classification = {'intent': 'code', 'tier': 2, 'thinking': False,
                          'thinking_budget': 0, 'score': 3}
 
@@ -196,8 +199,10 @@ class TestMaxToolIterations(unittest.TestCase):
         session.add_user('test')
 
         with patch.object(eng, '_call_with_failover', side_effect=mock_call), \
-             patch.object(eng, '_execute_tools_parallel', return_value={}), \
-             patch.object(eng, '_append_tool_results'):
+             patch.object(eng, '_handle_tool_calls', side_effect=mock_handle_tool_calls), \
+             patch('salmalm.core.engine.compact_messages', side_effect=lambda msgs, **kw: msgs), \
+             patch('salmalm.core.loop_helpers.prune_session_context', side_effect=lambda s, m: s.messages), \
+             patch('salmalm.core.loop_helpers.record_usage'):
             loop = asyncio.new_event_loop()
             try:
                 result = loop.run_until_complete(

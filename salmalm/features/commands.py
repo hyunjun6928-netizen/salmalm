@@ -437,10 +437,14 @@ class CommandRouter:
 
             if not check_approval("bash", shell_cmd):
                 return "🚫 Exec not approved. Use /approve to allow."
-        except (ImportError, Exception):
-            pass
+        except ImportError:
+            return "🚫 Security module unavailable — exec denied."
+        except Exception:
+            return "🚫 Approval check failed — exec denied for safety."
         try:
-            result = subprocess.run(shell_cmd, shell=True, capture_output=True, text=True, timeout=30)
+            import shlex
+
+            result = subprocess.run(shlex.split(shell_cmd), capture_output=True, text=True, timeout=30)
             out = result.stdout or ""
             err = result.stderr or ""
             code = result.returncode
