@@ -194,12 +194,13 @@
     if(a==='setLang')window.setLang(el.value);
     else if(a==='setModel')window.setModel(el.value);
   });
-  /* Temperature slider live label update */
+  /* Temperature & max-tokens slider live label update (querySelectorAll for duplicate EN/KR ids) */
+  function _updateAll(sel,txt){document.querySelectorAll(sel).forEach(function(el){el.textContent=txt;});}
   document.addEventListener('input',function(e){
-    if(e.target.id==='eng-temp-chat'){var l=document.getElementById('eng-temp-chat-val');if(l)l.textContent=e.target.value;}
-    if(e.target.id==='eng-temp-tool'){var l2=document.getElementById('eng-temp-tool-val');if(l2)l2.textContent=e.target.value;}
-    if(e.target.id==='eng-max-tokens-chat'){var l3=document.getElementById('eng-max-tokens-chat-val');if(l3)l3.textContent=e.target.value==='0'?'Auto (동적)':e.target.value;}
-    if(e.target.id==='eng-max-tokens-code'){var l4=document.getElementById('eng-max-tokens-code-val');if(l4)l4.textContent=e.target.value==='0'?'Auto (동적)':e.target.value;}
+    if(e.target.id==='eng-temp-chat')_updateAll('#eng-temp-chat-val,[data-label="eng-temp-chat-val"]',e.target.value);
+    if(e.target.id==='eng-temp-tool')_updateAll('#eng-temp-tool-val,[data-label="eng-temp-tool-val"]',e.target.value);
+    if(e.target.id==='eng-max-tokens-chat')_updateAll('#eng-max-tokens-chat-val,[data-label="eng-max-tokens-chat-val"]',e.target.value==='0'?'Auto (동적)':e.target.value);
+    if(e.target.id==='eng-max-tokens-code')_updateAll('#eng-max-tokens-code-val,[data-label="eng-max-tokens-code-val"]',e.target.value==='0'?'Auto (동적)':e.target.value);
   });
   document.addEventListener('keydown',function(e){
     if(e.key!=='Enter')return;
