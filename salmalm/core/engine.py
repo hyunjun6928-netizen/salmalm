@@ -596,11 +596,30 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         failover_warn,
     ) -> str:
         """Finalize LLM response: empty retry, reflection, logging."""
-        from salmalm.core.loop_helpers import handle_empty_response, finalize_response, auto_log_conversation
+        from salmalm.core.loop_helpers import handle_empty_response, finalize_response, is_truncated, auto_log_conversation
 
         response = result.get("content", "")
         if not response or not response.strip():
             response = await handle_empty_response(self._call_with_failover, pruned_messages, model, tools)
+
+        # Auto-continuation: if response was truncated, ask LLM to continue (up to 2 times)
+        _continuation_count = 0
+        while is_truncated(result) and _continuation_count < 2:
+            _continuation_count += 1
+            log.info(f"[AI] Response truncated, auto-continuing ({_continuation_count}/2)...")
+            _cont_msgs = list(pruned_messages) + [
+                {"role": "assistant", "content": response},
+                {"role": "user", "content": "Continue from where you left off. Do not repeat what you already said."},
+            ]
+            result, _ = await self._call_with_failover(
+                _cont_msgs, model=model, tools=None, max_tokens=4096, thinking=False,
+            )
+            _cont = result.get("content", "")
+            if _cont and _cont.strip():
+                response += _cont
+            else:
+                break
+
         response = finalize_response(result, response)
 
         if self._should_reflect(classification, response, iteration):

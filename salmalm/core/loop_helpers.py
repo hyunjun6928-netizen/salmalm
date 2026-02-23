@@ -146,13 +146,20 @@ async def handle_empty_response(call_fn, pruned_messages, model: str, tools: lis
 
 
 def finalize_response(result: dict, response: str) -> str:
-    """Handle truncation and content filter edge cases."""
+    """Handle truncation and content filter edge cases.
+
+    Truncation is no longer flagged — continuation is handled in _finalize_loop_response.
+    """
     stop_reason = result.get("stop_reason", "")
-    if stop_reason == "max_tokens" or result.get("usage", {}).get("output", 0) >= 4090:
-        response += "\n\n⚠️ [응답이 잘렸습니다 / Response was truncated]"
     if stop_reason in ("content_filter", "safety"):
         response = "⚠️ 안전 필터에 의해 응답이 차단되었습니다. / Response blocked by content filter."
     return response
+
+
+def is_truncated(result: dict) -> bool:
+    """Check if a response was truncated (hit max_tokens)."""
+    stop_reason = result.get("stop_reason", "")
+    return stop_reason == "max_tokens"
 
 
 def auto_log_conversation(user_message: str, response: str, classification: dict) -> None:
