@@ -274,9 +274,24 @@ INTENT_MAX_TOKENS = {
 _DETAIL_KEYWORDS = {"자세히", "상세", "detail", "detailed", "verbose", "explain", "설명", "thorough", "구체적"}
 
 
-def _get_dynamic_max_tokens(intent: str, user_message: str) -> int:
-    """Return max_tokens based on intent + user request."""
+_MODEL_DEFAULT_MAX = {
+    "anthropic": 8192,
+    "openai": 16384,
+    "google": 8192,
+    "xai": 4096,
+}
+
+
+def _get_dynamic_max_tokens(intent: str, user_message: str, model: str = "") -> int:
+    """Return max_tokens based on intent + user request.
+
+    If INTENT_MAX_TOKENS[intent] == 0, use model-provider default (dynamic allocation).
+    """
     base = INTENT_MAX_TOKENS.get(intent, 2048)
+    if base == 0:
+        # Dynamic: use provider default
+        provider = model.split("/")[0] if "/" in model else "anthropic"
+        base = _MODEL_DEFAULT_MAX.get(provider, 8192)
     msg_lower = user_message.lower()
     if any(kw in msg_lower for kw in _DETAIL_KEYWORDS):
         return max(base, 4096)

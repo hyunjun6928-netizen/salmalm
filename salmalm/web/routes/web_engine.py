@@ -212,7 +212,7 @@ class WebEngineMixin:
             if _mt_key in body:
                 try:
                     val = int(body[_mt_key])
-                    if 256 <= val <= 32768:
+                    if 0 <= val <= 32768:  # 0 = Auto (dynamic allocation)
                         os.environ[_mt_env] = str(val)
                         # Update runtime dict
                         from salmalm.core.classifier import INTENT_MAX_TOKENS

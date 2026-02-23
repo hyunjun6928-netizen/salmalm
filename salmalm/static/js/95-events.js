@@ -198,8 +198,8 @@
   document.addEventListener('input',function(e){
     if(e.target.id==='eng-temp-chat'){var l=document.getElementById('eng-temp-chat-val');if(l)l.textContent=e.target.value;}
     if(e.target.id==='eng-temp-tool'){var l2=document.getElementById('eng-temp-tool-val');if(l2)l2.textContent=e.target.value;}
-    if(e.target.id==='eng-max-tokens-chat'){var l3=document.getElementById('eng-max-tokens-chat-val');if(l3)l3.textContent=e.target.value;}
-    if(e.target.id==='eng-max-tokens-code'){var l4=document.getElementById('eng-max-tokens-code-val');if(l4)l4.textContent=e.target.value;}
+    if(e.target.id==='eng-max-tokens-chat'){var l3=document.getElementById('eng-max-tokens-chat-val');if(l3)l3.textContent=e.target.value==='0'?'Auto (동적)':e.target.value;}
+    if(e.target.id==='eng-max-tokens-code'){var l4=document.getElementById('eng-max-tokens-code-val');if(l4)l4.textContent=e.target.value==='0'?'Auto (동적)':e.target.value;}
   });
   document.addEventListener('keydown',function(e){
     if(e.key!=='Enter')return;

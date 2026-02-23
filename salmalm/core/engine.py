@@ -698,7 +698,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     _safe_callback(on_status, STATUS_TYPING, "typing")
 
             # LLM call
-            _dynamic_max_tokens = _get_dynamic_max_tokens(classification["intent"], user_message or "")
+            _dynamic_max_tokens = _get_dynamic_max_tokens(classification["intent"], user_message or "", model)
             result, _failover_warn = await self._call_with_failover(
                 pruned_messages,
                 model=model,
