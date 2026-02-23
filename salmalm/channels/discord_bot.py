@@ -125,7 +125,13 @@ class DiscordBot:
     # ── Gateway WebSocket ──
 
     async def _gateway_connect(self):
-        """Connect to Discord Gateway via raw SSL socket."""
+        """Connect to Discord Gateway via raw SSL socket.
+
+        NOTE: This uses raw SSL sockets instead of a WebSocket library to maintain
+        zero-dependency policy. The implementation handles framing, masking, ping/pong,
+        and reconnection. For production use with high traffic, consider adding
+        'websockets' as an optional dependency.
+        """
         import socket
 
         # Get gateway URL
@@ -137,9 +143,10 @@ class DiscordBot:
         host = gateway_url.split("//")[1].split("/")[0].split("?")[0]
         path = "/" + "/".join(gateway_url.split("//")[1].split("/")[1:])
 
-        # SSL connect
+        # SSL connect with timeout
         ctx = ssl.create_default_context()
         sock = socket.create_connection((host, 443), timeout=30)
+        sock.settimeout(90)  # 90s recv timeout — heartbeat should arrive within ~41s
         self._ws_raw = ctx.wrap_socket(sock, server_hostname=host)
 
         # WebSocket handshake
@@ -225,6 +232,9 @@ class DiscordBot:
                 return self._ws_recv()
             if opcode == 0x01:  # Text
                 return json.loads(data.decode())  # type: ignore[no-any-return]
+            return None
+        except (TimeoutError, OSError) as e:
+            log.warning(f"Discord WS recv timeout/error: {e}")
             return None
         except Exception as e:
             log.error(f"Discord WS recv error: {e}")

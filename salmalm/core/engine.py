@@ -1,11 +1,14 @@
-"""SalmAlm Intelligence Engine — TaskClassifier + IntelligenceEngine + process_message."""
+"""SalmAlm Intelligence Engine — TaskClassifier + IntelligenceEngine + process_message.
+
+Re-exports from submodules for backward compatibility. Consumers may import
+directly from the original modules (e.g. salmalm.core.model_selection) instead.
+"""
 
 from __future__ import annotations
 
 import asyncio
-import json  # noqa: F401
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, List, Optional, Tuple  # noqa: F401
+from typing import Any, Dict, Optional
 
 from salmalm.constants import (  # noqa: F401
     VERSION,
@@ -104,7 +107,6 @@ from salmalm.core.model_selection import (  # noqa: F401
     _COMPLEX_KEYWORDS,
     _MODEL_NAME_FIXES,
 )
-from salmalm.constants import MODELS as _MODELS  # noqa: F401  # noqa: F401
 
 # Backward-compat re-exports
 get_routing_config = _load_routing_config

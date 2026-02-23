@@ -195,9 +195,22 @@ def _cleanup_sessions():
 
 
 def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
-    """Get or create a chat session by ID."""
+    """Get or create a chat session by ID.
+
+    If user_id is provided and the session already exists with a different user_id,
+    access is denied (returns a new isolated session instead of the existing one).
+    """
     _cleanup_sessions()
     with _session_lock:
+        if session_id in _sessions:
+            existing = _sessions[session_id]
+            if user_id is not None and existing.user_id is not None and existing.user_id != user_id:
+                # Session belongs to another user — create isolated session
+                log.warning(f"[SESSION] User {user_id} denied access to session {session_id} (owned by {existing.user_id})")
+                isolated_id = f"{session_id}_u{user_id}"
+                if isolated_id not in _sessions:
+                    _sessions[isolated_id] = Session(isolated_id, user_id=user_id)
+                return _sessions[isolated_id]
         if session_id not in _sessions:
             _sessions[session_id] = Session(session_id, user_id=user_id)
             # Try to restore from SQLite
