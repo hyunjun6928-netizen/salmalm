@@ -281,7 +281,7 @@ class TestWebHandler(unittest.TestCase):
         handler = MagicMock(spec=WebHandler)
         handler._needs_onboarding = WebHandler._needs_onboarding.__get__(handler)
         # Mock vault as unlocked but empty
-        with patch('salmalm.web.vault') as mock_vault:
+        with patch('salmalm.web.routes.web_setup.vault') as mock_vault:
             mock_vault.is_unlocked = True
             mock_vault.get.return_value = None
             result = handler._needs_onboarding()
