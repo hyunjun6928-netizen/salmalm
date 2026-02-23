@@ -694,29 +694,34 @@
     var sid=localStorage.getItem('salm_sse_pending');
     if(!sid)return;
     localStorage.removeItem('salm_sse_pending');
-    /* Simple approach: wait for server to finish, then load last response */
-    var el=document.createElement('div');el.className='msg-row assistant';
-    el.innerHTML='<div class="avatar">😈</div><div class="bubble">⏳ Waiting for response...</div>';
-    el.id='recovery-msg';
-    chat.appendChild(el);chat.scrollTop=999999;
-    var polls=0;var lastCount=0;
+    /* Wait for server to finish, then check if last response is already shown */
+    var polls=0;
     function _rpoll(){
       polls++;
       fetch('/api/sessions/'+encodeURIComponent(sid)+'/last',{headers:{'X-Session-Token':_tok}})
       .then(function(r){return r.json()}).then(function(d){
-        var cnt=d.msg_count||0;
-        if(d.ok&&d.message&&cnt>lastCount&&polls>1){
-          /* msg_count grew between polls = new response arrived */
-          var rm=document.getElementById('recovery-msg');if(rm)rm.remove();
-          addMsg('assistant',d.message,'🔄 recovered');
-        }else{
-          lastCount=cnt;
+        if(!d.ok||!d.message){
+          /* No assistant message yet — server still processing */
           if(polls<30)setTimeout(_rpoll,2000);
-          else{var rm2=document.getElementById('recovery-msg');if(rm2)rm2.remove();addMsg('assistant','⚠️ Response lost. Please resend.')}
+          return;
+        }
+        /* Check if this message is already displayed in chat */
+        var snippet=d.message.substring(0,80).replace(/<[^>]*>/g,'');
+        var bubbles=chat.querySelectorAll('.msg-row .bubble');
+        var alreadyShown=false;
+        for(var i=bubbles.length-1;i>=Math.max(0,bubbles.length-5);i--){
+          if(bubbles[i].textContent.indexOf(snippet)>-1){alreadyShown=true;break}
+        }
+        if(!alreadyShown){
+          addMsg('assistant',d.message,'🔄 recovered');
+        }else if(polls<15){
+          /* Maybe server hasn't finished yet, keep checking */
+          setTimeout(_rpoll,2000);
         }
       }).catch(function(){if(polls<30)setTimeout(_rpoll,2000)});
     }
-    _rpoll();
+    /* First poll after 3s, then every 2s */
+    setTimeout(_rpoll,3000);
   };
 
   async function _sendViaSse(chatBody,_sendStart){
