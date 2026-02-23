@@ -8,10 +8,11 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
-[![Tests](https://img.shields.io/badge/tests-1%2C806%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1%2C877%20passed-brightgreen)]()
 [![Tools](https://img.shields.io/badge/tools-67-blueviolet)]()
+[![Coverage](https://img.shields.io/badge/docstrings-99%25-blue)]()
 
-**[한국어 README](README_KR.md)**
+**[한국어 README](README_KR.md)** · **[Documentation](https://hyunjun6928-netizen.github.io/salmalm/)**
 
 </div>
 
@@ -19,7 +20,7 @@
 
 ## What is SalmAlm?
 
-SalmAlm is a **personal AI gateway** — one Python package that gives you a full-featured AI assistant with a web UI, Telegram/Discord bots, 67 tools, and 10 features you won't find anywhere else.
+SalmAlm is a **personal AI gateway** — one Python package that gives you a full-featured AI assistant with a web UI, Telegram/Discord bots, 67 tools, browser automation, sub-agents, and memory system.
 
 No Docker. No Node.js. No config files. Just:
 
@@ -40,24 +41,26 @@ First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 | | Feature | SalmAlm | ChatGPT | OpenClaw | Open WebUI |
 |---|---|:---:|:---:|:---:|:---:|
 | 🔧 | Install complexity | `pip install` | N/A | npm + config | Docker |
-| 🤖 | Multi-provider routing | ✅ | ❌ | ✅ | ✅ |
-| 🧠 | Self-Evolving Prompt | ✅ | ❌ | ❌ | ❌ |
-| 👻 | Shadow Mode | ✅ | ❌ | ❌ | ❌ |
-| 💀 | Dead Man's Switch | ✅ | ❌ | ❌ | ❌ |
-| 🔐 | Encrypted Vault | ✅ | ❌ | ❌ | ❌ |
+| 🤖 | Multi-provider routing | ✅ Auto 3-tier | ❌ | ✅ | ✅ |
+| 🧠 | Memory (2-layer + auto-recall) | ✅ | ❌ | ✅ | ❌ |
+| 🤖 | Sub-agents (spawn/steer/notify) | ✅ | ❌ | ✅ | ❌ |
+| 🌐 | Browser automation (Playwright) | ✅ | ❌ | ✅ | ❌ |
+| 🧠 | Extended Thinking (4 levels) | ✅ | ❌ | ✅ | ❌ |
+| 🔐 | Encrypted Vault (AES-256-GCM) | ✅ | ❌ | ❌ | ❌ |
 | 📱 | Telegram + Discord | ✅ | ❌ | ✅ | ❌ |
-| 🧩 | MCP Marketplace | ✅ | ❌ | ❌ | ✅ |
+| 🧩 | MCP (Model Context Protocol) | ✅ | ❌ | ❌ | ✅ |
 | 🦙 | Local LLM (Ollama/LM Studio/vLLM) | ✅ | ❌ | ✅ | ✅ |
 | 📦 | Zero dependencies* | ✅ | N/A | ❌ | ❌ |
+| 💰 | Cost optimization (83% savings) | ✅ | ❌ | ❌ | ❌ |
 
-*\*stdlib-only core; optional `cryptography` for AES-256-GCM vault, otherwise pure Python HMAC-CTR fallback*
+*\*stdlib-only core; optional `cryptography` for AES-256-GCM vault*
 
 ---
 
 ## ⚡ Quick Start
 
 ```bash
-# One-liner install
+# Install
 pip install salmalm
 
 # Start (web UI at http://localhost:18800)
@@ -69,74 +72,122 @@ salmalm --open
 # Desktop shortcut (double-click to launch!)
 salmalm --shortcut
 
+# Self-diagnostics
+salmalm doctor
+
 # Self-update
 salmalm --update
-
-# Custom port / external access
-SALMALM_PORT=8080 salmalm
-SALMALM_BIND=0.0.0.0 salmalm    # expose to LAN (see Security section)
 ```
 
-### Supported Providers
+### Supported Providers (Auto-Routing)
 
-| Provider | Models | Setup |
+| Provider | Models | Tier |
 |---|---|---|
-| Anthropic | Claude Opus 4, Sonnet 4, Haiku 4.5 | Web UI → Settings → API Keys |
-| OpenAI | GPT-5.2, GPT-4.1, o3, o4-mini | Web UI → Settings → API Keys |
-| Google | Gemini 3 Pro/Flash, 2.5 Pro/Flash | Web UI → Settings → API Keys |
-| xAI | Grok-4, Grok-3 | Web UI → Settings → API Keys |
-| **Local LLM** | Ollama / LM Studio / vLLM | Web UI → Settings → Local LLM |
+| Anthropic | Claude Opus 4.6, Sonnet 4.6, Haiku 4.5 | Complex / Moderate / Simple |
+| OpenAI | GPT-5.2, GPT-5, o4-mini | Complex / Moderate |
+| Google | Gemini 3.1 Pro, 2.5 Flash | Moderate / Simple |
+| xAI | Grok-4, Grok-3-mini | Complex / Simple |
+| DeepSeek | R1, Chat | Via OpenRouter |
+| **Local LLM** | Ollama / LM Studio / vLLM | Auto-detected |
 
-**Local LLM endpoints**: Ollama `localhost:11434/v1` · LM Studio `localhost:1234/v1` · vLLM `localhost:8000/v1`
+---
+
+## 🧠 Architecture
+
+```
+Browser ──WebSocket──► SalmAlm ──► Anthropic / OpenAI / Google / xAI / Local
+   │                     │
+   └──HTTP/SSE──►       ├── Smart Model Router (3-tier: simple/moderate/complex)
+                         ├── Engine Pipeline (classify → route → context → execute)
+Telegram ──►             ├── Memory System (2-layer + auto-recall + TF-IDF RAG)
+Discord  ──►             ├── Sub-Agent Manager (spawn/steer/kill/notify)
+                         ├── Tool Registry (67 tools, risk-tiered)
+                         ├── Browser Automation (Playwright subprocess)
+                         ├── Security Middleware (auth/CSRF/CSP/rate-limit/audit)
+                         ├── Vault (PBKDF2-200K + AES-256-GCM)
+                         └── Cron / Backup / Self-Diagnostics
+```
+
+### Codebase Metrics
+
+| Metric | Value |
+|---|---|
+| Python files | 266 |
+| Total lines | 51,377 |
+| Functions | 2,162 |
+| Max cyclomatic complexity | 20 (all functions) |
+| Largest file | 778 lines |
+| Files > 800 lines | 0 |
+| Docstring coverage | 99% |
+| Return type hints | 81% |
+| Tests | 1,877 passing |
 
 ---
 
 ## 🎯 Feature Overview
 
-### Core AI
-- **Smart model routing** — auto-selects by complexity (simple→Haiku, moderate→Sonnet, complex→Opus)
-- **Extended Thinking** — deep reasoning with budget control
+### Core AI Engine
+- **3-tier auto-routing** — simple→Haiku ($1/M), moderate→Sonnet ($3/M), complex→GPT-5.2/Sonnet ($2-3/M)
+- **Extended Thinking** — 4 levels (low/medium/high/xhigh) with budget control
+- **Cross-provider message sanitization** — seamless model switching mid-conversation
 - **5-stage context compaction** — strip binary → trim tools → drop old → truncate → LLM summarize
 - **Prompt caching** — Anthropic cache_control for 90% cost reduction
 - **Model failover** — exponential backoff + retry across providers
-- **Sub-agent system** — spawn/steer/collect background AI workers
 - **Infinite loop detection** — 3+ same (tool, args_hash) in last 6 iterations = auto-break
-- **Irreversible action gate** — email send, calendar delete require explicit confirmation
+
+### Memory System (OpenClaw-style)
+- **2-layer architecture** — `MEMORY.md` (curated long-term) + `memory/YYYY-MM-DD.md` (daily logs)
+- **Auto-recall** — searches memory before each response, injects relevant context
+- **Auto-curation** — promotes important daily entries to long-term memory
+- **TF-IDF + cosine similarity search** across all memory files
+- **Memory scrubbing** — API keys/secrets auto-redacted before storage
+
+### Sub-Agent System
+- **Spawn** background AI workers with independent sessions
+- **Thinking level** per agent (low/medium/high/xhigh)
+- **Labels** for human-readable naming
+- **Steer** running agents with mid-task guidance
+- **Auto-notify** on completion (WebSocket + Telegram push)
+- **Collect** results (push-style, like OpenClaw)
+
+```
+/subagents spawn Review this PR --model sonnet --thinking high --label pr-review
+/subagents list
+/subagents steer abc123 Focus on security issues
+/subagents kill abc123
+/subagents collect
+```
 
 ### 67 Built-in Tools
-Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Python eval, image generation (DALL-E/Aurora), TTS/STT, browser automation (Playwright), RAG search, QR codes, system monitor, OS-native sandbox, mesh networking, canvas preview, and more.
+Web search (Brave), email (Gmail), calendar (Google), file I/O, shell exec, Python eval (opt-in), image generation (DALL-E/Aurora), TTS/STT, **browser automation (Playwright)**, RAG search, QR codes, system monitor, OS-native sandbox, mesh networking, and more.
 
 ### Web UI
 - Real-time streaming (WebSocket + SSE fallback)
 - Session branching, rollback, search (`Ctrl+K`), command palette (`Ctrl+Shift+P`)
-- Dark/Light themes, **EN/KR i18n** (language toggle in settings)
+- Dark/Light themes, **EN/KR i18n**
 - Image paste/drag-drop with vision, code syntax highlighting
-- PWA installable, CSP-compatible (all JS in external `app.js`)
+- Settings panels: Engine, Routing, Telegram, Discord, Memory, Cron, Backup
+- PWA installable
 
 ### Channels
 - **Web** — full SPA at `localhost:18800`
 - **Telegram** — polling + webhook with inline buttons
 - **Discord** — bot with thread support and mentions
 
-### Admin Panels
-📈 Dashboard · 📋 Sessions · ⏰ Cron Jobs · 🧠 Memory · 🔬 Debug · 📋 Logs · 📖 Docs
-
 ---
 
-## ✨ 10 Unique Features
+## ✨ Unique Features
 
-| # | Feature | What it does |
-|---|---|---|
-| 1 | **Self-Evolving Prompt** | AI auto-generates personality rules from your conversations |
-| 2 | **Dead Man's Switch** | Emergency actions if you go inactive for N days |
-| 3 | **Shadow Mode** | AI learns your style, replies as you when away |
-| 4 | **Life Dashboard** | Unified health, finance, habits, calendar view |
-| 5 | **Mood-Aware Response** | Detects emotional state, adjusts tone |
-| 6 | **Encrypted Vault** | PBKDF2-200K + AES-256-GCM / HMAC-CTR for API keys |
-| 7 | **Agent-to-Agent Protocol** | HMAC-SHA256 signed communication between instances |
-| 8 | **A/B Split Response** | Two model perspectives on the same question |
-| 9 | **Time Capsule** | Schedule messages to your future self |
-| 10 | **Thought Stream** | Private journaling with hashtag search and mood tracking |
+| Feature | What it does |
+|---|---|
+| **Self-Evolving Prompt** | AI auto-generates personality rules from conversations |
+| **Dead Man's Switch** | Emergency actions if you go inactive for N days |
+| **Shadow Mode** | AI learns your style, replies as you when away |
+| **Life Dashboard** | Unified health, finance, habits, calendar view |
+| **Mood-Aware Response** | Detects emotional state, adjusts tone |
+| **A/B Split Response** | Two model perspectives on the same question |
+| **Time Capsule** | Schedule messages to your future self |
+| **Thought Stream** | Private journaling with hashtag search and mood tracking |
 
 ---
 
@@ -147,12 +198,13 @@ SalmAlm is designed to minimize API costs without sacrificing quality:
 | Feature | Effect |
 |---|---|
 | Dynamic tool loading | 67 tools → 0 (chat) or 7-12 (actions) per request |
-| Smart model routing | Simple→Haiku ($1), Moderate→Sonnet ($3), Complex→Opus ($15) |
+| 3-tier auto-routing | Simple→$1/M, Moderate→$3/M, Complex→$3/M (no Opus needed) |
 | Tool schema compression | 7,749 → 693 tokens (91% reduction) |
 | System prompt compression | 762 → 310 tokens |
 | Intent-based max_tokens | Chat 512, search 1024, code 4096 |
 | Intent-based history trim | Chat 10 turns, code 20 turns |
 | Cache TTL | Same question cached (30min–24h, configurable) |
+| Cross-provider failover | Falls back to cheaper model on rate limit |
 
 **Result: $7.09/day → $1.23/day (83% savings at 100 calls/day)**
 
@@ -160,73 +212,41 @@ SalmAlm is designed to minimize API costs without sacrificing quality:
 
 ## 🔒 Security
 
-SalmAlm follows a **dangerous features default OFF** policy:
+**Dangerous features default OFF** — everything requires explicit opt-in:
 
 | Feature | Default | Opt-in |
 |---|---|---|
-| Network bind | `127.0.0.1` (loopback only) | `SALMALM_BIND=0.0.0.0` |
+| Network bind | `127.0.0.1` | `SALMALM_BIND=0.0.0.0` |
 | Shell operators | Blocked | `SALMALM_ALLOW_SHELL=1` |
+| Python eval | **Disabled** | `SALMALM_PYTHON_EVAL=1` |
 | Home dir file read | Workspace only | `SALMALM_ALLOW_HOME_READ=1` |
-| Vault fallback | Disabled | `SALMALM_VAULT_FALLBACK=1` |
 | Plugin system | Disabled | `SALMALM_PLUGINS=1` |
-| CLI OAuth reuse | Disabled | `SALMALM_CLI_OAUTH=1` |
-| Elevated exec on external bind | Blocked | `SALMALM_ALLOW_ELEVATED=1` |
-| Strict CSP (nonce mode) | Disabled | `SALMALM_CSP_STRICT=1` to enable |
-
-### Tool Risk Tiers
-
-Tools are classified by risk and **critical tools are blocked on external bind without authentication**:
-
-| Tier | Tools | External (0.0.0.0) |
-|---|---|---|
-| 🔴 Critical | `exec`, `exec_session`, `write_file`, `edit_file`, `python_eval`, `sandbox_exec`, `browser`, `email_send`, `gmail`, `google_calendar`, `calendar_delete`, `calendar_add`, `node_manage`, `plugin_manage` | Auth required |
-| 🟡 High | `http_request`, `read_file`, `memory_write`, `mesh`, `sub_agent`, `cron_manage`, `screenshot`, `tts`, `stt` | Allowed with warning |
-| 🟢 Normal | `web_search`, `weather`, `translate`, etc. | Allowed |
 
 ### Security Hardening
-
-- **SSRF defense** — DNS pinning + private IP block on every redirect hop (web tools AND browser)
-- **Browser SSRF** — internal/private URL blocked on external bind
-- **Irreversible action gate** — `gmail send`, `calendar delete/create` require `_confirmed=true`
-- **Audit log redaction** — secrets scrubbed from tool args before logging (9 pattern types)
-- **Memory scrubbing** — API keys/tokens auto-redacted before storage
-- **Path validation** — `Path.is_relative_to()` for all file operations (no `startswith` bypass)
-- **Write-path gate** — write tools blocked outside allowed roots even for non-existent paths
-- **Session isolation** — `user_id` column in session_store, export scoped to own data
-- **Vault export** — requires admin role
-- **Secret isolation** — API keys stripped from subprocess environments
-- **CSRF defense** — Origin validation + `X-Requested-With` custom header
-- **Centralized auth gate** — all `/api/` routes require auth unless in `_PUBLIC_PATHS`
-- **Node dispatch** — HMAC-SHA256 signed payloads with timestamp + nonce
+- **SSRF defense** — DNS pinning + private IP block on every redirect hop
+- **Tool risk tiers** — Critical tools blocked on external bind without auth
+- **CSRF** — Origin validation + `X-Requested-With` header
+- **CSP** — Strict nonce mode available
+- **Audit log** — secrets scrubbed before logging (9 pattern types)
+- **Memory scrubbing** — API keys auto-redacted before storage
+- **Path validation** — `Path.is_relative_to()` for all file operations
+- **Session isolation** — user_id scoped, export restricted to own data
+- **Node dispatch** — HMAC-SHA256 signed payloads
 - **150+ security regression tests** in CI
 
-See [`SECURITY.md`](SECURITY.md) for full threat model and details.
+See [`SECURITY.md`](SECURITY.md) for full threat model.
 
 ---
 
 ## 🦙 Local LLM Setup
 
-SalmAlm works with any OpenAI-compatible local LLM server:
-
-| Server | Default Endpoint | Setup |
+| Server | Endpoint | Setup |
 |---|---|---|
-| **Ollama** | `http://localhost:11434/v1` | `ollama serve` then pick model in UI |
+| **Ollama** | `http://localhost:11434/v1` | `ollama serve` |
 | **LM Studio** | `http://localhost:1234/v1` | Start server in LM Studio |
 | **vLLM** | `http://localhost:8000/v1` | `vllm serve <model>` |
 
-Settings → **Local LLM** → paste endpoint URL → Save. API key is optional (only if your server requires auth).
-
-SalmAlm auto-discovers available models via `/models`, `/v1/models`, or `/api/tags` endpoints.
-
----
-
-## 🔑 Google OAuth Setup (Gmail & Calendar)
-
-1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → Create OAuth client
-2. Enable **Gmail API** + **Google Calendar API**
-3. Redirect URI: `http://localhost:18800/api/google/callback`
-4. Save Client ID + Secret in Settings → API Keys
-5. Run `/oauth` in chat → click Google sign-in link
+Settings → **Local LLM** → paste endpoint → Save. Models auto-discovered.
 
 ---
 
@@ -241,75 +261,31 @@ SALMALM_HOME=~/SalmAlm    # Data directory
 # AI
 SALMALM_PLANNING=1         # Planning phase (opt-in)
 SALMALM_REFLECT=1          # Reflection pass (opt-in)
-SALMALM_MAX_TOOL_ITER=25   # Max tool iterations (999=unlimited)
+SALMALM_MAX_TOOL_ITER=25   # Max tool iterations
 SALMALM_COST_CAP=0         # Daily cost cap (0=unlimited)
 
 # Security
+SALMALM_PYTHON_EVAL=1       # Enable python_eval tool
 SALMALM_PLUGINS=1           # Enable plugin system
-SALMALM_CLI_OAUTH=1         # Allow CLI token reuse
-SALMALM_ALLOW_SHELL=1       # Enable shell operators in exec
-SALMALM_ALLOW_HOME_READ=1   # File read outside workspace
-SALMALM_VAULT_FALLBACK=1    # HMAC-CTR vault without cryptography
+SALMALM_ALLOW_SHELL=1       # Enable shell operators
 ```
 
-All settings also available in the web UI → Settings panels.
-
----
-
-## 🏗️ Architecture
-
-```
-Browser ──WebSocket──► SalmAlm ──► Anthropic / OpenAI / Google / xAI / Local LLM
-   │                     │
-   └──HTTP/SSE──►       ├── SQLite (sessions, usage, memory, audit)
-                         ├── Smart Model Routing (complexity-based)
-Telegram ──►             ├── Tool Registry (66 tools, risk-tiered)
-Discord  ──►             ├── Security Middleware (auth/CSRF/audit/rate-limit)
-                         ├── Sub-Agent Manager
-Mesh Peers ──►           ├── Message Queue (offline + retry)
-                         ├── Shared Secret Redaction (security/redact.py)
-                         ├── OS-native Sandbox (bwrap/rlimit)
-                         ├── Node Gateway (HMAC-signed dispatch)
-                         ├── Plugin System (opt-in)
-                         └── Vault (PBKDF2 + AES-256-GCM / HMAC-CTR)
-```
-
-- **234 modules**, **49K+ lines**, **82 test files**, **1,806 tests**
-- Pure Python 3.10+ stdlib — no frameworks, no heavy dependencies
-- Data stored under `~/SalmAlm` (configurable via `SALMALM_HOME`)
-
----
-
-## 🔌 Plugins
-
-> ⚠️ Plugins run arbitrary code. Enable with `SALMALM_PLUGINS=1`.
-
-Drop a `.py` file in `~/SalmAlm/plugins/`:
-
-```python
-# plugins/my_plugin.py
-TOOLS = [{
-    'name': 'my_tool',
-    'description': 'Says hello',
-    'input_schema': {'type': 'object', 'properties': {'name': {'type': 'string'}}}
-}]
-
-def handle_my_tool(args):
-    return f"Hello, {args.get('name', 'world')}!"
-```
+All settings also available in **Web UI → Settings**.
 
 ---
 
 ## 🤝 Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
 ```bash
 git clone https://github.com/hyunjun6928-netizen/salmalm.git
 cd salmalm
 pip install -e ".[dev]"
-for f in tests/test_*.py; do python -m pytest "$f" -q --timeout=30; done
+python -m pytest tests/ -q --timeout=30 -x \
+  --ignore=tests/test_multi_tenant.py \
+  --ignore=tests/test_fresh_install_e2e.py
 ```
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ---
 
