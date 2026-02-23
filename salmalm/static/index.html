@@ -978,8 +978,11 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             </label>
           </div>
           <div style="font-size:11px;color:var(--text2);margin-top:6px">
-            <span class="eng-en">⚠️ Low chat tokens (512) may truncate long responses like code reviews. Increase to 2048~4096 for detailed answers.</span>
-            <span class="eng-kr">⚠️ 대화 토큰이 낮으면 (512) 코드 리뷰 같은 긴 응답이 잘릴 수 있습니다. 상세 답변이 필요하면 2048~4096으로 올리세요.</span>
+            <span class="eng-en">⚠️ Low chat tokens (512) may truncate long responses like code reviews. Increase to 2048~4096 for detailed answers. "Code/Analysis" applies to code generation, analysis, and system tasks.</span>
+            <span class="eng-kr">⚠️ 대화 토큰이 낮으면 (512) 코드 리뷰 같은 긴 응답이 잘릴 수 있습니다. 상세 답변이 필요하면 2048~4096으로 올리세요. "코드/분석"은 코드 생성, 분석, 시스템 작업에 적용됩니다.</span>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px">
+            <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> No fixed max_tokens — uses <b>dynamic allocation</b> based on model context window. Simple replies get ~1K, complex tasks get 16K+. Anthropic models default to <b>8,192</b> output tokens; OpenAI <b>4,096~16,384</b> depending on model. SalmAlm uses intent-based allocation: chat <b>512</b>, code <b>4,096</b> by default — more cost-efficient but may truncate long responses.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 고정 max_tokens 없음 — 모델 컨텍스트 윈도우 기반 <b>동적 할당</b>. 간단한 응답 ~1K, 복잡한 작업 16K+. Anthropic 모델 기본 <b>8,192</b> 출력 토큰; OpenAI <b>4,096~16,384</b> (모델별). 삶앎은 의도 기반 할당: 대화 <b>512</b>, 코드 <b>4,096</b> 기본 — 더 비용 효율적이나 긴 응답이 잘릴 수 있음.</span></span>
           </div>
         </div>
 
