@@ -65,6 +65,32 @@ class WebSessionsMixin:
             sessions.append(entry)
         self._json({"sessions": sessions})
 
+    def _get_api_sessions_last(self):
+        """GET /api/sessions/{id}/last — return last assistant message for recovery."""
+        if not self._require_auth("user"):
+            return
+        import re as _re
+
+        m = _re.match(r"^/api/sessions/([^/]+)/last$", self.path)
+        if not m:
+            self._json({"ok": False, "error": "Invalid path"}, 400)
+            return
+        sid = m.group(1)
+        from salmalm.core import get_session
+
+        sess = get_session(sid)
+        # Find last assistant message
+        last_msg = None
+        for msg in reversed(sess.messages):
+            if msg.get("role") == "assistant":
+                last_msg = msg
+                break
+        msg_count = len(sess.messages)
+        if last_msg:
+            self._json({"ok": True, "message": last_msg.get("content", ""), "role": "assistant", "msg_count": msg_count})
+        else:
+            self._json({"ok": True, "message": None, "msg_count": msg_count})
+
     def _post_api_sessions_create(self):
         """Post api sessions create."""
         body = self._body

@@ -532,7 +532,7 @@
   /* ═══ 30-websocket.js ═══ */
   /* --- WebSocket Connection Manager --- */
   var _ws=null,_wsReady=false,_wsBackoff=500,_wsMaxBackoff=5000,_wsTimer=null,_wsPingTimer=null;
-  var _wsPendingResolve=null,_wsSendStart=0;
+  var _wsPendingResolve=null,_wsSendStart=0,_wsRequestPending=false,_wsRequestMsgCount=0;
 
   function _wsUrl(){
     var proto=location.protocol==='https:'?'wss:':'ws:';
@@ -547,6 +547,11 @@
       _wsReady=true;_wsBackoff=500;
       console.log('WS connected');
       _wsStartPing();
+      /* Recover lost response after reconnect */
+      if(_wsRequestPending){
+        _wsRequestPending=false;
+        setTimeout(function(){_wsRecoverResponse()},500);
+      }
     };
     _ws.onclose=function(){
       _wsReady=false;_wsStopPing();
@@ -607,6 +612,7 @@
         }
       }
     }else if(data.type==='done'){
+      _wsRequestPending=false;
       if(typingEl)typingEl.remove();
       var _secs=((Date.now()-_wsSendStart)/1000).toFixed(1);
       var _wcIcons={simple:'⚡',moderate:'🔧',complex:'💎'};
@@ -620,6 +626,7 @@
       var _sb=document.getElementById('stop-btn');var _sbSend=document.getElementById('send-btn');if(_sb)_sb.style.display='none';if(_sbSend)_sbSend.style.display='flex';
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
     }else if(data.type==='error'){
+      _wsRequestPending=false;
       if(typingEl)typingEl.remove();
       addMsg('assistant','❌ '+data.error);
       var _sb2=document.getElementById('stop-btn');var _sb2Send=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb2Send)_sb2Send.style.display='flex';
@@ -632,6 +639,37 @@
     }
   }
 
+  /* Recover response after WS reconnect */
+  function _wsRecoverResponse(){
+    var typingEl=document.getElementById('typing-row');
+    var sid=window._currentSession||'web';
+    var _pollCount=0;
+    function _poll(){
+      _pollCount++;
+      fetch('/api/sessions/'+encodeURIComponent(sid)+'/last',{headers:{'X-Session-Token':_tok}})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.ok&&d.message&&d.msg_count>_wsRequestMsgCount){
+          /* New response arrived — show it */
+          if(typingEl)typingEl.remove();
+          addMsg('assistant',d.message,'🔄 recovered');
+          var _sb=document.getElementById('stop-btn');var _sbS=document.getElementById('send-btn');
+          if(_sb)_sb.style.display='none';if(_sbS)_sbS.style.display='flex';
+          if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
+        }else if(_pollCount<20){
+          /* Still processing — poll again */
+          if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb&&!tb._streaming)tb.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> ⏳ Reconnected, waiting for response...'}
+          setTimeout(_poll,3000);
+        }else{
+          /* Give up */
+          if(typingEl)typingEl.remove();
+          addMsg('assistant','⚠️ Response may have been lost. Check chat history or resend.');
+          if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
+        }
+      }).catch(function(){if(_pollCount<20)setTimeout(_poll,3000)});
+    }
+    _poll();
+  }
+
   /* Connect on load */
   _wsConnect();
 
@@ -642,6 +680,8 @@
     return new Promise(function(resolve){
       if(!_wsReady||!_ws||_ws.readyState!==WebSocket.OPEN){resolve({fallback:true});return}
       _wsPendingResolve=resolve;
+      _wsRequestPending=true;
+      _wsRequestMsgCount=chat.querySelectorAll('.msg-row').length;
       var _wsPayload={type:'message',text:msg,session:session};
       if(window._pendingWsImage){_wsPayload.image=window._pendingWsImage.data;_wsPayload.image_mime=window._pendingWsImage.mime;window._pendingWsImage=null}
       _ws.send(JSON.stringify(_wsPayload));

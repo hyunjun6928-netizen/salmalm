@@ -3,6 +3,8 @@
     return new Promise(function(resolve){
       if(!_wsReady||!_ws||_ws.readyState!==WebSocket.OPEN){resolve({fallback:true});return}
       _wsPendingResolve=resolve;
+      _wsRequestPending=true;
+      _wsRequestMsgCount=chat.querySelectorAll('.msg-row').length;
       var _wsPayload={type:'message',text:msg,session:session};
       if(window._pendingWsImage){_wsPayload.image=window._pendingWsImage.data;_wsPayload.image_mime=window._pendingWsImage.mime;window._pendingWsImage=null}
       _ws.send(JSON.stringify(_wsPayload));

@@ -777,6 +777,7 @@ self.addEventListener('fetch',e=>{{
         ("/api/audit", "_get_api_audit", None),
         ("/api/sessions/", "_get_api_sessions_summary", """and "/summary" in self.path"""),
         ("/api/sessions/", "_get_api_sessions_alternatives", """and "/alternatives" in self.path"""),
+        ("/api/sessions/", "_get_api_sessions_last", """and "/last" in self.path"""),
         ("/api/logs", "_get_api_logs", None),
         ("/api/memory/read?", "_get_api_memory_read", None),
         ("/api/google/callback", "_get_api_google_callback", None),
