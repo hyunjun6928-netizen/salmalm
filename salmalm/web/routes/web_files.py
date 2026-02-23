@@ -1,5 +1,7 @@
 """SalmAlm Web — WebFilesMixin routes."""
 
+from salmalm.constants import WORKSPACE_DIR
+
 
 def _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, export_user, _json, datetime) -> None:
     """Populate export zip file with soul, memory, config, sessions, data, vault."""

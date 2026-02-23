@@ -3,7 +3,7 @@
 from salmalm.security.crypto import vault, log
 import json
 import os
-from salmalm.constants import DATA_DIR, VAULT_FILE
+from salmalm.constants import DATA_DIR, VAULT_FILE, TEST_MODELS
 from salmalm.core import audit_log
 
 

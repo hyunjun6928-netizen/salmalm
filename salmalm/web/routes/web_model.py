@@ -3,6 +3,7 @@
 from salmalm.security.crypto import vault, log
 import json
 import os
+from salmalm.constants import TEST_MODELS
 from salmalm.core import router
 
 
