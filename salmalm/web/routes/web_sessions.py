@@ -85,10 +85,11 @@ class WebSessionsMixin:
                 last_msg = msg
                 break
         msg_count = len(sess.messages)
+        last_active = getattr(sess, "last_active", 0)
         if last_msg:
-            self._json({"ok": True, "message": last_msg.get("content", ""), "role": "assistant", "msg_count": msg_count})
+            self._json({"ok": True, "message": last_msg.get("content", ""), "role": "assistant", "msg_count": msg_count, "last_active": last_active})
         else:
-            self._json({"ok": True, "message": None, "msg_count": msg_count})
+            self._json({"ok": True, "message": None, "msg_count": msg_count, "last_active": last_active})
 
     def _post_api_sessions_create(self):
         """Post api sessions create."""

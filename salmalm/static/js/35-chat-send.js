@@ -15,51 +15,43 @@
      Called after auth is complete and chat is loaded (from 95-events.js or init flow). */
   window._checkPendingRecovery=function(){
     var pending=localStorage.getItem('salm_sse_pending');
-    console.log('[Recovery] checking pending:',pending,'tok:',_tok?'yes':'NO');
     if(!pending)return;
     var pd;try{pd=JSON.parse(pending)}catch(e){localStorage.removeItem('salm_sse_pending');return}
     var sid=pd.session||'web';
-    var msgCount=pd.msgCount||0;
-    var startTime=pd.ts||0;
+    var sendTime=pd.ts||0;
     /* If pending flag is older than 5 minutes, discard */
-    if(startTime&&Date.now()-startTime>300000){console.log('[Recovery] expired, discarding');localStorage.removeItem('salm_sse_pending');return}
+    if(sendTime&&(Date.now()/1000-sendTime)>300){localStorage.removeItem('salm_sse_pending');return}
     localStorage.removeItem('salm_sse_pending');
     /* Show recovery indicator */
     addMsg('assistant','⏳ Recovering response after refresh...');
+    function _removeRecoveryMsg(){
+      var rows=chat.querySelectorAll('.msg-row');
+      for(var i=rows.length-1;i>=0;i--){var b=rows[i].querySelector('.bubble');if(b&&b.textContent.indexOf('Recovering')>-1){rows[i].remove();break}}
+    }
     var polls=0;
     function _rpoll(){
       polls++;
-      console.log('[Recovery] poll #'+polls+' sid='+sid+' msgCount='+msgCount);
       fetch('/api/sessions/'+encodeURIComponent(sid)+'/last',{headers:{'X-Session-Token':_tok}})
       .then(function(r){return r.json()}).then(function(d){
-        console.log('[Recovery] response:',JSON.stringify(d).substring(0,200));
-        if(d.ok&&d.message&&d.msg_count>msgCount){
-          /* Remove the "recovering" message and show actual response */
-          var rows=chat.querySelectorAll('.msg-row');
-          var last=rows[rows.length-1];
-          if(last){var b=last.querySelector('.bubble');if(b&&b.textContent.indexOf('Recovering')>-1)last.remove()}
+        /* Check if server has a response that was created AFTER we sent the request */
+        if(d.ok&&d.message&&d.last_active&&d.last_active>sendTime){
+          _removeRecoveryMsg();
           addMsg('assistant',d.message,'🔄 recovered after refresh');
         }else if(polls<30){
-          /* Server still processing — keep polling (up to 60s) */
           setTimeout(_rpoll,2000);
         }else{
-          /* Give up */
-          var rows2=chat.querySelectorAll('.msg-row');
-          var last2=rows2[rows2.length-1];
-          if(last2){var b2=last2.querySelector('.bubble');if(b2&&b2.textContent.indexOf('Recovering')>-1)last2.remove()}
+          _removeRecoveryMsg();
           addMsg('assistant','⚠️ Response may still be processing. Check back shortly or resend.');
         }
-      }).catch(function(e){console.error('[Recovery] fetch error:',e);if(polls<30)setTimeout(_rpoll,2000)});
+      }).catch(function(){if(polls<30)setTimeout(_rpoll,2000)});
     }
-    /* Wait for server to finish processing */
     setTimeout(_rpoll,3000);
   };
 
   async function _sendViaSse(chatBody,_sendStart){
     try{
-      /* Mark pending so page refresh can recover */
-      var _preMsgCount=chat.querySelectorAll('.msg-row').length;
-      localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',msgCount:_preMsgCount,ts:Date.now()}));
+      /* Mark pending so page refresh can recover — use timestamp for comparison */
+      localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',ts:Date.now()/1000}));
       _currentAbort=new AbortController();
       var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify(chatBody),signal:_currentAbort.signal});
