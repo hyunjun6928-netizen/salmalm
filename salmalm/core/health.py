@@ -17,6 +17,8 @@ except ImportError:
     _resource = None  # type: ignore[assignment]
 
 from salmalm.constants import VERSION, BASE_DIR
+import logging
+log = logging.getLogger(__name__)
 
 _start_time = time.time()
 
@@ -97,16 +99,16 @@ def _get_memory_mb() -> float:
         try:
             usage = _resource.getrusage(_resource.RUSAGE_SELF)
             return round(usage.ru_maxrss / 1024, 1)  # Linux: KB → MB
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
     # Fallback: /proc/self/status
     try:
         with open("/proc/self/status") as f:
             for line in f:
                 if line.startswith("VmRSS:"):
                     return round(int(line.split()[1]) / 1024, 1)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     return 0.0
 
 

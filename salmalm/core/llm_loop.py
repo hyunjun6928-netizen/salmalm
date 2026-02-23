@@ -55,8 +55,8 @@ def _load_failover_config() -> dict:
                 merged = dict(_DEFAULT_FALLBACKS)
                 merged.update(cfg)
                 return merged
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     return dict(_DEFAULT_FALLBACKS)
 
 
@@ -67,8 +67,8 @@ def _load_cooldowns() -> dict:
             data = json.loads(_COOLDOWN_FILE.read_text(encoding="utf-8"))
             if isinstance(data, dict):
                 return data
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     return {}
 
 
@@ -76,8 +76,8 @@ def _save_cooldowns(cd: dict):
     try:
         _COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
         _COOLDOWN_FILE.write_text(json.dumps(cd), encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
 
 
 def _is_model_cooled_down(model: str) -> bool:
@@ -165,8 +165,8 @@ def save_failover_config(config: dict) -> None:
     try:
         _FAILOVER_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
         _FAILOVER_CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
 
 
 # ============================================================
@@ -348,8 +348,8 @@ async def call_with_failover(
                 import asyncio
 
                 asyncio.create_task(message_queue.drain())
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         return result, None
 
     # Primary failed — record and try fallbacks
@@ -384,8 +384,8 @@ async def call_with_failover(
             if isinstance(content, str) and content:
                 message_queue.enqueue("unknown", content, model_override=model)
                 log.info("[QUEUE] Message queued after all-models-failed")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
 
     return result, "⚠️ All models failed"
 

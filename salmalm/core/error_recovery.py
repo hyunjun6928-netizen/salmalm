@@ -225,8 +225,8 @@ async def retry_with_recovery(
                 if on_retry:
                     try:
                         on_retry(attempt, delay, e)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        log.debug(f"Suppressed: {e}")
                 await _async_sleep(delay)
             else:
                 log.error(f"[RETRY] {provider} all {max_retries} retries exhausted: {e}")

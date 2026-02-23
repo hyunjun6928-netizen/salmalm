@@ -72,20 +72,20 @@ def _get_db() -> sqlite3.Connection:
         )""")
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         try:
             conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
@@ -117,16 +117,16 @@ def _init_audit_db():
     )""")
     try:
         conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     try:
         conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     try:
         conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL,
@@ -321,8 +321,8 @@ def close_all_db_connections() -> None:
         for conn in _all_db_connections:
             try:
                 conn.close()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
         _all_db_connections.clear()
     log.info("[DB] All database connections closed")
 
@@ -468,8 +468,8 @@ def track_usage(model: str, input_tokens: int, output_tokens: int, user_id: Opti
             # Ensure user_id column exists
             try:
                 conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL")
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
             conn.execute(
                 "INSERT INTO usage_stats (ts, model, input_tokens, output_tokens, cost, user_id) VALUES (?,?,?,?,?,?)",
                 (
@@ -698,8 +698,8 @@ def compact_messages(
     if on_status:
         try:
             on_status("compacting", "✨ Compacting context...")
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
 
     log.info(f"[PKG] Compacting {len(messages)} messages ({total_chars} chars)")
 
@@ -1250,8 +1250,8 @@ class LLMCronManager:
                                     if dbot and hasattr(dbot, "send_message"):
                                         dbot.send_message(channel_id, notify_text)
                                         notified = True
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    log.debug(f"Suppressed: {e}")
                     except Exception as e:
                         log.warning(f"[CRON] Notification routing failed for {job['name']}: {e}")
                 elif notify_cfg:
@@ -1296,8 +1296,8 @@ class LLMCronManager:
                 try:
                     if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
                         _tg_bot.send_message(_tg_bot.owner_id, error_text)
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.debug(f"Suppressed: {e}")
 
                 # Auto-disable after 5 consecutive failures
                 if job.get("error_count", 0) >= 5:
@@ -1359,8 +1359,8 @@ class Session:
             # Ensure user_id column exists
             try:
                 conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
             conn.execute(
                 "INSERT OR REPLACE INTO session_store (session_id, messages, updated_at, user_id) VALUES (?,?,?,?)",
                 (
@@ -1396,8 +1396,8 @@ class Session:
         # Auto-save to disk after final response (debounced — not on tool calls)
         try:
             save_session_to_disk(self.id)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
 
     def add_tool_results(self, results: list) -> None:
         """Add tool results as a single user message with all results.
@@ -1448,8 +1448,8 @@ def _cleanup_sessions():
         for sid in stale:
             try:
                 _sessions[sid]._persist()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
             del _sessions[sid]
         if stale:
             log.info(f"[CLEAN] Session cleanup: removed {len(stale)} inactive sessions")
@@ -1515,8 +1515,8 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                     if dm and dm != "auto":
                         _sessions[session_id]._default_model = dm
                         _sessions[session_id].model_override = dm
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
 
             log.info(
                 f"[NOTE] New session: {session_id} (system prompt: {len(_sessions[session_id].messages[0]['content'])} chars)"
@@ -1580,8 +1580,8 @@ def rollback_session(session_id: str, count: int) -> dict:
     session._persist()
     try:
         save_session_to_disk(session_id)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     audit_log("session_rollback", f"{session_id}: removed {pairs_removed} pairs")
     return {"ok": True, "removed": pairs_removed}
 
@@ -1612,12 +1612,12 @@ def branch_session(session_id: str, message_index: int) -> dict:
     conn = _get_db()
     try:
         conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     try:
         conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     conn.execute(
         "UPDATE session_store SET parent_session_id=?, branch_index=? WHERE session_id=?",
         (session_id, message_index, new_id),
@@ -1626,8 +1626,8 @@ def branch_session(session_id: str, message_index: int) -> dict:
 
     try:
         save_session_to_disk(new_id)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     audit_log("session_branch", f"{session_id} -> {new_id} at index {message_index}")
     return {"ok": True, "new_session_id": new_id, "parent_session_id": session_id}
 
@@ -1774,8 +1774,8 @@ class HeartbeatManager:
         try:
             if cls._STATE_FILE.exists():
                 return json.loads(cls._STATE_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         return {"lastChecks": {}, "history": [], "totalBeats": 0}
 
     @classmethod
@@ -1795,8 +1795,8 @@ class HeartbeatManager:
                 content = cls._HEARTBEAT_FILE.read_text(encoding="utf-8", errors="replace")
                 if content.strip():
                     return content
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
         return ""
 
     @classmethod
@@ -2070,8 +2070,8 @@ def auto_title_session(session_id: str, first_message: str) -> None:
         try:
             conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
             conn.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         conn.execute(
             'UPDATE session_store SET title=? WHERE session_id=? AND (title IS NULL OR title="")',
             (title, session_id),
@@ -2124,8 +2124,8 @@ def edit_message(session_id: str, message_index: int, new_content: str) -> dict:
     session._persist()
     try:
         save_session_to_disk(session_id)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     audit_log(
         "message_edit",
         f"{session_id}: edited index {message_index}, removed {removed_count} subsequent",
@@ -2169,8 +2169,8 @@ def delete_message(session_id: str, message_index: int) -> dict:
     session._persist()
     try:
         save_session_to_disk(session_id)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     audit_log(
         "message_delete",
         f"{session_id}: deleted {len(indices_to_remove)} messages at index {message_index}",

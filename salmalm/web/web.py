@@ -366,8 +366,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     _auto_pw = ""
                 if vault.unlock(_auto_pw, save_to_keychain=True):
                     return True
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         pw = os.environ.get("SALMALM_VAULT_PW", "")
         if pw:
             import warnings
@@ -387,8 +387,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                     vault._password = ""
                     vault._salt = b"\x00" * 16
                     return True
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
             # 2. Try env password (deprecated), then empty password
             try:
                 if pw and vault.unlock(pw, save_to_keychain=True):
@@ -471,8 +471,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
 
         try:
             _ensure_modules()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         # Session info
         sess = get_session("web")
         sess_msgs = len(sess.messages) if sess else 0
@@ -647,8 +647,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
                 _cur = _override
             elif _override == "auto":
                 _cur = "auto"
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         self._json(
             {
                 "providers": providers,
@@ -1251,8 +1251,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             _ensure_modules()
             for name in sorted(_HANDLERS.keys()):
                 tools.append({"name": name, "description": ""})
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         if not tools:
             # Fallback: list all known tools from INTENT_TOOLS
             try:
@@ -1510,8 +1510,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             )
             cost_timeline = [{"hour": r[0], "count": r[1]} for r in cur.fetchall()]
             _conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         self._json(
             {
                 "sessions": sessions_info,
@@ -2553,8 +2553,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
                     _pw_hint_file.write_text(base64.b64encode(_vault_pw.encode()).decode(), encoding="utf-8")
                 _pw_hint_file.chmod(0o600)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
             audit_log("setup", f"vault created {'with' if use_pw else 'without'} password")
         except RuntimeError:
             # cryptography not installed and fallback not enabled —
@@ -2568,8 +2568,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             try:
                 VAULT_FILE.parent.mkdir(parents=True, exist_ok=True)  # noqa: F405
                 VAULT_FILE.write_bytes(b'{"no_crypto": true}')  # noqa: F405
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
         self._json({"ok": True})
         return
 
@@ -2659,8 +2659,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     asyncio.ensure_future(ws_server.broadcast({"type": "update_status", "status": "installing"}))
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
             result = subprocess.run(
                 [
                     sys.executable,
@@ -3026,8 +3026,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 (sid, "[]", "New Chat"),
             )
             conn.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         self._json({"ok": True, "session_id": sid})
 
     def _post_api_sessions_import(self):
@@ -3313,8 +3313,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     payload = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
                     self.wfile.write(payload.encode())
                     self.wfile.flush()
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.debug(f"Suppressed: {e}")
 
             send_sse("status", {"text": "🤔 Thinking..."})
             tool_count = [0]
@@ -3342,8 +3342,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                         send_sse("tool", {"name": event.get("name", ""), "count": tool_count[0]})
                     elif etype == "error":
                         send_sse("error", {"text": event.get("error", "")})
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.debug(f"Suppressed: {e}")
 
             try:
                 loop = asyncio.new_event_loop()
@@ -3377,8 +3377,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
                 for cmd in pop_pending_commands():
                     send_sse("ui_cmd", cmd)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
             send_sse(
                 "done",
                 {
@@ -3390,8 +3390,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             try:
                 self.wfile.write(b"event: close\ndata: {}\n\n")
                 self.wfile.flush()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
         else:
             try:
                 loop = asyncio.new_event_loop()
@@ -3445,8 +3445,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 
             _s = _gs_switch(sid)
             _s.model_override = None if model == "auto" else model
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         # Return the effective model (session override takes precedence)
         _effective = model if model else llm_router.current_model
         self._json({"ok": "✅" in msg, "message": msg, "current_model": _effective})
@@ -3885,8 +3885,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                     vault.create("", save_to_keychain=False)
                 else:
                     vault.unlock("")
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
             if not vault.is_unlocked:
                 self._json({"error": "Vault locked"}, 403)
                 return
@@ -4027,8 +4027,8 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 os.makedirs(os.path.dirname(soul_path), exist_ok=True)
                 with open(soul_path, "w", encoding="utf-8") as f:
                     f.write(template)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         audit_log("onboarding", f"preferences: model={model}, persona={persona}")
         self._json({"ok": True})
         return

@@ -17,8 +17,9 @@
     var _rUri=document.querySelector('.google-redirect-uri');if(_rUri)_rUri.textContent=location.origin+'/api/google/callback';
     /* Load personas */
     if(window.loadPersonas)window.loadPersonas();
-    /* Auto-run doctor */
+    /* Auto-run doctor + usage chart */
     if(window._loadDoctor)window._loadDoctor();
+    if(window._loadUsageChart)window._loadUsageChart();
     /* Load users panel */
     if(window.loadUsers)window.loadUsers();
     /* Load routing config */

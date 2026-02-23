@@ -4,7 +4,11 @@ import textwrap
 from datetime import datetime
 
 from salmalm.constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, MEMORY_DIR, BASE_DIR, VERSION, KST, DATA_DIR
+import logging
+log = logging.getLogger(__name__)
 from salmalm.core import SkillLoader
+import logging
+log = logging.getLogger(__name__)
 from typing import Optional
 
 # User-customizable SOUL.md (takes priority over project SOUL.md)
@@ -95,8 +99,8 @@ def get_user_soul() -> str:
     try:
         if USER_SOUL_FILE.exists():
             return USER_SOUL_FILE.read_text(encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     return ""
 
 
@@ -111,8 +115,8 @@ def reset_user_soul() -> None:
     try:
         if USER_SOUL_FILE.exists():
             USER_SOUL_FILE.unlink()
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
 
 
 # ── Token optimization constants ──
@@ -165,8 +169,8 @@ def build_system_prompt(full: bool = True, mode: str = "full") -> str:
             from salmalm.features.edge_cases import substitute_prompt_variables
 
             result = substitute_prompt_variables(result)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
         return result
 
     # ── STATIC BLOCK (cacheable — rarely changes) ──
@@ -271,7 +275,7 @@ def build_system_prompt(full: bool = True, mode: str = "full") -> str:
         from salmalm.features.edge_cases import substitute_prompt_variables
 
         result = substitute_prompt_variables(result)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
 
     return result

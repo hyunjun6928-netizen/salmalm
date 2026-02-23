@@ -11,6 +11,8 @@ import re
 from typing import Tuple
 
 from salmalm.constants import MODELS as _MODELS, DATA_DIR
+import logging
+log = logging.getLogger(__name__)
 # ── Complexity keywords ──
 _SIMPLE_PATTERNS = re.compile(
     r"^(안녕|hi|hello|hey|ㅎㅇ|ㅎㅎ|ㄱㅅ|고마워|감사|ㅋㅋ|ㅎㅎ|ok|lol|yes|no|네|아니|응|ㅇㅇ|뭐해|잘자|굿|bye|잘가|좋아|ㅠㅠ|ㅜㅜ|오|와|대박|진짜|뭐|어|음|흠|뭐야|왜|어떻게|언제|어디|누구|얼마)[\?!？！.\s]*$",
@@ -52,6 +54,8 @@ _COMPLEX_KEYWORDS = [
 
 # ── Model name corrections (from constants — single source of truth) ──
 from salmalm.constants import MODEL_NAME_FIXES as _MODEL_NAME_FIXES
+import logging
+log = logging.getLogger(__name__)
 
 # ── Routing config ──
 _ROUTING_CONFIG_FILE = DATA_DIR / "routing.json"
@@ -71,8 +75,8 @@ def load_routing_config() -> dict:
             for k in ("simple", "moderate", "complex"):
                 if k in cfg and cfg[k]:
                     defaults[k] = cfg[k]
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     return defaults
 
 
@@ -81,8 +85,8 @@ def save_routing_config(config: dict) -> None:
     try:
         _ROUTING_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
         _ROUTING_CONFIG_FILE.write_text(json.dumps(config, indent=2), encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
 
 
 # ── Cost-per-1M-token table (input/output) for auto-optimization ──
@@ -226,8 +230,8 @@ def select_model(message: str, session) -> Tuple[str, str]:
                 key_name = _prov_keys.get(prov)
                 if key_name and not vault.get(key_name):
                     rc[k] = ""  # Force fallback to default
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
     for k in ("simple", "moderate", "complex"):
         if not rc[k]:
             rc[k] = _tier_defaults.get(k, _MODELS.get("sonnet", ""))

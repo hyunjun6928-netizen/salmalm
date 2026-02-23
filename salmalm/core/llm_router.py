@@ -150,8 +150,8 @@ def get_api_key(provider: str) -> Optional[str]:
                 key = vault.get(vault_name)
                 if not key and prov_cfg.get("alt_env_key"):
                     key = vault.get(prov_cfg["alt_env_key"].lower())
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
     return key
 
 
