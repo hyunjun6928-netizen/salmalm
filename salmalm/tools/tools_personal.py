@@ -12,9 +12,8 @@ import time
 import secrets
 import urllib.request
 from datetime import datetime, timedelta
-from pathlib import Path
 from salmalm.tools.tool_registry import register
-from salmalm.constants import KST, BASE_DIR
+from salmalm.constants import KST, BASE_DIR, DATA_DIR
 from salmalm.security.crypto import log
 from salmalm.utils.db import connect as _connect_db
 
@@ -536,7 +535,7 @@ _DEFAULT_ROUTINES = {
 
 
 def _load_routines() -> dict:
-    config_path = Path.home() / ".salmalm" / "routines.json"
+    config_path = DATA_DIR / "routines.json"
     if config_path.exists():
         try:
             return json.loads(config_path.read_text(encoding="utf-8"))

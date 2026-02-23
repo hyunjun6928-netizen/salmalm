@@ -21,9 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 from urllib.parse import urlparse
 
-from salmalm.constants import VERSION, KST
-
-
+from salmalm.constants import VERSION, KST, DATA_DIR
 # ── Sensitive Data Redaction ─────────────────────────────────
 
 REDACT_PATTERNS = [
@@ -42,7 +40,7 @@ _COMPILED_PATTERNS = [re.compile(p) for p in REDACT_PATTERNS]
 
 def _load_redact_config() -> dict:
     """Load redaction config from ~/.salmalm/security.json."""
-    config_path = Path.home() / ".salmalm" / "security.json"
+    config_path = DATA_DIR / "security.json"
     defaults = {"redactEnabled": True, "customPatterns": []}
     try:
         if config_path.exists():

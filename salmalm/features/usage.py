@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, List
 
-from salmalm.constants import KST
+from salmalm.constants import KST, DATA_DIR
 from salmalm.security.crypto import log
 
 
@@ -14,7 +13,7 @@ class UsageTracker:
     """Per-user, per-model token usage tracking with daily/monthly reports."""
 
     def __init__(self):
-        self._db_path = Path.home() / ".salmalm" / "salmalm.db"
+        self._db_path = DATA_DIR / "salmalm.db"
 
     def _get_db(self):
         from salmalm.core import _get_db

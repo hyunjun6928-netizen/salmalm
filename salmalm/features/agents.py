@@ -12,7 +12,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from salmalm.constants import WORKSPACE_DIR, BASE_DIR, KST
+from salmalm.constants import WORKSPACE_DIR, BASE_DIR, KST, DATA_DIR
 from salmalm.security.crypto import log
 
 # Auto-archive delay (seconds after completion)
@@ -29,7 +29,7 @@ def _core():
 def _load_tool_policy() -> dict:
     """Load subagent tool policy from config file."""
     policy_file = Path(__file__).resolve().parent.parent / "subagent_tool_policy.json"
-    user_policy = Path.home() / ".salmalm" / "subagent_tool_policy.json"
+    user_policy = DATA_DIR / "subagent_tool_policy.json"
     # User override takes priority
     for f in (user_policy, policy_file):
         if f.exists():
@@ -754,7 +754,7 @@ def execute(name: str, args: dict) -> str:
 # Multi-Agent Routing (다중 에이전트 라우팅)
 # ============================================================
 
-AGENTS_DIR = Path.home() / ".salmalm" / "agents"
+AGENTS_DIR = DATA_DIR / "agents"
 BINDINGS_FILE = AGENTS_DIR / "bindings.json"
 
 

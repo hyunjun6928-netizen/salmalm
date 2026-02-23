@@ -12,8 +12,9 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
 from salmalm import log
+from salmalm.constants import DATA_DIR
 
-_WATCHER_CONFIG = Path.home() / ".salmalm" / "watcher.json"
+_WATCHER_CONFIG = DATA_DIR / "watcher.json"
 
 DEFAULT_EXTENSIONS = {".md", ".txt", ".py", ".json", ".yaml", ".yml"}
 DEFAULT_EXCLUDE = {"node_modules", ".git", "__pycache__", ".venv", "venv"}
@@ -23,7 +24,7 @@ from salmalm.config_manager import ConfigManager
 
 _WATCHER_DEFAULTS = {
     "enabled": True,
-    "paths": [str(Path.home() / ".salmalm")],
+    "paths": [str(DATA_DIR)],
     "extensions": list(DEFAULT_EXTENSIONS),
     "interval": 5,
     "debounceMs": 2000,

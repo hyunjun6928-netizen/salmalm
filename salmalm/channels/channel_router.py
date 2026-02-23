@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from salmalm import log
+from salmalm.constants import DATA_DIR
 
 # ── Channel format rules ──
 CHANNEL_FORMAT: Dict[str, Dict[str, Any]] = {
@@ -17,7 +17,7 @@ CHANNEL_FORMAT: Dict[str, Dict[str, Any]] = {
     "webhook": {"max_chars": 65536, "markdown": "full"},
 }
 
-CONFIG_DIR = Path.home() / ".salmalm"
+CONFIG_DIR = DATA_DIR
 CONFIG_FILE = CONFIG_DIR / "channels.json"
 
 

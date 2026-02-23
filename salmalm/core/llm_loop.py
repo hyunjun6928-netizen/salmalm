@@ -9,7 +9,7 @@ import asyncio
 import json
 import threading as _threading
 import time as _time
-from pathlib import Path as _Path
+from salmalm.constants import DATA_DIR as _DATA_DIR
 from typing import Any, Dict, Optional, Tuple
 
 from salmalm.security.crypto import log
@@ -22,8 +22,8 @@ from salmalm.core.llm import (
 # ============================================================
 # Model Failover — exponential backoff cooldown + fallback chain
 # ============================================================
-_FAILOVER_CONFIG_FILE = _Path.home() / ".salmalm" / "failover.json"
-_COOLDOWN_FILE = _Path.home() / ".salmalm" / "cooldowns.json"
+_FAILOVER_CONFIG_FILE = _DATA_DIR / "failover.json"
+_COOLDOWN_FILE = _DATA_DIR / "cooldowns.json"
 _cooldown_lock = _threading.Lock()
 
 # Default fallback chains (no config needed)

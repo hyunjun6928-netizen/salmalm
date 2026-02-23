@@ -17,10 +17,11 @@ import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
+from salmalm.constants import DATA_DIR
 
 log = logging.getLogger(__name__)
 
-_CONFIG_DIR = Path.home() / ".salmalm"
+_CONFIG_DIR = DATA_DIR
 _HISTORY_DIR = _CONFIG_DIR / "screen_history"
 _SCREEN_CONFIG_PATH = _CONFIG_DIR / "screen_config.json"
 

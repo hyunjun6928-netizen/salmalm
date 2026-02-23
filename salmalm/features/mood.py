@@ -6,12 +6,10 @@ import json
 import re
 from collections import Counter
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from salmalm.constants import KST
-
-MOOD_DIR = Path.home() / ".salmalm"
+from salmalm.constants import KST, DATA_DIR
+MOOD_DIR = DATA_DIR
 MOOD_CONFIG_FILE = MOOD_DIR / "mood.json"
 MOOD_HISTORY_FILE = MOOD_DIR / "mood_history.json"
 

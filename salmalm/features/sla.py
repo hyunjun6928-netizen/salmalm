@@ -19,14 +19,13 @@ import threading
 import time
 from collections import deque
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any, Dict, Optional
 
-from salmalm.constants import VERSION, KST, AUDIT_DB
+from salmalm.constants import VERSION, KST, AUDIT_DB, DATA_DIR
 from salmalm.security.crypto import log
 
 # ── Paths ────────────────────────────────────────────────────
-_SALMALM_DIR = Path.home() / ".salmalm"
+_SALMALM_DIR = DATA_DIR
 _RUNNING_FILE = _SALMALM_DIR / ".running"
 _SLA_CONFIG_FILE = _SALMALM_DIR / "sla.json"
 

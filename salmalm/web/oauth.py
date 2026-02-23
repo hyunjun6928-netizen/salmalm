@@ -15,14 +15,14 @@ import os
 import secrets
 import time
 import urllib.parse
-from pathlib import Path
 from typing import Dict, Optional
 
 from salmalm.utils.http import request as _http_request
+from salmalm.constants import DATA_DIR
 
 log = logging.getLogger(__name__)
 
-_CONFIG_DIR = Path.home() / ".salmalm"
+_CONFIG_DIR = DATA_DIR
 _TOKENS_PATH = _CONFIG_DIR / "oauth_tokens.json"
 _secret = os.environ.get("SALMALM_SECRET", "")
 if not _secret:

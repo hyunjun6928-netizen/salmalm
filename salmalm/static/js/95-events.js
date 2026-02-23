@@ -110,10 +110,10 @@
     else if(a==='attachFile'){document.getElementById('file-input-hidden').click()}
     else if(a==='switchModel'){
       var model=el.getAttribute('data-model');
-      el.style.opacity='0.5';
-      fetch('/api/model/switch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({model:model})})
-      .then(function(r){return r.json()}).then(function(res){if(res.ok)window._loadModelRouter();else alert(res.message||'Failed')})
-      .catch(function(){el.style.opacity='1'});
+      if(typeof window.setModel==='function'){
+        window.setModel(model);
+        setTimeout(function(){if(typeof window._loadModelRouter==='function')window._loadModelRouter()},300);
+      }
     }
     else if(a==='toggleFeatCat'){el.parentElement.classList.toggle('open')}
     else if(a==='fillCommand'){var inp=document.getElementById('input');inp.value=el.getAttribute('data-cmd');inp.focus()}

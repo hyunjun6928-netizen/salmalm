@@ -8,14 +8,13 @@ import json
 import sqlite3
 import threading
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Dict, Optional
 
-from salmalm.constants import BASE_DIR, KST
+from salmalm.constants import BASE_DIR, KST, DATA_DIR
 from salmalm.utils.db import connect as _connect_db
 
 _DB_PATH = BASE_DIR / "personal.db"
-_DIGEST_PATH = Path.home() / ".salmalm" / "digest.json"
+_DIGEST_PATH = DATA_DIR / "digest.json"
 _db_lock = threading.Lock()
 
 
@@ -98,7 +97,7 @@ class LifeDashboard:
 
     def _get_routine_stats(self) -> dict:
         try:
-            config_path = Path.home() / ".salmalm" / "routines.json"
+            config_path = DATA_DIR / "routines.json"
             if not config_path.exists():
                 return {"routines": [], "completion_rate": 0}
             with open(config_path) as f:

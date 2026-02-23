@@ -12,7 +12,6 @@ import threading
 import time
 from collections import OrderedDict
 from datetime import datetime
-from pathlib import Path
 from typing import Callable, Optional
 
 from salmalm.constants import (
@@ -1633,7 +1632,7 @@ def branch_session(session_id: str, message_index: int) -> dict:
     return {"ok": True, "new_session_id": new_id, "parent_session_id": session_id}
 
 
-_SESSIONS_DIR = Path.home() / ".salmalm" / "sessions"
+_SESSIONS_DIR = DATA_DIR / "sessions"
 
 
 def save_session_to_disk(session_id: str) -> None:

@@ -6,12 +6,12 @@ import json
 import re
 import time
 from collections import Counter
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from salmalm.security.crypto import log
+from salmalm.constants import DATA_DIR
 
-_PROFILE_DIR = Path.home() / ".salmalm"
+_PROFILE_DIR = DATA_DIR
 _PROFILE_PATH = _PROFILE_DIR / "shadow_profile.json"
 
 # Patterns for speech style detection

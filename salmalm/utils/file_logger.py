@@ -9,6 +9,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Optional
+from salmalm.constants import DATA_DIR
 
 KST = timezone(timedelta(hours=9))
 
@@ -16,7 +17,7 @@ KST = timezone(timedelta(hours=9))
 class FileLogger:
     """JSON Lines 파일 로거."""
 
-    LOG_DIR = Path.home() / ".salmalm" / "logs"
+    LOG_DIR = DATA_DIR / "logs"
 
     def __init__(self, log_dir: Optional[Path] = None):
         if log_dir is not None:

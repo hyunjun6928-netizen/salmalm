@@ -6,7 +6,6 @@ import hashlib
 import hmac
 import io
 import json
-import os
 import secrets
 import shutil
 import sqlite3
@@ -15,9 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from salmalm.constants import KST
-
-VAULT_CHAT_DIR = Path(os.path.expanduser("~/.salmalm"))
+from salmalm.constants import KST, DATA_DIR
+VAULT_CHAT_DIR = DATA_DIR
 VAULT_CHAT_DB = VAULT_CHAT_DIR / "vault_chat.db"
 VAULT_CHAT_META = VAULT_CHAT_DIR / "vault_chat_meta.json"
 PBKDF2_ITERATIONS = 600_000

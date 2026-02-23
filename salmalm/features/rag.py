@@ -32,7 +32,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from salmalm.constants import MEMORY_DIR, WORKSPACE_DIR, MEMORY_FILE, BASE_DIR
+from salmalm.constants import MEMORY_DIR, WORKSPACE_DIR, MEMORY_FILE, BASE_DIR, DATA_DIR
 from salmalm.security.crypto import log
 
 # ── BM25 Parameters ──
@@ -297,7 +297,7 @@ _DEFAULT_CONFIG = {
 
 def load_rag_config(config_path: Optional[Path] = None) -> dict:
     """Load rag.json config, falling back to defaults."""
-    path = config_path or Path.home() / ".salmalm" / "rag.json"
+    path = config_path or DATA_DIR / "rag.json"
     config = dict(_DEFAULT_CONFIG)
     if path.exists():
         try:
@@ -595,7 +595,7 @@ class RAGEngine:
         if not si.get("enabled", False):
             return []
 
-        sessions_dir = Path.home() / ".salmalm" / "sessions"
+        sessions_dir = DATA_DIR / "sessions"
         if not sessions_dir.exists():
             return []
 

@@ -12,8 +12,8 @@ import random
 import re
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable, Dict, List, Literal, Optional, Tuple
+from salmalm.constants import DATA_DIR
 
 # ── Channel presets ──────────────────────────────────────────
 
@@ -77,7 +77,7 @@ class ChunkerConfig:
 def load_config_from_file(path: Optional[str] = None) -> ChunkerConfig:
     """Load streaming config from ~/.salmalm/streaming.json if it exists."""
     if path is None:
-        path = str(Path.home() / ".salmalm" / "streaming.json")
+        path = str(DATA_DIR / "streaming.json")
     try:
         with open(path) as f:
             data = json.load(f)

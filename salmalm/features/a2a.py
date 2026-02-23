@@ -10,12 +10,12 @@ import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from salmalm.security.crypto import log
+from salmalm.constants import DATA_DIR
 
-_DATA_DIR = Path.home() / ".salmalm"
+_DATA_DIR = DATA_DIR
 _PEERS_PATH = _DATA_DIR / "a2a_peers.json"
 _INBOX_PATH = _DATA_DIR / "a2a_inbox.json"
 

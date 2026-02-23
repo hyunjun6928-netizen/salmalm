@@ -9,12 +9,12 @@ import json
 import os
 import urllib.request
 import urllib.error
-from pathlib import Path
 from typing import Optional
 
 from salmalm import log
+from salmalm.constants import DATA_DIR
 
-_STT_CONFIG_PATH = Path.home() / ".salmalm" / "stt.json"
+_STT_CONFIG_PATH = DATA_DIR / "stt.json"
 
 
 from salmalm.config_manager import ConfigManager

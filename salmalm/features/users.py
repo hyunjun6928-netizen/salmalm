@@ -23,11 +23,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from salmalm.constants import BASE_DIR, KST
+from salmalm.constants import BASE_DIR, KST, DATA_DIR
 from salmalm.security.crypto import log
 
 USERS_DB = BASE_DIR / "auth.db"  # Reuse auth.db for user tables
-_USERS_DIR = Path.home() / ".salmalm" / "users"
+_USERS_DIR = DATA_DIR / "users"
 
 
 class QuotaExceeded(Exception):

@@ -8,12 +8,12 @@ from __future__ import annotations
 import json
 import threading
 import time
-from pathlib import Path
 from typing import Optional
 
 from salmalm.security.crypto import log
+from salmalm.constants import DATA_DIR
 
-_CACHE_CONFIG_FILE = Path.home() / ".salmalm" / "cache.json"
+_CACHE_CONFIG_FILE = DATA_DIR / "cache.json"
 
 _DEFAULT_CONFIG = {
     "promptCaching": True,
@@ -159,7 +159,7 @@ class HeartbeatManager:
     하트비트 관리자 — 활성 시간대 지원.
     """
 
-    _CONFIG_FILE = Path.home() / ".salmalm" / "heartbeat.json"
+    _CONFIG_FILE = DATA_DIR / "heartbeat.json"
     _DEFAULT_CONFIG = {
         "enabled": True,
         "interval_minutes": 30,

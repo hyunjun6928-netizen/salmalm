@@ -21,7 +21,7 @@ from salmalm.security.crypto import log
 from salmalm.constants import DATA_DIR
 
 PLUGINS_DIR = DATA_DIR / "plugins"
-PLUGINS_STATE_FILE = Path.home() / ".salmalm" / "plugins.json"
+PLUGINS_STATE_FILE = DATA_DIR / "plugins.json"
 
 
 class PluginInfo:

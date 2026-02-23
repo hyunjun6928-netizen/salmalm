@@ -12,14 +12,13 @@ import json
 import zipfile
 from datetime import datetime
 from io import BytesIO
-from pathlib import Path
 from typing import Any, Dict, List
 
-from salmalm.constants import VERSION, BASE_DIR, MEMORY_DIR, VAULT_FILE, KST
+from salmalm.constants import VERSION, BASE_DIR, MEMORY_DIR, VAULT_FILE, KST, DATA_DIR
 from salmalm.security.crypto import log
 
 # ── Paths ──────────────────────────────────────────────────────
-_HOME_DIR = Path.home() / ".salmalm"
+_HOME_DIR = DATA_DIR
 _PERSONAS_DIR = _HOME_DIR / "personas"
 _MEMORY_HOME = _HOME_DIR / "memory"
 _SESSIONS_DIR = _HOME_DIR / "sessions"

@@ -14,10 +14,11 @@ import time
 from datetime import timezone, timedelta
 from pathlib import Path
 from typing import List
+from salmalm.constants import DATA_DIR
 
 KST = timezone(timedelta(hours=9))
 
-_SALMALM_DIR = Path.home() / ".salmalm"
+_SALMALM_DIR = DATA_DIR
 
 
 def _status(ok: bool, msg: str, fixable: bool = False, issue_id: str = "") -> dict:
@@ -62,7 +63,7 @@ class Doctor:
     def check_config_integrity(self) -> dict:
         """설정 파일 존재/유효성/권한 검사."""
         if not _SALMALM_DIR.exists():
-            return _status(False, "~/.salmalm directory missing", fixable=True, issue_id="missing_dir")
+            return _status(False, "Data directory missing", fixable=True, issue_id="missing_dir")
         config_files = list(_SALMALM_DIR.glob("*.json"))
         bad = []
         for cf in config_files:

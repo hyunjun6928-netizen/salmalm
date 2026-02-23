@@ -9,12 +9,10 @@ import json
 import re
 import threading
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from salmalm.constants import KST
-
-WORKFLOWS_DIR = Path.home() / ".salmalm" / "workflows"
+from salmalm.constants import KST, DATA_DIR
+WORKFLOWS_DIR = DATA_DIR / "workflows"
 WORKFLOW_LOG_DIR = WORKFLOWS_DIR / "logs"
 
 

@@ -8,11 +8,9 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 from typing import Tuple
 
-from salmalm.constants import MODELS as _MODELS
-
+from salmalm.constants import MODELS as _MODELS, DATA_DIR
 # ── Complexity keywords ──
 _SIMPLE_PATTERNS = re.compile(
     r"^(안녕|hi|hello|hey|ㅎㅇ|ㅎㅎ|ㄱㅅ|고마워|감사|ㅋㅋ|ㅎㅎ|ok|lol|yes|no|네|아니|응|ㅇㅇ|뭐해|잘자|굿|bye|잘가|좋아|ㅠㅠ|ㅜㅜ|오|와|대박|진짜|뭐|어|음|흠|뭐야|왜|어떻게|언제|어디|누구|얼마)[\?!？！.\s]*$",
@@ -56,7 +54,7 @@ _COMPLEX_KEYWORDS = [
 from salmalm.constants import MODEL_NAME_FIXES as _MODEL_NAME_FIXES
 
 # ── Routing config ──
-_ROUTING_CONFIG_FILE = Path.home() / ".salmalm" / "routing.json"
+_ROUTING_CONFIG_FILE = DATA_DIR / "routing.json"
 
 
 def fix_model_name(model: str) -> str:

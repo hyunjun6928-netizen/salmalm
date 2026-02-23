@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-import os
 import re
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from salmalm.constants import KST
-
-CAPSULE_DB = Path(os.path.expanduser("~/.salmalm/capsules.db"))
+from salmalm.constants import KST, DATA_DIR
+CAPSULE_DB = DATA_DIR / "capsules.db"
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS capsules (

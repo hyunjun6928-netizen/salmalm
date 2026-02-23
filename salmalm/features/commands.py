@@ -13,8 +13,8 @@ import re
 import subprocess
 import sys
 import time
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from salmalm.constants import DATA_DIR
 
 log = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ TELEGRAM_COMMANDS: List[Tuple[str, str]] = [
     ("brave", "Quick Brave web search"),
 ]
 
-_CONFIG_DIR = Path.home() / ".salmalm"
+_CONFIG_DIR = DATA_DIR
 _CONFIG_PATH = _CONFIG_DIR / "config.json"
 
 
@@ -302,7 +302,6 @@ class CommandRouter:
     @staticmethod
     def _cmd_setup(cmd, session, **_):
         from salmalm.constants import PORT
-
         return f"🔧 Setup Wizard: Open http://localhost:{PORT}/setup in your browser to re-run the setup wizard."
 
     @staticmethod

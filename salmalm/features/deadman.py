@@ -10,9 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from salmalm.constants import KST
-
-DEADMAN_DIR = Path(os.path.expanduser("~/.salmalm"))
+from salmalm.constants import KST, DATA_DIR
+DEADMAN_DIR = DATA_DIR
 DEADMAN_CONFIG = DEADMAN_DIR / "deadman.json"
 DEADMAN_STATE = DEADMAN_DIR / "deadman_state.json"
 
@@ -26,7 +25,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
             "target": "telegram:CHAT_ID",
             "content": "긴급: {user_name}이(가) {days}일간 응답이 없습니다.",
         },
-        {"type": "backup", "destination": "~/.salmalm/backup/deadman/"},
+        {"type": "backup", "destination": str(DATA_DIR / "backup" / "deadman") + "/"},
         {"type": "email", "to": "emergency@example.com", "subject": "Dead Man's Switch Activated"},
     ],
     "warningHours": 24,
@@ -220,7 +219,7 @@ class DeadManSwitch:
             # In real implementation, dispatch to channel router
             return {"type": "message", "target": target, "content": content, "sent": True}
         elif atype == "backup":
-            dest = os.path.expanduser(action.get("destination", "~/.salmalm/backup/deadman/"))
+            dest = os.path.expanduser(action.get("destination", str(DATA_DIR / "backup" / "deadman") + "/"))
             if dry_run:
                 return {"type": "backup", "destination": dest, "dry_run": True}
             return self._run_backup(dest)
@@ -246,7 +245,7 @@ class DeadManSwitch:
     def _run_backup(self, dest: str) -> Dict[str, Any]:
         dest_path = Path(dest)
         dest_path.mkdir(parents=True, exist_ok=True)
-        src = Path(os.path.expanduser("~/.salmalm"))
+        src = DATA_DIR
         count = 0
         for f in src.glob("*.json"):
             shutil.copy2(f, dest_path / f.name)

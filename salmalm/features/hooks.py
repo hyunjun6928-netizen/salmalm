@@ -14,12 +14,12 @@ import json
 import os
 import subprocess
 import threading
-from pathlib import Path
 from typing import Dict, List, Optional
 
 from salmalm.security.crypto import log
+from salmalm.constants import DATA_DIR
 
-HOOKS_FILE = Path.home() / ".salmalm" / "hooks.json"
+HOOKS_FILE = DATA_DIR / "hooks.json"
 
 # Valid event names
 VALID_EVENTS = (

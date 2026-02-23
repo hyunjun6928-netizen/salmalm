@@ -16,10 +16,10 @@ import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 
 from salmalm.security.crypto import log
+from salmalm.constants import DATA_DIR
 
 # ── Enums ──
 
@@ -49,7 +49,7 @@ DEFAULT_CONFIG = {
     "byChannel": {},
 }
 
-CONFIG_PATH = Path.home() / ".salmalm" / "queue.json"
+CONFIG_PATH = DATA_DIR / "queue.json"
 
 
 def load_config() -> dict:

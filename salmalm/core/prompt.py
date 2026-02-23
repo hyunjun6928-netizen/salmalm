@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import textwrap
-from pathlib import Path
 from datetime import datetime
 
-from salmalm.constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, MEMORY_DIR, BASE_DIR, VERSION, KST
+from salmalm.constants import SOUL_FILE, AGENTS_FILE, MEMORY_FILE, USER_FILE, MEMORY_DIR, BASE_DIR, VERSION, KST, DATA_DIR
 from salmalm.core import SkillLoader
 from typing import Optional
 
 # User-customizable SOUL.md (takes priority over project SOUL.md)
-USER_SOUL_FILE = Path.home() / ".salmalm" / "SOUL.md"
+USER_SOUL_FILE = DATA_DIR / "SOUL.md"
 
 # ── Multi-Persona System ──
-PERSONAS_DIR = Path.home() / ".salmalm" / "personas"
+PERSONAS_DIR = DATA_DIR / "personas"
 
 _BUILTIN_PERSONAS = {
     "default": "# Default AI Assistant\nYou are a helpful, knowledgeable AI assistant.\nRespond clearly and concisely. Use appropriate formality based on context.\nYou can handle a wide range of tasks: coding, writing, analysis, research, and more.\nBe proactive in suggesting better approaches when you see them.\n",

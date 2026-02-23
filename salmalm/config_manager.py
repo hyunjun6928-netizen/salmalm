@@ -6,7 +6,7 @@
 
 import json
 import os
-from pathlib import Path
+from salmalm.constants import DATA_DIR
 
 
 # Runtime CLI overrides (populated by __main__ / entry points)
@@ -28,7 +28,7 @@ class ConfigManager:
       4. Caller-supplied *defaults* (typically from ``constants.py``)
     """
 
-    BASE_DIR = Path.home() / ".salmalm"
+    BASE_DIR = DATA_DIR
 
     @classmethod
     def load(cls, name: str, defaults: dict = None) -> dict:

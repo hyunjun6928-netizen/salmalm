@@ -4,10 +4,10 @@ import re
 import threading
 import time
 import os
-from pathlib import Path
 from salmalm.security.crypto import log
+from salmalm.constants import DATA_DIR
 
-_APPROVALS_FILE = Path.home() / ".salmalm" / "exec_approvals.json"
+_APPROVALS_FILE = DATA_DIR / "exec_approvals.json"
 _lock = threading.Lock()
 
 # Dangerous command patterns that require user approval

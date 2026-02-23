@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import json  # noqa: F401
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional, Tuple  # noqa: F401
 

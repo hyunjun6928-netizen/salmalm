@@ -2094,7 +2094,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
                 config_path = DATA_DIR / "config.json"
                 if config_path.exists():
                     zf.writestr("config.json", config_path.read_text(encoding="utf-8"))
-                routing_path = Path.home() / ".salmalm" / "routing.json"
+                routing_path = DATA_DIR / "routing.json"
                 if routing_path.exists():
                     zf.writestr("routing.json", routing_path.read_text(encoding="utf-8"))
                 # Sessions
@@ -2782,7 +2782,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             config_path = DATA_DIR / "config.json"
             if config_path.exists():
                 export_data["config"] = _json.loads(config_path.read_text(encoding="utf-8"))
-            routing_path = Path.home() / ".salmalm" / "routing.json"
+            routing_path = DATA_DIR / "routing.json"
             if routing_path.exists():
                 export_data["routing"] = _json.loads(routing_path.read_text(encoding="utf-8"))
             memory_dir = BASE_DIR / "memory"
