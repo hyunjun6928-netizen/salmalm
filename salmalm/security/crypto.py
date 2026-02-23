@@ -59,7 +59,7 @@ def _keychain_delete() -> bool:
 
 
 HAS_CRYPTO: bool = False
-_ALLOW_FALLBACK: bool = bool(os.environ.get("SALMALM_VAULT_FALLBACK"))
+_ALLOW_FALLBACK: bool = True  # Auto-fallback when cryptography is missing
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.primitives import hashes as crypto_hashes
@@ -68,17 +68,10 @@ try:
     HAS_CRYPTO = True
     log.info("[OK] cryptography available -- AES-256-GCM enabled")
 except ImportError:
-    if _ALLOW_FALLBACK:
-        log.warning(
-            "[WARN] cryptography not installed -- HMAC-CTR fallback enabled (SALMALM_VAULT_FALLBACK=1). "
-            "This is NOT a standard cipher; install 'cryptography' for AES-256-GCM."
-        )
-    else:
-        log.warning(
-            "[WARN] cryptography not installed -- vault DISABLED. "
-            "Use environment variables for API keys, or install 'cryptography' for encrypted vault. "
-            "Set SALMALM_VAULT_FALLBACK=1 to force HMAC-CTR fallback (not recommended for production)."
-        )
+    log.warning(
+        "[WARN] cryptography not installed -- HMAC-CTR fallback enabled automatically. "
+        "Install 'pip install salmalm[crypto]' for AES-256-GCM encryption."
+    )
 
 
 def _derive_key(password: str, salt: bytes, length: int = 32) -> bytes:
