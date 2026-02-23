@@ -36,7 +36,10 @@ _logging_initialized = False
 def init_logging() -> None:
     """Initialize file + console logging. Called once from entrypoint, not import."""
     global _logging_initialized
-    if _logging_initialized or log.handlers:
+    if _logging_initialized:
+        return
+    # NullHandler doesn't count as real logging setup
+    if log.handlers and not all(isinstance(h, logging.NullHandler) for h in log.handlers):
         return
     _logging_initialized = True
     try:
