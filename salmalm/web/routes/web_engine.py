@@ -157,7 +157,7 @@ class WebEngineMixin:
                 "reflection": os.environ.get("SALMALM_REFLECT", "0") == "1",
                 "compaction_threshold": COMPACTION_THRESHOLD,
                 "cost_cap": os.environ.get("SALMALM_COST_CAP", ""),
-                "max_tool_iterations": int(os.environ.get("SALMALM_MAX_TOOL_ITER", "15")),
+                "max_tool_iterations": int(os.environ.get("SALMALM_MAX_TOOL_ITER", "25")),
                 "cache_ttl": int(os.environ.get("SALMALM_CACHE_TTL", "3600")),
                 "batch_api": os.environ.get("SALMALM_BATCH_API", "0") == "1",
                 "file_presummary": os.environ.get("SALMALM_FILE_PRESUMMARY", "0") == "1",

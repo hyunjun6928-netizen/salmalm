@@ -11,8 +11,34 @@
     });
   }
 
+  /* On page load, check if there was a pending SSE request that got interrupted by refresh */
+  (function _checkPendingRecovery(){
+    var pending=localStorage.getItem('salm_sse_pending');
+    if(!pending)return;
+    localStorage.removeItem('salm_sse_pending');
+    var pd=JSON.parse(pending);
+    var sid=pd.session||'web';
+    var msgCount=pd.msgCount||0;
+    /* Poll /api/sessions/{id}/last to recover */
+    var polls=0;
+    function _rpoll(){
+      polls++;
+      fetch('/api/sessions/'+encodeURIComponent(sid)+'/last',{headers:{'X-Session-Token':_tok}})
+      .then(function(r){return r.json()}).then(function(d){
+        if(d.ok&&d.message&&d.msg_count>msgCount){
+          addMsg('assistant',d.message,'🔄 recovered after refresh');
+        }else if(polls<10){setTimeout(_rpoll,2000)}
+      }).catch(function(){if(polls<10)setTimeout(_rpoll,2000)});
+    }
+    /* Delay slightly to let session/chat load first */
+    setTimeout(_rpoll,1500);
+  })();
+
   async function _sendViaSse(chatBody,_sendStart){
     try{
+      /* Mark pending so page refresh can recover */
+      var _preMsgCount=chat.querySelectorAll('.msg-row').length;
+      localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',msgCount:_preMsgCount}));
       _currentAbort=new AbortController();
       var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify(chatBody),signal:_currentAbort.signal});
@@ -57,7 +83,10 @@
             else if(act==='add_cron'){fetch('/api/cron/add',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({name:edata.name||'ai-job',interval:edata.interval||3600,prompt:edata.prompt||''})}).then(function(){if(window._loadCron)window._loadCron()})}
           }else if(etype==='done'){
             gotDone=true;
+            localStorage.removeItem('salm_sse_pending');
             if(typingEl)typingEl.remove();
+            /* Auto-switch back to chat if user navigated away during generation */
+            if(chat.style.display==='none'&&window.showChat)window.showChat();
             var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
             var _cIcons={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
             var _cLabel=edata.complexity&&edata.complexity!=='auto'?(_cIcons[edata.complexity]||'')+edata.complexity+' → ':'';
@@ -71,6 +100,7 @@
       if(!gotDone)throw new Error('stream incomplete');
       if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
     }catch(streamErr){
+      localStorage.removeItem('salm_sse_pending');
       console.warn('SSE failed, falling back:',streamErr);
       var typRow=document.getElementById('typing-row');
       if(typRow){var tb3=typRow.querySelector('.bubble');if(tb3)tb3.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> Processing...'}

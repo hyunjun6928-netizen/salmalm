@@ -507,7 +507,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             return error_msg
 
     # ── OpenClaw-style limits ──
-    MAX_TOOL_ITERATIONS = 15
+    MAX_TOOL_ITERATIONS = 25
     MAX_CONSECUTIVE_ERRORS = 3
 
     async def _handle_token_overflow(

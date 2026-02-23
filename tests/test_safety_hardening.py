@@ -162,9 +162,9 @@ class TestMaxToolIterations(unittest.TestCase):
     """Test that the tool loop stops after MAX_TOOL_ITERATIONS."""
 
     def test_max_iterations_value(self):
-        """MAX_TOOL_ITERATIONS should be 15."""
+        """MAX_TOOL_ITERATIONS should be 25."""
         from salmalm.core.engine import IntelligenceEngine as Engine
-        self.assertEqual(Engine.MAX_TOOL_ITERATIONS, 15)
+        self.assertEqual(Engine.MAX_TOOL_ITERATIONS, 25)
 
     def test_loop_stops_at_max_iterations(self):
         """Engine should stop the loop after MAX_TOOL_ITERATIONS."""
