@@ -184,13 +184,32 @@ def _cmd_subagents(cmd: str, session, **_) -> str:
     elif sub == "spawn":
         if not arg:
             return "❌ Usage: /subagents spawn <task description>"
-        # Parse optional --model flag
+        # Parse optional flags: --model, --thinking, --label
         model = None
+        thinking = None
+        label = None
         if " --model " in arg:
             arg, _, model = arg.rpartition(" --model ")
             model = model.strip() or None
-        agent_id = SubAgent.spawn(arg.strip(), model=model)
-        return f"🤖 Sub-agent spawned: `{agent_id}`\nTask: {arg[:100]}\nWill notify on completion."
+        if " --thinking " in arg:
+            arg, _, thinking = arg.rpartition(" --thinking ")
+            thinking = thinking.strip() or None
+            if thinking not in ("low", "medium", "high", "xhigh"):
+                return f"❌ Invalid thinking level: {thinking}. Use: low/medium/high/xhigh"
+        if " --label " in arg:
+            arg, _, label = arg.rpartition(" --label ")
+            label = label.strip() or None
+        # Use subagent_manager for enhanced features
+        try:
+            from salmalm.features.subagents import subagent_manager
+            task = subagent_manager.spawn(
+                description=arg.strip(), model=model, thinking_level=thinking,
+                label=label, parent_session=getattr(session, 'id', 'web'),
+            )
+            return f"🤖 Sub-agent spawned: `{task.task_id}`\nLabel: {task.label or '-'}\nModel: {model or 'auto'}\nThinking: {thinking or 'off'}\nWill notify on completion."
+        except Exception:
+            agent_id = SubAgent.spawn(arg.strip(), model=model)
+            return f"🤖 Sub-agent spawned: `{agent_id}`\nTask: {arg[:100]}\nWill notify on completion."
 
     elif sub == "stop":
         if not arg:

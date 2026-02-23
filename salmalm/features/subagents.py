@@ -21,9 +21,12 @@ class SubAgentTask:
     task_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     description: str = ""
     model: Optional[str] = None
+    thinking_level: Optional[str] = None  # low/medium/high/xhigh
+    label: Optional[str] = None  # human-readable name
     max_turns: int = 10
     timeout_s: int = 300
     parent_session: str = "web"
+    notify: bool = True  # auto-notify on completion
     status: str = "pending"  # pending, running, completed, failed, killed
     result: str = ""
     error: str = ""
@@ -47,8 +50,10 @@ class SubAgentTask:
         """To dict."""
         return {
             "task_id": self.task_id,
+            "label": self.label or self.description[:40],
             "description": self.description[:100],
             "model": self.model,
+            "thinking_level": self.thinking_level,
             "status": self.status,
             "result": self.result[:500] if self.result else "",
             "error": self.error,
@@ -56,6 +61,7 @@ class SubAgentTask:
             "turns_used": self.turns_used,
             "tokens_used": self.tokens_used,
             "created_at": self.created_at,
+            "notify": self.notify,
         }
 
 
@@ -74,10 +80,13 @@ class SubAgentManager:
         self,
         description: str,
         model: Optional[str] = None,
+        thinking_level: Optional[str] = None,
+        label: Optional[str] = None,
         max_turns: int = 10,
         timeout_s: int = 300,
         parent_session: str = "web",
         on_complete: Optional[Callable] = None,
+        notify: bool = True,
     ) -> SubAgentTask:
         """Spawn a new sub-agent task."""
         with self._lock:
@@ -97,9 +106,12 @@ class SubAgentManager:
             task = SubAgentTask(
                 description=description,
                 model=model,
+                thinking_level=thinking_level,
+                label=label,
                 max_turns=max_turns,
                 timeout_s=timeout_s,
                 parent_session=parent_session,
+                notify=notify,
             )
             self._tasks[task.task_id] = task
 
@@ -157,8 +169,9 @@ class SubAgentManager:
                     task.error = f"Timeout after {task.timeout_s}s"
                     break
 
-                # Call LLM
-                result = call_llm(messages, model=model, tools=_get_tool_defs())
+                # Call LLM with optional thinking level
+                _think = task.thinking_level if task.thinking_level and turn == 0 else False
+                result = call_llm(messages, model=model, tools=_get_tool_defs(), thinking=_think)
                 task.turns_used = turn + 1
 
                 usage = result.get("usage", {})
@@ -213,6 +226,10 @@ class SubAgentManager:
                 except Exception as e:
                     log.error(f"[SUBAGENT] Callback error: {e}")
 
+            # Auto-notify on completion (Telegram/WS push)
+            if task.notify and task.status in ("completed", "failed"):
+                self._auto_notify(task)
+
     def list_tasks(self, include_completed: bool = True) -> List[dict]:
         """List all tasks."""
         with self._lock:
@@ -243,6 +260,31 @@ class SubAgentManager:
                 task._cancel.set()
                 killed += 1
         return f"Kill signal sent to {killed} sub-agents"
+
+    def _auto_notify(self, task: SubAgentTask) -> None:
+        """Push completion notification to Telegram/WS."""
+        label = task.label or task.description[:40]
+        if task.status == "completed":
+            msg = f"✅ Sub-agent [{task.task_id}] '{label}' completed ({task.elapsed_s}s, {task.turns_used} turns)\n\n{task.result[:500]}"
+        else:
+            msg = f"❌ Sub-agent [{task.task_id}] '{label}' failed: {task.error}"
+        # Try WS broadcast
+        try:
+            from salmalm.web.ws import ws_server
+            import asyncio
+            asyncio.run_coroutine_threadsafe(
+                ws_server.broadcast({"type": "subagent_complete", "task": task.to_dict()}),
+                asyncio.get_event_loop(),
+            )
+        except Exception:
+            pass
+        # Try Telegram notification
+        try:
+            from salmalm.integrations.telegram_bot import send_message_to_owner
+            send_message_to_owner(msg)
+        except Exception:
+            pass
+        log.info(f"[SUBAGENT] Notify: {task.task_id} → {task.status}")
 
     def _cleanup_old(self):
         """Remove old completed tasks beyond history limit."""
