@@ -63,7 +63,7 @@ class TokenManager:
     _SECRET_DIR = DATA_DIR / ".token_keys"
     _SECRET_FILE = DATA_DIR / ".token_secret"  # Legacy location
 
-    def __init__(self, secret: Optional[bytes] = None):
+    def __init__(self, secret: Optional[bytes] = None) -> None:
         self._keys: Dict[str, bytes] = {}  # kid -> secret
         self._current_kid: str = ""
         if secret:
@@ -270,7 +270,7 @@ class TokenManager:
 
 
 class RateLimitExceeded(Exception):
-    def __init__(self, retry_after: float = 0):
+    def __init__(self, retry_after: float = 0) -> None:
         self.retry_after = retry_after
         super().__init__(f"Rate limit exceeded. Retry after {retry_after:.0f}s")
 
@@ -278,7 +278,7 @@ class RateLimitExceeded(Exception):
 class RateLimiter:
     """Token bucket rate limiter per key (user_id or IP)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._buckets: Dict[str, dict] = {}
         self._lock = threading.Lock()
         # Default limits
@@ -337,7 +337,7 @@ class RateLimiter:
             bucket = self._buckets.get(key)
             return int(bucket["tokens"]) if bucket else -1
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Remove stale buckets (>1h inactive)."""
         with self._lock:
             now = time.time()
@@ -354,7 +354,7 @@ class AuthManager:
 
     ROLES = ("admin", "user", "readonly")
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._token_mgr = TokenManager()
         self._lock = threading.Lock()
         self._lockout_duration = 300  # 5 min lockout

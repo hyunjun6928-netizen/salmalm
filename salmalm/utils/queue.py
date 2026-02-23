@@ -133,7 +133,7 @@ class QueueLane:
     Global concurrency is controlled by the parent MessageQueue semaphores.
     """
 
-    def __init__(self, session_id: str, global_semaphore: asyncio.Semaphore):
+    def __init__(self, session_id: str, global_semaphore: asyncio.Semaphore) -> None:
         self.session_id = session_id
         self._global_sem = global_semaphore
         self._session_sem = asyncio.Semaphore(1)  # serial per session
@@ -298,7 +298,7 @@ class QueueLane:
             self._steer_event.clear()
         return msg
 
-    def reset_options(self):
+    def reset_options(self) -> None:
         """Reset per-session overrides to defaults."""
         self.options = SessionOptions()
 
@@ -306,7 +306,7 @@ class QueueLane:
 class _SemaphoreContext:
     """Async context manager for semaphore."""
 
-    def __init__(self, sem: asyncio.Semaphore):
+    def __init__(self, sem: asyncio.Semaphore) -> None:
         self._sem = sem
 
     async def __aenter__(self):
@@ -334,7 +334,7 @@ class MessageQueue:
     - Runtime config from ~/.salmalm/queue.json
     """
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: Optional[dict] = None) -> None:
         self._config = config or load_config()
         self._lanes: Dict[str, QueueLane] = {}
         self._lock = threading.Lock()
@@ -348,7 +348,7 @@ class MessageQueue:
     def config(self) -> dict:
         return self._config
 
-    def reload_config(self):
+    def reload_config(self) -> None:
         self._config = load_config()
 
     def _get_semaphore(self, session_id: str) -> asyncio.Semaphore:
@@ -462,7 +462,7 @@ class MessageQueue:
             f"  sessions: {self.active_sessions}"
         )
 
-    def cleanup(self, max_idle: float = 3600):
+    def cleanup(self, max_idle: float = 3600) -> None:
         """Remove idle session lanes."""
         now = time.time()
         if now - self._cleanup_ts < 600:

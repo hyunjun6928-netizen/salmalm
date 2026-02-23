@@ -63,7 +63,7 @@ class SubAgentManager:
     _MAX_CONCURRENT = 5
     _MAX_HISTORY = 50
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._tasks: Dict[str, SubAgentTask] = {}
         self._lock = threading.Lock()
 

@@ -81,7 +81,7 @@ class AnthropicOAuth:
     AUTH_URL = "https://console.anthropic.com/oauth/authorize"
     TOKEN_URL = "https://console.anthropic.com/oauth/token"
 
-    def __init__(self, client_id: str = "", client_secret: str = ""):
+    def __init__(self, client_id: str = "", client_secret: str = "") -> None:
         self.client_id = client_id or os.environ.get("ANTHROPIC_OAUTH_CLIENT_ID", "")
         self.client_secret = client_secret or os.environ.get("ANTHROPIC_OAUTH_CLIENT_SECRET", "")
 
@@ -163,7 +163,7 @@ class OpenAIOAuth:
     AUTH_URL = "https://auth.openai.com/authorize"
     TOKEN_URL = "https://auth.openai.com/oauth/token"
 
-    def __init__(self, client_id: str = "", client_secret: str = ""):
+    def __init__(self, client_id: str = "", client_secret: str = "") -> None:
         self.client_id = client_id or os.environ.get("OPENAI_OAUTH_CLIENT_ID", "")
         self.client_secret = client_secret or os.environ.get("OPENAI_OAUTH_CLIENT_SECRET", "")
 
@@ -230,7 +230,7 @@ class OpenAIOAuth:
 class OAuthManager:
     """Manages OAuth tokens for multiple providers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.anthropic = AnthropicOAuth()
         self.openai = OpenAIOAuth()
         self._tokens: Dict[str, dict] = {}

@@ -37,7 +37,7 @@ def _get_db(db_path: Optional[Path] = None) -> sqlite3.Connection:
 class QuickActionManager:
     """단축 액션 관리자."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None) -> None:
         self._db_path = db_path
         self._conn: Optional[sqlite3.Connection] = None
         self._command_dispatcher: Optional[Callable] = None
@@ -48,12 +48,12 @@ class QuickActionManager:
             self._conn = _get_db(self._db_path)
         return self._conn
 
-    def close(self):
+    def close(self) -> None:
         if self._conn:
             self._conn.close()
             self._conn = None
 
-    def set_dispatcher(self, dispatcher: Callable):
+    def set_dispatcher(self, dispatcher: Callable) -> None:
         """Set command dispatcher for executing chains."""
         self._command_dispatcher = dispatcher
 
@@ -281,7 +281,7 @@ async def handle_qa_command(cmd: str, session=None, **kw) -> Optional[str]:
 # ── Registration ──
 
 
-def register_qa_commands(command_router):
+def register_qa_commands(command_router) -> None:
     """Register /qa command."""
     from salmalm.features.commands import COMMAND_DEFS
 

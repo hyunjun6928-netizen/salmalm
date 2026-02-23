@@ -182,7 +182,7 @@ def list_available_models() -> List[Dict[str, str]]:
 class LLMRouter:
     """Multi-provider LLM router with fallback."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._current_model: Optional[str] = None
         self._fallback_order: List[str] = ["anthropic", "openai", "google", "groq", "ollama"]
         self._call_history: List[Dict[str, Any]] = []

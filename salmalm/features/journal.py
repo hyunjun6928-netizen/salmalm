@@ -77,7 +77,7 @@ def _detect_mood(text: str) -> tuple:
 class JournalManager:
     """AI 일지 관리자."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None) -> None:
         self._db_path = db_path
         self._conn: Optional[sqlite3.Connection] = None
 
@@ -87,7 +87,7 @@ class JournalManager:
             self._conn = _get_db(self._db_path)
         return self._conn
 
-    def close(self):
+    def close(self) -> None:
         if self._conn:
             self._conn.close()
             self._conn = None
@@ -309,7 +309,7 @@ async def handle_journal_command(cmd: str, session=None, **kw) -> Optional[str]:
 # ── Registration ──
 
 
-def register_journal_commands(command_router):
+def register_journal_commands(command_router) -> None:
     """Register /journal command."""
     from salmalm.features.commands import COMMAND_DEFS
 

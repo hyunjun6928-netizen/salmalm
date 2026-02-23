@@ -15,7 +15,7 @@ log = logging.getLogger("salmalm")
 class ShutdownManager:
     """Coordinates graceful shutdown across all subsystems."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._shutting_down = False
         self._lock = threading.Lock()
 

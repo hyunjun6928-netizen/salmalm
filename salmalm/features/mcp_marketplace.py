@@ -109,7 +109,7 @@ MCP_CATALOG: List[Dict[str, Any]] = [
 class MCPMarketplace:
     """Manage MCP server catalog, installation, and lifecycle."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._installed: Dict[str, Dict] = {}
         self._load()
 
@@ -273,7 +273,7 @@ class MCPMarketplace:
             lines.append(f"  {installed} `{e['name']}` — {e['description']}")
         return "\n".join(lines)
 
-    def auto_connect_all(self, retries: int = 3):
+    def auto_connect_all(self, retries: int = 3) -> None:
         """Connect all installed servers on startup."""
         for name in list(self._installed.keys()):
             for attempt in range(retries):

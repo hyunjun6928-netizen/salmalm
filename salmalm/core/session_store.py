@@ -43,7 +43,7 @@ class Session:
     - Session metadata tracking
     """
 
-    def __init__(self, session_id: str, user_id: Optional[int] = None):
+    def __init__(self, session_id: str, user_id: Optional[int] = None) -> None:
         self.id = session_id
         self.user_id = user_id  # Multi-tenant: owning user (None = legacy/local)
         self.messages: list = []

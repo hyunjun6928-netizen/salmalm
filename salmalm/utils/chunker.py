@@ -198,7 +198,7 @@ class EmbeddedBlockChunker:
     The on_chunk callback receives (text: str, is_final: bool).
     """
 
-    def __init__(self, config: Optional[ChunkerConfig] = None, on_chunk: Optional[Callable[[str, bool], None]] = None):
+    def __init__(self, config: Optional[ChunkerConfig] = None, on_chunk: Optional[Callable[[str, bool], None]] = None) -> None:
         self.config = config or ChunkerConfig()
         self.on_chunk = on_chunk
         self._buffer: str = ""

@@ -34,7 +34,7 @@ class WebChatMixin:
             self.send_header("Connection", "keep-alive")
             self.end_headers()
 
-            def send_sse(event, data):
+            def send_sse(event, data) -> None:
                 try:
                     payload = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
                     self.wfile.write(payload.encode())
@@ -45,14 +45,14 @@ class WebChatMixin:
             send_sse("status", {"text": "🤔 Thinking..."})
             tool_count = [0]
 
-            def on_tool_sse(name, args):
+            def on_tool_sse(name, args) -> None:
                 tool_count[0] += 1
                 send_sse("tool", {"name": name, "args": str(args)[:200], "count": tool_count[0]})
                 send_sse("status", {"text": f"🔧 Running {name}..."})
 
             streamed_text = [""]
 
-            def on_token_sse(event):
+            def on_token_sse(event) -> None:
                 try:
                     etype = event.get("type", "")
                     if etype == "text_delta":

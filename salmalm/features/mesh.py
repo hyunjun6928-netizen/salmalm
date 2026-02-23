@@ -35,7 +35,7 @@ _MESH_SECRET = os.environ.get("SALMALM_MESH_SECRET", "")
 class MeshPeer:
     """Represents a remote SalmAlm instance."""
 
-    def __init__(self, peer_id: str, url: str, name: str = "", secret: str = ""):
+    def __init__(self, peer_id: str, url: str, name: str = "", secret: str = "") -> None:
         self.peer_id = peer_id
         self.url = url.rstrip("/")
         self.name = name or peer_id
@@ -146,7 +146,7 @@ class MeshManager:
     _DISCOVERY_PORT = 18805
     _MAX_PEERS = 20
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._peers: Dict[str, MeshPeer] = {}
         self._lock = threading.Lock()
         self._clipboard: str = ""
@@ -251,7 +251,7 @@ class MeshManager:
         """Get the latest shared clipboard content."""
         return {"text": self._clipboard, "timestamp": self._clipboard_ts}
 
-    def set_clipboard(self, text: str):
+    def set_clipboard(self, text: str) -> None:
         """Set clipboard (called when receiving from a peer)."""
         self._clipboard = text
         self._clipboard_ts = time.time()

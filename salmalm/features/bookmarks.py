@@ -12,7 +12,7 @@ from salmalm.security.crypto import log
 class BookmarkManager:
     """Manage message bookmarks across sessions."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._ensure_table()
 
     def _ensure_table(self):

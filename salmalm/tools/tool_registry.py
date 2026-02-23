@@ -49,7 +49,7 @@ def register(name):
     return decorator
 
 
-def register_dynamic(name: str, handler, tool_def: dict = None):
+def register_dynamic(name: str, handler, tool_def: dict = None) -> None:
     """Dynamically register a tool at runtime (for plugins).
 
     플러그인에서 런타임에 도구를 동적으로 등록합니다.
@@ -62,7 +62,7 @@ def register_dynamic(name: str, handler, tool_def: dict = None):
     log.info(f"[TOOL] Dynamic tool registered: {name}")
 
 
-def unregister_dynamic(name: str):
+def unregister_dynamic(name: str) -> None:
     """Remove a dynamically registered tool."""
     _HANDLERS.pop(name, None)
     _DYNAMIC_TOOLS[:] = [t for t in _DYNAMIC_TOOLS if t.get("name") != name]

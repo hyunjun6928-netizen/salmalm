@@ -119,7 +119,7 @@ class ContextChunk:
 
     __slots__ = ("source", "content", "relevance", "tokens", "timestamp")
 
-    def __init__(self, source: str, content: str, relevance: float = 0.0, timestamp: float = 0.0):
+    def __init__(self, source: str, content: str, relevance: float = 0.0, timestamp: float = 0.0) -> None:
         self.source = source
         self.content = content
         self.relevance = relevance
@@ -133,7 +133,7 @@ class ContextChunk:
 class SmartContextWindow:
     """Intelligent context window manager."""
 
-    def __init__(self, token_budget: int = _DEFAULT_BUDGET):
+    def __init__(self, token_budget: int = _DEFAULT_BUDGET) -> None:
         self._budget = token_budget
         self._injected: List[ContextChunk] = []
         self._recent_messages: List[Dict] = []

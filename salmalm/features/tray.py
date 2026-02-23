@@ -18,7 +18,7 @@ def is_windows() -> bool:
     return sys.platform == "win32"
 
 
-def run_tray(port: int = 18800):
+def run_tray(port: int = 18800) -> None:
     """Run SalmAlm with system tray icon (Windows only).
 
     On non-Windows platforms, starts the server normally.
@@ -123,7 +123,7 @@ def _run_windows_tray(port: int = 18800):
     _server_ref = [None]  # noqa: F841
     base_url = f"http://127.0.0.1:{port}"
 
-    def start_server():
+    def start_server() -> None:
         """Start SalmAlm server in background thread."""
         from .__main__ import main
 
@@ -141,7 +141,7 @@ def _run_windows_tray(port: int = 18800):
     hwnd_ref = [None]
     nid_ref = [None]
 
-    def show_menu(hwnd):
+    def show_menu(hwnd) -> None:
         menu = user32.CreatePopupMenu()
         user32.AppendMenuW(menu, MF_STRING, ID_OPEN_UI, "🌐 Open Web UI")
         user32.AppendMenuW(menu, MF_STRING, ID_NEW_CHAT, "💬 New Chat")

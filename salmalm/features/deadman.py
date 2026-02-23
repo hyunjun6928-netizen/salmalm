@@ -36,7 +36,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 class DeadManSwitch:
     """Monitors user activity and triggers emergency actions on prolonged inactivity."""
 
-    def __init__(self, config_path: Optional[Path] = None, state_path: Optional[Path] = None):
+    def __init__(self, config_path: Optional[Path] = None, state_path: Optional[Path] = None) -> None:
         self.config_path = config_path or DEADMAN_CONFIG
         self.state_path = state_path or DEADMAN_STATE
         self.config = self._load_config()

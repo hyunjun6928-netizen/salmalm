@@ -256,7 +256,7 @@ async def run_server():
         log.error(f"WebSocket server failed: {e}")
 
     @ws_server.on_message
-    async def handle_ws_message(client, data):
+    async def handle_ws_message(client, data) -> None:
         msg_type = data.get("type", "message")
         if msg_type == "ping":
             await client.send_json({"type": "pong"})
@@ -273,10 +273,10 @@ async def run_server():
             # Send typing indicator immediately
             await client.send_json({"type": "typing", "status": "typing"})
 
-            async def on_tool(name, args):
+            async def on_tool(name, args) -> None:
                 await stream.send_tool_call(name, args)
 
-            async def on_status(status_type, detail):
+            async def on_status(status_type, detail) -> None:
                 """Forward engine status to WS client as typing events."""
                 await client.send_json({"type": "typing", "status": status_type, "detail": detail})
 
@@ -304,7 +304,7 @@ async def run_server():
                 await stream.send_error(str(e)[:200])
 
     @ws_server.on_connect
-    async def handle_ws_connect(client):
+    async def handle_ws_connect(client) -> None:
         await client.send_json(
             {
                 "type": "welcome",

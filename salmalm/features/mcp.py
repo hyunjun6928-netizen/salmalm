@@ -80,13 +80,13 @@ class MCPServer:
         "prompts": {"listChanged": False},
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._tools: List[dict] = []
         self._tool_executor = None  # async fn(name, args) -> result
         self._resources: List[dict] = []
         self._initialized = False
 
-    def set_tools(self, tools: list, executor):
+    def set_tools(self, tools: list, executor) -> None:
         """Register tools and their executor function."""
         self._tools = tools
         self._tool_executor = executor
@@ -298,7 +298,7 @@ class MCPServer:
             return _rpc_response(msg_id, error={"code": -32601, "message": f"Method not found: {method}"})
         return None
 
-    async def run_stdio(self):
+    async def run_stdio(self) -> None:
         """Run MCP server on stdin/stdout (for subprocess transport)."""
         log.info("[CONN] MCP Server starting (stdio transport)")
         loop = asyncio.get_event_loop()
@@ -341,7 +341,7 @@ class MCPServer:
 class MCPClientConnection:
     """A connection to a single external MCP server (stdio transport)."""
 
-    def __init__(self, name: str, command: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None):
+    def __init__(self, name: str, command: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None) -> None:
         self.name = name
         self.command = command
         self.env = env or {}
@@ -410,7 +410,7 @@ class MCPClientConnection:
             self.disconnect()
             return False
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Disconnect from an MCP server."""
         self._connected = False
         if self._process:
@@ -520,7 +520,7 @@ class MCPClientConnection:
 class MCPManager:
     """Manages multiple MCP client connections + the server instance."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._clients: Dict[str, MCPClientConnection] = {}
         self._server = MCPServer()
         self._config_path = BASE_DIR / "mcp_servers.json"
@@ -549,7 +549,7 @@ class MCPManager:
             return client.connect()
         return True
 
-    def remove_server(self, name: str):
+    def remove_server(self, name: str) -> None:
         """Disconnect and remove an MCP server."""
         if name in self._clients:
             self._clients[name].disconnect()
@@ -599,7 +599,7 @@ class MCPManager:
                 return client.call_tool(tool_name, arguments)
         return f"Unknown MCP tool: {prefixed_name}"
 
-    def save_config(self):
+    def save_config(self) -> None:
         """Save server configurations to JSON."""
         config = {}
         for name, client in self._clients.items():
@@ -611,7 +611,7 @@ class MCPManager:
         self._config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
         log.info(f"[CONN] MCP config saved ({len(config)} servers)")
 
-    def load_config(self):
+    def load_config(self) -> None:
         """Load and auto-connect configured MCP servers."""
         if not self._config_path.exists():
             return
@@ -624,7 +624,7 @@ class MCPManager:
         except Exception as e:
             log.error(f"MCP config load error: {e}")
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Disconnect all clients."""
         for client in self._clients.values():
             client.disconnect()

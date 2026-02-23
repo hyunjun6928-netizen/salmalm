@@ -74,7 +74,7 @@ class PresenceEntry:
 class PresenceManager:
     """Track connected client instances with TTL-based expiry."""
 
-    def __init__(self, ttl: int = DEFAULT_TTL, max_entries: int = MAX_ENTRIES):
+    def __init__(self, ttl: int = DEFAULT_TTL, max_entries: int = MAX_ENTRIES) -> None:
         self._entries: Dict[str, PresenceEntry] = {}
         self._lock = threading.Lock()
         self._ttl = ttl

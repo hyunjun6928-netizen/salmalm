@@ -79,7 +79,7 @@ def format_for_channel(text: str, channel: str) -> str:
 class ChannelRouter:
     """Routes messages between multiple channels and the agent engine."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._channels: Dict[str, Dict[str, Any]] = {}
         self._handlers: Dict[str, Callable] = {}
         self._config = _load_config()

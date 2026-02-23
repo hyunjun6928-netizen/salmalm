@@ -57,7 +57,7 @@ class MemoryManager:
 
         return scrub_secrets(text)
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._search = None  # Lazy — set after TFIDFSearch is ready
 
     def _get_search(self):

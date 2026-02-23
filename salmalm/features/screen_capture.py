@@ -181,7 +181,7 @@ $bitmap.Dispose()
 class ScreenHistory:
     """Manages periodic capture history (Rewind-style)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._config = self._load_config()
         self._watcher_thread: Optional[threading.Thread] = None
         self._watching = False
@@ -258,7 +258,7 @@ class ScreenHistory:
                 continue
         return results
 
-    def start_watching(self):
+    def start_watching(self) -> None:
         """Start periodic capture."""
         if self._watching:
             return
@@ -288,14 +288,14 @@ class ScreenHistory:
         self._watcher_thread = threading.Thread(target=_loop, daemon=True)
         self._watcher_thread.start()
 
-    def stop_watching(self):
+    def stop_watching(self) -> None:
         self._watching = False
 
 
 class ScreenManager:
     """High-level interface for /screen commands."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.capturer = ScreenCapture()
         self.history_mgr = ScreenHistory()
 

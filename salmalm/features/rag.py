@@ -353,7 +353,7 @@ def cosine_similarity(v1: Dict[str, float], v2: Dict[str, float]) -> float:
 class RAGEngine:
     """Hybrid BM25 + TF-IDF vector retrieval engine with persistent SQLite index."""
 
-    def __init__(self, db_path: Optional[Path] = None, config_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None, config_path: Optional[Path] = None) -> None:
         self._db_path = db_path or (BASE_DIR / "rag.db")
         self._config_path = config_path
         self._conn: Optional[sqlite3.Connection] = None
@@ -456,7 +456,7 @@ class RAGEngine:
 
         return unigrams + bigrams + char_trigrams + jamo_tokens
 
-    def index_file(self, label: str, fpath: Path):
+    def index_file(self, label: str, fpath: Path) -> None:
         """Index a single file."""
         self._ensure_db()
         try:
@@ -649,7 +649,7 @@ class RAGEngine:
                 continue
         return False
 
-    def reindex(self, force: bool = False):
+    def reindex(self, force: bool = False) -> None:
         """Rebuild the index from source files."""
         self._ensure_db()
         if not force and not self._needs_reindex():
@@ -666,7 +666,7 @@ class RAGEngine:
         vectors = []
         doc_freq: Dict[str, int] = {}
 
-        def process_text(label: str, text: str, mtime: float):
+        def process_text(label: str, text: str, mtime: float) -> None:
             lines = text.splitlines()
             step = max(1, chunk_size - chunk_overlap)
             for i in range(0, len(lines), step):
@@ -960,7 +960,7 @@ class RAGEngine:
             "indexed_files": len(self._mtimes),
         }
 
-    def close(self):
+    def close(self) -> None:
         """Close the RAG database connection."""
         if self._conn:
             self._conn.close()

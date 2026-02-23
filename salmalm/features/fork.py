@@ -12,7 +12,7 @@ from salmalm.security.crypto import log
 class ConversationFork:
     """Manage alternative responses at the same message index."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._ensure_table()
 
     def _ensure_table(self):
@@ -35,7 +35,7 @@ class ConversationFork:
         except Exception as e:
             log.warning(f"Alternatives table init: {e}")
 
-    def save_alternative(self, session_id: str, message_index: int, content: str, model: str = "", active: bool = True):
+    def save_alternative(self, session_id: str, message_index: int, content: str, model: str = "", active: bool = True) -> None:
         try:
             from salmalm.core import _get_db
 

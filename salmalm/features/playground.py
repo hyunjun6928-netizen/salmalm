@@ -47,7 +47,7 @@ def _get_db(db_path: Optional[Path] = None) -> sqlite3.Connection:
 class CodePlayground:
     """격리된 코드 실행 환경."""
 
-    def __init__(self, db_path: Optional[Path] = None, timeout: int = EXEC_TIMEOUT):
+    def __init__(self, db_path: Optional[Path] = None, timeout: int = EXEC_TIMEOUT) -> None:
         self._db_path = db_path
         self._conn: Optional[sqlite3.Connection] = None
         self.timeout = timeout
@@ -58,7 +58,7 @@ class CodePlayground:
             self._conn = _get_db(self._db_path)
         return self._conn
 
-    def close(self):
+    def close(self) -> None:
         if self._conn:
             self._conn.close()
             self._conn = None
@@ -302,7 +302,7 @@ async def handle_play_command(cmd: str, session=None, **kw) -> Optional[str]:
 # ── Registration ──
 
 
-def register_play_commands(command_router):
+def register_play_commands(command_router) -> None:
     """Register /play command."""
     from salmalm.features.commands import COMMAND_DEFS
 

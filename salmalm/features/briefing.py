@@ -32,7 +32,7 @@ def _save_config(config: dict):
 class DailyBriefing:
     """Generate daily briefing summaries."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.config = _load_config()
 
     def generate(self, sections: list = None) -> str:

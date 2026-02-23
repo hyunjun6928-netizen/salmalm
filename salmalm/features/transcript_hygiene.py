@@ -36,7 +36,7 @@ PROVIDER_RULES: Dict[str, dict] = {
 class TranscriptHygiene:
     """Clean conversation history per provider rules before LLM API calls."""
 
-    def __init__(self, provider: str = "anthropic"):
+    def __init__(self, provider: str = "anthropic") -> None:
         self.provider = provider.lower()
         self.rules = PROVIDER_RULES.get(self.provider, {})
 

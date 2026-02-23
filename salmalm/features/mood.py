@@ -196,7 +196,7 @@ def _ensure_dir():
 class MoodDetector:
     """Detects user mood from text using keywords, patterns, and emoji."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         _ensure_dir()
         self.config = self._load_config()
 
@@ -315,7 +315,7 @@ class MoodDetector:
         tone = MOOD_TONE_MAP.get(mood, {})
         return tone.get("inject", "")
 
-    def record_mood(self, mood: str, confidence: float):
+    def record_mood(self, mood: str, confidence: float) -> None:
         """Record mood to history."""
         _ensure_dir()
         history = []

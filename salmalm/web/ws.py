@@ -39,7 +39,7 @@ WS_MAGIC = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 class WSClient:
     """Represents a single WebSocket connection."""
 
-    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, session_id: str = "web"):
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter, session_id: str = "web") -> None:
         self.reader = reader
         self.writer = writer
         self.session_id = session_id
@@ -50,7 +50,7 @@ class WSClient:
         self._send_lock = asyncio.Lock()  # Serialize concurrent sends
         self._buffer: list = []  # Buffer messages during disconnect
 
-    async def send_json(self, data: dict):
+    async def send_json(self, data: dict) -> None:
         """Send a JSON message as a WebSocket text frame.
 
         Serializes concurrent sends to prevent frame interleaving.
@@ -68,7 +68,7 @@ class WSClient:
         except Exception:
             self.connected = False
 
-    async def send_text(self, text: str):
+    async def send_text(self, text: str) -> None:
         """Send a text message to a connected WebSocket client."""
         if not self.connected:
             return
@@ -122,7 +122,7 @@ class WSClient:
         except (asyncio.IncompleteReadError, ConnectionError, OSError):
             return None
 
-    async def close(self, code: int = 1000, reason: str = ""):
+    async def close(self, code: int = 1000, reason: str = "") -> None:
         """Send close frame and close connection."""
         if self.connected:
             self.connected = False
@@ -141,7 +141,7 @@ class WSClient:
 class WebSocketServer:
     """Async WebSocket server that handles upgrade from raw TCP."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 18801):
+    def __init__(self, host: str = "127.0.0.1", port: int = 18801) -> None:
         self.host = host
         self.port = port
         self.clients: Dict[int, WSClient] = {}
@@ -166,14 +166,14 @@ class WebSocketServer:
         self._on_disconnect = fn
         return fn
 
-    async def start(self):
+    async def start(self) -> None:
         """Start listening for WebSocket connections."""
         self._running = True
         self._server = await asyncio.start_server(self._handle_connection, self.host, self.port)
         log.info(f"[FAST] WebSocket server: ws://{self.host}:{self.port}")
         asyncio.create_task(self._keepalive_loop())
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
         """Graceful shutdown: notify clients with shutdown message, then close."""
         self._running = False
         # Send shutdown notification to all connected clients
@@ -193,11 +193,11 @@ class WebSocketServer:
             await self._server.wait_closed()
         log.info("[SHUTDOWN] WebSocket server stopped")
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Stop the WebSocket server (alias for shutdown)."""
         await self.shutdown()
 
-    async def broadcast(self, data: dict, session_id: Optional[str] = None):
+    async def broadcast(self, data: dict, session_id: Optional[str] = None) -> None:
         """Send to all connected clients (or filtered by session)."""
         for client in list(self.clients.values()):
             if session_id and client.session_id != session_id:
@@ -426,12 +426,12 @@ class WebSocketServer:
 class StreamingResponse:
     """Helper to stream LLM response chunks to a WS client."""
 
-    def __init__(self, client: WSClient, request_id: Optional[str] = None):
+    def __init__(self, client: WSClient, request_id: Optional[str] = None) -> None:
         self.client = client
         self.request_id = request_id or str(int(time.time() * 1000))
         self._chunks: list = []
 
-    async def send_chunk(self, text: str):
+    async def send_chunk(self, text: str) -> None:
         """Send a text chunk (partial response)."""
         self._chunks.append(text)
         await self.client.send_json(
@@ -442,7 +442,7 @@ class StreamingResponse:
             }
         )
 
-    async def send_tool_call(self, tool_name: str, tool_input: dict, result: Optional[str] = None):
+    async def send_tool_call(self, tool_name: str, tool_input: dict, result: Optional[str] = None) -> None:
         """Notify client about a tool call."""
         await self.client.send_json(
             {
@@ -454,7 +454,7 @@ class StreamingResponse:
             }
         )
 
-    async def send_thinking(self, text: str):
+    async def send_thinking(self, text: str) -> None:
         """Send thinking/reasoning chunk."""
         await self.client.send_json(
             {
@@ -464,7 +464,7 @@ class StreamingResponse:
             }
         )
 
-    async def send_done(self, full_text: Optional[str] = None):
+    async def send_done(self, full_text: Optional[str] = None) -> None:
         """Signal completion."""
         if full_text is None:
             full_text = "".join(self._chunks)
@@ -476,7 +476,7 @@ class StreamingResponse:
             }
         )
 
-    async def send_error(self, error: str):
+    async def send_error(self, error: str) -> None:
         """Send an error message to a WebSocket client."""
         await self.client.send_json(
             {

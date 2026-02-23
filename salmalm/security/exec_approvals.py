@@ -119,7 +119,7 @@ class BackgroundSession:
     _counter = 0
     _lock = threading.Lock()
 
-    def __init__(self, command: str, timeout: int = 1800, notify_on_exit: bool = False, env: dict = None):
+    def __init__(self, command: str, timeout: int = 1800, notify_on_exit: bool = False, env: dict = None) -> None:
         with BackgroundSession._lock:
             BackgroundSession._counter += 1
             self.session_id = f"bg-{BackgroundSession._counter}"

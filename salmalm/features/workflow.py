@@ -94,7 +94,7 @@ def _to_num(s: str):
 
 
 class StepResult:
-    def __init__(self, step_id: str, success: bool, result: Any = None, error: str = ""):
+    def __init__(self, step_id: str, success: bool, result: Any = None, error: str = "") -> None:
         self.step_id = step_id
         self.success = success
         self.result = result
@@ -107,7 +107,7 @@ class StepResult:
 class WorkflowEngine:
     """Execute multi-step workflows with variable substitution."""
 
-    def __init__(self, tool_executor=None):
+    def __init__(self, tool_executor=None) -> None:
         _ensure_dirs()
         self._tool_executor = tool_executor  # callable(tool_name, params) -> result
         self._lock = threading.Lock()

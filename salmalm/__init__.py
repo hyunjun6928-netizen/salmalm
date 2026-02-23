@@ -32,7 +32,7 @@ def _register_services() -> None:
 _logging_initialized = False
 
 
-def init_logging():
+def init_logging() -> None:
     """Initialize file + console logging. Called once from entrypoint, not import."""
     global _logging_initialized
     if _logging_initialized or log.handlers:

@@ -142,7 +142,7 @@ _runtime_overrides: Dict[str, Any] = {}
 class CommandRouter:
     """Central slash-command dispatcher."""
 
-    def __init__(self, engine_dispatch=None):
+    def __init__(self, engine_dispatch=None) -> None:
         """
         Args:
             engine_dispatch: async callable(cmd, session, **kw) -> str|None
@@ -155,11 +155,11 @@ class CommandRouter:
 
     # -- registration helpers --
 
-    def register(self, command: str, handler: Callable):
+    def register(self, command: str, handler: Callable) -> None:
         """Register exact-match command."""
         self._handlers[command] = handler
 
-    def register_prefix(self, prefix: str, handler: Callable):
+    def register_prefix(self, prefix: str, handler: Callable) -> None:
         """Register prefix-match command."""
         self._prefix_handlers.append((prefix, handler))
 

@@ -80,7 +80,7 @@ def _parse_capsule_date(text: str) -> datetime:
 class TimeCapsule:
     """Manages time capsules stored in SQLite."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None) -> None:
         self.db_path = db_path or CAPSULE_DB
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()

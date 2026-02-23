@@ -19,7 +19,7 @@ class LLMCronManager:
 
     _JOBS_FILE = BASE_DIR / ".cron_jobs.json"  # noqa: F405
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.jobs = []
 
     def load_jobs(self) -> None:

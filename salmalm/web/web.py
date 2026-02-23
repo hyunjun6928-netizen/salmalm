@@ -60,7 +60,7 @@ class WebHandler(
 ):
     """HTTP handler for web UI and API."""
 
-    def log_message(self, format, *args):
+    def log_message(self, format, *args) -> None:
         """Suppress default HTTP request logging."""
         pass  # Suppress default logging
 
@@ -264,7 +264,7 @@ class WebHandler(
             self.wfile.write(json.dumps({"error": "Rate limit exceeded", "retry_after": e.retry_after}).encode())
             return False
 
-    def do_PUT(self):
+    def do_PUT(self) -> None:
         """Handle HTTP PUT requests."""
         _start = time.time()
         import uuid
@@ -310,14 +310,14 @@ class WebHandler(
             return
         self._json({"error": "Not found"}, 404)
 
-    def do_OPTIONS(self):
+    def do_OPTIONS(self) -> None:
         """Handle CORS preflight requests."""
         self.send_response(204)
         self._cors()
         self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS")
         self.end_headers()
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         """Handle HTTP GET requests."""
         _start = time.time()
         import uuid
@@ -1949,7 +1949,7 @@ self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.
             # If header present, any value is fine (existence proves CORS preflight passed)
         return True
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         """Handle HTTP POST requests."""
         _start = time.time()
         import uuid

@@ -81,7 +81,7 @@ def _get_agent_name() -> str:
 class AgentExporter:
     """Export agent state to a ZIP file."""
 
-    def __init__(self, include_vault: bool = False, include_sessions: bool = True, include_data: bool = True):
+    def __init__(self, include_vault: bool = False, include_sessions: bool = True, include_data: bool = True) -> None:
         self.include_vault = include_vault
         self.include_sessions = include_sessions
         self.include_data = include_data
@@ -307,7 +307,7 @@ class AgentExporter:
 class ImportResult:
     """Result of an import operation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.ok: bool = True
         self.imported: List[str] = []
         self.skipped: List[str] = []
@@ -343,7 +343,7 @@ class AgentImporter:
     """Import agent state from a ZIP file."""
 
     # conflict_mode: 'overwrite' | 'merge' | 'skip'
-    def __init__(self, conflict_mode: str = "overwrite"):
+    def __init__(self, conflict_mode: str = "overwrite") -> None:
         self.conflict_mode = conflict_mode
 
     def preview(self, zip_data: bytes) -> Dict[str, Any]:
@@ -672,7 +672,7 @@ def quick_sync_export() -> dict:
     return data
 
 
-def quick_sync_import(data: dict):
+def quick_sync_import(data: dict) -> None:
     """Import core agent state from lightweight JSON.
     경량 JSON에서 핵심 에이전트 상태를 가져오기."""
     # SOUL.md

@@ -51,13 +51,13 @@ _DEFAULT_SLA_CONFIG = {
 class SLAConfig:
     """Runtime-reloadable SLA configuration from ~/.salmalm/sla.json."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._config: dict = dict(_DEFAULT_SLA_CONFIG)
         self._lock = threading.Lock()
         self._mtime: float = 0.0
         self.load()
 
-    def load(self):
+    def load(self) -> None:
         """Load config from disk. Creates default if missing."""
         _SALMALM_DIR.mkdir(parents=True, exist_ok=True)
         try:
@@ -81,7 +81,7 @@ class SLAConfig:
         except Exception as e:
             log.warning(f"[SLA] Config load error: {e}")
 
-    def save(self):
+    def save(self) -> None:
         """Write current config to disk."""
         _SALMALM_DIR.mkdir(parents=True, exist_ok=True)
         try:
@@ -97,7 +97,7 @@ class SLAConfig:
         with self._lock:
             return self._config.get(key, default)
 
-    def set(self, key: str, value):
+    def set(self, key: str, value) -> None:
         with self._lock:
             self._config[key] = value
         self.save()
@@ -107,7 +107,7 @@ class SLAConfig:
         with self._lock:
             return dict(self._config)
 
-    def update(self, data: dict):
+    def update(self, data: dict) -> None:
         with self._lock:
             self._config.update(data)
         self.save()
@@ -142,7 +142,7 @@ class UptimeMonitor:
     서버 업타임 추적, 비정상 종료 감지, 다운타임 이벤트 DB 기록.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._start_time = time.time()
         self._start_dt = datetime.now(KST)
         self._lock = threading.Lock()
@@ -153,7 +153,7 @@ class UptimeMonitor:
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
 
-    def init_db(self):
+    def init_db(self) -> None:
         """Create uptime_log table if not exists."""
         conn = self._get_db()
         conn.execute("""CREATE TABLE IF NOT EXISTS uptime_log (
@@ -166,7 +166,7 @@ class UptimeMonitor:
         conn.commit()
         conn.close()
 
-    def on_startup(self):
+    def on_startup(self) -> None:
         """Called at server startup: check lockfile, record crash if needed."""
         _SALMALM_DIR.mkdir(parents=True, exist_ok=True)
         self.init_db()
@@ -213,7 +213,7 @@ class UptimeMonitor:
         _RUNNING_FILE.write_text(json.dumps(lockdata), encoding="utf-8")
         log.info(f"[SLA] Lockfile created: {_RUNNING_FILE}")
 
-    def on_shutdown(self):
+    def on_shutdown(self) -> None:
         """Called on graceful shutdown: remove lockfile."""
         try:
             if _RUNNING_FILE.exists():
@@ -222,7 +222,7 @@ class UptimeMonitor:
         except Exception as e:
             log.warning(f"[SLA] Lockfile removal error: {e}")
 
-    def record_downtime(self, start: str, end: str, duration: float, reason: str):
+    def record_downtime(self, start: str, end: str, duration: float, reason: str) -> None:
         """Manually record a downtime event."""
         try:
             conn = self._get_db()
@@ -360,14 +360,14 @@ class LatencyTracker:
     P50/P95/P99 계산 + SLA 경고.
     """
 
-    def __init__(self, max_size: int = 100):
+    def __init__(self, max_size: int = 100) -> None:
         self._max_size = max_size
         self._records: deque = deque(maxlen=max_size)
         self._lock = threading.Lock()
         self._consecutive_timeouts = 0
         self._timeout_threshold = 3  # Trigger failover after N consecutive timeouts
 
-    def record(self, ttft_ms: float, total_ms: float, model: str = "", timed_out: bool = False, session_id: str = ""):
+    def record(self, ttft_ms: float, total_ms: float, model: str = "", timed_out: bool = False, session_id: str = "") -> None:
         """Record a single request's latency.
 
         요청의 레이턴시 기록.
@@ -401,7 +401,7 @@ class LatencyTracker:
         with self._lock:
             return self._consecutive_timeouts >= self._timeout_threshold
 
-    def reset_timeout_counter(self):
+    def reset_timeout_counter(self) -> None:
         with self._lock:
             self._consecutive_timeouts = 0
 
@@ -490,7 +490,7 @@ class Watchdog:
     이상 감지 시 로그 + 알림 + 자동 복구 시도.
     """
 
-    def __init__(self, uptime_monitor: UptimeMonitor, latency_tracker: LatencyTracker):
+    def __init__(self, uptime_monitor: UptimeMonitor, latency_tracker: LatencyTracker) -> None:
         self._uptime = uptime_monitor
         self._latency = latency_tracker
         self._thread: Optional[threading.Thread] = None
@@ -498,7 +498,7 @@ class Watchdog:
         self._last_report: dict = {}
         self._lock = threading.Lock()
 
-    def start(self):
+    def start(self) -> None:
         """Start watchdog background thread."""
         if self._thread and self._thread.is_alive():
             return
@@ -507,7 +507,7 @@ class Watchdog:
         self._thread.start()
         log.info("[SLA] Watchdog started")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop watchdog."""
         self._stop_event.set()
         if self._thread:

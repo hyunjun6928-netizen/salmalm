@@ -34,7 +34,7 @@ from salmalm.security.crypto import log
 class CircuitBreaker:
     """Track error rates per component. Trip after threshold."""
 
-    def __init__(self, threshold: int = 5, window_sec: int = 300, cooldown_sec: int = 60):
+    def __init__(self, threshold: int = 5, window_sec: int = 300, cooldown_sec: int = 60) -> None:
         self.threshold = threshold
         self.window_sec = window_sec
         self.cooldown_sec = cooldown_sec
@@ -42,7 +42,7 @@ class CircuitBreaker:
         self._tripped: Dict[str, float] = {}  # component -> trip time
         self._lock = threading.Lock()
 
-    def record_error(self, component: str, error: str = ""):
+    def record_error(self, component: str, error: str = "") -> None:
         """Record an error for a component."""
         with self._lock:
             if component not in self._errors:
@@ -54,7 +54,7 @@ class CircuitBreaker:
                 }
             )
 
-    def record_success(self, component: str):
+    def record_success(self, component: str) -> None:
         """Record successful operation — helps reset breaker."""
         with self._lock:
             if component in self._tripped:
@@ -102,7 +102,7 @@ class CircuitBreaker:
 class HealthMonitor:
     """Comprehensive health monitoring and auto-recovery."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.circuit_breaker = CircuitBreaker()
         self._start_time = time.time()
         self._checks: Dict[str, dict] = {}
@@ -399,7 +399,7 @@ class HealthMonitor:
 # ── Watchdog async task ──────────────────────────────────────
 
 
-async def watchdog_tick(monitor: HealthMonitor):
+async def watchdog_tick(monitor: HealthMonitor) -> None:
     """Periodic watchdog check — run via cron every 5 minutes."""
     health = monitor.check_health()
 

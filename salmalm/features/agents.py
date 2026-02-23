@@ -761,7 +761,7 @@ BINDINGS_FILE = AGENTS_DIR / "bindings.json"
 class AgentConfig:
     """Configuration and paths for a single agent (에이전트 설정)."""
 
-    def __init__(self, agent_id: str):
+    def __init__(self, agent_id: str) -> None:
         self.agent_id = agent_id
         self.base_dir = AGENTS_DIR / agent_id
         self.workspace_dir = self.base_dir / "workspace"
@@ -777,7 +777,7 @@ class AgentConfig:
         except Exception:
             self._config = {}
 
-    def save(self):
+    def save(self) -> None:
         try:
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
             self.config_file.write_text(json.dumps(self._config, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -822,7 +822,7 @@ class AgentManager:
     다중 에이전트 관리 — Telegram 채팅/사용자별 라우팅 지원.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._agents: dict = {}  # agent_id -> AgentConfig
         self._bindings: dict = {}  # "telegram:chatid" -> agent_id
         self._lock = threading.Lock()
@@ -855,7 +855,7 @@ class AgentManager:
         except Exception as e:
             log.error(f"[AGENT] Bindings save error: {e}")
 
-    def scan(self):
+    def scan(self) -> None:
         """Scan agents directory and load all agent configs."""
         AGENTS_DIR.mkdir(parents=True, exist_ok=True)
         with self._lock:

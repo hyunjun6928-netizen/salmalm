@@ -61,7 +61,7 @@ class FileWatcher:
         self._pending_changes: List[dict] = []
         self._lock = threading.Lock()
 
-    def start(self):
+    def start(self) -> None:
         """Start watching in a background thread."""
         if self._running:
             return
@@ -72,7 +72,7 @@ class FileWatcher:
         self._thread.start()
         log.info("FileWatcher started")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the watcher."""
         self._running = False
         if self._debounce_timer:
@@ -192,7 +192,7 @@ class FileWatcher:
 class RAGFileWatcher(FileWatcher):
     """FileWatcher that triggers RAG re-indexing on file changes."""
 
-    def __init__(self, rag_engine=None, **kwargs):
+    def __init__(self, rag_engine=None, **kwargs) -> None:
         self._rag = rag_engine
         super().__init__(on_change=self._on_file_change, **kwargs)
 

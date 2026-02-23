@@ -79,7 +79,7 @@ class LoginRateLimiter:
     """Per-key exponential backoff for login attempts.
     로그인 시도에 대한 지수 백오프 제한."""
 
-    def __init__(self, max_attempts: int = 5, lockout_seconds: int = 300):
+    def __init__(self, max_attempts: int = 5, lockout_seconds: int = 300) -> None:
         self._attempts: Dict[str, List[float]] = {}
         self._lockouts: Dict[str, float] = {}  # key -> lockout_until
         self._lock = threading.Lock()
@@ -111,7 +111,7 @@ class LoginRateLimiter:
 
             return True, 0
 
-    def record_failure(self, key: str):
+    def record_failure(self, key: str) -> None:
         """Record a failed login attempt. 실패한 로그인 기록."""
         with self._lock:
             now = time.time()
@@ -119,13 +119,13 @@ class LoginRateLimiter:
                 self._attempts[key] = []
             self._attempts[key].append(now)
 
-    def record_success(self, key: str):
+    def record_success(self, key: str) -> None:
         """Clear attempts on successful login. 성공 시 시도 기록 초기화."""
         with self._lock:
             self._attempts.pop(key, None)
             self._lockouts.pop(key, None)
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Remove stale entries. 오래된 항목 정리."""
         with self._lock:
             now = time.time()

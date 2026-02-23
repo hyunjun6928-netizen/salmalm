@@ -12,7 +12,7 @@ from salmalm.security.crypto import log
 class UsageTracker:
     """Per-user, per-model token usage tracking with daily/monthly reports."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._db_path = DATA_DIR / "salmalm.db"
 
     def _get_db(self):
@@ -32,7 +32,7 @@ class UsageTracker:
         conn.commit()
         return conn
 
-    def record(self, session_id: str, model: str, input_tokens: int, output_tokens: int, cost: float, intent: str = ""):
+    def record(self, session_id: str, model: str, input_tokens: int, output_tokens: int, cost: float, intent: str = "") -> None:
         try:
             conn = self._get_db()
             now = datetime.now(KST).isoformat()

@@ -268,7 +268,7 @@ class PatternAnalyzer:
 class PromptEvolver:
     """Learns user preferences and evolves the system prompt over time."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         _ensure_dir()
         self.analyzer = PatternAnalyzer()
         self.state = self._load_state()
@@ -291,7 +291,7 @@ class PromptEvolver:
         _ensure_dir()
         EVOLUTION_FILE.write_text(json.dumps(self.state, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def record_conversation(self, messages: List[Dict]):
+    def record_conversation(self, messages: List[Dict]) -> None:
         """Record a conversation for pattern analysis."""
         self.state["conversation_count"] = self.state.get("conversation_count", 0) + 1
         self._analyze_and_update(messages)

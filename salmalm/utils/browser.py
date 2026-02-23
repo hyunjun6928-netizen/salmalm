@@ -45,7 +45,7 @@ _WS_MAGIC = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 class CDPConnection:
     """Low-level CDP WebSocket connection to Chrome."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._reader: Optional[asyncio.StreamReader] = None
         self._writer: Optional[asyncio.StreamWriter] = None
         self._connected = False
@@ -100,7 +100,7 @@ class CDPConnection:
             log.error(f"CDP connect failed: {e}")
             return False
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         """Disconnect from the browser WebSocket."""
         self._connected = False
         if self._read_task:
@@ -137,7 +137,7 @@ class CDPConnection:
             self._pending.pop(msg_id, None)
             raise TimeoutError(f"CDP command timeout: {method}")
 
-    def on_event(self, method: str, handler):
+    def on_event(self, method: str, handler) -> None:
         """Register event handler."""
         if method not in self._event_handlers:
             self._event_handlers[method] = []
@@ -231,7 +231,7 @@ class CDPConnection:
 class BrowserController:
     """High-level browser automation API over CDP."""
 
-    def __init__(self, debug_host: str = "127.0.0.1", debug_port: int = 9222):
+    def __init__(self, debug_host: str = "127.0.0.1", debug_port: int = 9222) -> None:
         self.debug_host = debug_host
         self.debug_port = debug_port
         self._cdp: Optional[CDPConnection] = None
@@ -284,7 +284,7 @@ class BrowserController:
             log.error(f"Browser connect failed: {e}")
             return False
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         """Disconnect from the browser WebSocket."""
         if self._cdp:
             await self._cdp.disconnect()
@@ -481,7 +481,7 @@ class BrowserManager:
         "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
     ]
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._browser: Optional[BrowserController] = None
         self._process: Optional[Any] = None  # subprocess.Popen
         self._chrome_path: Optional[str] = None

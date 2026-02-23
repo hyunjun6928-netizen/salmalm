@@ -62,14 +62,14 @@ class _TagStripper(HTMLParser):
         ]
     )
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.result: List[str] = []
         self._skip_depth = 0
         self._title = ""
         self._in_title = False
 
-    def handle_starttag(self, tag: str, attrs):
+    def handle_starttag(self, tag: str, attrs) -> None:
         tag = tag.lower()
         if tag in self._SKIP_TAGS:
             self._skip_depth += 1
@@ -78,7 +78,7 @@ class _TagStripper(HTMLParser):
         if tag in self._BLOCK_TAGS:
             self.result.append("\n")
 
-    def handle_endtag(self, tag: str):
+    def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
         if tag in self._SKIP_TAGS and self._skip_depth > 0:
             self._skip_depth -= 1
@@ -87,7 +87,7 @@ class _TagStripper(HTMLParser):
         if tag in self._BLOCK_TAGS:
             self.result.append("\n")
 
-    def handle_data(self, data: str):
+    def handle_data(self, data: str) -> None:
         if self._in_title:
             self._title += data
         if self._skip_depth > 0:
@@ -142,7 +142,7 @@ class WebClip:
 
     __slots__ = ("id", "url", "title", "content", "created_at", "word_count")
 
-    def __init__(self, *, id: str, url: str, title: str, content: str, created_at: float = 0):
+    def __init__(self, *, id: str, url: str, title: str, content: str, created_at: float = 0) -> None:
         self.id = id
         self.url = url
         self.title = title
@@ -174,7 +174,7 @@ class WebClip:
 class ClipManager:
     """Manage web clips."""
 
-    def __init__(self, storage_dir: Optional[Path] = None):
+    def __init__(self, storage_dir: Optional[Path] = None) -> None:
         self._dir = storage_dir or CLIPS_DIR
         self._dir.mkdir(parents=True, exist_ok=True)
         self._db_path = self._dir / "clips.json"
@@ -326,12 +326,12 @@ def handle_clip_command(cmd: str, session=None, **kw) -> str:
         return f"❌ Failed to clip URL: {e}"
 
 
-def register_commands(router):
+def register_commands(router) -> None:
     """Register /clip commands."""
     router.register_prefix("/clip", handle_clip_command)
 
 
-def register_tools(registry_module=None):
+def register_tools(registry_module=None) -> None:
     """Register web clip tools."""
     try:
         from salmalm.tools.tool_registry import register_dynamic

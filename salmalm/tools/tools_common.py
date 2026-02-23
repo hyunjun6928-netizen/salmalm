@@ -249,7 +249,7 @@ def _is_private_url_follow_redirects(url: str, max_redirects: int = 5):
             # Use a custom opener that doesn't follow redirects
 
             class _NoRedirect(urllib.request.HTTPRedirectHandler):
-                def redirect_request(self, req, fp, code, msg, headers, newurl):
+                def redirect_request(self, req, fp, code, msg, headers, newurl) -> None:
                     raise urllib.error.HTTPError(newurl, code, msg, headers, fp)
 
             opener = urllib.request.build_opener(_NoRedirect)
@@ -281,13 +281,13 @@ def _make_pinned_opener(resolved_ip: str, hostname: str):
     import ssl  # noqa: F401
 
     class _PinnedHTTPConnection(http.client.HTTPConnection):
-        def connect(self):
+        def connect(self) -> None:
             self.host = resolved_ip
             super().connect()
             self.host = hostname  # Restore for Host header
 
     class _PinnedHTTPSConnection(http.client.HTTPSConnection):
-        def connect(self):
+        def connect(self) -> None:
             # Connect TCP to pinned IP, but use original hostname for SNI + cert check
             import socket as _sock
             self.sock = _sock.create_connection((resolved_ip, self.port or 443), self.timeout)

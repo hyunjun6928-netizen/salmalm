@@ -295,7 +295,7 @@ def _esc(s: str) -> str:
 class ProactiveDigest:
     """Generates morning/evening digest messages."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.dashboard = LifeDashboard()
         self._config = self._load_config()
 

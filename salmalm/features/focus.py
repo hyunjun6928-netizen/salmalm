@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 class FocusSession:
     """Single focus session data."""
 
-    def __init__(self, topic: str):
+    def __init__(self, topic: str) -> None:
         self.topic = topic
         self.start_time = time.time()
         self.end_time: Optional[float] = None
@@ -45,7 +45,7 @@ class FocusSession:
             return f"{m}분 {sec}초"
         return f"{sec}초"
 
-    def end(self):
+    def end(self) -> None:
         self.end_time = time.time()
 
     def to_dict(self) -> Dict:
@@ -63,7 +63,7 @@ class FocusSession:
 class FocusManager:
     """집중 모드 관리자."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._sessions: Dict[str, FocusSession] = {}  # user_id -> session
         self._history: list = []
 
@@ -228,7 +228,7 @@ async def handle_focus_command(cmd: str, session=None, **kw) -> Optional[str]:
 # ── Registration ──
 
 
-def register_focus_commands(command_router):
+def register_focus_commands(command_router) -> None:
     """Register /focus command."""
     from salmalm.features.commands import COMMAND_DEFS
 

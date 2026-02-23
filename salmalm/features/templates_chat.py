@@ -235,7 +235,7 @@ class Template:
 class TemplateManager:
     """Manage conversation templates."""
 
-    def __init__(self, templates_dir: Optional[Path] = None):
+    def __init__(self, templates_dir: Optional[Path] = None) -> None:
         self._dir = templates_dir or TEMPLATES_DIR
         self._dir.mkdir(parents=True, exist_ok=True)
         self._templates: Dict[str, Template] = {}
@@ -284,7 +284,7 @@ class TemplateManager:
             return self._templates.get(self._active)
         return None
 
-    def deactivate(self):
+    def deactivate(self) -> None:
         self._active = None
 
     def create(
@@ -369,12 +369,12 @@ def handle_template_command(cmd: str, session=None, **kw) -> str:
     return "❌ Usage: `/template list|use <name>|create <name>|off`"
 
 
-def register_commands(router):
+def register_commands(router) -> None:
     """Register /template commands."""
     router.register_prefix("/template", handle_template_command)
 
 
-def register_tools(registry_module=None):
+def register_tools(registry_module=None) -> None:
     """Register template tools."""
     try:
         from salmalm.tools.tool_registry import register_dynamic

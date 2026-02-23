@@ -19,7 +19,7 @@ API_BASE = "https://discord.com/api/v10"
 class DiscordBot:
     """Minimal Discord bot using Gateway WebSocket + REST API."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.token: Optional[str] = None
         self.owner_id: Optional[str] = None
         self._running = False
@@ -30,7 +30,7 @@ class DiscordBot:
         self._on_message: Optional[Callable] = None
         self._ws = None
 
-    def configure(self, token: str, owner_id: Optional[str] = None):
+    def configure(self, token: str, owner_id: Optional[str] = None) -> None:
         """Configure the Discord bot with token and channel settings."""
         self.token = token
         self.owner_id = owner_id
@@ -88,7 +88,7 @@ class DiscordBot:
             text = text[cut:].lstrip("\n")
         return chunks
 
-    def send_typing(self, channel_id: str):
+    def send_typing(self, channel_id: str) -> None:
         """Send typing indicator."""
         self._api("POST", f"/channels/{channel_id}/typing")
 
@@ -109,12 +109,12 @@ class DiscordBot:
 
         return asyncio.create_task(_loop())
 
-    def add_reaction(self, channel_id: str, message_id: str, emoji: str):
+    def add_reaction(self, channel_id: str, message_id: str, emoji: str) -> None:
         """Add an emoji reaction to a Discord message."""
         encoded = urllib.parse.quote(emoji)
         self._api("PUT", f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me")
 
-    def remove_reaction(self, channel_id: str, message_id: str, emoji: str):
+    def remove_reaction(self, channel_id: str, message_id: str, emoji: str) -> None:
         """Remove bot's own reaction from a Discord message."""
         encoded = urllib.parse.quote(emoji)
         self._api("DELETE", f"/channels/{channel_id}/messages/{message_id}/reactions/{encoded}/@me")
@@ -441,7 +441,7 @@ class DiscordBot:
             return f"❌ Command error: {str(e)[:200]}"
         return None
 
-    async def poll(self):
+    async def poll(self) -> None:
         """Main gateway loop."""
         if not self.token:
             log.warning("Discord token not configured")
@@ -469,7 +469,7 @@ class DiscordBot:
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 60)
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the Discord bot."""
         self._running = False
         try:

@@ -35,7 +35,7 @@ def select_model(model_override, user_message, tier, iteration, router):
     return model
 
 
-def trim_history(session, classification):
+def trim_history(session, classification) -> None:
     """Aggressive history trim for simple intents."""
     _INTENT_HISTORY_LIMIT = {"chat": 10, "memory": 10, "creative": 20}
     _hist_limit = _INTENT_HISTORY_LIMIT.get(classification["intent"])
@@ -58,7 +58,7 @@ def prune_session_context(session, model):
     return session.messages
 
 
-def record_usage(session_id, model, result, classification, iteration):
+def record_usage(session_id, model, result, classification, iteration) -> None:
     """Record API usage and audit log."""
     from salmalm.core.engine import record_response_usage, estimate_cost, audit_log
 
@@ -155,7 +155,7 @@ def finalize_response(result: dict, response: str) -> str:
     return response
 
 
-def auto_log_conversation(user_message: str, response: str, classification: dict):
+def auto_log_conversation(user_message: str, response: str, classification: dict) -> None:
     """Auto-log significant conversations to daily memory."""
     try:
         # Skip trivial exchanges

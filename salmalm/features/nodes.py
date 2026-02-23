@@ -44,7 +44,7 @@ NODES_CONFIG = DATA_DIR / "nodes.json"
 class SSHNode:
     """Remote node accessible via SSH."""
 
-    def __init__(self, name: str, host: str, user: str = "root", port: int = 22, key: Optional[str] = None):
+    def __init__(self, name: str, host: str, user: str = "root", port: int = 22, key: Optional[str] = None) -> None:
         self.name = name
         self.host = host
         self.user = user
@@ -164,7 +164,7 @@ class SSHNode:
 class HTTPNode:
     """Remote node accessible via HTTP agent protocol."""
 
-    def __init__(self, name: str, url: str, token: str = ""):
+    def __init__(self, name: str, url: str, token: str = "") -> None:
         self.name = name
         self.url = url.rstrip("/")
         self.token = token
@@ -229,10 +229,10 @@ class HTTPNode:
 class NodeManager:
     """Manages all remote nodes."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._nodes: Dict[str, object] = {}
 
-    def load_config(self):
+    def load_config(self) -> None:
         """Load nodes from nodes.json."""
         if not NODES_CONFIG.exists():
             return
@@ -259,7 +259,7 @@ class NodeManager:
         except Exception as e:
             log.error(f"Node config error: {e}")
 
-    def save_config(self):
+    def save_config(self) -> None:
         """Save node configs to JSON."""
         config = {}
         for name, node in self._nodes.items():
@@ -368,11 +368,11 @@ class NodeManager:
 class GatewayRegistry:
     """Gateway side: manages registered nodes that can execute tools remotely."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._nodes: Dict[str, dict] = {}  # node_id → {url, token, capabilities, last_heartbeat, status}
         self._gateway_token: str = ""  # Set via config to require auth for registration
 
-    def set_gateway_token(self, token: str):
+    def set_gateway_token(self, token: str) -> None:
         """Set the gateway authentication token. Nodes must provide this to register."""
         self._gateway_token = token
 
@@ -575,7 +575,7 @@ class NodeAgent:
         except Exception:
             return "127.0.0.1"
 
-    def start_heartbeat(self, interval: int = 30):
+    def start_heartbeat(self, interval: int = 30) -> None:
         """Start background heartbeat to gateway."""
         self._running = True
         import threading
@@ -598,7 +598,7 @@ class NodeAgent:
         self._heartbeat_thread = threading.Thread(target=_beat, daemon=True)  # type: ignore[assignment]
         self._heartbeat_thread.start()  # type: ignore[attr-defined]
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the node manager and close connections."""
         self._running = False
 

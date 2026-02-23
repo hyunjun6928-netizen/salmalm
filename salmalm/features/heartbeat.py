@@ -36,7 +36,7 @@ def load_cache_config() -> dict:
     return dict(_DEFAULT_CONFIG)
 
 
-def save_cache_config(config: dict):
+def save_cache_config(config: dict) -> None:
     """Save cache config."""
     try:
         _CACHE_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -48,13 +48,13 @@ def save_cache_config(config: dict):
 class CacheWarmer:
     """Periodically warm Anthropic prompt cache to prevent TTL expiry."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._last_warm: float = 0.0
         self._warm_count: int = 0
 
-    def start(self):
+    def start(self) -> None:
         """Start the cache warming background thread."""
         config = load_cache_config()
         if not config.get("warmingEnabled", False):
@@ -68,7 +68,7 @@ class CacheWarmer:
         self._thread.start()
         log.info(f"[CACHE] Cache warmer started (interval={config['warmingIntervalMinutes']}min)")
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the cache warming thread."""
         self._stop_event.set()
         if self._thread:
@@ -167,7 +167,7 @@ class HeartbeatManager:
         "timezone": "Asia/Seoul",
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._config = self._load_config()
 
     def _load_config(self) -> dict:
@@ -180,7 +180,7 @@ class HeartbeatManager:
             pass
         return cfg
 
-    def reload(self):
+    def reload(self) -> None:
         self._config = self._load_config()
 
     @property

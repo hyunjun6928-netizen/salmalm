@@ -314,7 +314,7 @@ class SandboxConfig:
 class SandboxResult:
     """Result of a sandboxed execution."""
 
-    def __init__(self, stdout: str = "", stderr: str = "", exit_code: int = -1, timed_out: bool = False):
+    def __init__(self, stdout: str = "", stderr: str = "", exit_code: int = -1, timed_out: bool = False) -> None:
         self.stdout = stdout
         self.stderr = stderr
         self.exit_code = exit_code

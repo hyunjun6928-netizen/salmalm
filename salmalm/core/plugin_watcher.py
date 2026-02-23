@@ -18,7 +18,7 @@ from salmalm.features.plugin_manager import PLUGINS_DIR, plugin_manager
 class PluginWatcher:
     """Polling-based watcher for plugin hot-reload."""
 
-    def __init__(self, interval: int = 3):
+    def __init__(self, interval: int = 3) -> None:
         self._interval = interval
         self._running = False
         self._thread: Optional[threading.Thread] = None

@@ -27,7 +27,7 @@ def _extract_tags(content: str) -> str:
 class ThoughtStream:
     """Quick thought capture with SQLite storage."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None) -> None:
         _ensure_dir()
         self.db_path = db_path or THOUGHTS_DB
         self._ensure_db()

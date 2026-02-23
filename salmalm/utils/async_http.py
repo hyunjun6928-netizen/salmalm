@@ -119,7 +119,7 @@ class AsyncHTTPClient:
         print(await resp.text())
     """
 
-    def __init__(self, default_timeout: float = 30):
+    def __init__(self, default_timeout: float = 30) -> None:
         self._default_timeout = default_timeout
 
     async def request(

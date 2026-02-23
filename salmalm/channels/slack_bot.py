@@ -15,13 +15,13 @@ API_BASE = "https://slack.com/api"
 class SlackBot:
     """Minimal Slack bot using Event API (webhook) + Web API (urllib)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.bot_token: Optional[str] = None
         self.signing_secret: Optional[str] = None
         self.bot_user_id: Optional[str] = None
         self._on_message: Optional[Callable] = None
 
-    def configure(self, bot_token: str, signing_secret: Optional[str] = None):
+    def configure(self, bot_token: str, signing_secret: Optional[str] = None) -> None:
         """Configure the Slack bot."""
         self.bot_token = bot_token
         self.signing_secret = signing_secret

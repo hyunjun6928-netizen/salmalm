@@ -17,7 +17,7 @@ class MessageDeduplicator:
     TTL: 60 seconds (default).
     """
 
-    def __init__(self, ttl: float = 60.0):
+    def __init__(self, ttl: float = 60.0) -> None:
         self._cache: Dict[str, float] = {}
         self._lock = threading.Lock()
         self._ttl = ttl

@@ -90,7 +90,7 @@ class Artifact:
 class ArtifactManager:
     """Manage conversation artifacts."""
 
-    def __init__(self, storage_dir: Optional[Path] = None):
+    def __init__(self, storage_dir: Optional[Path] = None) -> None:
         self._dir = storage_dir or ARTIFACTS_DIR
         self._dir.mkdir(parents=True, exist_ok=True)
         self._db_path = self._dir / "artifacts.json"
@@ -222,12 +222,12 @@ def handle_artifacts_command(cmd: str, session=None, **kw) -> str:
     return "❌ Usage: `/artifacts list|get <id>|export`"
 
 
-def register_commands(router):
+def register_commands(router) -> None:
     """Register /artifacts commands."""
     router.register_prefix("/artifacts", handle_artifacts_command)
 
 
-def register_tools(registry_module=None):
+def register_tools(registry_module=None) -> None:
     """Register artifact tools."""
     try:
         from salmalm.tools.tool_registry import register_dynamic

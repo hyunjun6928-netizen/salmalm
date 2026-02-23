@@ -23,7 +23,7 @@ from salmalm.channels.telegram_commands import TelegramCommandsMixin
 
 
 class TelegramBot(TelegramCommandsMixin):
-    def __init__(self):
+    def __init__(self) -> None:
         self.token: Optional[str] = None
         self.owner_id: Optional[str] = None
         self.offset = 0
@@ -35,7 +35,7 @@ class TelegramBot(TelegramCommandsMixin):
         # Typing indicator config: instant|message|never
         self.typing_mode = "instant"
 
-    def configure(self, token: str, owner_id: str):
+    def configure(self, token: str, owner_id: str) -> None:
         """Configure the Telegram bot with token and owner chat ID."""
         self.token = token
         self.owner_id = owner_id
@@ -375,7 +375,7 @@ class TelegramBot(TelegramCommandsMixin):
         except Exception as e:
             log.error(f"[TTS] OpenAI TTS API error: {e}")
 
-    def send_typing(self, chat_id):
+    def send_typing(self, chat_id) -> None:
         """Send a typing indicator to a Telegram chat."""
         try:
             self._api("sendChatAction", {"chat_id": chat_id, "action": "typing"})
@@ -398,7 +398,7 @@ class TelegramBot(TelegramCommandsMixin):
 
         return asyncio.create_task(_loop())
 
-    def edit_message(self, chat_id, message_id, text: str, parse_mode: Optional[str] = None):
+    def edit_message(self, chat_id, message_id, text: str, parse_mode: Optional[str] = None) -> None:
         """Edit an existing Telegram message."""
         data: Dict[str, Any] = {
             "chat_id": chat_id,
@@ -505,11 +505,11 @@ class TelegramBot(TelegramCommandsMixin):
             return False
         return secrets.compare_digest(secret_token, self._webhook_secret)
 
-    async def handle_webhook_update(self, update: dict):
+    async def handle_webhook_update(self, update: dict) -> None:
         """Process a single update received via webhook."""
         await self._handle_update(update)
 
-    async def poll(self):
+    async def poll(self) -> None:
         """Long-polling loop for Telegram updates."""
         self._running = True
         log.info(f"[NET] Telegram bot started (owner: {self.owner_id})")
@@ -871,7 +871,7 @@ class TelegramBot(TelegramCommandsMixin):
                 log.error(f"TTS error: {e}")
 
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the Telegram polling loop."""
         self._running = False
 

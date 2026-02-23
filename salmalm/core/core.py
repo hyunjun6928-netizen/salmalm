@@ -509,7 +509,7 @@ class ModelRouter:
 
     _MODEL_PREF_FILE = DATA_DIR / ".model_pref"  # noqa: F405
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.default_tier = 2
         self.force_model: Optional[str] = None
         # Restore persisted model preference

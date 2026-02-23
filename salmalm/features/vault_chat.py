@@ -72,7 +72,7 @@ class VaultChat:
     only when unlocked, and re-encrypted on every write and on close.
     """
 
-    def __init__(self, db_path: Optional[Path] = None, meta_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None, meta_path: Optional[Path] = None) -> None:
         self.db_path = db_path or VAULT_CHAT_DB
         self.meta_path = meta_path or VAULT_CHAT_META
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

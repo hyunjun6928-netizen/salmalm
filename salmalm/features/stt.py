@@ -35,7 +35,7 @@ def _load_config() -> dict:
 class STTManager:
     """Speech-to-text manager supporting Web Speech API and OpenAI Whisper."""
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: Optional[dict] = None) -> None:
         self.config = config or _load_config()
 
     @property

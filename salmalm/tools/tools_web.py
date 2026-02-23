@@ -50,23 +50,23 @@ def handle_web_fetch(args: dict) -> str:
     from html.parser import HTMLParser
 
     class _TextExtractor(HTMLParser):
-        def __init__(self):
+        def __init__(self) -> None:
             super().__init__()
             self._parts: list = []
             self._skip = False
             self._skip_tags = {"script", "style", "noscript", "svg"}
 
-        def handle_starttag(self, tag, attrs):
+        def handle_starttag(self, tag, attrs) -> None:
             if tag.lower() in self._skip_tags:
                 self._skip = True
             elif tag.lower() in ("br", "p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr"):
                 self._parts.append("\n")
 
-        def handle_endtag(self, tag):
+        def handle_endtag(self, tag) -> None:
             if tag.lower() in self._skip_tags:
                 self._skip = False
 
-        def handle_data(self, data):
+        def handle_data(self, data) -> None:
             if not self._skip:
                 self._parts.append(data)
 

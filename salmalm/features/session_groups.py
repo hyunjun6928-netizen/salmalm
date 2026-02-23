@@ -12,7 +12,7 @@ from salmalm.security.crypto import log
 class SessionGroupManager:
     """Manage session groups/folders for organizing conversations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._ensure_tables()
 
     def _ensure_tables(self):
