@@ -691,52 +691,38 @@
   /* On page load, check if there was a pending SSE request that got interrupted by refresh.
      Called after auth is complete and chat is loaded (from 95-events.js or init flow). */
   window._checkPendingRecovery=function(){
-    var pending=localStorage.getItem('salm_sse_pending');
-    if(!pending)return;
-    var pd;try{pd=JSON.parse(pending)}catch(e){localStorage.removeItem('salm_sse_pending');return}
-    var sid=pd.session||'web';
-    var prevCount=pd.prevCount||0;
-    var prevMsg=(pd.prevMsg||'').substring(0,100);
+    var sid=localStorage.getItem('salm_sse_pending');
+    if(!sid)return;
     localStorage.removeItem('salm_sse_pending');
-    /* Show recovery indicator */
-    addMsg('assistant','⏳ Recovering response after refresh...');
-    function _removeRecoveryMsg(){
-      var rows=chat.querySelectorAll('.msg-row');
-      for(var i=rows.length-1;i>=0;i--){var b=rows[i].querySelector('.bubble');if(b&&b.textContent.indexOf('Recovering')>-1){rows[i].remove();break}}
-    }
-    var polls=0;
+    /* Simple approach: wait for server to finish, then load last response */
+    var el=document.createElement('div');el.className='msg-row assistant';
+    el.innerHTML='<div class="avatar">😈</div><div class="bubble">⏳ Waiting for response...</div>';
+    el.id='recovery-msg';
+    chat.appendChild(el);chat.scrollTop=999999;
+    var polls=0;var lastCount=0;
     function _rpoll(){
       polls++;
       fetch('/api/sessions/'+encodeURIComponent(sid)+'/last',{headers:{'X-Session-Token':_tok}})
       .then(function(r){return r.json()}).then(function(d){
-        /* New response = msg_count increased OR last message content changed */
-        var newCount=d.msg_count||0;
-        var newMsg=(d.message||'').substring(0,100);
-        if(d.ok&&d.message&&(newCount>prevCount||newMsg!==prevMsg)){
-          _removeRecoveryMsg();
-          addMsg('assistant',d.message,'🔄 recovered after refresh');
-        }else if(polls<30){
-          setTimeout(_rpoll,2000);
+        var cnt=d.msg_count||0;
+        if(d.ok&&d.message&&cnt>lastCount&&polls>1){
+          /* msg_count grew between polls = new response arrived */
+          var rm=document.getElementById('recovery-msg');if(rm)rm.remove();
+          addMsg('assistant',d.message,'🔄 recovered');
         }else{
-          _removeRecoveryMsg();
-          addMsg('assistant','⚠️ Response may still be processing. Try refreshing again.');
+          lastCount=cnt;
+          if(polls<30)setTimeout(_rpoll,2000);
+          else{var rm2=document.getElementById('recovery-msg');if(rm2)rm2.remove();addMsg('assistant','⚠️ Response lost. Please resend.')}
         }
       }).catch(function(){if(polls<30)setTimeout(_rpoll,2000)});
     }
-    /* Wait 3s for server to start/finish processing */
-    setTimeout(_rpoll,3000);
+    _rpoll();
   };
 
   async function _sendViaSse(chatBody,_sendStart){
     try{
-      /* Mark pending so page refresh can recover — fetch server msg count for comparison */
-      try{
-        var _preR=await fetch('/api/sessions/'+encodeURIComponent(chatBody.session||'web')+'/last',{headers:{'X-Session-Token':_tok}});
-        var _preD=await _preR.json();
-        localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',prevCount:(_preD.msg_count||0),prevMsg:(_preD.message||'').substring(0,100)}));
-      }catch(e){
-        localStorage.setItem('salm_sse_pending',JSON.stringify({session:chatBody.session||'web',prevCount:0,prevMsg:''}));
-      }
+      /* Mark pending so page refresh can recover */
+      localStorage.setItem('salm_sse_pending',chatBody.session||'web');
       _currentAbort=new AbortController();
       var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify(chatBody),signal:_currentAbort.signal});
