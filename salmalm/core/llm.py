@@ -147,6 +147,73 @@ def _resolve_api_key(provider: str) -> Optional[str]:
     return vault.get(f"{provider}_api_key")
 
 
+def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
+    """Convert messages between provider formats to avoid role errors.
+    
+    - Anthropic only accepts 'user', 'assistant', 'system' roles
+    - OpenAI uses 'tool' role for tool results  
+    - Google uses 'model' instead of 'assistant'
+    """
+    if provider == "anthropic":
+        sanitized = []
+        for msg in messages:
+            role = msg.get("role", "")
+            if role == "tool":
+                # Convert OpenAI tool result → Anthropic user message with tool_result
+                sanitized.append({
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": msg.get("tool_call_id", "unknown"),
+                            "content": msg.get("content", ""),
+                        }
+                    ],
+                })
+            elif role == "model":
+                sanitized.append({**msg, "role": "assistant"})
+            else:
+                sanitized.append(msg)
+        return sanitized
+    elif provider == "google":
+        sanitized = []
+        for msg in messages:
+            role = msg.get("role", "")
+            if role == "assistant":
+                sanitized.append({**msg, "role": "model"})
+            elif role == "tool":
+                # Skip tool messages for Google — they use a different format
+                continue
+            elif role == "system":
+                # Google doesn't support system role — prepend to first user message
+                continue
+            else:
+                sanitized.append(msg)
+        return sanitized
+    elif provider in ("openai", "xai", "deepseek", "openrouter"):
+        # OpenAI-compatible: filter out Anthropic-specific content blocks
+        sanitized = []
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, list):
+                # Convert Anthropic content blocks to text
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict):
+                        if block.get("type") == "text":
+                            text_parts.append(block.get("text", ""))
+                        elif block.get("type") == "tool_result":
+                            text_parts.append(block.get("content", ""))
+                    elif isinstance(block, str):
+                        text_parts.append(block)
+                if text_parts:
+                    sanitized.append({**msg, "content": "\n".join(text_parts)})
+            else:
+                sanitized.append(msg)
+        return sanitized
+    return messages
+
+
 def call_llm(
     messages: List[Dict[str, Any]],
     model: Optional[str] = None,
@@ -188,6 +255,9 @@ def call_llm(
             "usage": {"input": 0, "output": 0},
             "model": model,
         }
+
+    # Sanitize messages for provider compatibility
+    messages = _sanitize_messages_for_provider(messages, provider)
 
     log.info(f"[BOT] LLM call: {model} ({len(messages)} msgs, tools={len(tools or [])})")
 
