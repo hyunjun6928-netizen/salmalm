@@ -79,12 +79,30 @@ class WebAuthMixin:
             if not pw:
                 return False  # Has password but no env var — show unlock screen
             return False
-        elif pw:
+        else:
+            # No vault file — auto-create from .vault_auto or env pw
+            _auto_pw = ""
             try:
-                vault.create(pw)
+                _pw_hint_file = VAULT_FILE.parent / ".vault_auto"  # noqa: F405
+                if _pw_hint_file.exists():
+                    _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
+                    if _hint:
+                        import base64 as _b64
+                        try:
+                            _auto_pw = _b64.b64decode(_hint).decode()
+                        except Exception:
+                            _auto_pw = _hint
+                elif pw:
+                    _auto_pw = pw
+            except Exception as e:
+                log.debug(f"Suppressed: {e}")
+            try:
+                vault.create(_auto_pw)
+                vault.unlock(_auto_pw, save_to_keychain=True)
+                log.info("[UNLOCK] Vault auto-created and unlocked from localhost")
                 return True
-            except RuntimeError:
-                log.warning("Vault create failed (cryptography not installed?)")
+            except RuntimeError as e:
+                log.warning(f"Vault create failed: {e}")
                 return False
         # No vault file, no env var → first run, handled by _needs_first_run
         return True
