@@ -477,7 +477,19 @@ class ModelRouter:
     def _has_key(self, provider: str) -> bool:
         """Has key."""
         if provider == "ollama":
-            return True  # Ollama always available (local)
+            # Check if Ollama is actually reachable (cached for 60s)
+            now = time.time()
+            if now - getattr(self, "_ollama_check_ts", 0) < 60:
+                return getattr(self, "_ollama_ok", False)
+            try:
+                import urllib.request
+                req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+                urllib.request.urlopen(req, timeout=1)
+                self._ollama_ok = True
+            except Exception:
+                self._ollama_ok = False
+            self._ollama_check_ts = now
+            return self._ollama_ok
         if provider in self._OR_PROVIDERS:
             return bool(vault.get("openrouter_api_key"))
         return bool(vault.get(f"{provider}_api_key"))

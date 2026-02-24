@@ -74,7 +74,7 @@ async def process_message(
     if not sess_lock.acquire(blocking=False):
         # Previous request still running — send abort signal and wait
         from salmalm.features.abort import abort_controller
-        abort_controller.request_abort(session_id)
+        abort_controller.set_abort(session_id)
         log.info(f"[ENGINE] Session {session_id} busy — aborting previous and waiting")
         acquired = sess_lock.acquire(timeout=15.0)
         if not acquired:
