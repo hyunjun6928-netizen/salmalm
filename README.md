@@ -36,11 +36,14 @@ First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 ## ⚡ Quick Start
 
 ```bash
-# Install
-pip install salmalm
+# Install (recommended)
+pipx install salmalm
+
+# Or with pip (in a venv)
+python3 -m venv ~/.salmalm-env && ~/.salmalm-env/bin/pip install salmalm
 
 # Run
-python3 -m salmalm --open
+salmalm --open
 # → Browser opens http://localhost:18800
 
 # Setup Wizard appears → paste API key → done!

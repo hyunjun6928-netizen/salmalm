@@ -35,11 +35,14 @@ python3 -m salmalm
 ## ⚡ 5분 퀵스타트
 
 ```bash
-# 1. 설치
-pip install salmalm
+# 1. 설치 (권장)
+pipx install salmalm
+
+# 또는 venv로
+python3 -m venv ~/.salmalm-env && ~/.salmalm-env/bin/pip install salmalm
 
 # 2. 실행
-python3 -m salmalm --open
+salmalm --open
 
 # 3. 브라우저에서 설정 마법사 → API 키 입력 → 대화 시작!
 ```
