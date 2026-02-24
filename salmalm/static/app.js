@@ -902,9 +902,20 @@
 
   /* ═══ 36-dosend.js ═══ */
   /* --- Send --- */
+  var _sending=false;
+  var _pendingQueue=[];
   async function doSend(){
     var _inputText=input.value.trim();
     if(!_inputText&&!pendingFile)return;
+    /* If already sending, queue the message instead of aborting */
+    if(_sending){
+      _pendingQueue.push({text:_inputText,files:pendingFiles.slice()});
+      input.value='';input.style.height='auto';
+      if(_inputText)addMsg('user',_inputText);
+      if(pendingFiles.length)window.clearFile();
+      return;
+    }
+    _sending=true;
     /* Client-side /rollback N command */
     var rollMatch=_inputText.match(/^\/rollback\s+(\d+)$/);
     if(rollMatch){
@@ -946,7 +957,7 @@
           var reader=new FileReader();
           var previewUrl=await new Promise(function(res){reader.onload=function(){res(reader.result)};reader.readAsDataURL(_f)});
           addMsg('user','<img src="'+previewUrl+'" style="max-width:300px;max-height:300px;border-radius:8px;display:block;margin:4px 0" alt="'+_f.name+'">');
-        }else{addMsg('user','[📎 '+_f.name+' Uploading...]')}
+        }
         var fd=new FormData();fd.append('file',_f);
         try{
           var ur=await fetch('/api/upload',{method:'POST',body:fd});
@@ -980,7 +991,9 @@
        * WS remains connected for real-time typing/thinking indicators only */
       await _sendViaSse(chatBody,_sendStart);
     }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ Error: '+se.message)}
-    finally{clearTimeout(_safetyTimer);btn.disabled=false;input.focus();var _sb2=document.getElementById('stop-btn');var _sb3=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb3)_sb3.style.display='flex';var _tr3=document.getElementById('typing-row');if(_tr3)_tr3.remove()}
+    finally{clearTimeout(_safetyTimer);_sending=false;btn.disabled=false;input.focus();var _sb2=document.getElementById('stop-btn');var _sb3=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb3)_sb3.style.display='flex';var _tr3=document.getElementById('typing-row');if(_tr3)_tr3.remove();
+      /* Process queued messages */
+      if(_pendingQueue.length){var _next=_pendingQueue.shift();input.value=_next.text;if(_next.files&&_next.files.length){window.setFiles(_next.files)}doSend()}}
   }
   window.doSend=doSend;
 
