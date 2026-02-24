@@ -124,10 +124,19 @@ class Vault:
         """Whether the vault has been unlocked with a valid password."""
         return self._password is not None
 
-    def create(self, password: str, save_to_keychain: bool = True) -> None:
-        """Create a new vault with the given master password."""
+    def create(self, password: str, save_to_keychain: bool = True, force: bool = False) -> None:
+        """Create a new vault with the given master password.
+
+        Args:
+            force: If False (default), refuse to overwrite an existing vault file.
+                   This prevents accidental data loss from stale create() calls.
+        """
         if not HAS_CRYPTO and not _ALLOW_FALLBACK:
             raise RuntimeError("Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1")
+        if not force and VAULT_FILE.exists():
+            raise RuntimeError(
+                "Vault already exists. Unlock it instead, or pass force=True to overwrite."
+            )
         self._password = password
         self._salt = secrets.token_bytes(16)
         self._data = {}

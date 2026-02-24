@@ -158,10 +158,19 @@ class TestKeychainIntegration(unittest.TestCase):
         with patch.dict('sys.modules', {'keyring': mock_kr}):
             v = Vault()
             with patch.object(v, '_save'):
-                v.create("mypass", save_to_keychain=True)
+                v.create("mypass", save_to_keychain=True, force=True)
                 mock_kr.set_password.assert_called_once_with(
                     _KEYCHAIN_SERVICE, _KEYCHAIN_ACCOUNT, "mypass"
                 )
+
+    def test_vault_create_refuses_overwrite(self):
+        """Vault.create() refuses to overwrite existing vault by default."""
+        from salmalm.security.crypto import Vault
+        v = Vault()
+        v.create("first", force=True)
+        # Now VAULT_FILE exists — create without force should raise
+        with self.assertRaises(RuntimeError):
+            v.create("second")
 
     def test_vault_create_skip_keychain(self):
         """Vault.create() with save_to_keychain=False skips keychain."""
@@ -171,5 +180,5 @@ class TestKeychainIntegration(unittest.TestCase):
         with patch.dict('sys.modules', {'keyring': mock_kr}):
             v = Vault()
             with patch.object(v, '_save'):
-                v.create("mypass", save_to_keychain=False)
+                v.create("mypass", save_to_keychain=False, force=True)
                 mock_kr.set_password.assert_not_called()

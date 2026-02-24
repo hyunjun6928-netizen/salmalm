@@ -195,7 +195,10 @@ def _try_vault_auto_file() -> None:
         if _hint:
             import base64 as _b64
 
-            _auto_pw = _b64.b64decode(_hint).decode()
+            try:
+                _auto_pw = _b64.b64decode(_hint).decode()
+            except Exception:
+                _auto_pw = _hint  # Plain text fallback
         else:
             _auto_pw = ""
         if vault.unlock(_auto_pw, save_to_keychain=True):

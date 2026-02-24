@@ -124,7 +124,7 @@ class TestE2EVaultOpenClose(unittest.TestCase):
                 self.skipTest('cryptography not installed')
         from salmalm.security.crypto import Vault
         v = Vault()
-        v.create('test_password_123')
+        v.create('test_password_123', force=True)
         self.assertTrue(v.is_unlocked)
         v.set('api_key', 'sk-test')
         self.assertEqual(v.get('api_key'), 'sk-test')

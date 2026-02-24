@@ -388,6 +388,7 @@ class TestCryptography(unittest.TestCase):
         v = Vault()
         with tempfile.NamedTemporaryFile(suffix='.vault', delete=False) as f:
             temp_path = f.name
+        os.unlink(temp_path)  # Remove so vault.create() sees no existing file
         try:
             from unittest.mock import patch
             with patch('salmalm.security.crypto.VAULT_FILE', Path(temp_path)):
