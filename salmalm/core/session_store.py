@@ -86,10 +86,16 @@ class Session:
             saveable = []
             for m in self.messages[-_PERSIST_MESSAGE_LIMIT:]:  # Keep last 50 messages
                 if isinstance(m.get("content"), list):
-                    # Multimodal — save text parts only
-                    texts = [b for b in m["content"] if b.get("type") == "text"]
-                    if texts:
-                        saveable.append({**m, "content": texts})
+                    # Multimodal — replace base64 images with placeholder, keep text
+                    parts = []
+                    for b in m["content"]:
+                        if b.get("type") == "text":
+                            parts.append(b)
+                        elif b.get("type") == "image":
+                            # Replace heavy base64 with marker so context is preserved
+                            parts.append({"type": "text", "text": "[Image was attached to this message]"})
+                    if parts:
+                        saveable.append({**m, "content": parts})
                 elif isinstance(m.get("content"), str):
                     saveable.append(m)
             conn = _get_db()
