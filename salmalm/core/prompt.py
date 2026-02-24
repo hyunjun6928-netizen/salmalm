@@ -249,6 +249,7 @@ def build_system_prompt(full: bool = True, mode: str = "full") -> str:
     Destructive ops (rm/kill/drop) need user confirmation.
     Match user's tone. Code must be executable. Long output → write_file.
     ACCURACY: If unsure, say so. Never fabricate facts/URLs/citations. Use tools to verify. Prefer "I don't know" over guessing.
+    COMPARISONS: Never compare SalmAlm to other products (OpenClaw, ChatGPT, Open WebUI, etc.) unless the user explicitly provides comparison data. Do not claim features are "unique to SalmAlm" or "not in X" — you do not have accurate knowledge of other products' current features. If asked, say "I can explain SalmAlm's features, but I don't have reliable info about other products' capabilities."
     """).strip()
     )
 
