@@ -64,6 +64,10 @@
     var _sendBtnEl=document.getElementById('send-btn');
     if(_stopBtn){_stopBtn.style.display='flex'}
     if(_sendBtnEl){_sendBtnEl.style.display='none'}
+    /* Safety timeout: if typing still showing after 3 minutes, force cleanup */
+    var _safetyTimer=setTimeout(function(){
+      var tr=document.getElementById('typing-row');if(tr){tr.remove();addMsg('assistant','⚠️ '+(t('timeout-msg')||'Response timed out. Please try again.'));btn.disabled=false;var sb=document.getElementById('stop-btn');var sb2=document.getElementById('send-btn');if(sb)sb.style.display='none';if(sb2)sb2.style.display='flex'}
+    },180000);
     var _sendStart=Date.now();
     _wsSendStart=_sendStart;
     var chatBody={message:msg,session:_currentSession,lang:_lang};
@@ -73,6 +77,6 @@
        * WS remains connected for real-time typing/thinking indicators only */
       await _sendViaSse(chatBody,_sendStart);
     }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ Error: '+se.message)}
-    finally{btn.disabled=false;input.focus();var _sb2=document.getElementById('stop-btn');var _sb3=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb3)_sb3.style.display='flex';var _tr3=document.getElementById('typing-row');if(_tr3)_tr3.remove()}
+    finally{clearTimeout(_safetyTimer);btn.disabled=false;input.focus();var _sb2=document.getElementById('stop-btn');var _sb3=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb3)_sb3.style.display='flex';var _tr3=document.getElementById('typing-row');if(_tr3)_tr3.remove()}
   }
   window.doSend=doSend;

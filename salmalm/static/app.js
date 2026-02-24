@@ -966,6 +966,10 @@
     var _sendBtnEl=document.getElementById('send-btn');
     if(_stopBtn){_stopBtn.style.display='flex'}
     if(_sendBtnEl){_sendBtnEl.style.display='none'}
+    /* Safety timeout: if typing still showing after 3 minutes, force cleanup */
+    var _safetyTimer=setTimeout(function(){
+      var tr=document.getElementById('typing-row');if(tr){tr.remove();addMsg('assistant','⚠️ '+(t('timeout-msg')||'Response timed out. Please try again.'));btn.disabled=false;var sb=document.getElementById('stop-btn');var sb2=document.getElementById('send-btn');if(sb)sb.style.display='none';if(sb2)sb2.style.display='flex'}
+    },180000);
     var _sendStart=Date.now();
     _wsSendStart=_sendStart;
     var chatBody={message:msg,session:_currentSession,lang:_lang};
@@ -975,7 +979,7 @@
        * WS remains connected for real-time typing/thinking indicators only */
       await _sendViaSse(chatBody,_sendStart);
     }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ Error: '+se.message)}
-    finally{btn.disabled=false;input.focus();var _sb2=document.getElementById('stop-btn');var _sb3=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb3)_sb3.style.display='flex';var _tr3=document.getElementById('typing-row');if(_tr3)_tr3.remove()}
+    finally{clearTimeout(_safetyTimer);btn.disabled=false;input.focus();var _sb2=document.getElementById('stop-btn');var _sb3=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb3)_sb3.style.display='flex';var _tr3=document.getElementById('typing-row');if(_tr3)_tr3.remove()}
   }
   window.doSend=doSend;
 
@@ -1090,7 +1094,7 @@ window._i18n={
       'img-too-large':'Image too large (max 5MB)','mic-denied':'Microphone access denied.','mic-hint-localhost':'💡 Try accessing via http://localhost:18800 instead of 127.0.0.1 (Chrome requires secure context for microphone).',
       'rollback-done':'⏪ Rolled back','rollback-pairs':'message pair(s).',
       'rollback-fail':'❌ Rollback failed:','branch-fail':'❌ Branch failed:',
-      'upload-fail':'❌ Upload failed:','upload-error':'❌ Upload error:',
+      'upload-fail':'❌ Upload failed:','upload-error':'❌ Upload error:','timeout-msg':'Response timed out. Please try again.',
       'btn-edit':'Edit','btn-delete':'Delete',
       'confirm-delete-msg':'Delete this message and its response?',
       'confirm-regen-after-edit':'Regenerate response after edit?',
@@ -1210,7 +1214,7 @@ window._i18n={
       'img-too-large':'이미지가 너무 큽니다 (최대 5MB)','mic-denied':'마이크 접근이 거부되었습니다.','mic-hint-localhost':'💡 127.0.0.1 대신 http://localhost:18800 으로 접속해보세요 (Chrome은 보안 컨텍스트에서만 마이크를 허용합니다).',
       'rollback-done':'⏪ 되돌리기 완료:','rollback-pairs':'개의 메시지 쌍',
       'rollback-fail':'❌ 되돌리기 실패:','branch-fail':'❌ 분기 실패:',
-      'upload-fail':'❌ 업로드 실패:','upload-error':'❌ 업로드 오류:',
+      'upload-fail':'❌ 업로드 실패:','upload-error':'❌ 업로드 오류:','timeout-msg':'응답 시간이 초과되었습니다. 다시 시도해주세요.',
       'btn-edit':'편집','btn-delete':'삭제',
       'confirm-delete-msg':'이 메시지와 응답을 삭제하시겠습니까?',
       'confirm-regen-after-edit':'편집 후 응답을 재생성하시겠습니까?',

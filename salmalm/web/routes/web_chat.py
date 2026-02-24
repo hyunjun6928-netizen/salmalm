@@ -109,14 +109,18 @@ class WebChatMixin:
                     send_sse("ui_cmd", cmd)
             except Exception as e:
                 log.debug(f"Suppressed: {e}")
-            send_sse(
-                "done",
-                {
-                    "response": response,
-                    "model": getattr(_sess2, "last_model", router.force_model or "auto"),
-                    "complexity": getattr(_sess2, "last_complexity", "auto"),
-                },
-            )
+            try:
+                send_sse(
+                    "done",
+                    {
+                        "response": response,
+                        "model": getattr(_sess2, "last_model", router.force_model or "auto"),
+                        "complexity": getattr(_sess2, "last_complexity", "auto"),
+                    },
+                )
+                log.info(f"[SSE] Done event sent ({len(response)} chars)")
+            except Exception as done_err:
+                log.error(f"[SSE] Failed to send done event: {done_err}")
             try:
                 self.wfile.write(b"event: close\ndata: {}\n\n")
                 self.wfile.flush()
