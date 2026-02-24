@@ -84,7 +84,8 @@
       if(typingEl)typingEl.remove();
       var _secs=((Date.now()-_wsSendStart)/1000).toFixed(1);
       var _wcIcons={simple:'⚡',moderate:'🔧',complex:'💎'};
-      var _wcLabel=data.complexity&&data.complexity!=='auto'?(_wcIcons[data.complexity]||'')+data.complexity+' → ':'';
+      var _wcLabel=data.complexity&&data.complexity!=='auto'&&data.complexity!=='manual'?(_wcIcons[data.complexity]||'')+data.complexity+' → ':'';
+      if(data.complexity==='manual')_isAutoRouting=false;
       var _wmShort=(data.model||'').split('/').pop();
       addMsg('assistant',data.text||'',_wcLabel+_wmShort+' · ⏱️'+_secs+'s');
       if(_wmShort)modelBadge.textContent=_isAutoRouting?'Auto → '+_wmShort:_wmShort;

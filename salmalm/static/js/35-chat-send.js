@@ -106,7 +106,8 @@
             if(chat.style.display==='none'&&window.showChat)window.showChat();
             var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
             var _cIcons={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
-            var _cLabel=edata.complexity&&edata.complexity!=='auto'?(_cIcons[edata.complexity]||'')+edata.complexity+' → ':'';
+            var _cLabel=edata.complexity&&edata.complexity!=='auto'&&edata.complexity!=='manual'?(_cIcons[edata.complexity]||'')+edata.complexity+' → ':'';
+            if(edata.complexity==='manual')_isAutoRouting=false;
             var _mShort=(edata.model||'').split('/').pop();
             var _sMeta=(_cLabel||'')+(_mShort||'');if(_sMeta)_sMeta+=' · ';_sMeta+='⏱️'+_secs+'s';addMsg('assistant',edata.response||'',_sMeta);
             modelBadge.textContent=_mShort?(_isAutoRouting?'Auto → '+_mShort:_mShort):'auto routing';
@@ -128,7 +129,8 @@
             if(chat.style.display==='none'&&window.showChat)window.showChat();
             var _secs3=((Date.now()-_sendStart)/1000).toFixed(1);
             var _cI2={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
-            var _cL2=edata2.complexity&&edata2.complexity!=='auto'?(_cI2[edata2.complexity]||'')+edata2.complexity+' → ':'';
+            var _cL2=edata2.complexity&&edata2.complexity!=='auto'&&edata2.complexity!=='manual'?(_cI2[edata2.complexity]||'')+edata2.complexity+' → ':'';
+            if(edata2.complexity==='manual')_isAutoRouting=false;
             var _mS2=(edata2.model||'').split('/').pop();
             var _sM2=(_cL2||'')+(_mS2||'');if(_sM2)_sM2+=' · ';_sM2+='⏱️'+_secs3+'s';addMsg('assistant',edata2.response||'',_sM2);
             modelBadge.textContent=_mS2?(_isAutoRouting?'Auto → '+_mS2:_mS2):'auto routing';
