@@ -45,7 +45,30 @@ class WebSetupMixin:
 
     def _needs_first_run(self) -> bool:
         """True if vault file doesn't exist and no env password — brand new install."""
-        return not VAULT_FILE.exists() and not os.environ.get("SALMALM_VAULT_PW", "")  # noqa: F405
+        if VAULT_FILE.exists():  # noqa: F405
+            return False
+        if os.environ.get("SALMALM_VAULT_PW", ""):
+            return False
+        # If .vault_auto exists, auto-create vault with that password
+        try:
+            _pw_hint_file = VAULT_FILE.parent / ".vault_auto"  # noqa: F405
+            if _pw_hint_file.exists():
+                _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
+                if _hint:
+                    import base64
+                    try:
+                        _auto_pw = base64.b64decode(_hint).decode()
+                    except Exception:
+                        _auto_pw = _hint
+                else:
+                    _auto_pw = ""
+                vault.create(_auto_pw)
+                vault.unlock(_auto_pw, save_to_keychain=True)
+                log.info("[SETUP] Vault auto-created from .vault_auto")
+                return False
+        except Exception as e:
+            log.debug(f"vault_auto create failed: {e}")
+        return True
 
     # ── Extracted GET handlers ────────────────────────────────
 
