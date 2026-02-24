@@ -268,6 +268,12 @@ class WebSetupMixin:
         persona = body.get("persona", "expert")
         if model and model != "auto":
             vault.set("default_model", model)
+            # Also persist to router's model pref file so it takes effect immediately
+            try:
+                from salmalm.core.llm_router import router
+                router.set_force_model(model)
+            except Exception:
+                pass
         # Write SOUL.md persona template
         persona_templates = {
             "expert": "# SOUL.md\n\nYou are a professional AI expert. Be precise, detail-oriented, and thorough in your responses. Use technical language when appropriate and always provide well-structured answers.",

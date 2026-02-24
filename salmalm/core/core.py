@@ -418,13 +418,20 @@ class ModelRouter:
         """Init  ."""
         self.default_tier = 2
         self.force_model: Optional[str] = None
-        # Restore persisted model preference
+        # Restore persisted model preference (check .model_pref file first, then vault)
         try:
             if self._MODEL_PREF_FILE.exists():
                 saved = self._MODEL_PREF_FILE.read_text().strip()
                 if saved and saved != "auto":
                     self.force_model = saved
                     log.info(f"[FIX] Restored model preference: {saved}")
+            if not self.force_model:
+                # Fallback: check vault (set by setup wizard)
+                from salmalm.security.crypto import vault
+                vault_model = vault.get("default_model", "")
+                if vault_model and vault_model != "auto":
+                    self.force_model = vault_model
+                    log.info(f"[FIX] Restored model from vault: {vault_model}")
         except Exception as e:
             log.debug(f"Suppressed: {e}")
 
