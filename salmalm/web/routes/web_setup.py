@@ -266,14 +266,17 @@ class WebSetupMixin:
         # Save model + persona preferences from setup wizard
         model = body.get("model", "auto")
         persona = body.get("persona", "expert")
+        log.info(f"[SETUP] Onboarding preferences: model={model!r}, persona={persona!r}")
         if model and model != "auto":
             vault.set("default_model", model)
+            log.info(f"[SETUP] Saved model to vault: {model}")
             # Also persist to router's model pref file so it takes effect immediately
             try:
-                from salmalm.core.llm_router import router
+                from salmalm.core.core import router
                 router.set_force_model(model)
-            except Exception:
-                pass
+                log.info(f"[SETUP] Applied model to router: {model}, force_model={router.force_model}")
+            except Exception as e:
+                log.warning(f"[SETUP] Failed to set router model: {e}")
         # Write SOUL.md persona template
         persona_templates = {
             "expert": "# SOUL.md\n\nYou are a professional AI expert. Be precise, detail-oriented, and thorough in your responses. Use technical language when appropriate and always provide well-structured answers.",
