@@ -288,6 +288,9 @@ class SystemMixin:
         """
         origin = self.headers.get("Origin", "")
         # Layer 1: If Origin is present, it must be whitelisted
+        if self._ALLOWED_ORIGINS is None:
+            from salmalm.web.web import WebHandler
+            WebHandler._ALLOWED_ORIGINS = WebHandler._build_allowed_origins()
         if origin and origin not in self._ALLOWED_ORIGINS:
             log.warning(f"[BLOCK] CSRF blocked: Origin={origin} on {self.path}")
             self.send_response(403)
