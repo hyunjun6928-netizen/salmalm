@@ -53,6 +53,9 @@ class WebSessionsMixin:
                 except Exception as e:  # noqa: broad-except
                     title = sid
                     msg_count = 0
+            # Skip ghost sessions: no title and no user/assistant messages
+            if not stored_title and msg_count == 0 and sid != "web":
+                continue
             entry = {
                 "id": sid,
                 "title": title or sid,

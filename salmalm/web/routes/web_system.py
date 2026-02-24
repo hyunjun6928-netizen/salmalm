@@ -123,15 +123,18 @@ class SystemMixin:
         from urllib.parse import parse_qs, urlparse
         qs = parse_qs(urlparse(self.path).query)
         _sid = qs.get("session", ["web"])[0]
-        _effective_model = router.force_model or "auto"
+        # Session-level override takes absolute precedence (including "auto")
+        _effective_model = "auto"
         try:
             from salmalm.core import get_session
             _sess = get_session(_sid)
             _ov = getattr(_sess, "model_override", None)
-            if _ov and _ov != "auto":
-                _effective_model = _ov
+            if _ov:
+                _effective_model = _ov  # "auto" or specific model
+            elif router.force_model:
+                _effective_model = router.force_model  # global fallback
         except Exception:
-            pass
+            _effective_model = router.force_model or "auto"
         self._json(
             {
                 "app": APP_NAME,

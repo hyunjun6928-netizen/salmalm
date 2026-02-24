@@ -118,11 +118,9 @@
     localStorage.removeItem('salm_chat');
     chat.innerHTML='';
     addMsg('system',t('new-session-msg'));
-    /* Register new session on server immediately so it appears in sidebar */
-    fetch('/api/sessions/create',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
-      body:JSON.stringify({session_id:sid})})
-    .then(function(){loadSessionList()})
-    .catch(function(){loadSessionList()});
+    /* Session is registered on server when first message is sent (lazy create).
+       This prevents ghost sessions from accumulating in the sidebar. */
+    loadSessionList();
     var sb=document.getElementById('sidebar');if(sb&&sb.classList.contains('open'))toggleSidebar();
   };
 
