@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import time
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -152,7 +153,45 @@ def get_api_key(provider: str) -> Optional[str]:
                     key = vault.get(prov_cfg["alt_env_key"].lower())
         except Exception as e:
             log.debug(f"Suppressed: {e}")
+    # Fallback: detect CLI OAuth tokens (Codex CLI / Claude Code)
+    if not key:
+        key = _detect_cli_token(provider)
     return key
+
+
+def _detect_cli_token(provider: str) -> Optional[str]:
+    """Auto-detect OAuth tokens from Codex CLI or Claude Code installations."""
+    home = Path.home()
+    try:
+        if provider == "openai":
+            # Codex CLI: ~/.codex/auth.json
+            codex_auth = home / ".codex" / "auth.json"
+            if codex_auth.exists():
+                data = json.loads(codex_auth.read_text(encoding="utf-8"))
+                token = data.get("token") or data.get("access_token") or data.get("api_key")
+                if token:
+                    log.info("[CLI] Auto-detected OpenAI token from Codex CLI (~/.codex/auth.json)")
+                    return token
+            # OpenAI CLI: ~/.openai/auth.json
+            openai_auth = home / ".openai" / "auth.json"
+            if openai_auth.exists():
+                data = json.loads(openai_auth.read_text(encoding="utf-8"))
+                token = data.get("token") or data.get("access_token") or data.get("api_key")
+                if token:
+                    log.info("[CLI] Auto-detected OpenAI token from ~/.openai/auth.json")
+                    return token
+        elif provider == "anthropic":
+            # Claude Code: ~/.claude/auth.json or ~/.claude.json
+            for p in [home / ".claude" / "auth.json", home / ".claude.json"]:
+                if p.exists():
+                    data = json.loads(p.read_text(encoding="utf-8"))
+                    token = data.get("token") or data.get("access_token") or data.get("api_key") or data.get("sessionKey")
+                    if token:
+                        log.info(f"[CLI] Auto-detected Anthropic token from Claude Code ({p})")
+                        return token
+    except Exception as e:
+        log.debug(f"CLI token detection failed: {e}")
+    return None
 
 
 def detect_ollama(base_url: str = "") -> dict:
