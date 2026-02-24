@@ -223,6 +223,20 @@ class WebAuthMixin:
             self._json({"error": str(e)}, 400)
         return
 
+    def _post_api_auto_unlock(self):
+        """Auto-unlock vault from .vault_auto — called by unlock page on load."""
+        if vault.is_unlocked:
+            token = secrets.token_hex(32)
+            self._json({"ok": True, "token": token})
+            return
+        # Try auto-unlock
+        if self._auto_unlock_localhost():
+            audit_log("unlock", "vault auto-unlocked from page load")
+            token = secrets.token_hex(32)
+            self._json({"ok": True, "token": token})
+        else:
+            self._json({"ok": False}, 401)
+
     def _post_api_unlock(self):
         """Post api unlock."""
         body = self._body

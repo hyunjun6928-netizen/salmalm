@@ -71,7 +71,7 @@ def handle_google_calendar(args: dict) -> str:
             f"{base_url}/events?timeMin={time_min}&timeMax={time_max}&maxResults=20&singleEvents=true&orderBy=startTime"
         )
         req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
         events = data.get("items", [])
         if not events:
@@ -105,7 +105,7 @@ def handle_google_calendar(args: dict) -> str:
         req = urllib.request.Request(
             f"{base_url}/events", data=body, headers={**headers, "Content-Type": "application/json"}, method="POST"
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             result = json.loads(resp.read())
         return f"📅 Event created: **{result.get('summary')}** ({result.get('htmlLink', '')})"
 
@@ -114,7 +114,7 @@ def handle_google_calendar(args: dict) -> str:
         if not event_id:
             return "❌ event_id is required for delete"
         req = urllib.request.Request(f"{base_url}/events/{event_id}", headers=headers, method="DELETE")
-        urllib.request.urlopen(req, timeout=15)
+        urllib.request.urlopen(req, timeout=10)
         return f"📅 Event deleted: {event_id}"
 
     return f"❌ Unknown calendar action: {action}"
@@ -133,7 +133,7 @@ def _gmail_list(args: dict, base_url: str, headers: dict) -> str:
     elif label:
         params += f"&labelIds={label}"
     req = urllib.request.Request(f"{base_url}/messages?{params}", headers=headers)
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with urllib.request.urlopen(req, timeout=10) as resp:
         data = json.loads(resp.read())
     messages = data.get("messages", [])
     if not messages:
@@ -168,7 +168,7 @@ def handle_gmail(args: dict) -> str:
             return "❌ message_id is required for read"
         url = f"{base_url}/messages/{msg_id}?format=full"
         req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             msg = json.loads(resp.read())
         hdrs = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
         subj = hdrs.get("Subject", "(no subject)")
@@ -213,7 +213,7 @@ def handle_gmail(args: dict) -> str:
             headers={**headers, "Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             result = json.loads(resp.read())
         return f"📧 Email sent to {to} (ID: {result.get('id', '?')})"
 
