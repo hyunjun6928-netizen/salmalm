@@ -229,13 +229,46 @@ class WebAuthMixin:
             token = secrets.token_hex(32)
             self._json({"ok": True, "token": token})
             return
+        ip = self._get_client_ip()
+        if ip not in ("127.0.0.1", "::1", "localhost"):
+            self._json({"ok": False}, 401)
+            return
         # Try auto-unlock
         if self._auto_unlock_localhost():
             audit_log("unlock", "vault auto-unlocked from page load")
             token = secrets.token_hex(32)
             self._json({"ok": True, "token": token})
-        else:
-            self._json({"ok": False}, 401)
+            return
+        # Nuclear option: on localhost, if vault_auto exists but unlock fails,
+        # the vault was created with a different password (upgrade artifact).
+        # Delete and recreate from .vault_auto.
+        try:
+            _pw_hint_file = VAULT_FILE.parent / ".vault_auto"  # noqa: F405
+            if _pw_hint_file.exists() and VAULT_FILE.exists():  # noqa: F405
+                _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
+                if _hint:
+                    import base64 as _b64
+                    try:
+                        _auto_pw = _b64.b64decode(_hint).decode()
+                    except Exception:
+                        _auto_pw = _hint
+                else:
+                    _auto_pw = ""
+                # Backup old vault then recreate
+                _bak = VAULT_FILE.with_suffix(".vault.enc.bak")  # noqa: F405
+                import shutil
+                shutil.copy2(str(VAULT_FILE), str(_bak))  # noqa: F405
+                VAULT_FILE.unlink()  # noqa: F405
+                log.warning("[VAULT] Auto-unlock failed — resetting vault from .vault_auto (backup saved)")
+                vault.create(_auto_pw)
+                vault.unlock(_auto_pw, save_to_keychain=True)
+                audit_log("unlock", "vault reset and auto-unlocked from .vault_auto")
+                token = secrets.token_hex(32)
+                self._json({"ok": True, "token": token})
+                return
+        except Exception as e:
+            log.error(f"[VAULT] Auto-reset failed: {e}")
+        self._json({"ok": False}, 401)
 
     def _post_api_unlock(self):
         """Post api unlock."""

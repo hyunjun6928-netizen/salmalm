@@ -69,12 +69,12 @@ async function unlock(){
   btn.disabled=false;btn.textContent='Unlock';
 }
 document.getElementById('unlock-btn').addEventListener('click',()=>unlock());
-/* Auto-unlock on page load — try empty password first, then trigger server-side auto-unlock */
+/* Auto-unlock on page load — server tries .vault_auto, resets vault if needed */
 (async function(){
   try{
-    var r=await fetch('/api/auto-unlock',{method:'POST',headers:{'Content-Type':'application/json'}});
+    var r=await fetch('/api/auto-unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     var d=await r.json();
-    if(d.ok){sessionStorage.setItem('tok',d.token||'');location.reload();return}
+    if(d.ok){sessionStorage.setItem('tok',d.token||'');localStorage.setItem('salm_token',d.token||'');location.href='/'}
   }catch(e){}
 })();
 document.getElementById('login-btn').addEventListener('click',()=>loginUser());
