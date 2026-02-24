@@ -450,22 +450,26 @@ class ModelRouter:
         if iteration > 2:
             return self._pick_available(2)
 
-        # Tier 3: complex tasks
+        # Determine current message tier
         complex_score = sum(1 for kw in COMPLEX_INDICATORS if kw in msg)  # noqa: F405
         tool_hint_score = sum(1 for kw in TOOL_HINT_KEYWORDS if kw in msg)  # noqa: F405
+
         if complex_score >= 2 or msg_len > 1000 or (complex_score >= 1 and tool_hint_score >= 1):
-            return self._pick_available(3)
+            tier = 3
+        elif has_tools and (tool_hint_score >= 1 or msg_len > 300):
+            tier = 2
+        elif msg_len < SIMPLE_QUERY_MAX_CHARS and not has_tools and complex_score == 0:  # noqa: F405
+            tier = 1
+        else:
+            tier = 2
 
-        # Tier 2: tool usage likely or medium complexity
-        if has_tools and (tool_hint_score >= 1 or msg_len > 300):
-            return self._pick_available(2)
+        # Session tier momentum: don't drop more than 1 tier from recent high.
+        # Prevents "멀었노?" (short follow-up) from falling to haiku mid-task.
+        prev_tier = getattr(self, "_last_tier", 1)
+        tier = max(tier, prev_tier - 1)
+        self._last_tier = tier
 
-        # Tier 1: simple queries only
-        if msg_len < SIMPLE_QUERY_MAX_CHARS and not has_tools and complex_score == 0:  # noqa: F405
-            return self._pick_available(1)
-
-        # Tier 2: default
-        return self._pick_available(2)
+        return self._pick_available(tier)
 
     _OR_PROVIDERS = frozenset(["deepseek", "meta-llama", "mistralai", "qwen"])
 
