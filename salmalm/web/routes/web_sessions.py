@@ -159,6 +159,30 @@ class WebSessionsMixin:
         audit_log("session_delete", sid, session_id=sid, detail_dict={"session_id": sid})
         self._json({"ok": True})
 
+    def _post_api_sessions_clear(self):
+        """Delete all sessions except the specified one (or 'web')."""
+        body = self._body
+        if not self._require_auth("user"):
+            return
+        keep = body.get("keep", "web")
+        from salmalm.core import _sessions, _get_db
+
+        conn = _get_db()
+        # Get all session ids except the one to keep
+        rows = conn.execute(
+            "SELECT session_id FROM session_store WHERE session_id != ?", (keep,)
+        ).fetchall()
+        deleted = 0
+        for r in rows:
+            sid = r[0]
+            if sid in _sessions:
+                del _sessions[sid]
+            deleted += 1
+        conn.execute("DELETE FROM session_store WHERE session_id != ?", (keep,))
+        conn.commit()
+        audit_log("session_clear", keep, detail_dict={"deleted": deleted, "kept": keep})
+        self._json({"ok": True, "deleted": deleted})
+
     def _post_api_sessions_rename(self):
         """Post api sessions rename."""
         body = self._body

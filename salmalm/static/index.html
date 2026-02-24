@@ -246,7 +246,10 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
   <div class="side-nav">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px 4px">
       <div class="nav-section" style="margin:0;padding:0;cursor:pointer" data-action="showChat" data-i18n="sec-chats">💬 Chats</div>
-      <button data-action="newSession" title="New Chat" style="background:var(--accent);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+      <div style="display:flex;gap:4px">
+        <button data-action="clearAllSessions" title="Clear all" style="background:var(--bg3);color:var(--text2);border:none;width:28px;height:28px;border-radius:8px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">🗑</button>
+        <button data-action="newSession" title="New Chat" style="background:var(--accent);color:#fff;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+      </div>
     </div>
     <div id="session-list" style="max-height:240px;overflow-y:auto;padding:0 8px 4px"></div>
     <div class="nav-section" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px" data-i18n="sec-channels">Channels</div>

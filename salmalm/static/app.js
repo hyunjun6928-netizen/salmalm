@@ -145,6 +145,20 @@
     }).catch(function(){});
   };
 
+  window.clearAllSessions=function(){
+    if(!confirm(t('confirm-clear-all')))return;
+    fetch('/api/sessions/clear',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+      body:JSON.stringify({keep:_currentSession})}).then(function(){
+      /* Clear all localStorage session caches except current */
+      for(var i=localStorage.length-1;i>=0;i--){
+        var k=localStorage.key(i);
+        if(k&&k.startsWith('salm_chat_')&&k!==_storageKey(_currentSession))localStorage.removeItem(k);
+      }
+      _sessionCache={};
+      loadSessionList();
+    }).catch(function(){});
+  };
+
 
   /* ═══ 10-restore.js ═══ */
   /* --- Restore chat history (deferred until i18n t() is ready) --- */
@@ -1026,6 +1040,7 @@ window._i18n={
       'btn-mic-title':'Voice input','btn-tts-title':'Read aloud',
       'btn-branch-title':'Branch from here','btn-regen-title':'Regenerate',
       'confirm-delete':'Delete this conversation?',
+      'confirm-clear-all':'Delete ALL other conversations? (keeps current)',
       'no-sessions':'No conversations yet',
       'new-session-msg':'😈 New conversation started.',
       'no-chat-export':'No chat to export.',
@@ -1145,6 +1160,7 @@ window._i18n={
       'btn-mic-title':'음성 입력','btn-tts-title':'소리로 듣기',
       'btn-branch-title':'여기서 분기','btn-regen-title':'다시 생성',
       'confirm-delete':'이 대화를 삭제하시겠습니까?',
+      'confirm-clear-all':'현재 대화를 제외한 모든 대화를 삭제하시겠습니까?',
       'no-sessions':'아직 대화가 없습니다',
       'new-session-msg':'😈 새 대화가 시작되었습니다.',
       'no-chat-export':'내보낼 대화가 없습니다.',
@@ -2339,6 +2355,7 @@ window._i18n={
     var el=e.target.closest('[data-action]');if(!el)return;
     var a=el.getAttribute('data-action');
     if(a==='newSession')window.newSession();
+    else if(a==='clearAllSessions')window.clearAllSessions();
     else if(a==='showChat')window.showChat();
     else if(a==='showSettings')window.showSettings();
     else if(a==='showUsage')window.showDashboard();

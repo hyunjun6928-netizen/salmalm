@@ -116,3 +116,17 @@
       loadSessionList();
     }).catch(function(){});
   };
+
+  window.clearAllSessions=function(){
+    if(!confirm(t('confirm-clear-all')))return;
+    fetch('/api/sessions/clear',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+      body:JSON.stringify({keep:_currentSession})}).then(function(){
+      /* Clear all localStorage session caches except current */
+      for(var i=localStorage.length-1;i>=0;i--){
+        var k=localStorage.key(i);
+        if(k&&k.startsWith('salm_chat_')&&k!==_storageKey(_currentSession))localStorage.removeItem(k);
+      }
+      _sessionCache={};
+      loadSessionList();
+    }).catch(function(){});
+  };

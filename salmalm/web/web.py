@@ -674,6 +674,7 @@ self.addEventListener('fetch',e=>{{
         "/api/cron/run": "_post_api_cron_run",
         "/api/sessions/create": "_post_api_sessions_create",
         "/api/sessions/delete": "_post_api_sessions_delete",
+        "/api/sessions/clear": "_post_api_sessions_clear",
         "/api/sessions/import": "_post_api_sessions_import",
         "/api/soul": "_post_api_soul",
         "/api/routing": "_post_api_routing",

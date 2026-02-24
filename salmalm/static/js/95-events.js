@@ -6,6 +6,7 @@
     var el=e.target.closest('[data-action]');if(!el)return;
     var a=el.getAttribute('data-action');
     if(a==='newSession')window.newSession();
+    else if(a==='clearAllSessions')window.clearAllSessions();
     else if(a==='showChat')window.showChat();
     else if(a==='showSettings')window.showSettings();
     else if(a==='showUsage')window.showDashboard();
