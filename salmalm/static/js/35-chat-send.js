@@ -109,6 +109,26 @@
           }
         }
       }
+      /* Process any remaining data in buffer */
+      if(buf.trim()){
+        var em2=buf.match(/^event: (\w+)\ndata: (.+)$/m);
+        if(em2){
+          var etype2=em2[1],edata2=JSON.parse(em2[2]);
+          if(etype2==='done'){
+            gotDone=true;
+            localStorage.removeItem('salm_sse_pending');
+            if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
+            if(chat.style.display==='none'&&window.showChat)window.showChat();
+            var _secs3=((Date.now()-_sendStart)/1000).toFixed(1);
+            var _cI2={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
+            var _cL2=edata2.complexity&&edata2.complexity!=='auto'?(_cI2[edata2.complexity]||'')+edata2.complexity+' → ':'';
+            var _mS2=(edata2.model||'').split('/').pop();
+            var _sM2=(_cL2||'')+(_mS2||'');if(_sM2)_sM2+=' · ';_sM2+='⏱️'+_secs3+'s';addMsg('assistant',edata2.response||'',_sM2);
+            modelBadge.textContent=_mS2?(_isAutoRouting?'Auto → '+_mS2:_mS2):'auto routing';
+            fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+          }
+        }
+      }
       if(!gotDone)throw new Error('stream incomplete');
       if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
     }catch(streamErr){
@@ -123,13 +143,20 @@
       console.warn('SSE failed, falling back:',streamErr);
       var typRow=document.getElementById('typing-row');
       if(typRow){var tb3=typRow.querySelector('.bubble');if(tb3)tb3.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> Processing...'}
-      var r2=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
-        body:JSON.stringify(chatBody)});
-      var d=await r2.json();
-      if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
-      var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
-      if(d.response){localStorage.removeItem('salm_sse_pending');var _fcI={simple:'⚡',moderate:'🔧',complex:'💎'};var _fcL=d.complexity&&d.complexity!=='auto'?(_fcI[d.complexity]||'')+d.complexity+' → ':'';var _fmS=(d.model||'').split('/').pop();var _meta=(_fcL||'')+(_fmS||'');if(_meta)_meta+=' · ';_meta+='⏱️'+_secs2+'s';addMsg('assistant',d.response,_meta);if(_fmS)modelBadge.textContent=_isAutoRouting?'Auto → '+_fmS:_fmS;}
-      else if(d.error){localStorage.removeItem('salm_sse_pending');addMsg('assistant','❌ '+d.error);}
-      fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+      try{
+        var r2=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
+          body:JSON.stringify(chatBody)});
+        var d=await r2.json();
+        if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
+        var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
+        if(d.response){localStorage.removeItem('salm_sse_pending');var _fcI={simple:'⚡',moderate:'🔧',complex:'💎'};var _fcL=d.complexity&&d.complexity!=='auto'?(_fcI[d.complexity]||'')+d.complexity+' → ':'';var _fmS=(d.model||'').split('/').pop();var _meta=(_fcL||'')+(_fmS||'');if(_meta)_meta+=' · ';_meta+='⏱️'+_secs2+'s';addMsg('assistant',d.response,_meta);if(_fmS)modelBadge.textContent=_isAutoRouting?'Auto → '+_fmS:_fmS;}
+        else if(d.error){localStorage.removeItem('salm_sse_pending');addMsg('assistant','❌ '+d.error);}
+        fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+      }catch(fbErr){
+        console.error('Fallback POST also failed:',fbErr);
+        if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
+        localStorage.removeItem('salm_sse_pending');
+        addMsg('assistant','❌ Connection error. Please try again.');
+      }
     }
   }
