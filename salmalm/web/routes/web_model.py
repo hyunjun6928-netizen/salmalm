@@ -213,6 +213,7 @@ class WebModelMixin:
 
             _s = _gs_switch(sid)
             _s.model_override = None if model == "auto" else model
+            _s.persist()  # Save to DB immediately so it survives restart
         except Exception as e:
             log.debug(f"Suppressed: {e}")
         # Return the effective model (session override takes precedence)

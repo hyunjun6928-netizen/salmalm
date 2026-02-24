@@ -289,7 +289,9 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                     dm = vault.get("default_model")
                     if dm and dm != "auto":
                         _sessions[session_id]._default_model = dm
-                        _sessions[session_id].model_override = dm
+                        # Don't set model_override here — let user's explicit
+                        # UI selection (persisted in DB) take precedence.
+                        # _default_model is used as fallback in auto-routing only.
             except Exception as e:
                 log.debug(f"Suppressed: {e}")
 
