@@ -117,6 +117,23 @@ Discord  ──►           ├── Engine Pipeline (classify → route → c
 ### 62 Built-in Tools
 Shell exec, file I/O, web search (Brave), web fetch, Python eval (opt-in), image gen (DALL-E), TTS/STT, browser automation (Playwright), RAG search, cron jobs, system monitor, and more.
 
+### Unique Features
+
+| Feature | What it does |
+|---|---|
+| **Self-Evolving Prompt** | AI auto-generates personality rules from conversations (max 20, FIFO) |
+| **Dead Man's Switch** | Automated actions (email, commands) if you go inactive for N days |
+| **Shadow Mode** | AI learns your communication style, can reply as you when away |
+| **Life Dashboard** | Unified view: expenses, habits, calendar, mood, routines |
+| **Mood-Aware Response** | Detects emotional state from NLP signals, adjusts tone |
+| **A/B Split Response** | Two model perspectives on the same question, side-by-side |
+| **Time Capsule** | Schedule encrypted messages to your future self |
+| **Thought Stream** | Private journaling with hashtag search and mood tracking |
+| **Agent-to-Agent** | HMAC-SHA256 signed communication between SalmAlm instances |
+| **Workflow Engine** | Multi-step AI workflows with conditions and loops |
+| **Message Queue** | 5 modes: collect, steer, followup, steer-backlog, interrupt |
+| **MCP Marketplace** | Install/manage Model Context Protocol tool servers |
+
 ### Web UI
 - SSE streaming with real-time thinking display
 - Multi-file upload (drag-drop, paste, clip button)
