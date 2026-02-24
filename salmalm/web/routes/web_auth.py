@@ -1,10 +1,12 @@
 """Authentication endpoints — login, register, unlock, Google OAuth."""
 
-from salmalm.security.crypto import vault, log
-from salmalm.web.auth import rate_limiter, RateLimitExceeded  # noqa: F401
+import json
 import os
 import secrets
 import time
+
+from salmalm.security.crypto import vault, log
+from salmalm.web.auth import rate_limiter, RateLimitExceeded  # noqa: F401
 from salmalm.constants import VAULT_FILE
 from salmalm.core import audit_log
 from salmalm.web.auth import auth_manager, extract_auth
