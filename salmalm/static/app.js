@@ -7,7 +7,7 @@
     filePrev=document.getElementById('file-preview'),fileIconEl=document.getElementById('file-icon'),
     fileNameEl=document.getElementById('file-name'),fileSizeEl=document.getElementById('file-size'),
     imgPrev=document.getElementById('img-preview'),inputArea=document.getElementById('input-area');
-  let _tok=sessionStorage.getItem('tok')||'',pendingFile=null;
+  let _tok=sessionStorage.getItem('tok')||'',pendingFile=null,pendingFiles=[];
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
   var _isAutoRouting=true;
@@ -510,10 +510,10 @@
 
 
   /* ═══ 25-files.js ═══ */
-  /* --- File handling --- */
+  /* --- File handling (single & multi) --- */
   window.setFile=function(file){
     if(file.type.startsWith('image/')&&file.size>5*1024*1024){alert(t('img-too-large'));return}
-    pendingFile=file;
+    pendingFile=file;pendingFiles=[file];
     const isImg=file.type.startsWith('image/');
     fileIconEl.textContent=isImg?'🖼️':'📎';
     fileNameEl.textContent=file.name;
@@ -523,7 +523,26 @@
     else{imgPrev.style.display='none'}
     input.focus();
   };
-  window.clearFile=function(){pendingFile=null;filePrev.style.display='none';imgPrev.style.display='none'};
+  window.setFiles=function(files){
+    pendingFiles=[];
+    for(var i=0;i<files.length;i++){
+      var f=files[i];
+      if(f.type.startsWith('image/')&&f.size>5*1024*1024)continue;
+      pendingFiles.push(f);
+    }
+    if(!pendingFiles.length)return;
+    pendingFile=pendingFiles[0];
+    fileIconEl.textContent=pendingFiles.length>1?'📎×'+pendingFiles.length:(pendingFiles[0].type.startsWith('image/')?'🖼️':'📎');
+    fileNameEl.textContent=pendingFiles.length>1?pendingFiles.map(function(f){return f.name}).join(', '):pendingFiles[0].name;
+    fileSizeEl.textContent=(pendingFiles.reduce(function(s,f){return s+f.size},0)/1024).toFixed(1)+'KB';
+    filePrev.style.display='block';
+    imgPrev.style.display='none';
+    if(pendingFiles.length===1&&pendingFiles[0].type.startsWith('image/')){
+      var r=new FileReader();r.onload=function(e){imgPrev.src=e.target.result;imgPrev.style.display='block'};r.readAsDataURL(pendingFiles[0]);
+    }
+    input.focus();
+  };
+  window.clearFile=function(){pendingFile=null;pendingFiles=[];filePrev.style.display='none';imgPrev.style.display='none'};
 
 
   /* ═══ 26-paste.js ═══ */
@@ -548,7 +567,7 @@
   document.addEventListener('dragleave',function(e){e.preventDefault();_dragCtr--;if(_dragCtr<=0){_dragCtr=0;_dropOv.style.display='none'}});
   document.addEventListener('dragover',function(e){e.preventDefault()});
   document.addEventListener('drop',function(e){e.preventDefault();_dragCtr=0;_dropOv.style.display='none';
-    var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)window.setFile(f)});
+    var _dfs=e.dataTransfer&&e.dataTransfer.files;if(_dfs&&_dfs.length>1){window.setFiles(Array.from(_dfs))}else if(_dfs&&_dfs[0]){window.setFile(_dfs[0])}});
 
 
   /* ═══ 30-websocket.js ═══ */
@@ -903,20 +922,24 @@
     input.value='';input.style.height='auto';btn.disabled=true;
 
     var fileMsg='';var imgData=null;var imgMime=null;
-    if(pendingFile){
-      var isImg=pendingFile.type.startsWith('image/');
-      if(isImg){
-        var reader=new FileReader();
-        var previewUrl=await new Promise(function(res){reader.onload=function(){res(reader.result)};reader.readAsDataURL(pendingFile)});
-        addMsg('user','<img src="'+previewUrl+'" style="max-width:300px;max-height:300px;border-radius:8px;display:block;margin:4px 0" alt="'+pendingFile.name+'">');
-      }else{addMsg('user','[📎 '+pendingFile.name+' Uploading...]')}
-      var fd=new FormData();fd.append('file',pendingFile);
-      try{
-        var ur=await fetch('/api/upload',{method:'POST',body:fd});
-        var ud=await ur.json();
-        if(ud.ok){fileMsg=ud.info;if(ud.image_base64){imgData=ud.image_base64;imgMime=ud.image_mime;window._pendingWsImage={data:imgData,mime:imgMime}}}
-        else addMsg('assistant',t('upload-fail')+' '+(ud.error||''));
-      }catch(ue){addMsg('assistant',t('upload-error')+' '+ue.message)}
+    var _filesToSend=pendingFiles.length?pendingFiles:(pendingFile?[pendingFile]:[]);
+    if(_filesToSend.length){
+      for(var fi=0;fi<_filesToSend.length;fi++){
+        var _f=_filesToSend[fi];
+        var isImg=_f.type.startsWith('image/');
+        if(isImg){
+          var reader=new FileReader();
+          var previewUrl=await new Promise(function(res){reader.onload=function(){res(reader.result)};reader.readAsDataURL(_f)});
+          addMsg('user','<img src="'+previewUrl+'" style="max-width:300px;max-height:300px;border-radius:8px;display:block;margin:4px 0" alt="'+_f.name+'">');
+        }else{addMsg('user','[📎 '+_f.name+' Uploading...]')}
+        var fd=new FormData();fd.append('file',_f);
+        try{
+          var ur=await fetch('/api/upload',{method:'POST',body:fd});
+          var ud=await ur.json();
+          if(ud.ok){fileMsg+=(fileMsg?'\n':'')+ud.info;if(ud.image_base64&&!imgData){imgData=ud.image_base64;imgMime=ud.image_mime;window._pendingWsImage={data:imgData,mime:imgMime}}}
+          else addMsg('assistant',t('upload-fail')+' '+(ud.error||''));
+        }catch(ue){addMsg('assistant',t('upload-error')+' '+ue.message)}
+      }
       window.clearFile();
     }
 
@@ -1209,7 +1232,7 @@ window._i18n={
   if(window._checkPendingRecovery){try{window._checkPendingRecovery()}catch(e){console.warn('Recovery check failed:',e)}}
   /* File input change handler */
   var _fileInput=document.getElementById('file-input-hidden');
-  if(_fileInput)_fileInput.addEventListener('change',function(){if(this.files[0])window.setFile(this.files[0]);this.value=''});
+  if(_fileInput)_fileInput.addEventListener('change',function(){if(this.files.length>1){window.setFiles(Array.from(this.files))}else if(this.files[0]){window.setFile(this.files[0])}this.value=''});
   /* Tool i18n map: name -> {icon, en, kr, cmd} */
   var _toolI18n={
     apply_patch:{icon:'🩹',en:'Apply Patch',kr:'패치 적용',cmd:'/patch'},
@@ -2074,7 +2097,7 @@ window._i18n={
   ia.addEventListener('dragover',function(e){e.preventDefault()});
   ia.addEventListener('dragleave',function(){ia.classList.remove('drag-over')});
   ia.addEventListener('drop',function(e){e.preventDefault();ia.classList.remove('drag-over');
-    var files=e.dataTransfer.files;if(files.length>0){window.setFile(files[0])}});
+    var files=e.dataTransfer.files;if(files.length>1){window.setFiles(Array.from(files))}else if(files.length>0){window.setFile(files[0])}});
 
   /* --- Scroll to bottom button --- */
   var scrollBtn=document.createElement('button');scrollBtn.id='scroll-bottom';scrollBtn.textContent='↓';

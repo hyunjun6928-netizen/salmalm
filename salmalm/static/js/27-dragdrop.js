@@ -9,4 +9,4 @@
   document.addEventListener('dragleave',function(e){e.preventDefault();_dragCtr--;if(_dragCtr<=0){_dragCtr=0;_dropOv.style.display='none'}});
   document.addEventListener('dragover',function(e){e.preventDefault()});
   document.addEventListener('drop',function(e){e.preventDefault();_dragCtr=0;_dropOv.style.display='none';
-    var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)window.setFile(f)});
+    var _dfs=e.dataTransfer&&e.dataTransfer.files;if(_dfs&&_dfs.length>1){window.setFiles(Array.from(_dfs))}else if(_dfs&&_dfs[0]){window.setFile(_dfs[0])}});

@@ -4,7 +4,7 @@
     filePrev=document.getElementById('file-preview'),fileIconEl=document.getElementById('file-icon'),
     fileNameEl=document.getElementById('file-name'),fileSizeEl=document.getElementById('file-size'),
     imgPrev=document.getElementById('img-preview'),inputArea=document.getElementById('input-area');
-  let _tok=sessionStorage.getItem('tok')||'',pendingFile=null;
+  let _tok=sessionStorage.getItem('tok')||'',pendingFile=null,pendingFiles=[];
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
   var _isAutoRouting=true;

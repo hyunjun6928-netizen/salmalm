@@ -4,7 +4,7 @@
   ia.addEventListener('dragover',function(e){e.preventDefault()});
   ia.addEventListener('dragleave',function(){ia.classList.remove('drag-over')});
   ia.addEventListener('drop',function(e){e.preventDefault();ia.classList.remove('drag-over');
-    var files=e.dataTransfer.files;if(files.length>0){window.setFile(files[0])}});
+    var files=e.dataTransfer.files;if(files.length>1){window.setFiles(Array.from(files))}else if(files.length>0){window.setFile(files[0])}});
 
   /* --- Scroll to bottom button --- */
   var scrollBtn=document.createElement('button');scrollBtn.id='scroll-bottom';scrollBtn.textContent='↓';

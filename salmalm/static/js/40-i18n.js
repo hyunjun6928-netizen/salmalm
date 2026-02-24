@@ -8,7 +8,7 @@
   if(window._checkPendingRecovery){try{window._checkPendingRecovery()}catch(e){console.warn('Recovery check failed:',e)}}
   /* File input change handler */
   var _fileInput=document.getElementById('file-input-hidden');
-  if(_fileInput)_fileInput.addEventListener('change',function(){if(this.files[0])window.setFile(this.files[0]);this.value=''});
+  if(_fileInput)_fileInput.addEventListener('change',function(){if(this.files.length>1){window.setFiles(Array.from(this.files))}else if(this.files[0]){window.setFile(this.files[0])}this.value=''});
   /* Tool i18n map: name -> {icon, en, kr, cmd} */
   var _toolI18n={
     apply_patch:{icon:'🩹',en:'Apply Patch',kr:'패치 적용',cmd:'/patch'},

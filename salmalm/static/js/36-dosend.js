@@ -34,20 +34,24 @@
     input.value='';input.style.height='auto';btn.disabled=true;
 
     var fileMsg='';var imgData=null;var imgMime=null;
-    if(pendingFile){
-      var isImg=pendingFile.type.startsWith('image/');
-      if(isImg){
-        var reader=new FileReader();
-        var previewUrl=await new Promise(function(res){reader.onload=function(){res(reader.result)};reader.readAsDataURL(pendingFile)});
-        addMsg('user','<img src="'+previewUrl+'" style="max-width:300px;max-height:300px;border-radius:8px;display:block;margin:4px 0" alt="'+pendingFile.name+'">');
-      }else{addMsg('user','[📎 '+pendingFile.name+' Uploading...]')}
-      var fd=new FormData();fd.append('file',pendingFile);
-      try{
-        var ur=await fetch('/api/upload',{method:'POST',body:fd});
-        var ud=await ur.json();
-        if(ud.ok){fileMsg=ud.info;if(ud.image_base64){imgData=ud.image_base64;imgMime=ud.image_mime;window._pendingWsImage={data:imgData,mime:imgMime}}}
-        else addMsg('assistant',t('upload-fail')+' '+(ud.error||''));
-      }catch(ue){addMsg('assistant',t('upload-error')+' '+ue.message)}
+    var _filesToSend=pendingFiles.length?pendingFiles:(pendingFile?[pendingFile]:[]);
+    if(_filesToSend.length){
+      for(var fi=0;fi<_filesToSend.length;fi++){
+        var _f=_filesToSend[fi];
+        var isImg=_f.type.startsWith('image/');
+        if(isImg){
+          var reader=new FileReader();
+          var previewUrl=await new Promise(function(res){reader.onload=function(){res(reader.result)};reader.readAsDataURL(_f)});
+          addMsg('user','<img src="'+previewUrl+'" style="max-width:300px;max-height:300px;border-radius:8px;display:block;margin:4px 0" alt="'+_f.name+'">');
+        }else{addMsg('user','[📎 '+_f.name+' Uploading...]')}
+        var fd=new FormData();fd.append('file',_f);
+        try{
+          var ur=await fetch('/api/upload',{method:'POST',body:fd});
+          var ud=await ur.json();
+          if(ud.ok){fileMsg+=(fileMsg?'\n':'')+ud.info;if(ud.image_base64&&!imgData){imgData=ud.image_base64;imgMime=ud.image_mime;window._pendingWsImage={data:imgData,mime:imgMime}}}
+          else addMsg('assistant',t('upload-fail')+' '+(ud.error||''));
+        }catch(ue){addMsg('assistant',t('upload-error')+' '+ue.message)}
+      }
       window.clearFile();
     }
 
