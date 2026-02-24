@@ -131,8 +131,10 @@ class SystemMixin:
             _ov = getattr(_sess, "model_override", None)
             if _ov and _ov != "auto":
                 _effective_model = _ov  # specific model override on session
-            elif router.force_model:
-                _effective_model = router.force_model  # global fallback
+            elif _ov == "auto":
+                _effective_model = "auto"  # user explicitly chose auto routing
+            elif _ov is None and router.force_model:
+                _effective_model = router.force_model  # no session pref → global fallback
         except Exception:
             _effective_model = router.force_model or "auto"
         self._json(

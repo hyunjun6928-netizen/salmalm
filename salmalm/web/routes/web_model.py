@@ -212,7 +212,7 @@ class WebModelMixin:
             from salmalm.core import get_session as _gs_switch
 
             _s = _gs_switch(sid)
-            _s.model_override = None if model == "auto" else model
+            _s.model_override = "auto" if model == "auto" else model
             _s.persist()  # Save to DB immediately so it survives restart
         except Exception as e:
             log.debug(f"Suppressed: {e}")
