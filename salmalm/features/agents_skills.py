@@ -1,10 +1,11 @@
 """Skill loading and management."""
 
 import json
-import time
 import logging
 import os
 import re
+import subprocess
+import time
 from pathlib import Path
 
 log = logging.getLogger(__name__)

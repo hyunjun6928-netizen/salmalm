@@ -8,7 +8,7 @@ from typing import Any, Dict, Generator, List, Optional
 
 log = logging.getLogger(__name__)
 
-from salmalm.core.core import CostCapExceeded, check_cost_cap  # noqa: E402
+from salmalm.core.core import CostCapExceeded, check_cost_cap, router  # noqa: E402
 
 from salmalm.constants import DEFAULT_MAX_TOKENS  # noqa: E402
 

@@ -1,7 +1,10 @@
 """Telegram command handler — extracted from TelegramBot._handle_command."""
 
 import json
+import textwrap
+
 from salmalm.constants import VERSION
+from salmalm.core.core import router
 
 
 class TelegramCommandsMixin:

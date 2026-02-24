@@ -1,9 +1,14 @@
 """Telegram media handling mixin."""
 
+import asyncio
 import json
 import logging
+import secrets
+import time
 import urllib.request
 from pathlib import Path
+
+from salmalm.security.crypto import vault
 
 log = logging.getLogger(__name__)
 

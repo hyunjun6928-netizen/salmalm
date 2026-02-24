@@ -1,8 +1,10 @@
 """TF-IDF search engine — pure Python, no external deps."""
 
-from salmalm.security.crypto import log
 import math
 import re
+import time
+
+from salmalm.security.crypto import log
 
 
 class TFIDFSearch:
