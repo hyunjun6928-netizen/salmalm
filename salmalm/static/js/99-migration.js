@@ -310,7 +310,7 @@
       }
       var dot=function(ok){return ok?'🟢':'🔴'};
       // System
-      var sysRows=[[kr?'Python':'Python',d.python.split(' ')[0]],[kr?'플랫폼':'Platform',d.platform],[kr?'PID':'PID',d.pid],[kr?'메모리':'Memory',d.memory_mb+'MB'],[kr?'GC (0/1/2)':'GC (0/1/2)',d.gc.gen0+'/'+d.gc.gen1+'/'+d.gc.gen2]];
+      var sysRows=[[kr?'Python':'Python',(d.python||'?').split(' ')[0]],[kr?'플랫폼':'Platform',d.platform||'?'],[kr?'PID':'PID',d.pid||'?'],[kr?'메모리':'Memory',(d.memory_mb||0)+'MB'],[kr?'GC (0/1/2)':'GC (0/1/2)',d.gc?(d.gc.gen0+'/'+d.gc.gen1+'/'+d.gc.gen2):'?']];
       // Engine
       var m=d.metrics||{};
       var engRows=[[kr?'활성 요청':'Active Requests',d.active_requests],[kr?'종료 중':'Shutting Down',d.shutting_down?'⚠️ Yes':'No'],[kr?'총 요청':'Total Requests',m.requests||0],[kr?'도구 호출':'Tool Calls',m.tool_calls||0],[kr?'에러':'Errors',m.errors||0],[kr?'캐시 히트':'Cache Hits',m.cache_hits||0]];
