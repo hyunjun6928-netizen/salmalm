@@ -769,12 +769,12 @@ self.addEventListener('fetch',e=>{{
 
     _GET_PREFIX_ROUTES = [
         ("/api/search", "_get_api_search", None),
-        ("/api/sessions/", "_get_api_sessions_export", """and "/export" in self.path"""),
+        ("/api/sessions/", "_get_api_sessions_export", "/export"),
         ("/api/rag/search", "_get_api_rag_search", None),
         ("/api/audit", "_get_api_audit", None),
-        ("/api/sessions/", "_get_api_sessions_summary", """and "/summary" in self.path"""),
-        ("/api/sessions/", "_get_api_sessions_alternatives", """and "/alternatives" in self.path"""),
-        ("/api/sessions/", "_get_api_sessions_last", """and "/last" in self.path"""),
+        ("/api/sessions/", "_get_api_sessions_summary", "/summary"),
+        ("/api/sessions/", "_get_api_sessions_alternatives", "/alternatives"),
+        ("/api/sessions/", "_get_api_sessions_last", "/last"),
         ("/api/logs", "_get_api_logs", None),
         ("/api/memory/read?", "_get_api_memory_read", None),
         ("/api/google/callback", "_get_api_google_callback", None),
