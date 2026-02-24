@@ -199,7 +199,15 @@ def select_model(message: str, session) -> Tuple[str, str]:
     Respects session-level model_override (from /model command).
     """
     override = getattr(session, "model_override", None)
-    log.info(f"[MODEL-SELECT] session.model_override={override!r}, session.id={getattr(session, 'id', '?')}")
+    # Fallback to global force_model if session has no specific override
+    if not override or override == "auto":
+        try:
+            from salmalm.core.core import router
+            if router.force_model:
+                override = router.force_model
+        except Exception:
+            pass
+    log.info(f"[MODEL-SELECT] effective_override={override!r}, session.id={getattr(session, 'id', '?')}")
     if override and override != "auto":
         _OVERRIDE_MAP = {"haiku": ("simple", "haiku"), "sonnet": ("moderate", "sonnet"), "opus": ("complex", "opus")}
         if override in _OVERRIDE_MAP:
