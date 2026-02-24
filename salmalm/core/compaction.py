@@ -199,6 +199,7 @@ def _stage5_llm_summarize(
     )
 
     try:
+        from salmalm.core.memory import memory_manager
         result = memory_manager.auto_curate(days_back=3)
         if "No new" not in result:
             log.info(f"[MEM] Post-compaction auto-curate: {result}")
@@ -238,6 +239,7 @@ def compact_messages(
     total_chars_check = sum(len(_msg_content_str(m)) for m in messages)
     if session and total_chars_check > COMPACTION_THRESHOLD * 0.8:  # noqa: F405
         try:
+            from salmalm.core.memory import memory_manager
             memory_manager.flush_before_compaction(session)
         except Exception as e:
             log.warning(f"[MEM] Memory flush error: {e}")

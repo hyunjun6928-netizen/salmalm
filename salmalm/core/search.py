@@ -4,6 +4,7 @@ import math
 import re
 import time
 
+from salmalm.constants import MEMORY_FILE, MEMORY_DIR, WORKSPACE_DIR
 from salmalm.security.crypto import log
 
 
