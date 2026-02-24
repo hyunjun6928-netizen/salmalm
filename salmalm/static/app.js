@@ -68,6 +68,7 @@
         rendered[s.id]=true;
         var active=s.id===_currentSession?' style="background:var(--accent-dim);border-radius:8px"':'';
         var title=s.title||s.id;
+        title=title.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1').replace(/`([^`]+)`/g,'$1');
         if(title.length>40)title=title.slice(0,40)+'...';
         var pad=indent?'padding-left:'+(10+indent*16)+'px;':'';
         var icon=s.parent_session_id?'↳ ':'';

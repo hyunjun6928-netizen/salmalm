@@ -45,9 +45,19 @@ class WebSessionsMixin:
                         ).fetchone()[0]
                     )
                     title = ""
+                    import re as _re_title
                     for m in msgs:
                         if m.get("role") == "user" and isinstance(m.get("content"), str):
-                            title = m["content"][:60]
+                            _raw = m["content"].strip()
+                            # Skip file upload info lines as title
+                            if _raw.startswith("[") and ("uploaded" in _raw or "📎" in _raw or "🖼" in _raw):
+                                continue
+                            # Strip markdown formatting
+                            _raw = _re_title.sub(r'\*\*([^*]+)\*\*', r'\1', _raw)
+                            _raw = _re_title.sub(r'\*([^*]+)\*', r'\1', _raw)
+                            _raw = _re_title.sub(r'`([^`]+)`', r'\1', _raw)
+                            _raw = _raw.replace("*", "").replace("`", "")
+                            title = _raw[:60]
                             break
                     msg_count = len([m for m in msgs if m.get("role") in ("user", "assistant")])
                 except Exception as e:  # noqa: broad-except
