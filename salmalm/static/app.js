@@ -378,6 +378,15 @@
       };
       mt.appendChild(ttsBtn);
     }
+    /* Copy button for assistant messages */
+    if(role==='assistant'&&_cleanText&&_cleanText.length>5){
+      var copyBtn=document.createElement('button');copyBtn.className='tts-btn';copyBtn.textContent='📋';copyBtn.title=t('btn-copy-title')||'Copy';
+      copyBtn.onclick=function(){
+        var raw=_cleanText.replace(/<[^>]*>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+        navigator.clipboard.writeText(raw).then(function(){copyBtn.textContent='✅';setTimeout(function(){copyBtn.textContent='📋'},1500)}).catch(function(){copyBtn.textContent='❌';setTimeout(function(){copyBtn.textContent='📋'},1500)});
+      };
+      mt.appendChild(copyBtn);
+    }
     if(role==='assistant'&&text){
       var regenBtn=document.createElement('span');
       regenBtn.textContent=' 🔄';regenBtn.style.cursor='pointer';regenBtn.title=t('btn-regen-title');
@@ -1096,7 +1105,7 @@ window._i18n={
       'dc-connected':'Connected','dc-disconnected':'Not connected',
       'dc-guide-title':'📋 Setup Guide (click to expand)',
       'btn-mic-title':'Voice input','btn-tts-title':'Read aloud',
-      'btn-branch-title':'Branch from here','btn-regen-title':'Regenerate',
+      'btn-copy-title':'Copy response','btn-branch-title':'Branch from here','btn-regen-title':'Regenerate',
       'confirm-delete':'Delete this conversation?',
       'confirm-clear-all':'Delete ALL other conversations? (keeps current)',
       'no-sessions':'No conversations yet',
@@ -1216,7 +1225,7 @@ window._i18n={
       'dc-connected':'연결됨','dc-disconnected':'연결 안 됨',
       'dc-guide-title':'📋 설정 가이드 (클릭하여 펼치기)',
       'btn-mic-title':'음성 입력','btn-tts-title':'소리로 듣기',
-      'btn-branch-title':'여기서 분기','btn-regen-title':'다시 생성',
+      'btn-copy-title':'답변 복사','btn-branch-title':'여기서 분기','btn-regen-title':'다시 생성',
       'confirm-delete':'이 대화를 삭제하시겠습니까?',
       'confirm-clear-all':'현재 대화를 제외한 모든 대화를 삭제하시겠습니까?',
       'no-sessions':'아직 대화가 없습니다',

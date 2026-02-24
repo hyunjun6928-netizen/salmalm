@@ -126,6 +126,15 @@
       };
       mt.appendChild(ttsBtn);
     }
+    /* Copy button for assistant messages */
+    if(role==='assistant'&&_cleanText&&_cleanText.length>5){
+      var copyBtn=document.createElement('button');copyBtn.className='tts-btn';copyBtn.textContent='📋';copyBtn.title=t('btn-copy-title')||'Copy';
+      copyBtn.onclick=function(){
+        var raw=_cleanText.replace(/<[^>]*>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+        navigator.clipboard.writeText(raw).then(function(){copyBtn.textContent='✅';setTimeout(function(){copyBtn.textContent='📋'},1500)}).catch(function(){copyBtn.textContent='❌';setTimeout(function(){copyBtn.textContent='📋'},1500)});
+      };
+      mt.appendChild(copyBtn);
+    }
     if(role==='assistant'&&text){
       var regenBtn=document.createElement('span');
       regenBtn.textContent=' 🔄';regenBtn.style.cursor='pointer';regenBtn.title=t('btn-regen-title');
