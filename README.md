@@ -33,26 +33,6 @@ First launch opens a **Setup Wizard** — paste an API key, pick a model, done.
 
 ---
 
-## Why SalmAlm?
-
-| Feature | SalmAlm | ChatGPT | OpenClaw | Open WebUI |
-|---|:---:|:---:|:---:|:---:|
-| Install | `pip install` | N/A | npm + config | Docker |
-| Multi-provider routing | ✅ 3-tier auto | ❌ | ✅ | ✅ |
-| Memory (2-layer + auto-recall) | ✅ | ❌ | ✅ | ❌ |
-| Sub-agents (spawn/steer) | ✅ | ❌ | ✅ | ❌ |
-| Extended Thinking (4 levels) | ✅ | ❌ | ✅ | ❌ |
-| Encrypted Vault (AES-256-GCM) | ✅ | N/A | ❌ | ❌ |
-| Telegram + Discord bots | ✅ | ❌ | ✅ | ❌ |
-| Local LLM (Ollama) | ✅ | ❌ | ✅ | ✅ |
-| Zero external deps* | ✅ | N/A | ❌ | ❌ |
-| Cost optimization | ✅ 83% savings | ❌ | ❌ | ❌ |
-| Self-hosted | ✅ | ❌ | ❌ | ✅ |
-
-*\*stdlib-only core; optional `cryptography` for vault encryption*
-
----
-
 ## ⚡ Quick Start
 
 ```bash
