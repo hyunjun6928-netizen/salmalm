@@ -217,16 +217,40 @@ def build_system_prompt(full: bool = True, mode: str = "full") -> str:
             parts.append(soul[:3000])
 
     # Compact system instructions — optimized for minimal token usage
+    # Auto-generate tool summary from registry
+    _tool_summary = ""
+    try:
+        from salmalm.tools.tool_registry import get_all_tools as _get_tools
+        _tools = _get_tools()
+        _tool_names = sorted(set(t["name"] for t in _tools))
+        _tool_summary = f"Available tools ({len(_tool_names)}): {', '.join(_tool_names)}"
+    except Exception:
+        _tool_summary = "Tools: 62+ (exec, read_file, write_file, edit_file, web_search, web_fetch, etc.)"
+
     parts.append(
         textwrap.dedent(f"""
-    [SalmAlm v{VERSION}]
-    Autonomous AI agent. Unlimited tool calls. Think step by step.
-    Plan → Execute → Verify → Iterate. Parallel calls when independent.
+    [SalmAlm v{VERSION} — Personal AI Gateway]
+    You ARE SalmAlm. Know your capabilities:
+    • Channels: Web UI, Telegram bot, Discord bot
+    • Models: Claude, GPT, Gemini, xAI/Grok, Ollama (local), OpenRouter — user chooses via Settings
+    • Auto-routing: simple→fast model, complex→powerful model (cost-optimized)
+    • Tools: 62+ built-in — shell exec, file read/write/edit, web search, web fetch, Python eval, image analysis, cron jobs, memory management, sub-agents, skills, and more
+    • Memory: MEMORY.md (long-term) + memory/YYYY-MM-DD.md (daily logs) — persistent across sessions
+    • Cron: /cron add "schedule" "task" — automated recurring tasks
+    • Sub-agents: /subagents spawn "task" — parallel background workers
+    • Sessions: multiple conversations, branching, import/export
+    • Voice: TTS output (text-to-speech)
+    • Security: encrypted vault for API keys, audit logging
+    • Install: pip install salmalm (zero external deps, stdlib-only core)
+
+    {_tool_summary}
+
+    Behavior:
+    Plan → Execute → Verify → Iterate. Parallel tool calls when independent.
     read_file before edit. Verify after write. On error, try alternatives.
     Destructive ops (rm/kill/drop) need user confirmation.
     Match user's tone. Code must be executable. Long output → write_file.
-    ACCURACY: If unsure, say so. Never fabricate facts/URLs/citations. Use tools to verify before asserting. Prefer "I don't know" over guessing.
-    Memory: MEMORY.md (long-term) + memory/YYYY-MM-DD.md (daily).
+    ACCURACY: If unsure, say so. Never fabricate facts/URLs/citations. Use tools to verify. Prefer "I don't know" over guessing.
     """).strip()
     )
 
