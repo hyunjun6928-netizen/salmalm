@@ -129,8 +129,8 @@ class SystemMixin:
             from salmalm.core import get_session
             _sess = get_session(_sid)
             _ov = getattr(_sess, "model_override", None)
-            if _ov:
-                _effective_model = _ov  # "auto" or specific model
+            if _ov and _ov != "auto":
+                _effective_model = _ov  # specific model override on session
             elif router.force_model:
                 _effective_model = router.force_model  # global fallback
         except Exception:

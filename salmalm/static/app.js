@@ -856,8 +856,10 @@
             var _sMeta=(_cLabel||'')+(_mShort||'');if(_sMeta)_sMeta+=' · ';_sMeta+='⏱️'+_secs+'s';addMsg('assistant',edata.response||'',_sMeta);
             modelBadge.textContent=_mShort?(_isAutoRouting?'Auto → '+_mShort:_mShort):'auto routing';
             fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+            break; /* Exit reader loop immediately after done event */
           }
         }
+        if(gotDone)break; /* Also break outer chunk loop */
       }
       /* Process any remaining data in buffer */
       if(buf.trim()){

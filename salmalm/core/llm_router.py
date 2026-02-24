@@ -160,34 +160,72 @@ def get_api_key(provider: str) -> Optional[str]:
 
 
 def _detect_cli_token(provider: str) -> Optional[str]:
-    """Auto-detect OAuth tokens from Codex CLI or Claude Code installations."""
+    """Auto-detect API keys stored by CLI tools (Codex CLI / Claude Code).
+
+    Only returns standard API keys (sk-*, sk-ant-*, AIza*, etc.).
+    OAuth JWT tokens (eyJ...) are skipped — they lack the scopes needed
+    for standard API endpoints and would cause false 'connected' status.
+    """
     home = Path.home()
+
+    def _is_usable_key(token: str) -> bool:
+        """Reject OAuth JWTs; accept only real API keys."""
+        if not token:
+            return False
+        if token.startswith("eyJ"):
+            log.debug("[CLI] Skipping OAuth JWT token (not a standard API key)")
+            return False
+        return True
+
     try:
         if provider == "openai":
             # Codex CLI: ~/.codex/auth.json
             codex_auth = home / ".codex" / "auth.json"
             if codex_auth.exists():
                 data = json.loads(codex_auth.read_text(encoding="utf-8"))
-                token = data.get("token") or data.get("access_token") or data.get("api_key")
-                if token:
-                    log.info("[CLI] Auto-detected OpenAI token from Codex CLI (~/.codex/auth.json)")
+                # Check top-level OPENAI_API_KEY first (set when user logs in with API key)
+                token = data.get("OPENAI_API_KEY")
+                if not token:
+                    # Nested tokens structure (OAuth or API key)
+                    tokens = data.get("tokens", {})
+                    token = (
+                        tokens.get("access_token")
+                        or data.get("token")
+                        or data.get("access_token")
+                        or data.get("api_key")
+                    )
+                if _is_usable_key(token):
+                    log.info("[CLI] Auto-detected OpenAI API key from Codex CLI (~/.codex/auth.json)")
                     return token
             # OpenAI CLI: ~/.openai/auth.json
             openai_auth = home / ".openai" / "auth.json"
             if openai_auth.exists():
                 data = json.loads(openai_auth.read_text(encoding="utf-8"))
-                token = data.get("token") or data.get("access_token") or data.get("api_key")
-                if token:
-                    log.info("[CLI] Auto-detected OpenAI token from ~/.openai/auth.json")
+                tokens = data.get("tokens", {})
+                token = (
+                    tokens.get("access_token")
+                    or data.get("token")
+                    or data.get("access_token")
+                    or data.get("api_key")
+                )
+                if _is_usable_key(token):
+                    log.info("[CLI] Auto-detected OpenAI API key from ~/.openai/auth.json")
                     return token
         elif provider == "anthropic":
             # Claude Code: ~/.claude/auth.json or ~/.claude.json
             for p in [home / ".claude" / "auth.json", home / ".claude.json"]:
                 if p.exists():
                     data = json.loads(p.read_text(encoding="utf-8"))
-                    token = data.get("token") or data.get("access_token") or data.get("api_key") or data.get("sessionKey")
-                    if token:
-                        log.info(f"[CLI] Auto-detected Anthropic token from Claude Code ({p})")
+                    tokens = data.get("tokens", {})
+                    token = (
+                        tokens.get("access_token")
+                        or data.get("token")
+                        or data.get("access_token")
+                        or data.get("api_key")
+                        or data.get("sessionKey")
+                    )
+                    if _is_usable_key(token):
+                        log.info(f"[CLI] Auto-detected Anthropic API key from Claude Code ({p})")
                         return token
     except Exception as e:
         log.debug(f"CLI token detection failed: {e}")

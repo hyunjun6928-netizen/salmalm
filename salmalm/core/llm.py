@@ -152,8 +152,22 @@ def _resolve_api_key(provider: str) -> Optional[str]:
     if provider == "ollama":
         return vault.get("ollama_api_key") or "ollama"
     if provider == "google":
-        return vault.get("google_api_key") or vault.get("gemini_api_key")
-    return vault.get(f"{provider}_api_key")
+        key = vault.get("google_api_key") or vault.get("gemini_api_key")
+        if not key:
+            try:
+                from salmalm.core.llm_router import _detect_cli_token
+                key = _detect_cli_token("google")
+            except Exception:
+                pass
+        return key
+    key = vault.get(f"{provider}_api_key")
+    if not key:
+        try:
+            from salmalm.core.llm_router import _detect_cli_token
+            key = _detect_cli_token(provider)
+        except Exception:
+            pass
+    return key
 
 
 def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
