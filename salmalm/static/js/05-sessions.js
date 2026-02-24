@@ -90,6 +90,8 @@
     localStorage.setItem('salm_active_session',sid);
     localStorage.removeItem('salm_chat');
     chat.innerHTML='';
+    /* Reset send state so new session isn't blocked by stale _sending flag */
+    if(window._resetSendState)window._resetSendState();
     addMsg('system',t('new-session-msg'));
     /* Session is registered on server when first message is sent (lazy create).
        This prevents ghost sessions from accumulating in the sidebar. */

@@ -16,14 +16,13 @@
     /* Client-side /rollback N command */
     var rollMatch=_inputText.match(/^\/rollback\s+(\d+)$/);
     if(rollMatch){
-      input.value='';
+      input.value='';_sending=false;
       var cnt=parseInt(rollMatch[1]);
       fetch('/api/sessions/rollback',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify({session_id:_currentSession,count:cnt})})
       .then(function(r){return r.json()}).then(function(d){
         if(d.ok){
           addMsg('assistant',t('rollback-done')+' '+d.removed+' '+t('rollback-pairs'));
-          /* Reload session */
           switchSession(_currentSession);
         }else{addMsg('assistant',t('rollback-fail')+' '+(d.error||''));}
       });
@@ -31,7 +30,7 @@
     }
     /* Client-side /branch command */
     if(_inputText==='/branch'){
-      input.value='';
+      input.value='';_sending=false;
       var allMsgs=chat.querySelectorAll('.msg-row');
       var idx=allMsgs.length-1;
       fetch('/api/sessions/branch',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
@@ -93,3 +92,4 @@
       if(_pendingQueue.length){var _next=_pendingQueue.shift();input.value=_next.text;if(_next.files&&_next.files.length){window.setFiles(_next.files)}doSend()}}
   }
   window.doSend=doSend;
+  window._resetSendState=function(){_sending=false;_pendingQueue=[];};
