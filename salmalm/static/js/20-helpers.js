@@ -47,6 +47,7 @@
     t=t.replace(/^### (.+)$/gm,'<h4 style="margin:8px 0 4px;font-size:13px;color:var(--accent2)">$1</h4>');
     t=t.replace(/^## (.+)$/gm,'<h3 style="margin:10px 0 6px;font-size:14px;color:var(--accent2)">$1</h3>');
     t=t.replace(/^# (.+)$/gm,'<h2 style="margin:12px 0 8px;font-size:16px;color:var(--accent2)">$1</h2>');
+    t=t.replace(/^-{3,}$/gm,'<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">');
     t=t.replace(/^[•\-] (.+)$/gm,'<div style="padding-left:16px;position:relative"><span style="position:absolute;left:4px">•</span>$1</div>');
     t=t.replace(/^(\d+)\. (.+)$/gm,'<div style="padding-left:16px">$1. $2</div>');
     t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1</a>');
@@ -54,11 +55,11 @@
     t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
     /* Restore code blocks AFTER all markdown transforms */
     for(var ci=0;ci<codeBlocks.length;ci++){t=t.replace('%%CODEBLOCK'+ci+'%%',codeBlocks[ci])}
-    /* Collapse 3+ consecutive line breaks into 2 max */
-    t=t.replace(/\n{3,}/g,'\n\n');
+    /* Collapse 2+ consecutive blank lines into 1 */
+    t=t.replace(/\n{2,}/g,'\n\n');
     t=t.replace(/\n/g,'<br>');
-    /* Collapse excessive <br> chains (from table separators etc) */
-    t=t.replace(/(<br>\s*){3,}/g,'<br><br>');
+    /* Collapse excessive <br> chains */
+    t=t.replace(/(<br>\s*){2,}/g,'<br>');
     return t;
   }
   window.copyCode=function(id){
