@@ -41,6 +41,15 @@
     .then(function(r){return r.json()})
     .then(function(d){
       var el=document.getElementById('session-list');if(!el)return;
+      /* Clean orphaned localStorage sessions not in server DB */
+      var serverIds=new Set((d.sessions||[]).map(function(s){return s.id}));
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i);
+        if(k&&k.startsWith('salm_chat_')){
+          var lsid=k.slice(10);
+          if(lsid!=='web'&&!serverIds.has(lsid)){localStorage.removeItem(k);i--}
+        }
+      }
       if(!d.sessions||!d.sessions.length){
         el.innerHTML='<div style="padding:8px 12px;opacity:0.5;font-size:12px">'+t('no-sessions')+'</div>';
         return;
