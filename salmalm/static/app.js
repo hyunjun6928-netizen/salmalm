@@ -302,7 +302,11 @@
     t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1</a>');
     t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" data-action="openImage">');
     t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
+    /* Collapse 3+ consecutive line breaks into 2 max */
+    t=t.replace(/\n{3,}/g,'\n\n');
     t=t.replace(/\n/g,'<br>');
+    /* Collapse excessive <br> chains (from table separators etc) */
+    t=t.replace(/(<br>\s*){3,}/g,'<br><br>');
     return t;
   }
   window.copyCode=function(id){
