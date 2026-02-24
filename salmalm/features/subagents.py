@@ -281,9 +281,9 @@ class SubAgentManager:
             pass
         # Try Telegram notification
         try:
-            from salmalm.integrations.telegram_bot import send_message_to_owner
+            from salmalm.channels.telegram import TelegramBot
 
-            send_message_to_owner(msg)
+            TelegramBot.notify_owner(msg)
         except Exception:
             pass
         log.info(f"[SUBAGENT] Notify: {task.task_id} → {task.status}")

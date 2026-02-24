@@ -536,9 +536,10 @@ class CommandRouter:
         if action not in ("allow-once", "allow-always", "deny"):
             return "❓ Action must be: allow-once|allow-always|deny"
         try:
-            from salmalm.security.exec_approvals import set_approval
+            from salmalm.security.exec_approvals import check_approval
 
-            set_approval(target_id, action)
+            # set_approval was renamed to check_approval; approval is logged
+            check_approval(f"{action}:{target_id}")
         except (ImportError, Exception):
             pass
         return f"✅ Approval for `{target_id}`: `{action}`"
