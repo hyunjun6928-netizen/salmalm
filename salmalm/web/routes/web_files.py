@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from salmalm.constants import WORKSPACE_DIR
+from salmalm.core import audit_log
 from salmalm.security.crypto import vault, log
 
 

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from salmalm.constants import DATA_DIR, VERSION, WORKSPACE_DIR, BASE_DIR  # noqa: F401
-from salmalm.security.crypto import vault  # noqa: F401
+from salmalm.security.crypto import vault, log  # noqa: F401
 from salmalm.constants import APP_NAME  # noqa: F401
 from salmalm.core.core import get_usage_report, router  # noqa: F401
 

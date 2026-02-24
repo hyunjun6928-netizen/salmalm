@@ -5,8 +5,10 @@ import os
 import sys
 import time
 
+from salmalm.core import audit_log
+
 from salmalm.constants import DATA_DIR, VERSION, WORKSPACE_DIR, BASE_DIR  # noqa: F401
-from salmalm.security.crypto import vault  # noqa: F401
+from salmalm.security.crypto import vault, log  # noqa: F401
 from salmalm.web.auth import extract_auth, auth_manager  # noqa: F401
 
 log = logging.getLogger(__name__)
