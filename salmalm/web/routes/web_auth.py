@@ -32,9 +32,12 @@ class WebAuthMixin:
             if _pw_hint_file.exists():
                 _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
                 if _hint:
+                    # Try base64 first, fall back to plain text
                     import base64
-
-                    _auto_pw = base64.b64decode(_hint).decode()
+                    try:
+                        _auto_pw = base64.b64decode(_hint).decode()
+                    except Exception:
+                        _auto_pw = _hint  # Plain text fallback
                 else:
                     _auto_pw = ""
                 if vault.unlock(_auto_pw, save_to_keychain=True):
