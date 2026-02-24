@@ -218,8 +218,8 @@ def build_system_prompt(full: bool = True, mode: str = "full") -> str:
 
     # Compact system instructions — optimized for minimal token usage
     parts.append(
-        textwrap.dedent("""
-    [SalmAlm v0.5]
+        textwrap.dedent(f"""
+    [SalmAlm v{VERSION}]
     Autonomous AI agent. Unlimited tool calls. Think step by step.
     Plan → Execute → Verify → Iterate. Parallel calls when independent.
     read_file before edit. Verify after write. On error, try alternatives.
