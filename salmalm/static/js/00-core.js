@@ -7,6 +7,7 @@
   let _tok=sessionStorage.getItem('tok')||'',pendingFile=null;
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
+  var _isAutoRouting=true;
   // CSRF: monkey-patch fetch to add X-Requested-With on same-origin /api/ requests
   const _origFetch=window.fetch;
   window.fetch=function(url,opts){

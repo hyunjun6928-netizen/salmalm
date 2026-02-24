@@ -87,7 +87,7 @@
       var _wcLabel=data.complexity&&data.complexity!=='auto'?(_wcIcons[data.complexity]||'')+data.complexity+' → ':'';
       var _wmShort=(data.model||'').split('/').pop();
       addMsg('assistant',data.text||'',_wcLabel+_wmShort+' · ⏱️'+_secs+'s');
-      if(_wmShort)modelBadge.textContent=_wmShort;
+      if(_wmShort)modelBadge.textContent=_isAutoRouting?'Auto → '+_wmShort:_wmShort;
       fetch('/api/status').then(function(r){return r.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
       /* Queue drain: send next queued message */
       if(window._msgQueue&&window._msgQueue.length>0){var _nextMsg=window._msgQueue.shift();setTimeout(function(){var _inp=document.getElementById('input');if(_inp){_inp.value=_nextMsg;window.doSend()}},500)}

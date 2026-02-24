@@ -214,6 +214,7 @@
     }).catch(function(){st.innerHTML=''})
   };
   window.setModel=function(m){
+    _isAutoRouting=(m==='auto');
     modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
     /* Immediately update UI (optimistic) */
     var cn=document.getElementById('mr-current-name');
@@ -228,6 +229,7 @@
       /* Re-update from server response to ensure consistency */
       var eff=d.current_model||m;
       if(cn)cn.textContent=eff==='auto'?'🔄 Auto Routing':eff;
+      _isAutoRouting=(eff==='auto');
       modelBadge.textContent=eff==='auto'?'auto routing':eff.split('/').pop();
       if(sel)sel.value=eff;
       if(hint){hint.style.display=eff==='auto'?'none':'block'}

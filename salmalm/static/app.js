@@ -10,6 +10,7 @@
   let _tok=sessionStorage.getItem('tok')||'',pendingFile=null;
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
+  var _isAutoRouting=true;
   // CSRF: monkey-patch fetch to add X-Requested-With on same-origin /api/ requests
   const _origFetch=window.fetch;
   window.fetch=function(url,opts){
@@ -619,7 +620,7 @@
       var _wcLabel=data.complexity&&data.complexity!=='auto'?(_wcIcons[data.complexity]||'')+data.complexity+' → ':'';
       var _wmShort=(data.model||'').split('/').pop();
       addMsg('assistant',data.text||'',_wcLabel+_wmShort+' · ⏱️'+_secs+'s');
-      if(_wmShort)modelBadge.textContent=_wmShort;
+      if(_wmShort)modelBadge.textContent=_isAutoRouting?'Auto → '+_wmShort:_wmShort;
       fetch('/api/status').then(function(r){return r.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
       /* Queue drain: send next queued message */
       if(window._msgQueue&&window._msgQueue.length>0){var _nextMsg=window._msgQueue.shift();setTimeout(function(){var _inp=document.getElementById('input');if(_inp){_inp.value=_nextMsg;window.doSend()}},500)}
@@ -781,7 +782,7 @@
             var _cLabel=edata.complexity&&edata.complexity!=='auto'?(_cIcons[edata.complexity]||'')+edata.complexity+' → ':'';
             var _mShort=(edata.model||'').split('/').pop();
             var _sMeta=(_cLabel||'')+(_mShort||'');if(_sMeta)_sMeta+=' · ';_sMeta+='⏱️'+_secs+'s';addMsg('assistant',edata.response||'',_sMeta);
-            modelBadge.textContent=_mShort||'auto routing';
+            modelBadge.textContent=_mShort?(_isAutoRouting?'Auto → '+_mShort:_mShort):'auto routing';
             fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
           }
         }
@@ -789,6 +790,12 @@
       if(!gotDone)throw new Error('stream incomplete');
       if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
     }catch(streamErr){
+      /* User-initiated abort: clean up and stop — don't fallback */
+      if(streamErr.name==='AbortError'){
+        console.log('SSE aborted by user');
+        if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
+        return;
+      }
       /* Do NOT remove salm_sse_pending here — page refresh triggers abort,
          and we need the flag to survive for recovery on reload */
       console.warn('SSE failed, falling back:',streamErr);
@@ -799,7 +806,7 @@
       var d=await r2.json();
       if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
       var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
-      if(d.response){localStorage.removeItem('salm_sse_pending');var _fcI={simple:'⚡',moderate:'🔧',complex:'💎'};var _fcL=d.complexity&&d.complexity!=='auto'?(_fcI[d.complexity]||'')+d.complexity+' → ':'';var _fmS=(d.model||'').split('/').pop();var _meta=(_fcL||'')+(_fmS||'');if(_meta)_meta+=' · ';_meta+='⏱️'+_secs2+'s';addMsg('assistant',d.response,_meta);if(_fmS)modelBadge.textContent=_fmS;}
+      if(d.response){localStorage.removeItem('salm_sse_pending');var _fcI={simple:'⚡',moderate:'🔧',complex:'💎'};var _fcL=d.complexity&&d.complexity!=='auto'?(_fcI[d.complexity]||'')+d.complexity+' → ':'';var _fmS=(d.model||'').split('/').pop();var _meta=(_fcL||'')+(_fmS||'');if(_meta)_meta+=' · ';_meta+='⏱️'+_secs2+'s';addMsg('assistant',d.response,_meta);if(_fmS)modelBadge.textContent=_isAutoRouting?'Auto → '+_fmS:_fmS;}
       else if(d.error){localStorage.removeItem('salm_sse_pending');addMsg('assistant','❌ '+d.error);}
       fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
     }
@@ -1980,6 +1987,7 @@ window._i18n={
     }).catch(function(){st.innerHTML=''})
   };
   window.setModel=function(m){
+    _isAutoRouting=(m==='auto');
     modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
     /* Immediately update UI (optimistic) */
     var cn=document.getElementById('mr-current-name');
@@ -1994,6 +2002,7 @@ window._i18n={
       /* Re-update from server response to ensure consistency */
       var eff=d.current_model||m;
       if(cn)cn.textContent=eff==='auto'?'🔄 Auto Routing':eff;
+      _isAutoRouting=(eff==='auto');
       modelBadge.textContent=eff==='auto'?'auto routing':eff.split('/').pop();
       if(sel)sel.value=eff;
       if(hint){hint.style.display=eff==='auto'?'none':'block'}
@@ -2148,9 +2157,10 @@ window._i18n={
   /* --- Restore model preference from server --- */
   fetch('/api/status?session='+encodeURIComponent(_currentSession)).then(r=>r.json()).then(d=>{
     if(d.model&&d.model!=='auto'){
+      _isAutoRouting=false;
       var sel=document.getElementById('s-model');
       if(sel){sel.value=d.model;modelBadge.textContent=d.model.split('/').pop()}
-    }else{modelBadge.textContent='auto routing'}
+    }else{_isAutoRouting=true;modelBadge.textContent='auto routing'}
     /* Channel badges */
     var ch=d.channels||{};
     var tgB=document.querySelector('#tg-status .badge');
