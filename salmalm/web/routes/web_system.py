@@ -41,7 +41,7 @@ class SystemMixin:
         import platform
         import gc
         from salmalm.core import _metrics, get_session
-        from salmalm.core.engine import _active_requests, _shutting_down
+        from salmalm.core.engine_pipeline import _active_requests, _shutting_down
         from salmalm.tools.tool_registry import (
             _HANDLERS,
             _ensure_modules,

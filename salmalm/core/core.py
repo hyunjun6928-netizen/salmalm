@@ -26,6 +26,7 @@ from salmalm.constants import (
 from salmalm.security.crypto import vault, log
 from salmalm.core.audit import (  # noqa: F401
     _init_audit_db,
+    _ensure_audit_v2_table,
     audit_log,
     audit_checkpoint,
     query_audit_log,
