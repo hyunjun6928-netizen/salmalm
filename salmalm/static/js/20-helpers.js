@@ -33,8 +33,7 @@
     });
     /* Escape remaining HTML to prevent XSS */
     t=escHtml(t);
-    /* Restore code blocks */
-    for(var ci=0;ci<codeBlocks.length;ci++){t=t.replace('%%CODEBLOCK'+ci+'%%',codeBlocks[ci])}
+    /* Markdown transforms BEFORE restoring code blocks (so code content is not affected) */
     t=t.replace(/`([^`]+)`/g,function(_,c){return '<code>'+c+'</code>'});
     t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
     t=t.replace(/\*([^*]+)\*/g,'<em>$1</em>');
@@ -53,6 +52,8 @@
     t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1</a>');
     t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" data-action="openImage">');
     t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
+    /* Restore code blocks AFTER all markdown transforms */
+    for(var ci=0;ci<codeBlocks.length;ci++){t=t.replace('%%CODEBLOCK'+ci+'%%',codeBlocks[ci])}
     /* Collapse 3+ consecutive line breaks into 2 max */
     t=t.replace(/\n{3,}/g,'\n\n');
     t=t.replace(/\n/g,'<br>');
