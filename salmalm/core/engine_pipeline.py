@@ -13,6 +13,10 @@ _active_requests = 0
 _active_requests_lock = _threading.Lock()
 _active_requests_event = _threading.Event()
 
+# Per-session concurrency guard — prevents overlapping requests on same session
+_session_locks: dict = {}  # session_id → threading.Lock
+_session_locks_lock = _threading.Lock()
+
 import re as _re
 
 
@@ -61,6 +65,21 @@ async def process_message(
     if _shutting_down:
         return "⚠️ Server is shutting down. Please try again later. / 서버가 종료 중입니다."
 
+    # Per-session lock: if previous request still running, abort it and wait
+    with _session_locks_lock:
+        if session_id not in _session_locks:
+            _session_locks[session_id] = _threading.Lock()
+        sess_lock = _session_locks[session_id]
+
+    if not sess_lock.acquire(blocking=False):
+        # Previous request still running — send abort signal and wait
+        from salmalm.features.abort import abort_controller
+        abort_controller.request_abort(session_id)
+        log.info(f"[ENGINE] Session {session_id} busy — aborting previous and waiting")
+        acquired = sess_lock.acquire(timeout=15.0)
+        if not acquired:
+            log.warning(f"[ENGINE] Session {session_id} lock timeout — proceeding anyway")
+
     with _active_requests_lock:
         global _active_requests
         _active_requests += 1
@@ -88,6 +107,10 @@ async def process_message(
             _active_requests -= 1
             if _active_requests == 0:
                 _active_requests_event.set()
+        try:
+            sess_lock.release()
+        except RuntimeError:
+            pass  # Already released
 
 
 def _classify_task(session, user_message: str) -> dict:
