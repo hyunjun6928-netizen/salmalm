@@ -127,17 +127,36 @@
         document.getElementById('do-update-btn').style.display='none'}
     }).catch(function(e){re.innerHTML='<span style="color:#f87171">❌ Check failed: '+e.message+'</span>'})};
   window.doUpdate=function(){
+    /* Works from both dashboard (with update-result/do-update-btn) and banner */
     var re=document.getElementById('update-result');
     var btn=document.getElementById('do-update-btn');
-    btn.disabled=true;btn.textContent='⏳ Installing...';
-    re.innerHTML='<span style="color:var(--text2)">Running pip install --upgrade salmalm... (up to 30s)</span>';
+    var bannerBtn=document.querySelector('#update-banner button');
+    /* Update UI for whichever context we're in */
+    if(btn){btn.disabled=true;btn.textContent='⏳ Installing...';}
+    if(bannerBtn){bannerBtn.disabled=true;bannerBtn.textContent='⏳ Installing...';}
+    if(re)re.innerHTML='<span style="color:var(--text2)">Running pip install --upgrade salmalm... (up to 30s)</span>';
     fetch('/api/do-update',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
-      if(d.ok){re.innerHTML='<span style="color:#4ade80">✅ v'+d.version+' Installed! Please restart the server.</span>';
-        var rb=document.createElement('button');rb.className='btn';rb.style.marginTop='8px';rb.textContent='🔄 Restart Now';
-        rb.onclick=function(){fetch('/api/restart',{method:'POST'});setTimeout(function(){location.reload()},3000)};re.appendChild(rb);
-      }else{re.innerHTML='<span style="color:#f87171">❌ Failed: '+d.error+'</span>'}
-      btn.disabled=false;btn.textContent='⬆️ Update'})
-    .catch(function(e){re.innerHTML='<span style="color:#f87171">❌ '+e.message+'</span>';btn.disabled=false;btn.textContent='⬆️ Update'})};
+      if(d.ok){
+        var msg='✅ v'+d.version+' installed! Restart to apply.';
+        if(re){re.innerHTML='<span style="color:#4ade80">'+msg+'</span>';
+          var rb=document.createElement('button');rb.className='btn';rb.style.marginTop='8px';rb.textContent='🔄 Restart Now';
+          rb.onclick=function(){fetch('/api/restart',{method:'POST'});setTimeout(function(){location.reload()},3000)};re.appendChild(rb);
+        }
+        if(bannerBtn){bannerBtn.textContent='🔄 Restart';bannerBtn.disabled=false;
+          bannerBtn.onclick=function(){fetch('/api/restart',{method:'POST'});bannerBtn.textContent='Restarting...';bannerBtn.disabled=true;setTimeout(function(){location.reload()},3000)};
+        }
+      }else{
+        var errMsg='❌ '+(d.error||'Update failed');
+        if(re)re.innerHTML='<span style="color:#f87171">'+errMsg+'</span>';
+        if(bannerBtn){bannerBtn.textContent='❌ Failed';setTimeout(function(){bannerBtn.textContent='Update Now';bannerBtn.disabled=false},3000);}
+      }
+      if(btn){btn.disabled=false;btn.textContent='⬆️ Update';}
+    }).catch(function(e){
+      var errMsg='❌ '+e.message;
+      if(re)re.innerHTML='<span style="color:#f87171">'+errMsg+'</span>';
+      if(btn){btn.disabled=false;btn.textContent='⬆️ Update';}
+      if(bannerBtn){bannerBtn.textContent='❌ Error';setTimeout(function(){bannerBtn.textContent='Update Now';bannerBtn.disabled=false},3000);}
+    });};
   window.saveKey=function(vaultKey,inputId){
     var v=document.getElementById(inputId).value.trim();
     if(!v){addMsg('assistant','Please enter a key');return}
