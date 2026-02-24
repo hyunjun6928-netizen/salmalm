@@ -517,14 +517,21 @@
   /* --- File handling (single & multi) --- */
   window.setFile=function(file){
     if(file.type.startsWith('image/')&&file.size>5*1024*1024){alert(t('img-too-large'));return}
-    pendingFile=file;pendingFiles=[file];
-    const isImg=file.type.startsWith('image/');
-    fileIconEl.textContent=isImg?'🖼️':'📎';
-    fileNameEl.textContent=file.name;
-    fileSizeEl.textContent=(file.size/1024).toFixed(1)+'KB';
+    pendingFiles.push(file);pendingFile=pendingFiles[0];
+    if(pendingFiles.length>1){
+      fileIconEl.textContent='📎×'+pendingFiles.length;
+      fileNameEl.textContent=pendingFiles.map(function(f){return f.name}).join(', ');
+      fileSizeEl.textContent=(pendingFiles.reduce(function(s,f){return s+f.size},0)/1024).toFixed(1)+'KB';
+      imgPrev.style.display='none';
+    }else{
+      const isImg=file.type.startsWith('image/');
+      fileIconEl.textContent=isImg?'🖼️':'📎';
+      fileNameEl.textContent=file.name;
+      fileSizeEl.textContent=(file.size/1024).toFixed(1)+'KB';
+      if(isImg){const r=new FileReader();r.onload=function(e){imgPrev.src=e.target.result;imgPrev.style.display='block'};r.readAsDataURL(file)}
+      else{imgPrev.style.display='none'}
+    }
     filePrev.style.display='block';
-    if(isImg){const r=new FileReader();r.onload=function(e){imgPrev.src=e.target.result;imgPrev.style.display='block'};r.readAsDataURL(file)}
-    else{imgPrev.style.display='none'}
     input.focus();
   };
   window.setFiles=function(files){
