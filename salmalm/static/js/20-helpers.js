@@ -250,6 +250,8 @@
     var tr=document.getElementById('typing-row');if(tr)tr.remove();
     addMsg('assistant','⏹ '+(t('gen-cancelled')||'Generation cancelled.'));
     btn.disabled=false;input.focus();
+    var _sb=document.getElementById('stop-btn');var _sb2=document.getElementById('send-btn');
+    if(_sb)_sb.style.display='none';if(_sb2)_sb2.style.display='flex';
   };
   function updateTypingStatus(status, detail){
     var el=document.getElementById('typing-row');
