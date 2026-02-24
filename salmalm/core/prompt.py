@@ -15,13 +15,11 @@ from salmalm.constants import (
     DATA_DIR,
 )
 import logging
-
-log = logging.getLogger(__name__)
-from salmalm.core import SkillLoader
-import logging
-
-log = logging.getLogger(__name__)
 from typing import Optional
+
+from salmalm.core import SkillLoader
+
+log = logging.getLogger(__name__)
 
 # User-customizable SOUL.md (takes priority over project SOUL.md)
 USER_SOUL_FILE = DATA_DIR / "SOUL.md"
