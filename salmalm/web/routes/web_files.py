@@ -1,6 +1,7 @@
 """SalmAlm Web — WebFilesMixin routes."""
 
 from salmalm.constants import WORKSPACE_DIR
+from salmalm.security.crypto import vault
 
 
 def _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, export_user, _json, datetime) -> None:
