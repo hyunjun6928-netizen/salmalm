@@ -95,8 +95,13 @@
             else if(act==='add_cron'){fetch('/api/cron/add',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},body:JSON.stringify({name:edata.name||'ai-job',interval:edata.interval||3600,prompt:edata.prompt||''})}).then(function(){if(window._loadCron)window._loadCron()})}
           }else if(etype==='done'){
             gotDone=true;
+            _currentAbort=null; /* Prevent stale abort after completion */
             localStorage.removeItem('salm_sse_pending');
             if(typingEl)typingEl.remove();
+            /* Restore send button immediately */
+            var _sbD=document.getElementById('stop-btn');var _sbDS=document.getElementById('send-btn');
+            if(_sbD)_sbD.style.display='none';if(_sbDS)_sbDS.style.display='flex';
+            btn.disabled=false;
             /* Auto-switch back to chat if user navigated away during generation */
             if(chat.style.display==='none'&&window.showChat)window.showChat();
             var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
