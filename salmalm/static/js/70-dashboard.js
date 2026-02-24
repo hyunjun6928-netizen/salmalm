@@ -233,5 +233,7 @@
       modelBadge.textContent=eff==='auto'?'auto routing':eff.split('/').pop();
       if(sel)sel.value=eff;
       if(hint){hint.style.display=eff==='auto'?'none':'block'}
+      /* Reload model cards to sync highlight */
+      if(typeof window._loadModelRouter==='function')window._loadModelRouter();
     });
   };
