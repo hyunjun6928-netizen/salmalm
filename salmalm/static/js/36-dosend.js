@@ -1,9 +1,9 @@
   /* --- Send --- */
   async function doSend(){
-    var t=input.value.trim();
-    if(!t&&!pendingFile)return;
+    var _inputText=input.value.trim();
+    if(!_inputText&&!pendingFile)return;
     /* Client-side /rollback N command */
-    var rollMatch=t.match(/^\/rollback\s+(\d+)$/);
+    var rollMatch=_inputText.match(/^\/rollback\s+(\d+)$/);
     if(rollMatch){
       input.value='';
       var cnt=parseInt(rollMatch[1]);
@@ -19,7 +19,7 @@
       return;
     }
     /* Client-side /branch command */
-    if(t==='/branch'){
+    if(_inputText==='/branch'){
       input.value='';
       var allMsgs=chat.querySelectorAll('.msg-row');
       var idx=allMsgs.length-1;
@@ -51,8 +51,8 @@
       window.clearFile();
     }
 
-    var msg=(fileMsg?fileMsg+'\n':'')+t;
-    if(t)addMsg('user',t);
+    var msg=(fileMsg?fileMsg+'\n':'')+_inputText;
+    if(_inputText)addMsg('user',_inputText);
     if(!msg){btn.disabled=false;return}
 
     addTyping();
