@@ -237,14 +237,18 @@ class TelegramMediaMixin:
         if _model_ov == "auto":
             _model_ov = None
 
-        response = await process_message(
-            session_id,
-            text,
-            model_override=_model_ov,
-            image_data=_image_data,
-            on_token=_on_stream_token,
-            on_status=_on_status,
-        )
+        try:
+            response = await process_message(
+                session_id,
+                text,
+                model_override=_model_ov,
+                image_data=_image_data,
+                on_token=_on_stream_token,
+                on_status=_on_status,
+            )
+        except Exception as e:
+            log.error(f"Telegram process_message error: {e}")
+            response = f"⚠️ 일시적 오류가 발생했습니다. 다시 시도해주세요.\n(Error: {type(e).__name__})"
         _elapsed = time.time() - _start
 
         # Cancel typing loop
