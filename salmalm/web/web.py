@@ -360,6 +360,7 @@ class WebHandler(
         "/api/agents": "_get_api_agents",
         "/api/hooks": "_get_api_hooks",
         "/api/security/report": "_get_api_security_report",
+        "/api/security/bans": "_get_api_security_bans",
         "/api/health/providers": "_get_api_health_providers",
         "/api/bookmarks": "_get_api_bookmarks",
         "/api/paste/detect": "_get_api_paste_detect",
@@ -472,6 +473,34 @@ class WebHandler(
         from salmalm.security import security_auditor
 
         self._json(security_auditor.audit())
+
+    def _get_api_security_bans(self):
+        """List currently banned IPs. Admin only."""
+        if not self._require_auth("admin"):
+            return
+        from salmalm.web.auth import ip_ban_list
+        self._json({"bans": ip_ban_list.list_banned()})
+
+    def _post_api_security_unban(self):
+        """Manually lift an IP ban. Admin only.
+
+        Body: {"ip": "1.2.3.4"}
+        """
+        if not self._require_auth("admin"):
+            return
+        import json as _json
+        try:
+            body = _json.loads(self.rfile.read(int(self.headers.get("content-length", 0))))
+            ip = body.get("ip", "").strip()
+        except Exception:
+            self._json({"error": "Invalid JSON body"}, 400)
+            return
+        if not ip:
+            self._json({"error": "Missing 'ip' field"}, 400)
+            return
+        from salmalm.web.auth import ip_ban_list
+        ip_ban_list.unban(ip)
+        self._json({"ok": True, "ip": ip, "message": f"IP {ip} unbanned"})
 
     def _get_api_bookmarks(self):
         # Message bookmarks — LobeChat style (메시지 북마크)
@@ -660,6 +689,7 @@ self.addEventListener('fetch',e=>{{
         "/api/auth/login": "_post_api_auth_login",
         "/api/auth/register": "_post_api_auth_register",
         "/api/setup": "_post_api_setup",
+        "/api/security/unban": "_post_api_security_unban",
         "/api/do-update": "_post_api_do_update",
         "/api/restart": "_post_api_restart",
         "/api/update": "_post_api_update",

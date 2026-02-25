@@ -322,6 +322,41 @@ class WebSocketServer:
             if ":" in line:
                 k, v = line.split(":", 1)
                 headers[k.strip().lower()] = v.strip()
+
+        # ── WebSocket Abuse Guard ────────────────────────────────────────────
+        peer = writer.get_extra_info("peername")
+        _ws_ip = peer[0] if peer else "unknown"
+
+        # IP ban check
+        try:
+            from salmalm.web.auth import ip_ban_list, rate_limiter, RateLimitExceeded
+            _banned, _ban_rem = ip_ban_list.is_banned(_ws_ip)
+            if _banned:
+                writer.write(
+                    f"HTTP/1.1 429 Too Many Requests\r\n"
+                    f"Retry-After: {_ban_rem}\r\n"
+                    f"Content-Length: 0\r\n\r\n".encode()
+                )
+                await writer.drain()
+                writer.close()
+                return None
+            # IP-level connection rate limit (reuses the global rate_limiter "ip" bucket)
+            rate_limiter.check(f"ip:{_ws_ip}", "ip")
+        except RateLimitExceeded as _e:
+            ip_ban_list.record_violation(_ws_ip)
+            _ra = int(_e.retry_after)
+            writer.write(
+                f"HTTP/1.1 429 Too Many Requests\r\n"
+                f"Retry-After: {_ra}\r\n"
+                f"Content-Length: 0\r\n\r\n".encode()
+            )
+            await writer.drain()
+            writer.close()
+            return None
+        except Exception as _guard_err:
+            log.debug("[WS] Abuse guard skipped: %s", _guard_err)
+        # ── End WebSocket Abuse Guard ────────────────────────────────────────
+
         # Validate Origin
         origin = headers.get("origin", "")
         if origin:

@@ -350,6 +350,124 @@ class RateLimiter:
                 del self._buckets[k]
 
 
+# ── LLM-specific Rate Limiter ───────────────────────────────
+
+
+class LLMRateLimiter(RateLimiter):
+    """Tighter token bucket for LLM-triggering endpoints (/api/chat, /api/agent/task).
+
+    LLM calls consume external API credits; a single user can cause significant
+    cost within seconds. These limits are intentionally lower than the global
+    rate limiter.
+    """
+
+    def __init__(self) -> None:
+        """Init  ."""
+        super().__init__()
+        self._limits = {
+            "admin":     {"rate": 30,  "per": 60, "burst": 40},   # 30 req/min
+            "user":      {"rate": 10,  "per": 60, "burst": 15},   # 10 req/min
+            "readonly":  {"rate": 3,   "per": 60, "burst": 5},    # 3 req/min
+            "anonymous": {"rate": 2,   "per": 60, "burst": 3},    # 2 req/min
+            "ip":        {"rate": 20,  "per": 60, "burst": 30},   # 20 req/min per IP
+        }
+
+
+# ── IP Ban List ─────────────────────────────────────────────
+
+
+class IPBanList:
+    """Auto-ban IPs that repeatedly exceed rate limits.
+
+    Tracks violation counts per IP in a sliding window. After
+    ``ban_threshold`` violations, the IP is blocked for ``ban_duration``
+    seconds. All state is in-memory; restarting the server resets bans
+    (acceptable for a personal-use gateway — persistent bans would require
+    SQLite and are future work).
+    """
+
+    def __init__(self, ban_threshold: int = 10, ban_duration: int = 3600) -> None:
+        """Init  ."""
+        # ip -> {"count": int, "first_at": float, "banned_until": float}
+        self._records: Dict[str, dict] = {}
+        self._lock = threading.Lock()
+        self._ban_threshold = ban_threshold  # violations before ban
+        self._ban_duration = ban_duration    # seconds to ban (default 1 h)
+
+    def is_banned(self, ip: str) -> "tuple[bool, int]":
+        """Return (is_banned, seconds_remaining). Pure read — no side effects."""
+        with self._lock:
+            rec = self._records.get(ip)
+            if not rec:
+                return False, 0
+            now = time.time()
+            if rec["banned_until"] > now:
+                return True, int(rec["banned_until"] - now)
+            return False, 0
+
+    def record_violation(self, ip: str) -> bool:
+        """Record one rate-limit violation for *ip*.
+
+        Returns True if the IP is now banned (either newly or already).
+        """
+        with self._lock:
+            now = time.time()
+            if ip not in self._records:
+                self._records[ip] = {"count": 0, "first_at": now, "banned_until": 0.0}
+
+            rec = self._records[ip]
+
+            # Already banned — just return
+            if rec["banned_until"] > now:
+                return True
+
+            # Reset sliding window after 1 h of no bans
+            if now - rec["first_at"] > 3600:
+                rec["count"] = 0
+                rec["first_at"] = now
+
+            rec["count"] += 1
+
+            if rec["count"] >= self._ban_threshold:
+                rec["banned_until"] = now + self._ban_duration
+                log.warning(
+                    "[BAN] IP %s auto-banned for %ds after %d violations",
+                    ip, self._ban_duration, rec["count"],
+                )
+                return True
+
+            return False
+
+    def unban(self, ip: str) -> None:
+        """Manually lift a ban (admin use)."""
+        with self._lock:
+            if ip in self._records:
+                self._records[ip]["banned_until"] = 0.0
+                self._records[ip]["count"] = 0
+        log.info("[BAN] IP %s manually unbanned", ip)
+
+    def list_banned(self) -> list:
+        """Return list of currently banned IPs with remaining seconds."""
+        now = time.time()
+        with self._lock:
+            return [
+                {"ip": ip, "remaining": int(rec["banned_until"] - now)}
+                for ip, rec in self._records.items()
+                if rec["banned_until"] > now
+            ]
+
+    def cleanup(self) -> None:
+        """Evict expired records to prevent unbounded memory growth."""
+        with self._lock:
+            now = time.time()
+            expired = [
+                ip for ip, rec in self._records.items()
+                if rec["banned_until"] < now and now - rec["first_at"] > 7200
+            ]
+            for ip in expired:
+                del self._records[ip]
+
+
 # ── User Database ───────────────────────────────────────────
 
 
@@ -666,3 +784,5 @@ def extract_auth(headers: dict) -> Optional[dict]:
 
 auth_manager = AuthManager()
 rate_limiter = RateLimiter()
+llm_rate_limiter = LLMRateLimiter()
+ip_ban_list = IPBanList(ban_threshold=10, ban_duration=3600)

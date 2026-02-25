@@ -25,7 +25,21 @@ from fastapi.staticfiles import StaticFiles
 
 from salmalm.security.crypto import log
 from salmalm.utils.logging_ext import request_logger, set_correlation_id
+from salmalm.web.auth import (
+    rate_limiter, llm_rate_limiter, ip_ban_list,
+    RateLimitExceeded, extract_auth,
+)
 import uuid
+
+# LLM-triggering paths that get the tighter LLMRateLimiter bucket
+_LLM_PATHS: frozenset = frozenset({
+    "/api/chat",
+    "/api/chat/stream",
+    "/api/chat/abort",
+    "/api/chat/regenerate",
+    "/api/chat/compare",
+    "/api/ask",
+})
 
 
 # ── Response signal exceptions ─────────────────────────────────────────────
@@ -294,6 +308,76 @@ def create_asgi_app() -> FastAPI:
                     "Access-Control-Max-Age": "86400",
                 },
             )
+
+        # ── Abuse Guard ──────────────────────────────────────────────────────
+        # Resolve client IP (trust X-Forwarded-For only when proxy env is set)
+        _xff = request.headers.get("x-forwarded-for", "")
+        if _xff and os.environ.get("SALMALM_TRUST_PROXY"):
+            _client_ip = _xff.split(",")[0].strip()
+        else:
+            _client_ip = (request.client.host if request.client else None) or "unknown"
+
+        # 1. IP ban check — hard block before any further processing
+        _is_banned, _ban_remaining = ip_ban_list.is_banned(_client_ip)
+        if _is_banned:
+            return JSONResponse(
+                {"error": "Too many requests. IP temporarily blocked.",
+                 "retry_after": _ban_remaining},
+                status_code=429,
+                headers={"Retry-After": str(_ban_remaining)},
+            )
+
+        # 2. Extract auth token for role-based limiting
+        _auth_headers = {k.lower(): v for k, v in request.headers.items()}
+        _auth_user = extract_auth(_auth_headers)
+        _role = (_auth_user.get("role", "anonymous") if _auth_user else "anonymous")
+        _uid_key = (str(_auth_user["id"]) if _auth_user else f"ip:{_client_ip}")
+
+        # 3. Global IP-level rate limit (protects against unauthenticated flood)
+        try:
+            rate_limiter.check(f"ip:{_client_ip}", "ip")
+        except RateLimitExceeded as _e:
+            ip_ban_list.record_violation(_client_ip)
+            _ra = int(_e.retry_after)
+            return JSONResponse(
+                {"error": "Rate limit exceeded", "retry_after": _ra},
+                status_code=429,
+                headers={"Retry-After": str(_ra)},
+            )
+
+        # 4. Per-user role-based rate limit
+        if _auth_user:
+            try:
+                rate_limiter.check(_uid_key, _role)
+            except RateLimitExceeded as _e:
+                _ra = int(_e.retry_after)
+                return JSONResponse(
+                    {"error": "Rate limit exceeded", "retry_after": _ra},
+                    status_code=429,
+                    headers={
+                        "Retry-After": str(_ra),
+                        "X-RateLimit-Role": _role,
+                    },
+                )
+
+        # 5. LLM-path tighter quota — cost-protection for chat/agent endpoints
+        _req_path_base = request.url.path.split("?")[0]
+        _is_llm_path = (
+            _req_path_base in _LLM_PATHS
+            or _req_path_base.startswith("/api/agent/task")
+        )
+        if _is_llm_path and method in ("POST", "PUT", "PATCH"):
+            try:
+                llm_rate_limiter.check(_uid_key, _role)
+            except RateLimitExceeded as _e:
+                ip_ban_list.record_violation(_client_ip)
+                _ra = int(_e.retry_after)
+                return JSONResponse(
+                    {"error": "LLM rate limit exceeded", "retry_after": _ra},
+                    status_code=429,
+                    headers={"Retry-After": str(_ra)},
+                )
+        # ── End Abuse Guard ──────────────────────────────────────────────────
 
         # Read body for write methods
         body_bytes = b""
