@@ -726,8 +726,8 @@ async def run_server():
 
     begin_shutdown()
 
-    log.info("[SHUTDOWN] Phase 2: Wait for active LLM requests (max 30s)")
-    wait_for_active_requests(timeout=30.0)
+    log.info("[SHUTDOWN] Phase 2: Wait for active LLM requests (max 10s)")
+    wait_for_active_requests(timeout=10.0)
 
     log.info("[SHUTDOWN] Phase 3: Notify WebSocket clients")
     await ws_server.shutdown()
@@ -741,7 +741,20 @@ async def run_server():
     close_all_db_connections()
 
     log.info("[SHUTDOWN] Phase 6: Stop HTTP server")
-    server.shutdown()
+    try:
+        import inspect as _inspect
+        if _inspect.iscoroutinefunction(getattr(type(server), "shutdown", None)):
+            # uvicorn.Server.shutdown() is a coroutine — must await
+            server.should_exit = True          # signal the run loop first
+            await asyncio.wait_for(server.shutdown(), timeout=5.0)
+        else:
+            server.shutdown()                  # ThreadingHTTPServer — sync
+    except (asyncio.TimeoutError, Exception) as _e:
+        log.debug(f"[SHUTDOWN] HTTP server stop: {_e}")
+        try:
+            server.should_exit = True          # fallback: just set the flag
+        except AttributeError:
+            pass
 
     # Fire on_shutdown hook
     try:
