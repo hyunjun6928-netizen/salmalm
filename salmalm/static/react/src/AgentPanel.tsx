@@ -394,6 +394,19 @@ export default function AgentPanel() {
     }
   };
 
+  const handleClearCompleted = async () => {
+    try {
+      await Promise.all(
+        completedTasks.map(t =>
+          fetch(`/api/agent/task/${t.id}`, { method: 'DELETE', headers: authHeaders() })
+        )
+      );
+      await fetchTasks();
+    } catch {
+      // ignore
+    }
+  };
+
   const activeTasks = tasks.filter(t => t.status === 'running' || t.status === 'pending');
   const completedTasks = tasks.filter(t => t.status === 'done' || t.status === 'failed' || t.status === 'cancelled');
 
@@ -485,7 +498,17 @@ export default function AgentPanel() {
 
       {/* Completed Tasks */}
       <div style={styles.section}>
-        <p style={styles.sectionTitle}>✓ Completed ({completedTasks.length})</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <p style={{ ...styles.sectionTitle, margin: 0 }}>✓ Completed ({completedTasks.length})</p>
+          {completedTasks.length > 0 && (
+            <button
+              onClick={handleClearCompleted}
+              style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', border: '1px solid #7f1d1d', background: '#1a0505', color: '#fca5a5', cursor: 'pointer' }}
+            >
+              🗑 전체 삭제
+            </button>
+          )}
+        </div>
         {completedTasks.length === 0 ? (
           <p style={styles.emptyState}>Completed tasks will appear here.</p>
         ) : (
