@@ -196,7 +196,13 @@ def _fetch_provider_models(provider: str) -> List[str]:
                 ids.sort(reverse=True)
             elif provider in ("groq", "xai"):
                 ids = [m for m in ids if not any(
-                    x in m.lower() for x in ("whisper", "embed", "guard", "vision-tool")
+                    x in m.lower() for x in (
+                        "whisper", "embed", "guard", "vision-tool",
+                        "playai",           # Groq PlayAI TTS models
+                        "tts",              # any text-to-speech models
+                        "speech",           # speech synthesis
+                        "transcription",    # audio transcription
+                    )
                 )]
                 ids.sort()
             return ids

@@ -200,20 +200,11 @@ def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
                 sanitized.append(msg)
         return sanitized
     elif provider == "google":
-        sanitized = []
-        for msg in messages:
-            role = msg.get("role", "")
-            if role == "assistant":
-                sanitized.append({**msg, "role": "model"})
-            elif role == "tool":
-                # Skip tool messages for Google — they use a different format
-                continue
-            elif role == "system":
-                # Google doesn't support system role — prepend to first user message
-                continue
-            else:
-                sanitized.append(msg)
-        return sanitized
+        # _build_gemini_contents handles all format conversion:
+        #   system → user, assistant+tool_calls → model+functionCall,
+        #   tool → user+functionResponse
+        # Pass through unchanged; do not pre-convert or drop messages.
+        return list(messages)
     elif provider in ("openai", "xai", "deepseek", "openrouter"):
         # OpenAI-compatible: filter out Anthropic-specific content blocks
         sanitized = []
@@ -712,15 +703,72 @@ def _call_google(
 
 
 def _build_gemini_contents(messages: List[Dict[str, Any]]) -> list:
-    """Convert messages list to Gemini contents format, merging consecutive same-role."""
+    """Convert messages list to Gemini contents format.
+
+    Handles OpenAI tool format → Gemini functionCall/functionResponse:
+      assistant + tool_calls → role=model, parts=[{functionCall: ...}]
+      role=tool              → role=user,  parts=[{functionResponse: ...}]
+    Merges consecutive same-role turns as Gemini requires alternating roles.
+    """
     parts = []
     for m in messages:
-        content = m.get("content", "")
-        if isinstance(content, list):
-            text_parts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
-            content = " ".join(text_parts)
-        role = "user" if m["role"] in ("user", "system") else "model"
-        parts.append({"role": role, "parts": [{"text": str(content)}]})
+        role = m.get("role", "")
+        content = m.get("content") or ""
+
+        if role == "system":
+            # Gemini has no system role — treat as user context
+            parts.append({"role": "user", "parts": [{"text": str(content)}]})
+
+        elif role == "tool":
+            # OpenAI tool result → Gemini functionResponse
+            # We need the function name; use tool_call_id as fallback key
+            tool_name = m.get("name") or m.get("tool_call_id", "tool")
+            parts.append({
+                "role": "user",
+                "parts": [{
+                    "functionResponse": {
+                        "name": tool_name,
+                        "response": {"content": str(content)},
+                    }
+                }]
+            })
+
+        elif role == "assistant":
+            tool_calls = m.get("tool_calls") or []
+            gemini_parts = []
+            if content:
+                if isinstance(content, list):
+                    # Anthropic content blocks
+                    text = " ".join(b.get("text", "") for b in content
+                                   if isinstance(b, dict) and b.get("type") == "text")
+                    if text:
+                        gemini_parts.append({"text": text})
+                else:
+                    gemini_parts.append({"text": str(content)})
+            for tc in tool_calls:
+                fn = tc.get("function", {})
+                try:
+                    args = json.loads(fn.get("arguments", "{}"))
+                except Exception:
+                    args = {}
+                gemini_parts.append({
+                    "functionCall": {
+                        "name": fn.get("name", ""),
+                        "args": args,
+                    }
+                })
+            if gemini_parts:
+                parts.append({"role": "model", "parts": gemini_parts})
+
+        else:
+            # user / unknown
+            if isinstance(content, list):
+                text = " ".join(b.get("text", "") for b in content
+                               if isinstance(b, dict) and b.get("type") == "text")
+                content = text
+            parts.append({"role": "user", "parts": [{"text": str(content)}]})
+
+    # Merge consecutive same-role turns (Gemini requires alternating user/model)
     merged: list = []
     for p in parts:
         if merged and merged[-1]["role"] == p["role"]:
