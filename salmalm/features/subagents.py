@@ -277,15 +277,15 @@ class SubAgentManager:
                 ws_server.broadcast({"type": "subagent_complete", "task": task.to_dict()}),
                 asyncio.get_event_loop(),
             )
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"[SUBAGENT] WS broadcast skipped: {e}")
         # Try Telegram notification
         try:
             from salmalm.channels.telegram import TelegramBot
 
             TelegramBot.notify_owner(msg)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug(f"[SUBAGENT] Telegram notification skipped: {e}")
         log.info(f"[SUBAGENT] Notify: {task.task_id} → {task.status}")
 
     def _cleanup_old(self):

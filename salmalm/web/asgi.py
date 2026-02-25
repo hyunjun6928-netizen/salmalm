@@ -266,17 +266,9 @@ def create_asgi_app() -> FastAPI:
     _static_dist.mkdir(parents=True, exist_ok=True)
     app.mount("/static/dist", StaticFiles(directory=str(_static_dist)), name="static_dist")
 
-    # ── WebSocket endpoint ──────────────────────────────────────────────────
-    try:
-        from salmalm.web.ws import WebSocketHandler as _WSH
-        ws_handler = _WSH()
-
-        @app.websocket("/ws")
-        async def websocket_endpoint(ws: WebSocket):
-            await ws.accept()
-            await ws_handler.handle(ws)
-    except Exception as e:
-        log.warning(f"[ASGI] WebSocket handler unavailable: {e}")
+    # ── WebSocket note ──────────────────────────────────────────────────────
+    # WebSocket runs as a separate asyncio TCP server on port 18801 (ws.py).
+    # Clients connect directly to ws://host:18801 — no ASGI WS route needed.
 
     # ── HTTP catch-all ──────────────────────────────────────────────────────
     @app.api_route(

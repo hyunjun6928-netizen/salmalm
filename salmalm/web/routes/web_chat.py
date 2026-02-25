@@ -57,8 +57,8 @@ class WebChatMixin:
                     try:
                         from salmalm.features.edge_cases import abort_controller
                         abort_controller.set_abort(session_id)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        log.debug(f"[SSE] abort_controller unavailable: {e}")
                     return False
                 except Exception as e:
                     log.debug(f"[SSE] send error: {e}")

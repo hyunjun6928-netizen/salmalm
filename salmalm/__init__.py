@@ -67,5 +67,5 @@ if not _BUILDING:
 
         app = Container()
         _register_services()
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug(f"[INIT] Container setup failed (non-fatal at import): {e}")

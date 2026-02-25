@@ -571,8 +571,8 @@ def _start_tunnel(port: int) -> None:
                 print(f"  📱 폰에서 이 URL을 열거나, QR 코드를 스캔하세요:\n")
                 try:
                     _print_qr(tunnel_url)
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.debug(f"[TUNNEL] QR print skipped: {e}")
                 break
 
     def _print_qr(url: str) -> None:

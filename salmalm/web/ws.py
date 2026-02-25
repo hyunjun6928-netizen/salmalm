@@ -338,8 +338,8 @@ class WebSocketServer:
         if request_lines and "?session=" in request_lines[0]:
             try:
                 headers["_session_id"] = request_lines[0].split("?session=")[1].split()[0].split("&")[0]
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"[WS] session ID parse failed: {e}")
         ws_key = headers.get("sec-websocket-key", "")
         if not ws_key or "upgrade" not in headers.get("connection", "").lower():
             writer.write(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n")

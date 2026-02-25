@@ -1,6 +1,7 @@
 """Agent tools: sub_agent, skill_manage, plugin_manage, cron_manage, mcp_manage, node_manage."""
 
 import json
+from salmalm.security.crypto import log
 from salmalm.tools.tool_registry import register
 from salmalm.core import SubAgent, SkillLoader
 
@@ -62,7 +63,8 @@ def _agent_steer(args):
         from salmalm.features.subagents import subagent_manager
 
         return subagent_manager.steer(args["agent_id"], args["message"])
-    except Exception:
+    except Exception as e:
+        log.warning(f"[AGENT] subagent_manager.steer failed, falling back: {e}")
         return SubAgent.send_message(args["agent_id"], args["message"])
 
 

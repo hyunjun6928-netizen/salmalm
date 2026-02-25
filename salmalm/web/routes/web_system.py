@@ -135,7 +135,8 @@ class SystemMixin:
                 _effective_model = "auto"  # user explicitly chose auto routing
             elif _ov is None and router.force_model:
                 _effective_model = router.force_model  # no session pref → global fallback
-        except Exception:
+        except Exception as e:
+            log.debug(f"[STATUS] session model lookup failed: {e}")
             _effective_model = router.force_model or "auto"
         self._json(
             {

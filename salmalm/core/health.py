@@ -72,6 +72,25 @@ def get_health_report() -> dict:
     # Threads
     report["threads"] = threading.active_count()
 
+    # Vault status
+    try:
+        from salmalm.security.crypto import vault
+        report["vault"] = {"locked": not vault.is_unlocked}
+        if not vault.is_unlocked:
+            issues.append("vault")
+    except Exception:
+        report["vault"] = {"locked": True}
+
+    # WebSocket server status (port 18801)
+    try:
+        from salmalm.web.ws import ws_server
+        report["websocket"] = {
+            "running": ws_server._running,
+            "clients": len(ws_server.clients),
+        }
+    except Exception:
+        report["websocket"] = {"running": False, "clients": 0}
+
     # Determine status
     if len(issues) >= 2 or "disk" in issues:
         report["status"] = "unhealthy"
