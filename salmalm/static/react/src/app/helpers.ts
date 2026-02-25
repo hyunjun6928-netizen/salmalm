@@ -1,4 +1,4 @@
-import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl, fileNameEl, fileSizeEl, imgPrev, inputArea, _tok, pendingFile, pendingFiles, _currentSession, _sessionCache, _isAutoRouting, set_tok, set_pendingFile, set_pendingFiles, set_currentSession, set_sessionCache, set_isAutoRouting } from './globals';
+import { _currentSession, _isAutoRouting, _sessionCache, _storageKey, _tok, btn, chat, costEl, doSend, fileIconEl, fileNameEl, filePrev, fileSizeEl, imgPrev, input, inputArea, loadSessionList, modelBadge, pendingFile, pendingFiles, set_currentSession, set_isAutoRouting, set_pendingFile, set_pendingFiles, set_sessionCache, set_tok, settingsEl, t } from './globals';
 
   /* --- Helpers --- */
   var _copyId=0;
@@ -279,4 +279,4 @@ import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl,
     else label=detail||'';
     b.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div>'+(label?' '+label:'');
   }
-
+  window.addMsg = addMsg;

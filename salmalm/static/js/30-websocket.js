@@ -6,6 +6,10 @@
   function _wsUrl(){
     var proto=location.protocol==='https:'?'wss:':'ws:';
     var host=location.hostname||'localhost';
+    var port=location.port;
+    /* Behind nginx (port 80/443/empty): WS through same nginx host */
+    if(!port||port==='80'||port==='443'){return proto+'//'+location.host;}
+    /* Direct access: WS on port 18801 */
     return proto+'//'+host+':18801';
   }
 

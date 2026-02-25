@@ -1,4 +1,4 @@
-import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl, fileNameEl, fileSizeEl, imgPrev, inputArea, _tok, pendingFile, pendingFiles, _currentSession, _sessionCache, _isAutoRouting, set_tok, set_pendingFile, set_pendingFiles, set_currentSession, set_sessionCache, set_isAutoRouting } from './globals';
+import { _closeCmdPalette, _currentSession, _isAutoRouting, _sessionCache, _tok, btn, chat, costEl, fileIconEl, fileNameEl, filePrev, fileSizeEl, imgPrev, input, inputArea, modelBadge, pendingFile, pendingFiles, set_currentSession, set_isAutoRouting, set_pendingFile, set_pendingFiles, set_sessionCache, set_tok, settingsEl, t } from './globals';
 
   /* --- Keyboard shortcuts + modals --- */
   var _shortcutModal=document.createElement('div');_shortcutModal.id='shortcut-modal';
@@ -85,4 +85,5 @@ import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl,
       }).catch(function(){_searchResults.innerHTML='<div style="padding:16px;text-align:center;color:var(--red)">'+t('search-error')+'</div>'});
     },300);
   });
-
+  window._closeAllModals = _closeAllModals;
+  window._closeSearchModal = _closeSearchModal;

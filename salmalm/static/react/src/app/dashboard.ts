@@ -1,3 +1,5 @@
+import { _currentSession, _hideAll, _isAutoRouting, _sessionCache, _tok, addMsg, btn, chat, costEl, fileIconEl, fileNameEl, filePrev, fileSizeEl, imgPrev, input, inputArea, modelBadge, pendingFile, pendingFiles, set_currentSession, set_isAutoRouting, set_pendingFile, set_pendingFiles, set_sessionCache, set_tok, settingsEl, t } from './globals';
+
   var _dashMode='tokens';
   window.showDashboard=function(){
     _hideAll();dashView.style.display='block';
@@ -140,10 +142,10 @@
         var msg='✅ v'+d.version+' installed! Restart to apply.';
         if(re){re.innerHTML='<span style="color:#4ade80">'+msg+'</span>';
           var rb=document.createElement('button');rb.className='btn';rb.style.marginTop='8px';rb.textContent='🔄 Restart Now';
-          rb.onclick=function(){fetch('/api/restart',{method:'POST'});window._waitForServerThenReload&&_waitForServerThenReload()||setTimeout(function(){location.reload()},5000)};re.appendChild(rb);
+          rb.onclick=function(){fetch('/api/restart',{method:'POST'});setTimeout(function(){location.reload()},3000)};re.appendChild(rb);
         }
         if(bannerBtn){bannerBtn.textContent='🔄 Restart';bannerBtn.disabled=false;
-          bannerBtn.onclick=function(){fetch('/api/restart',{method:'POST'});bannerBtn.textContent='Restarting...';bannerBtn.disabled=true;window._waitForServerThenReload?_waitForServerThenReload():setTimeout(function(){location.reload()},5000)};
+          bannerBtn.onclick=function(){fetch('/api/restart',{method:'POST'});bannerBtn.textContent='Restarting...';bannerBtn.disabled=true;setTimeout(function(){location.reload()},3000)};
         }
       }else{
         var errMsg='❌ '+(d.error||'Update failed');
@@ -233,7 +235,7 @@
     }).catch(function(){st.innerHTML=''})
   };
   window.setModel=function(m){
-    _isAutoRouting=(m==='auto');
+    set_isAutoRouting(m==='auto');
     modelBadge.textContent=m==='auto'?'auto routing':m.split('/').pop();
     /* Immediately update UI (optimistic) */
     var cn=document.getElementById('mr-current-name');
@@ -248,7 +250,7 @@
       /* Re-update from server response to ensure consistency */
       var eff=d.current_model||m;
       if(cn)cn.textContent=eff==='auto'?'🔄 Auto Routing':eff;
-      _isAutoRouting=(eff==='auto');
+      set_isAutoRouting(eff==='auto');
       modelBadge.textContent=eff==='auto'?'auto routing':eff.split('/').pop();
       if(sel)sel.value=eff;
       if(hint){hint.style.display=eff==='auto'?'none':'block'}
@@ -256,3 +258,4 @@
       if(typeof window._loadModelRouter==='function')window._loadModelRouter();
     });
   };
+

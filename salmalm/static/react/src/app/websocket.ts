@@ -1,3 +1,5 @@
+import { _currentSession, _isAutoRouting, _sessionCache, _tok, addMsg, btn, chat, costEl, doSend, fileIconEl, fileNameEl, filePrev, fileSizeEl, imgPrev, input, inputArea, modelBadge, pendingFile, pendingFiles, set_currentSession, set_isAutoRouting, set_pendingFile, set_pendingFiles, set_sessionCache, set_tok, settingsEl } from './globals';
+
   /* --- WebSocket Connection Manager --- */
   var _ws=null,_wsReady=false,_wsBackoff=500,_wsMaxBackoff=30000,_wsTimer=null,_wsPingTimer=null;
   var _wsPendingResolve=null,_wsSendStart=0,_wsRequestPending=false,_wsRequestMsgCount=0;
@@ -6,6 +8,13 @@
   function _wsUrl(){
     var proto=location.protocol==='https:'?'wss:':'ws:';
     var host=location.hostname||'localhost';
+    var port=location.port;
+    /* Behind nginx (port 80/443/empty): WS goes through same nginx host.
+       nginx routes WebSocket (Upgrade header) to 18801. */
+    if(!port||port==='80'||port==='443'){
+      return proto+'//'+location.host;
+    }
+    /* Direct access (port 18800): WS on port 18801 */
     return proto+'//'+host+':18801';
   }
 
@@ -14,9 +23,8 @@
     try{_ws=new WebSocket(_wsUrl())}catch(e){console.warn('WS connect error:',e);_wsScheduleReconnect();return}
     _ws.onopen=function(){
       _wsReady=true;_wsBackoff=500;_wsRetryCount=0;_wsLastConnectedAt=Date.now();
-      /* Restore badge color silently on reconnect */
-      if(modelBadge)modelBadge.style.opacity='';
       console.log('WS connected');
+      if(modelBadge)modelBadge.style.opacity='';
       _wsStartPing();
       /* Recover lost response after reconnect */
       if(_wsRequestPending){
@@ -26,7 +34,6 @@
     };
     _ws.onclose=function(ev){
       _wsReady=false;_wsStopPing();
-      /* Dim badge slightly — silent visual cue, no modal/error */
       if(modelBadge)modelBadge.style.opacity='0.45';
       if(_wsPendingResolve){_wsPendingResolve({fallback:true});_wsPendingResolve=null}
       /* Auto-reconnect — always retry, with exponential backoff + jitter */
@@ -97,7 +104,7 @@
       var _secs=((Date.now()-_wsSendStart)/1000).toFixed(1);
       var _wcIcons={simple:'⚡',moderate:'🔧',complex:'💎'};
       var _wcLabel=data.complexity&&data.complexity!=='auto'&&data.complexity!=='manual'?(_wcIcons[data.complexity]||'')+data.complexity+' → ':'';
-      if(data.complexity==='manual')_isAutoRouting=false;
+      if(data.complexity==='manual')set_isAutoRouting(false);
       var _wmShort=(data.model||'').split('/').pop();
       addMsg('assistant',data.text||'',_wcLabel+_wmShort+' · ⏱️'+_secs+'s');
       if(_wmShort)modelBadge.textContent=_isAutoRouting?'Auto → '+_wmShort:_wmShort;
@@ -158,8 +165,8 @@
     _poll();
   }
 
-  /* Poll /api/health until server is back up, then reload — prevents blank page on restart */
-  function _waitForServerThenReload(maxTries,interval){
+  /* Poll /api/health until server is back, then reload — prevents blank page on restart */
+  function _waitForServerThenReload(maxTries?,interval?){
     maxTries=maxTries||30;interval=interval||1000;
     var tries=0;
     function _poll(){
@@ -168,17 +175,17 @@
       .then(function(r){
         if(r.ok){location.reload();}
         else if(tries<maxTries){setTimeout(_poll,interval);}
-        else{location.reload();} /* give up and reload anyway */
+        else{location.reload();}
       })
       .catch(function(){
         if(tries<maxTries){setTimeout(_poll,interval);}
         else{location.reload();}
       });
     }
-    /* Wait 1s before first attempt (server is shutting down) */
     setTimeout(_poll,1000);
   }
   window._waitForServerThenReload=_waitForServerThenReload;
 
   /* Connect on load */
   _wsConnect();
+

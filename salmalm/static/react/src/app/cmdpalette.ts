@@ -1,4 +1,4 @@
-import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl, fileNameEl, fileSizeEl, imgPrev, inputArea, _tok, pendingFile, pendingFiles, _currentSession, _sessionCache, _isAutoRouting, set_tok, set_pendingFile, set_pendingFiles, set_currentSession, set_sessionCache, set_isAutoRouting } from './globals';
+import { _currentSession, _isAutoRouting, _sessionCache, _tok, btn, chat, costEl, doSend, fileIconEl, fileNameEl, filePrev, fileSizeEl, imgPrev, input, inputArea, modelBadge, pendingFile, pendingFiles, set_currentSession, set_isAutoRouting, set_pendingFile, set_pendingFiles, set_sessionCache, set_tok, settingsEl, t } from './globals';
 
   /* --- Command Palette (Ctrl+Shift+P) --- */
   var _cmdPalette=document.createElement('div');_cmdPalette.id='cmd-palette';
@@ -53,4 +53,4 @@ import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl,
     var el=document.getElementById('cmd-results');var filtered=el._filtered||[];
     if(filtered[idx]){_closeCmdPalette();filtered[idx].action();}
   });
-
+  window._closeCmdPalette = _closeCmdPalette;

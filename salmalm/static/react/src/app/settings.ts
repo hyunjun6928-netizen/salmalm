@@ -90,4 +90,4 @@ import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl,
       document.getElementById('usage-detail').innerHTML=h});
   };
   window.showUsage=function(){window.showDashboard()};
-
+  window._hideAll = _hideAll;

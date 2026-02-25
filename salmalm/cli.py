@@ -315,11 +315,54 @@ def _run_service(subcmd: str) -> None:
         print("Usage: salmalm service <install|uninstall|start|stop|status|logs>")
 
 
+def _run_nginx(subcmd: str) -> None:
+    """Handle `salmalm nginx <show|install|test>`."""
+    import shutil
+    from pathlib import Path
+    import importlib.resources as _ir
+
+    # Locate bundled nginx config (salmalm/config/salmalm.nginx.conf)
+    nginx_conf = Path(__file__).parent / "config" / "salmalm.nginx.conf"
+    if not nginx_conf.exists():
+        print("❌  nginx config not found. Try reinstalling salmalm.")
+        raise SystemExit(1)
+
+    if subcmd == "show":
+        print(nginx_conf.read_text())
+    elif subcmd == "install":
+        dest = Path("/etc/nginx/sites-available/salmalm")
+        enabled = Path("/etc/nginx/sites-enabled/salmalm")
+        if not shutil.which("nginx"):
+            print("❌  nginx not installed. Run: sudo apt install nginx")
+            raise SystemExit(1)
+        import subprocess
+        subprocess.run(["sudo", "cp", str(nginx_conf), str(dest)], check=True)
+        if not enabled.exists():
+            subprocess.run(["sudo", "ln", "-s", str(dest), str(enabled)], check=True)
+        result = subprocess.run(["sudo", "nginx", "-t"], capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"❌  nginx config test failed:\n{result.stderr}")
+            raise SystemExit(1)
+        subprocess.run(["sudo", "systemctl", "reload", "nginx"], check=True)
+        print("✅  nginx configured and reloaded.")
+        print(f"    Config: {dest}")
+        print("    Edit server_name and uncomment HTTPS block when ready.")
+    elif subcmd == "test":
+        import subprocess
+        result = subprocess.run(["sudo", "nginx", "-t"], capture_output=True, text=True)
+        print(result.stdout + result.stderr)
+    else:
+        print("Usage: salmalm nginx <show|install|test>")
+
+
 def dispatch_cli() -> bool:
     """Handle CLI flags. Returns True if a flag was handled (caller should exit)."""
     if "service" in sys.argv[1:2]:
         subcmd = sys.argv[2] if len(sys.argv) > 2 else "install"
         _run_service(subcmd)
+        return True
+    if "nginx" in sys.argv[1:2]:
+        _run_nginx(sys.argv[2] if len(sys.argv) > 2 else "show")
         return True
     if "--update" in sys.argv or "update" in sys.argv[1:2]:
         _run_update()

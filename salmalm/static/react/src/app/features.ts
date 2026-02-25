@@ -32,4 +32,4 @@ import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl,
     empty.style.display=total?'none':'block';
   }
   document.getElementById('features-search').addEventListener('input',function(){renderFeatures(this.value)});
-
+  window.renderFeatures = renderFeatures;

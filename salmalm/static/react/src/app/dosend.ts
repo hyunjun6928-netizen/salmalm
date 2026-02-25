@@ -1,4 +1,4 @@
-import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl, fileNameEl, fileSizeEl, imgPrev, inputArea, _tok, pendingFile, pendingFiles, _currentSession, _sessionCache, _isAutoRouting, set_tok, set_pendingFile, set_pendingFiles, set_currentSession, set_sessionCache, set_isAutoRouting } from './globals';
+import { _currentSession, _isAutoRouting, _sessionCache, _tok, addMsg, btn, chat, costEl, fileIconEl, fileNameEl, filePrev, fileSizeEl, imgPrev, input, inputArea, loadSessionList, modelBadge, pendingFile, pendingFiles, set_currentSession, set_isAutoRouting, set_pendingFile, set_pendingFiles, set_sessionCache, set_tok, settingsEl, t } from './globals';
 
   /* --- Send --- */
   var _sending=false;
@@ -129,4 +129,4 @@ import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl,
   }
   window.doSend=doSend;
   window._resetSendState=function(){_sending=false;_pendingQueue=[];};
-
+  window.doSend = doSend;

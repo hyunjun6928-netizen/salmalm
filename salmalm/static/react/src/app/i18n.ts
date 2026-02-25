@@ -1,4 +1,4 @@
-import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl, fileNameEl, fileSizeEl, imgPrev, inputArea, _tok, pendingFile, pendingFiles, _currentSession, _sessionCache, _isAutoRouting, set_tok, set_pendingFile, set_pendingFiles, set_currentSession, set_sessionCache, set_isAutoRouting } from './globals';
+import { _currentSession, _isAutoRouting, _sessionCache, _tok, btn, chat, costEl, fileIconEl, fileNameEl, filePrev, fileSizeEl, imgPrev, input, inputArea, modelBadge, pendingFile, pendingFiles, renderFeatures, set_currentSession, set_isAutoRouting, set_pendingFile, set_pendingFiles, set_sessionCache, set_tok, settingsEl } from './globals';
 
   /* --- i18n --- */
   var _i18n=window._i18n||{en:{},ko:{}};
@@ -134,4 +134,5 @@ import { chat, input, btn, costEl, modelBadge, settingsEl, filePrev, fileIconEl,
     if(ts){ts.placeholder=_lang==='ko'?'도구 검색...':'Search tools...';_renderToolsList(ts.value)}
   }
   window.setLang=function(v){_lang=v;localStorage.setItem('salmalm-lang',v);applyLang();if(typeof renderFeatures==='function')renderFeatures(document.getElementById('features-search')?document.getElementById('features-search').value:'');};
-
+  window.t = t;
+  window.applyLang = applyLang;
