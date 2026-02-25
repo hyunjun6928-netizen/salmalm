@@ -127,6 +127,30 @@ class ContentMixin:
         tid = thought_stream.add(content, mood=mood)
         self._json({"ok": True, "id": tid})
 
+    def _get_api_browser_status(self):
+        """GET /api/browser/status — check if Playwright (browser automation) is available."""
+        available = False
+        reason = "playwright not installed"
+        try:
+            import importlib.util
+            if importlib.util.find_spec("playwright") is not None:
+                # Also verify chromium executable exists
+                try:
+                    from playwright.sync_api import sync_playwright
+                    with sync_playwright() as p:
+                        exe = p.chromium.executable_path
+                        import os
+                        available = os.path.isfile(exe)
+                        reason = "chromium found" if available else f"chromium missing: {exe}"
+                except Exception as _e:
+                    available = False
+                    reason = f"playwright import error: {_e}"
+            else:
+                reason = "playwright package not installed (pip install salmalm[browser])"
+        except Exception as _e:
+            reason = str(_e)
+        self._json({"available": available, "reason": reason})
+
     def _get_personas(self):
         """Get personas."""
         from salmalm.core.prompt import list_personas, get_active_persona

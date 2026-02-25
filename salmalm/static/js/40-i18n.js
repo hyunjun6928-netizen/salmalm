@@ -86,14 +86,22 @@
       _renderToolsList('');
     }).catch(function(){});
   }
-  fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'keys'})})
-    .then(function(r){return r.json()}).then(function(d){window._configuredKeys=d.keys||[];_loadToolList();})
-    .catch(function(){_loadToolList();});
-  /* req → vault key mapping (for configured-key check) */
-  var _reqKeyMap={brave:'brave_api_key',openai:'openai_api_key',google:'google_client_id'};
+  /* Load vault keys + browser status in parallel, then render tool list */
+  Promise.all([
+    fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'keys'})})
+      .then(function(r){return r.json()}).catch(function(){return {keys:[]}}),
+    fetch('/api/browser/status',{headers:{'X-Session-Token':_tok}})
+      .then(function(r){return r.json()}).catch(function(){return {available:false}})
+  ]).then(function(results){
+    var keys=results[0].keys||[];
+    if(results[1].available)keys=keys.concat(['_browser_playwright']);
+    window._configuredKeys=keys;
+    _loadToolList();
+  });
+  /* req → virtual/vault key mapping */
+  var _reqKeyMap={brave:'brave_api_key',openai:'openai_api_key',google:'google_client_id',browser:'_browser_playwright'};
   function _isReqMet(req){
     if(!req)return true;
-    if(req==='browser')return false; // playwright — always show badge
     var needed=_reqKeyMap[req];
     if(!needed)return false;
     var ck=window._configuredKeys||[];
