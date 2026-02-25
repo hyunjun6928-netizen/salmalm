@@ -355,7 +355,8 @@ class WebFilesMixin:
             return
         client_id = vault.get("google_client_id") or ""
         client_secret = vault.get("google_client_secret") or ""
-        port = self.server.server_address[1]
+        import os as _os
+        port = getattr(getattr(self, "server", None), "server_address", [None, None])[1] or int(_os.environ.get("SALMALM_PORT", 18800))
         redirect_uri = f"http://localhost:{port}/api/google/callback"
         try:
             data = json.dumps(

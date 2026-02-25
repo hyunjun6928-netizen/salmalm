@@ -128,7 +128,8 @@ class WebAuthMixin:
             return
         import urllib.parse
 
-        port = self.server.server_address[1]
+        import os as _os
+        port = getattr(getattr(self, "server", None), "server_address", [None, None])[1] or int(_os.environ.get("SALMALM_PORT", 18800))
         redirect_uri = f"http://localhost:{port}/api/google/callback"
         # CSRF protection: generate and store state token
         state = secrets.token_urlsafe(32)
