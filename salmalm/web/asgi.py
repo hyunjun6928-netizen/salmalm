@@ -424,9 +424,14 @@ def _inject_mixin_methods(target_cls, source_cls) -> None:
     methods are protected by the exclusion list below.
     """
     import http.server
+    import socketserver
 
-    skip_bases = {http.server.BaseHTTPRequestHandler, http.server.StreamRequestHandler,
-                  http.server.BaseRequestHandler, object}
+    skip_bases = {
+        http.server.BaseHTTPRequestHandler,
+        socketserver.StreamRequestHandler,
+        socketserver.BaseRequestHandler,
+        object,
+    }
 
     # Methods that FastHandler overrides — never overwrite these
     _protected = frozenset({

@@ -382,13 +382,10 @@ async def _setup_services(host: str, port: int, httpd, server_thread, url: str) 
     # ── Phase 12: Discord Bot ──
     await _start_discord_bot()
 
-    # Auto-open browser on first start
-    try:
-        import webbrowser
-
-        webbrowser.open(f"http://127.0.0.1:{port}")
-    except Exception as e:  # noqa: broad-except
-        log.debug(f"Suppressed: {e}")
+    # Browser auto-open is handled by run_server() via SALMALM_OPEN_BROWSER=1.
+    # Do NOT open browser here — _setup_services is called on every start
+    # including auto-restarts, and silently opening a new tab each time is
+    # disruptive. (was: unconditional webbrowser.open — removed)
 
     # ── Graceful Shutdown ──
     _shutdown_count = [0]
