@@ -2,11 +2,45 @@
 
 import asyncio
 import threading
-
+import time as _time
 
 from salmalm.security.crypto import vault, log
 import json
 from salmalm.core import router
+
+# ── SSE response idempotency cache ───────────────────────────────────────────
+# Prevents duplicate processing when SSE stream fails and client falls back to
+# HTTP POST with the same req_id.
+# Format: { "req_id:session_id": {"response": str, "model": str, "complexity": str, "ts": float} }
+_RESP_CACHE: dict = {}
+_RESP_CACHE_TTL = 300  # 5 minutes — enough to cover any SSE→HTTP fallback window
+
+
+def _get_cached_response(req_id: str, session_id: str) -> dict | None:
+    """Return cached response dict for req_id+session or None if not found / expired."""
+    if not req_id:
+        return None
+    key = f"{req_id}:{session_id}"
+    entry = _RESP_CACHE.get(key)
+    if entry and _time.time() - entry["ts"] < _RESP_CACHE_TTL:
+        log.info(f"[IDEMPOTENCY] Cache hit for req_id={req_id[:12]}… — skipping re-process")
+        return entry
+    if key in _RESP_CACHE:
+        del _RESP_CACHE[key]
+    return None
+
+
+def _cache_response(req_id: str, session_id: str, response: str, model: str, complexity: str) -> None:
+    """Cache SSE response for idempotency. Prunes expired entries."""
+    if not req_id:
+        return
+    key = f"{req_id}:{session_id}"
+    _RESP_CACHE[key] = {"response": response, "model": model, "complexity": complexity, "ts": _time.time()}
+    # Prune expired entries (keep memory bounded)
+    now = _time.time()
+    expired = [k for k, v in list(_RESP_CACHE.items()) if now - v["ts"] > _RESP_CACHE_TTL]
+    for k in expired:
+        _RESP_CACHE.pop(k, None)
 
 
 class WebChatMixin:
@@ -26,6 +60,7 @@ class WebChatMixin:
         image_b64 = body.get("image_base64")
         image_mime = body.get("image_mime", "image/png")
         ui_lang = body.get("lang", "")
+        req_id = body.get("req_id", "")  # idempotency key (generated per-send by client)
         use_stream = self.path.endswith("/stream")
 
         if use_stream:
@@ -162,19 +197,35 @@ class WebChatMixin:
                     send_sse("ui_cmd", cmd)
             except Exception as e:
                 log.debug(f"Suppressed: {e}")
+            _done_model = getattr(_sess2, "last_model", router.force_model or "auto")
+            _done_complexity = getattr(_sess2, "last_complexity", "auto")
+            # Cache response for idempotency (SSE fallback → HTTP POST dedup)
+            _cache_response(req_id, session_id, response, _done_model, _done_complexity)
             try:
                 send_sse(
                     "done",
                     {
                         "response": response,
-                        "model": getattr(_sess2, "last_model", router.force_model or "auto"),
-                        "complexity": getattr(_sess2, "last_complexity", "auto"),
+                        "model": _done_model,
+                        "complexity": _done_complexity,
                     },
                 )
                 log.info(f"[SSE] Done event sent ({len(response)} chars)")
             except Exception as done_err:
                 log.error(f"[SSE] Failed to send done event: {done_err}")
         else:
+            # Idempotency check: if SSE already processed this req_id, return cached response
+            # Prevents duplicate assistant messages when SSE fails + client falls back to HTTP POST
+            _cached = _get_cached_response(req_id, session_id)
+            if _cached:
+                self._json({
+                    "response": _cached["response"],
+                    "model": _cached["model"],
+                    "complexity": _cached["complexity"],
+                    "from_cache": True,
+                })
+                return
+
             # Fix #1: always close loop via try/finally (non-stream path)
             loop = asyncio.new_event_loop()
             try:

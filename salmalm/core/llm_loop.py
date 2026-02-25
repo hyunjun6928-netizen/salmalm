@@ -27,7 +27,25 @@ _COOLDOWN_FILE = _DATA_DIR / "cooldowns.json"
 _cooldown_lock = _threading.Lock()
 
 # _DEFAULT_FALLBACKS imported from constants.py as MODEL_FALLBACKS
-_COOLDOWN_STEPS = [60, 300, 1500, 3600]  # 1m, 5m, 25m, 1h
+_COOLDOWN_STEPS = [60, 300, 1500, 3600]  # 1m, 5m, 25m, 1h (rate-limit / transient)
+_BILLING_COOLDOWN_STEPS = [5 * 3600, 12 * 3600, 24 * 3600]  # 5h, 12h, 24h (billing / quota)
+_BILLING_PATTERNS = (
+    "insufficient_quota",
+    "billing",
+    "credit_balance_too_low",
+    "insufficient credits",
+    "out of credits",
+    "exceeded your current quota",
+    "exceeded your monthly",
+    "payment_required",
+    "payment required",
+    "account_deactivated",
+    "account deactivated",
+    "you exceeded",
+    "quota exceeded",
+    "no credits",
+    "your balance",
+)
 
 
 def _load_failover_config() -> dict:
@@ -418,6 +436,20 @@ async def try_llm_call(
             # Check for error responses — prefer explicit 'error' field over content sniffing
             if result.get("error"):
                 error_str = str(result["error"]).lower()
+                # Billing / quota errors: long cooldown (5h→12h→24h), not retried
+                if any(p in error_str for p in _BILLING_PATTERNS):
+                    _cd = _load_cooldowns()
+                    _billing_failures = _cd.get(model, {}).get("failures", 0)
+                    _billing_step = min(_billing_failures, len(_BILLING_COOLDOWN_STEPS) - 1)
+                    _billing_secs = _BILLING_COOLDOWN_STEPS[_billing_step]
+                    log.warning(
+                        f"[BILLING] {model} billing/quota error — cooldown {_billing_secs//3600}h "
+                        f"(failure #{_billing_failures + 1}): {result['error']}"
+                    )
+                    _record_model_failure(model, cooldown_seconds=_billing_secs)
+                    result["_failed"] = True
+                    result["_billing_error"] = True
+                    return result
                 # Auth errors: cooldown entire provider (invalid key affects all models)
                 if any(p in error_str for p in _AUTH_PATTERNS):
                     log.warning(f"[AUTH] {model} API key invalid — provider cooldown 1h: {result['error']}")

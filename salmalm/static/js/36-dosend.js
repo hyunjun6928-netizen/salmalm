@@ -114,7 +114,10 @@
     },180000);
     var _sendStart=Date.now();
     _wsSendStart=_sendStart;
-    var chatBody={message:msg,session:_currentSession,lang:_lang};
+    /* Idempotency key: unique per send — same key used for SSE and HTTP POST fallback
+       so server can return cached response instead of re-processing on fallback */
+    var _reqId=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+    var chatBody={message:msg,session:_currentSession,lang:_lang,req_id:_reqId};
     if(imgData){chatBody.image_base64=imgData;chatBody.image_mime=imgMime}
     try{
       /* SSE primary (HTTP POST + stream) — no connection dependency
@@ -122,8 +125,25 @@
       await _sendViaSse(chatBody,_sendStart);
     }catch(se){var tr2=document.getElementById('typing-row');if(tr2)tr2.remove();addMsg('assistant','❌ Error: '+se.message)}
     finally{clearTimeout(_safetyTimer);_sending=false;btn.disabled=false;input.focus();var _sb2=document.getElementById('stop-btn');var _sb3=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb3)_sb3.style.display='flex';var _tr3=document.getElementById('typing-row');if(_tr3)_tr3.remove();
-      /* Process queued messages */
-      if(_pendingQueue.length){var _next=_pendingQueue.shift();input.value=_next.text;if(_next.files&&_next.files.length){window.setFiles(_next.files)}doSend()}}
+      /* Queue debounce: wait 800ms for more messages to arrive, then coalesce into one turn
+         Prevents rapid consecutive sends from generating separate LLM responses */
+      if(_pendingQueue.length){
+        setTimeout(function(){
+          if(!_pendingQueue.length)return;
+          var all=_pendingQueue.splice(0); // drain entire queue
+          var texts=all.map(function(q){return q.text}).filter(Boolean);
+          var allFiles=[];
+          all.forEach(function(q){if(q.files&&q.files.length)allFiles=allFiles.concat(q.files)});
+          /* Show coalesced count if >1 messages merged */
+          if(texts.length>1){
+            input.value=texts.join('\n');
+          }else if(texts.length===1){
+            input.value=texts[0];
+          }
+          if(allFiles.length){window.setFiles(allFiles);}
+          if(input.value.trim())doSend();
+        },800);
+      }}
   }
   window.doSend=doSend;
   window._resetSendState=function(){_sending=false;_pendingQueue=[];};

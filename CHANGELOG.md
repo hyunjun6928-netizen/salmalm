@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.27.2 (2026-02-25)
+### Stability Hardening (OpenClaw patterns)
+- **SSE 중복 응답 방지 (Idempotency)** — 클라이언트가 send마다 `req_id` 생성, SSE 완료 시 서버가 5분 캐시 저장. HTTP POST fallback 시 캐시 히트 → 재처리 없이 즉시 반환. `❌ 응답 2개` 버그 근본 해결
+- **Billing 전용 장기 쿨다운** — `insufficient_quota`, `billing`, `out of credits` 등 15개 패턴 감지. 잔액 부족 시 5h→12h→24h 쿨다운 (rate limit 1m→5m→1h와 구분). `_BILLING_COOLDOWN_STEPS`, `_BILLING_PATTERNS` 추가
+- **Queue debounce 800ms + coalesce** — 연속 전송 메시지를 800ms 대기 후 한 번에 합쳐 처리. LLM 중복 응답 방지 + 문맥 통합 효과
+- `_RESP_CACHE` TTL 5분, 만료 항목 자동 prune
+
 ## v0.27.1 (2026-02-25)
 ### Stability + Keyword
 - **SSE per-chunk stall timeout (60s)** — 서버가 접속 유지하면서 데이터 안 보낼 때 60초 후 자동 abort → HTTP POST fallback. 기존 180초 전체 타이머만으론 청크 단위 stall 감지 불가
