@@ -117,7 +117,6 @@ def handle_google_calendar(args: dict) -> str:
     return f"❌ Unknown calendar action: {action}"
 
 
-@register("gmail")
 def _gmail_list(args: dict, base_url: str, headers: dict) -> str:
     """List/search Gmail messages."""
     count = min(args.get("count", 10), 50)
@@ -150,6 +149,7 @@ def _gmail_list(args: dict, base_url: str, headers: dict) -> str:
     return "\n".join(lines)
 
 
+@register("gmail")
 def handle_gmail(args: dict) -> str:
     """Handle gmail."""
     action = args.get("action", "list")
