@@ -357,6 +357,14 @@ async def call_with_failover(
                 asyncio.create_task(message_queue.drain())
         except Exception as e:
             log.debug(f"Suppressed: {e}")
+        # Notify user if router silently fell back to a different model
+        if result.get("fallback"):
+            actual = result.get("model", "unknown").split("/")[-1]
+            requested = model.split("/")[-1]
+            warn = f"⚠️ **{requested}** 모델을 사용할 수 없어 **{actual}** 로 전환됐소."
+            if result.get("content"):
+                result["content"] = warn + "\n\n" + result["content"]
+            return result, warn
         return result, None
 
     # Primary failed — record and try fallbacks

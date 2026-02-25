@@ -41,13 +41,13 @@ PROVIDERS: Dict[str, Dict[str, Any]] = {
         "base_url": "https://api.openai.com/v1",
         "chat_endpoint": "/chat/completions",
         "models": [
-            "gpt-5.2-codex",
-            "gpt-5.1-codex",
             "gpt-4.1",
             "gpt-4.1-mini",
             "gpt-4.1-nano",
             "o3",
             "o4-mini",
+            "gpt-4o",
+            "gpt-4o-mini",
         ],
     },
     "google": {
