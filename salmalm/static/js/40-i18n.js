@@ -99,7 +99,7 @@
     _loadToolList();
   });
   /* req → virtual/vault key mapping */
-  var _reqKeyMap={brave:'brave_api_key',openai:'openai_api_key',google:'google_client_id',browser:'_browser_playwright'};
+  var _reqKeyMap={brave:'brave_api_key',openai:'openai_api_key',google:'google_refresh_token',browser:'_browser_playwright'};
   function _isReqMet(req){
     if(!req)return true;
     var needed=_reqKeyMap[req];
