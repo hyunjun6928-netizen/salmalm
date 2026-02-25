@@ -310,6 +310,63 @@ def _start_https_if_configured(bind_addr: str) -> None:
         log.warning(f"[HTTPS] Failed to start: {e}")
 
 
+def _start_https_uvicorn(bind_addr: str, asgi_app) -> None:
+    """Start a second uvicorn instance on the HTTPS port with SSL (uvicorn path only).
+
+    If SALMALM_HTTPS=1 or SALMALM_HTTPS_PORT is set, generates a self-signed cert
+    (same as _start_https_if_configured) and launches uvicorn with ssl_keyfile /
+    ssl_certfile so the ASGI app is served over TLS.
+    """
+    https_port = int(os.environ.get("SALMALM_HTTPS_PORT", 0))
+    if not https_port and os.environ.get("SALMALM_HTTPS", "").lower() not in ("1", "true", "yes"):
+        return
+    https_port = https_port or 18443
+    try:
+        import ssl as _ssl
+        import uvicorn as _uvicorn
+
+        cert_dir = DATA_DIR / ".certs"
+        cert_dir.mkdir(exist_ok=True)
+        cert_file = cert_dir / "salmalm.pem"
+        key_file = cert_dir / "salmalm-key.pem"
+
+        # Generate self-signed cert if missing
+        if not cert_file.exists() or not key_file.exists():
+            import subprocess
+            subprocess.run(
+                [
+                    "openssl", "req", "-x509", "-newkey", "rsa:2048",
+                    "-keyout", str(key_file), "-out", str(cert_file),
+                    "-days", "3650", "-nodes", "-batch", "-subj", "/CN=localhost",
+                ],
+                capture_output=True, timeout=30,
+            )
+            log.info("[HTTPS] Self-signed certificate generated")
+
+        if not cert_file.exists() or not key_file.exists():
+            log.warning("[HTTPS] Certificate generation failed — HTTPS not started")
+            return
+
+        https_config = _uvicorn.Config(
+            asgi_app,
+            host=bind_addr,
+            port=https_port,
+            log_level="warning",
+            access_log=False,
+            loop="asyncio",
+            ws="websockets",
+            ssl_keyfile=str(key_file),
+            ssl_certfile=str(cert_file),
+            timeout_keep_alive=75,
+            timeout_graceful_shutdown=10,
+        )
+        https_server = _uvicorn.Server(https_config)
+        threading.Thread(target=https_server.run, daemon=True).start()
+        log.info(f"[HTTPS] Secure UI: https://localhost:{https_port} (uvicorn TLS)")
+    except (ImportError, OSError, Exception) as e:
+        log.warning(f"[HTTPS] uvicorn TLS startup failed: {e}")
+
+
 async def _handle_ws_msg(client, data: dict) -> None:
     """Handle incoming WebSocket message."""
     msg_type = data.get("type", "message")
@@ -607,6 +664,8 @@ async def run_server():
         _uvicorn_ok = True
         log.info("[WEB] Running on uvicorn (ASGI)")
         server = uvicorn_server  # keep reference for shutdown
+        # Start HTTPS uvicorn on separate port if configured
+        _start_https_uvicorn(bind_addr, asgi_app)
     except ImportError:
         log.warning("[WEB] uvicorn not installed — falling back to ThreadingHTTPServer")
         log.warning("[WEB] Install for better stability: pip install 'uvicorn[standard]'")

@@ -721,10 +721,12 @@ self.addEventListener('fetch',e=>{{
 
         length = int(self.headers.get("Content-Length", 0))
 
-        # Request size limit
-        if length > self._MAX_POST_SIZE:
+        # Request size limit: uploads get 50 MB, everything else 10 MB
+        _upload_max = 50 * 1024 * 1024
+        _effective_max = _upload_max if self.path == "/api/upload" else self._MAX_POST_SIZE
+        if length > _effective_max:
             self._json(
-                {"error": f"Request too large ({length} bytes). Max: {self._MAX_POST_SIZE} bytes."},
+                {"error": f"Request too large ({length} bytes). Max: {_effective_max} bytes."},
                 413,
             )
             return

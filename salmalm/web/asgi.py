@@ -300,7 +300,10 @@ def create_asgi_app() -> FastAPI:
         body_bytes = b""
         if method in ("POST", "PUT", "PATCH"):
             content_length = int(request.headers.get("content-length", 0))
-            if content_length > 10 * 1024 * 1024:
+            # /api/upload allows up to 50 MB; all other endpoints cap at 10 MB
+            _is_upload = request.url.path == "/api/upload"
+            _max_body = 50 * 1024 * 1024 if _is_upload else 10 * 1024 * 1024
+            if content_length > _max_body:
                 return JSONResponse({"error": "Request too large"}, status_code=413)
             body_bytes = await request.body()
 
