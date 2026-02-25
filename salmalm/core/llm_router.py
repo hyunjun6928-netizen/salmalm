@@ -95,6 +95,17 @@ PROVIDERS: Dict[str, Dict[str, Any]] = {
             "mistral",
         ],
     },
+    "openrouter": {
+        "env_key": "OPENROUTER_API_KEY",
+        "base_url": "https://openrouter.ai/api/v1",
+        "chat_endpoint": "/chat/completions",
+        "models": [
+            "openrouter/deepseek/deepseek-r1",
+            "openrouter/deepseek/deepseek-chat",
+            "openrouter/meta-llama/llama-3.3-70b-instruct",
+            "openrouter/mistralai/mistral-large",
+        ],
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -216,6 +227,31 @@ def _fetch_provider_models(provider: str) -> List[str]:
                 ids.sort()
             return ids
 
+        elif provider == "openrouter":
+            req = urllib.request.Request(
+                "https://openrouter.ai/api/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.loads(r.read())
+            _OR_EXCLUDE = (
+                "embed", "instruct-fp8",  # embedding / quantized non-chat
+                "vision:free",            # vision-only free tier
+            )
+            _OR_CONTEXT_MIN = 4096        # skip < 4K context models
+            ids = []
+            for m in data.get("data", []):
+                mid = m.get("id", "")
+                ctx = m.get("context_length", 0) or 0
+                if any(x in mid.lower() for x in _OR_EXCLUDE):
+                    continue
+                if ctx and ctx < _OR_CONTEXT_MIN:
+                    continue
+                # prefix with openrouter/ for routing
+                ids.append(f"openrouter/{mid}" if not mid.startswith("openrouter/") else mid)
+            ids.sort()
+            return ids
+
     except Exception as e:
         log.debug(f"[MODELS] Live fetch failed for {provider}: {e}")
     return []
@@ -267,7 +303,7 @@ _PREFIX_MAP = {
     "groq/": "groq",
     "ollama/": "ollama",
     "xai/": "xai",
-    "openrouter/": "openai",  # OpenRouter uses OpenAI-compatible API
+    "openrouter/": "openrouter",  # OpenRouter — OpenAI-compat API, own key/base_url
 }
 
 

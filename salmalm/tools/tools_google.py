@@ -72,6 +72,13 @@ def handle_google_calendar(args: dict) -> str:
                 data = json.loads(resp.read())
         except _ue.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")[:300]
+            if e.code == 403:
+                return (
+                    f"❌ Calendar API 403 Forbidden — 권한 부족\n"
+                    f"Google OAuth 토큰에 캘린더 스코프가 없거나 Calendar API가 비활성화된 상태이오.\n"
+                    f"Settings → Integrations → Google → 재연동(Re-authorize) 후 재시도하시오.\n"
+                    f"상세: {body}"
+                )
             return f"❌ Calendar API {e.code} {e.reason}: {body}"
         events = data.get("items", [])
         if not events:

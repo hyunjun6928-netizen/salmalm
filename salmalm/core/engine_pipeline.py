@@ -186,8 +186,8 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
         recall = memory_manager.auto_recall(user_message)
         if recall:
             session.messages.append({"role": "system", "content": recall})
-    except Exception:
-        pass
+    except Exception as _recall_err:
+        log.debug(f"[PIPELINE] auto_recall skipped: {_recall_err}")
 
     try:
         from salmalm.features.mood import mood_detector
