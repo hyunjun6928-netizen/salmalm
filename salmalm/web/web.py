@@ -784,6 +784,7 @@ self.addEventListener('fetch',e=>{{
 
     _GET_PREFIX_ROUTES = [
         ("/api/search", "_get_api_search", None),
+        ("/api/sessions/", "_get_api_sessions_messages", "/messages"),
         ("/api/sessions/", "_get_api_sessions_export", "/export"),
         ("/api/rag/search", "_get_api_rag_search", None),
         ("/api/audit", "_get_api_audit", None),

@@ -263,3 +263,49 @@ class WebSessionsMixin:
 
         result = branch_session(sid, int(message_index))
         self._json(result)
+
+    def _get_api_sessions_messages(self):
+        """GET /api/sessions/{session_id}/messages — full message history.
+
+        Used by the web UI to load cross-channel sessions (Telegram, Discord, etc.)
+        that are not stored in the browser's localStorage.
+        """
+        import re as _re
+        if not self._require_auth("user"):
+            return
+        m = _re.match(r"^/api/sessions/([^/]+)/messages", self.path)
+        if not m:
+            self._json({"error": "Bad path"}, 400)
+            return
+        sid = m.group(1)
+        from salmalm.core import _get_db
+
+        conn = _get_db()
+        row = conn.execute(
+            "SELECT messages FROM session_store WHERE session_id=?", (sid,)
+        ).fetchone()
+        if not row:
+            self._json({"messages": []})
+            return
+        try:
+            raw_msgs = json.loads(row[0]) if row[0] else []
+        except (json.JSONDecodeError, TypeError):
+            self._json({"messages": []})
+            return
+        out = []
+        for msg in raw_msgs:
+            role = msg.get("role", "")
+            if role not in ("user", "assistant"):
+                continue
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                text = " ".join(
+                    p.get("text", "") for p in content
+                    if isinstance(p, dict) and p.get("type") == "text"
+                ).strip()
+            else:
+                text = str(content)
+            model = msg.get("model", "")
+            if text:
+                out.append({"role": role, "text": text, "model": model})
+        self._json({"session_id": sid, "messages": out})

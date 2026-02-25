@@ -165,53 +165,58 @@ class Vault:
             if len(raw) < 17:
                 return False
             version: bytes = raw[0:1]
-            self._salt = raw[1:17]
+            _tmp_salt: bytes = raw[1:17]   # local — NOT committed until success
             ciphertext: bytes = raw[17:]
-            self._password = password
             try:
-                key = _derive_key(password, self._salt)
+                key = _derive_key(password, _tmp_salt)
                 plaintext: bytes
                 if version == b"\x03" and HAS_CRYPTO:
                     nonce, ct = ciphertext[:12], ciphertext[12:]
                     plaintext = AESGCM(key).decrypt(nonce, ct, None)
                 elif version in (b"\x02", b"\x03"):
-                    plaintext = self._unlock_hmac_ctr(password, ciphertext)
+                    plaintext = self._unlock_hmac_ctr(password, ciphertext, _tmp_salt)
                 else:
                     return False
-                self._data = json.loads(plaintext.decode("utf-8"))
+                _tmp_data = json.loads(plaintext.decode("utf-8"))
+                # ── commit atomically ONLY after full success ──────────────
+                self._salt = _tmp_salt
+                self._password = password
+                self._data = _tmp_data
                 if save_to_keychain and password:
                     _keychain_set(password)
                 return True
             except json.JSONDecodeError as e:
                 log.warning(f"[VAULT] Unlock failed: corrupted vault data: {e}")
-                self._password = None
                 return False
             except ValueError as e:
-                log.warning(f"[VAULT] Unlock failed: bad decryption (wrong password?): {e}")
-                self._password = None
+                log.warning(f"[VAULT] Unlock failed: {e}")
                 return False
             except Exception as e:  # noqa: broad-except
                 log.warning(f"[VAULT] Unlock failed: {type(e).__name__}: {e}")
-                self._password = None
                 return False
 
-    def _unlock_hmac_ctr(self, password: str, ciphertext: bytes) -> bytes:
-        """Decrypt HMAC-CTR vault (new format with IV, legacy without)."""
-        assert self._salt is not None, "Salt must be set before unlock"
+    def _unlock_hmac_ctr(self, password: str, ciphertext: bytes,
+                         salt: Optional[bytes] = None) -> bytes:
+        """Decrypt HMAC-CTR vault (new format with IV, legacy without).
+
+        salt: explicit bytes (preferred); falls back to self._salt for compat.
+        """
+        _salt = salt if salt is not None else self._salt
+        assert _salt is not None, "Salt must be provided"
         tag, rest = ciphertext[:32], ciphertext[32:]
-        hmac_key = _derive_key(password, self._salt + b"hmac", 32)
+        hmac_key = _derive_key(password, _salt + b"hmac", 32)
         if len(rest) >= 16:
             iv, ct = rest[:16], rest[16:]
             expected = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
             if hmac.compare_digest(tag, expected):
-                enc_key = _derive_key(password, self._salt + b"enc" + iv, 32)
+                enc_key = _derive_key(password, _salt + b"enc" + iv, 32)
                 return self._ctr_decrypt(enc_key, ct)
             # Legacy format (no IV)
             ct = rest
             expected = hmac.new(hmac_key, ct, hashlib.sha256).digest()
             if not hmac.compare_digest(tag, expected):
                 raise ValueError("HMAC mismatch")
-            enc_key = _derive_key(password, self._salt + b"enc", 32)
+            enc_key = _derive_key(password, _salt + b"enc", 32)
             return self._ctr_decrypt(enc_key, ct)
         raise ValueError("Ciphertext too short")
 

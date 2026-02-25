@@ -502,3 +502,89 @@ class StreamingResponse:
 # ── Module-level server instance ──────────────────────────────
 
 ws_server = WebSocketServer()
+
+
+# ── ASGI WebSocket handler (FastAPI/Starlette) ─────────────────────────────
+
+class WebSocketHandler:
+    """Bridges FastAPI/Starlette WebSocket to the SalmAlm engine.
+
+    Used by asgi.py when running under uvicorn — replaces the raw-TCP
+    WebSocketServer for the /ws endpoint.
+    """
+
+    async def handle(self, ws) -> None:  # ws: fastapi.WebSocket
+        """Handle the full lifecycle of a FastAPI WebSocket connection."""
+        from salmalm.constants import VERSION
+        import time as _time
+
+        session_id = "web"
+        if ws.client:
+            session_id = f"web_{ws.client.host}"
+
+        try:
+            await ws.send_json({"type": "welcome", "version": VERSION, "session": session_id})
+        except Exception:
+            return
+
+        try:
+            while True:
+                try:
+                    data = await ws.receive_json()
+                except Exception:
+                    break
+
+                msg_type = data.get("type", "message")
+                if msg_type == "ping":
+                    await ws.send_json({"type": "pong"})
+                    continue
+                if msg_type != "message":
+                    continue
+
+                text = data.get("text", "").strip()
+                image_b64 = data.get("image")
+                image_mime = data.get("image_mime", "image/png")
+                sid = data.get("session") or session_id
+
+                if not text and not image_b64:
+                    await ws.send_json({"type": "error", "error": "Empty message"})
+                    continue
+
+                await ws.send_json({"type": "typing", "status": "typing"})
+                _start = _time.time()
+
+                async def on_tool(name: str, args) -> None:
+                    try:
+                        await ws.send_json({"type": "tool_call", "name": name, "input": args})
+                    except Exception:
+                        pass
+
+                async def on_status(status_type, detail) -> None:
+                    try:
+                        await ws.send_json({"type": "typing", "status": status_type, "detail": detail})
+                    except Exception:
+                        pass
+
+                try:
+                    from salmalm.core.engine import process_message
+                    from salmalm.core import get_session as _gs
+
+                    _sess = _gs(sid)
+                    _model_ov = getattr(_sess, "model_override", None)
+                    if _model_ov == "auto":
+                        _model_ov = None
+                    image_data = (image_b64, image_mime) if image_b64 else None
+                    response = await process_message(
+                        sid,
+                        text or "",
+                        image_data=image_data,
+                        model_override=_model_ov,
+                        on_tool=on_tool,
+                        on_status=on_status,
+                    )
+                    _elapsed = _time.time() - _start
+                    await ws.send_json({"type": "done", "text": response, "elapsed": round(_elapsed, 2)})
+                except Exception as e:
+                    await ws.send_json({"type": "error", "error": str(e)[:200]})
+        except Exception:
+            pass

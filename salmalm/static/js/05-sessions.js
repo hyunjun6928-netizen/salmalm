@@ -35,6 +35,12 @@
         }
       });
       var rendered={};
+      function _chIcon(sid){
+        if(sid&&sid.startsWith('telegram_'))return '📱 ';
+        if(sid&&sid.startsWith('discord_'))return '💬 ';
+        if(sid&&sid.startsWith('slack_'))return '🟦 ';
+        return '';
+      }
       function renderSession(s,indent){
         if(rendered[s.id])return '';
         rendered[s.id]=true;
@@ -43,7 +49,7 @@
         title=title.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1').replace(/`([^`]+)`/g,'$1');
         if(title.length>40)title=title.slice(0,40)+'...';
         var pad=indent?'padding-left:'+(10+indent*16)+'px;':'';
-        var icon=s.parent_session_id?'↳ ':'';
+        var icon=(s.parent_session_id?'↳ ':'')+_chIcon(s.id);
         var h='<div class="nav-item session-item"'+active+' data-action="switchSession" data-sid="'+s.id+'" style="'+pad+'">'
           +'<span class="session-title" data-sid="'+s.id+'" title="Double-click to rename" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+icon+title+'</span>'
           +'<span class="session-del" data-action="deleteSession" data-sid="'+s.id+'" title="Delete" style="opacity:0.4;cursor:pointer;padding:2px 4px;font-size:11px">✕</span>'
@@ -57,6 +63,10 @@
     }).catch(function(){});
   }
 
+  function _isCrossChannel(sid){
+    return sid&&(sid.startsWith('telegram_')||sid.startsWith('discord_')||sid.startsWith('slack_'));
+  }
+
   window.switchSession=function(sid){
     /* Save current chat to cache */
     _sessionCache[_currentSession]=chat.innerHTML;
@@ -64,15 +74,28 @@
     /* Switch */
     _currentSession=sid;
     localStorage.setItem('salm_active_session',sid);
-    /* Restore from cache or localStorage */
     chat.innerHTML='';
     localStorage.removeItem('salm_chat');
-    var stored=localStorage.getItem(_storageKey(sid));
-    if(stored){
-      localStorage.setItem('salm_chat',stored);
-      var hist=JSON.parse(stored);
-      if(hist.length){window._restoring=true;hist.forEach(function(m){if(m&&m.role)addMsg(m.role,m.text,m.model)});window._restoring=false}
+
+    if(_isCrossChannel(sid)){
+      /* Cross-channel (Telegram/Discord/Slack): load history from server */
+      fetch('/api/sessions/'+encodeURIComponent(sid)+'/messages',{headers:{'X-Session-Token':_tok}})
+        .then(function(r){return r.json()})
+        .then(function(d){
+          var msgs=d.messages||[];
+          if(msgs.length){window._restoring=true;msgs.forEach(function(m){if(m&&m.role)addMsg(m.role,m.text,m.model)});window._restoring=false;}
+          else{addMsg('system',(_lang==='ko'?'대화 내역이 없소.':'No messages yet.'));}
+        }).catch(function(){addMsg('system','Failed to load session history.');});
+    } else {
+      /* Local web session: restore from localStorage */
+      var stored=localStorage.getItem(_storageKey(sid));
+      if(stored){
+        localStorage.setItem('salm_chat',stored);
+        var hist=JSON.parse(stored);
+        if(hist.length){window._restoring=true;hist.forEach(function(m){if(m&&m.role)addMsg(m.role,m.text,m.model)});window._restoring=false;}
+      }
     }
+
     loadSessionList();
     /* Refresh model panel to reflect this session's override */
     if(typeof window._loadModelRouter==='function')window._loadModelRouter();
