@@ -76,23 +76,40 @@
     ui_control:{icon:'🎛️',en:'UI Control',kr:'UI 제어',cmd:'Change theme to dark'}
   };
   var _allTools=[];
-  /* Load dynamic tool list */
-  fetch('/api/tools/list',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
-    _allTools=(d.tools||[]).map(function(t){var m=_toolI18n[t.name];return{name:t.name,icon:m?m.icon:'🔧',en:m?m.en:t.name,kr:m?m.kr:t.name,cmd:m?m.cmd:'',req:m?m.req||'':''}});
-    var th=document.getElementById('tools-header');
-    if(th)th.textContent='🛠️ '+(_lang==='ko'?'도구':'Tools')+' ('+_allTools.length+') ▾';
-    _renderToolsList('');
-  }).catch(function(){});
+  window._configuredKeys=window._configuredKeys||[];
+  /* Load vault keys first, then tool list — so req badges are accurate on first render */
+  function _loadToolList(){
+    fetch('/api/tools/list',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
+      _allTools=(d.tools||[]).map(function(t){var m=_toolI18n[t.name];return{name:t.name,icon:m?m.icon:'🔧',en:m?m.en:t.name,kr:m?m.kr:t.name,cmd:m?m.cmd:'',req:m?m.req||'':''}});
+      var th=document.getElementById('tools-header');
+      if(th)th.textContent='🛠️ '+(_lang==='ko'?'도구':'Tools')+' ('+_allTools.length+') ▾';
+      _renderToolsList('');
+    }).catch(function(){});
+  }
+  fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'keys'})})
+    .then(function(r){return r.json()}).then(function(d){window._configuredKeys=d.keys||[];_loadToolList();})
+    .catch(function(){_loadToolList();});
+  /* req → vault key mapping (for configured-key check) */
+  var _reqKeyMap={brave:'brave_api_key',openai:'openai_api_key',google:'google_client_id'};
+  function _isReqMet(req){
+    if(!req)return true;
+    if(req==='browser')return false; // playwright — always show badge
+    var needed=_reqKeyMap[req];
+    if(!needed)return false;
+    var ck=window._configuredKeys||[];
+    return ck.indexOf(needed)>=0;
+  }
   function _renderToolsList(q){
     var c=document.getElementById('tools-items');if(!c)return;
     var ql=q.toLowerCase();
     var filtered=ql?_allTools.filter(function(t){return t.name.toLowerCase().indexOf(ql)>=0||t.en.toLowerCase().indexOf(ql)>=0||t.kr.indexOf(ql)>=0}):_allTools;
     c.innerHTML=filtered.map(function(t){
       var label=_lang==='ko'?t.kr:t.en;
-      var reqAttr=t.req?' data-tool-req="'+t.req+'"':'';
+      var needsSetup=t.req&&!_isReqMet(t.req);
+      var reqAttr=needsSetup?' data-tool-req="'+t.req+'"':'';
       var reqLabels={google:'Google',brave:'Brave',openai:'OpenAI',browser:'Browser'};
-      var reqBadge=t.req?' <span style="font-size:9px;color:#f59e0b;margin-left:auto;background:#fef3c7;padding:1px 6px;border-radius:8px">🔗 '+reqLabels[t.req]+'</span>':'';
-      return '<div class="nav-item" data-action="tool-run" data-tool-cmd="'+t.cmd.replace(/"/g,'&quot;')+'" data-tool-name="'+t.name+'"'+reqAttr+' title="'+(t.req?(_lang==='ko'?'설정 필요: ':'Setup required: ')+reqLabels[t.req]:t.name)+'">'+t.icon+' '+label+reqBadge+'</div>';
+      var reqBadge=needsSetup?' <span style="font-size:9px;color:#f59e0b;margin-left:auto;background:#fef3c7;padding:1px 6px;border-radius:8px">🔗 '+reqLabels[t.req]+'</span>':'';
+      return '<div class="nav-item" data-action="tool-run" data-tool-cmd="'+t.cmd.replace(/"/g,'&quot;')+'" data-tool-name="'+t.name+'"'+reqAttr+' title="'+(needsSetup?(_lang==='ko'?'설정 필요: ':'Setup required: ')+reqLabels[t.req]:t.name)+'">'+t.icon+' '+label+reqBadge+'</div>';
     }).join('');
     if(!filtered.length)c.innerHTML='<div style="padding:8px 12px;color:var(--text2);font-size:12px">'+(_lang==='ko'?'검색 결과 없음':'No results')+'</div>';
   }

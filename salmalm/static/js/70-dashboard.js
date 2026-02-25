@@ -166,6 +166,10 @@
       var re=document.getElementById('key-test-result');
       re.innerHTML='<span style="color:#4ade80">✅ '+vaultKey+' Saved</span>';
       document.getElementById(inputId).value='';
+      // Update global configured keys so tool badges refresh immediately
+      if(!window._configuredKeys)window._configuredKeys=[];
+      if(window._configuredKeys.indexOf(vaultKey)<0)window._configuredKeys.push(vaultKey);
+      if(typeof _renderToolsList==='function')_renderToolsList(document.getElementById('tools-search')?document.getElementById('tools-search').value:'');
       // Auto-optimize routing when an LLM provider key is saved
       var llmKeys=['anthropic_api_key','openai_api_key','xai_api_key','google_api_key'];
       if(llmKeys.indexOf(vaultKey)!==-1){

@@ -51,6 +51,8 @@
         document.getElementById('vault-keys').innerHTML=d.keys.map(function(k){return '<div style="padding:4px 0;font-size:13px;color:var(--text2)">🔑 '+k+'</div>'}).join('');
         /* Show saved indicator on Telegram/Discord fields */
         var _vk=d.keys||[];
+        window._configuredKeys=_vk; // share globally for tool badge filtering
+        if(typeof _renderToolsList==='function')_renderToolsList(document.getElementById('tools-search')?document.getElementById('tools-search').value:'');
         if(_vk.indexOf('telegram_token')>=0){var _ti=document.getElementById('sk-telegram-token');if(_ti)_ti.placeholder='••••••••• (saved)'}
         if(_vk.indexOf('telegram_owner_id')>=0){var _to=document.getElementById('sk-telegram-owner');if(_to)_to.placeholder='••••••••• (saved)'}
         if(_vk.indexOf('discord_token')>=0){var _di=document.getElementById('sk-discord-token');if(_di)_di.placeholder='••••••••• (saved)'}
