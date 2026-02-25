@@ -68,12 +68,6 @@ def stream_google(
 
     api_key = vault.get("google_api_key") or vault.get("gemini_api_key")
     if not api_key:
-        try:
-            from salmalm.core.llm_router import _detect_cli_token
-            api_key = _detect_cli_token("google")
-        except Exception:
-            pass
-    if not api_key:
         yield {"type": "error", "error": "❌ Google API key not configured. Set GOOGLE_API_KEY or GEMINI_API_KEY."}
         return
 
@@ -268,12 +262,6 @@ def stream_anthropic(
         return
 
     api_key = vault.get("anthropic_api_key")
-    if not api_key:
-        try:
-            from salmalm.core.llm_router import _detect_cli_token
-            api_key = _detect_cli_token("anthropic")
-        except Exception:
-            pass
     if not api_key:
         yield {"type": "error", "error": "❌ Anthropic API key not configured."}
         return
