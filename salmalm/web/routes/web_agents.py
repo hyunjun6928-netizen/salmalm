@@ -39,6 +39,8 @@ def _task_record(
 
 def _run_task(task_id: str, description: str, model: str) -> None:
     """Run an agent task in a background thread."""
+    import asyncio as _asyncio
+
     start = time.time()
 
     def _update(status: str, output: str = "", result_preview: str = "") -> None:
@@ -53,64 +55,33 @@ def _run_task(task_id: str, description: str, model: str) -> None:
                 )
 
     _update("running")
+
+    with _tasks_lock:
+        if _tasks.get(task_id, {}).get("status") == "cancelled":
+            return
+
+    loop = _asyncio.new_event_loop()
     try:
-        from salmalm.core import get_session
         from salmalm.core.engine import process_message
 
         session_id = f"agent_{task_id[:8]}"
-        session = get_session(session_id)
+        model_override = model if model and model != "auto" else None
 
-        # Set model override
-        if model and model != "auto":
-            session.model_override = model
-        else:
-            session.model_override = None
-
-        # System prompt for autonomous agent
-        system_prompt = (
-            "You are an autonomous AI agent. Complete the assigned task thoroughly "
-            "and concisely. Provide a clear result. Do not ask clarifying questions — "
-            "make reasonable assumptions and proceed."
-        )
-
-        # Run the task
-        result_chunks: List[str] = []
-
-        def _on_chunk(chunk: str) -> None:
-            result_chunks.append(chunk)
-
-        # Check if cancelled before running
-        with _tasks_lock:
-            if _tasks.get(task_id, {}).get("status") == "cancelled":
-                return
-
-        # Process via engine
-        full_output = ""
-        try:
-            for chunk in process_message(
-                text=description,
-                session=session,
-                system_override=system_prompt,
-                stream=True,
-            ):
-                # Check for cancellation
-                with _tasks_lock:
-                    if _tasks.get(task_id, {}).get("status") == "cancelled":
-                        return
-                full_output += chunk
-        except TypeError:
-            # process_message may not support stream=True — try non-streaming
-            full_output = process_message(
-                text=description,
-                session=session,
-                system_override=system_prompt,
-            ) or ""
+        full_output = loop.run_until_complete(
+            process_message(
+                session_id,
+                description,
+                model_override=model_override,
+            )
+        ) or ""
 
         _update("done", output=full_output, result_preview=full_output[:120])
 
     except Exception as e:
         log.error(f"[AGENT] Task {task_id} failed: {e}")
         _update("failed", output=f"Error: {e}", result_preview=f"Error: {str(e)[:80]}")
+    finally:
+        loop.close()
 
 
 class AgentsMixin:

@@ -424,9 +424,24 @@ export default function AgentPanel() {
             onChange={e => setModel(e.target.value)}
           >
             <option value="auto">auto</option>
-            <option value="haiku">haiku</option>
-            <option value="sonnet">sonnet</option>
-            <option value="opus">opus</option>
+            <optgroup label="── Anthropic ──">
+              <option value="haiku">haiku</option>
+              <option value="sonnet">sonnet</option>
+              <option value="opus">opus</option>
+            </optgroup>
+            <optgroup label="── OpenAI ──">
+              <option value="gpt-4o-mini">gpt-4o-mini</option>
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt">gpt (5.2)</option>
+            </optgroup>
+            <optgroup label="── Google ──">
+              <option value="gemini-2.0-flash">gemini-flash</option>
+              <option value="gemini-2.5-pro-preview-03-25">gemini-pro</option>
+            </optgroup>
+            <optgroup label="── xAI ──">
+              <option value="grok-3-mini">grok-mini</option>
+              <option value="grok-3">grok-3</option>
+            </optgroup>
           </select>
           <button
             style={{ ...styles.spawnBtn, ...(submitting ? styles.spawnBtnDisabled : {}) }}
