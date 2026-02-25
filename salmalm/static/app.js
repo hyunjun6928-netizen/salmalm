@@ -829,7 +829,7 @@
               var tc2=thinkEl2.querySelector('.think-content');if(tc2){tc2.textContent+=edata.text||'';tc2.scrollTop=tc2.scrollHeight}
             }}
           }else if(etype==='chunk'){
-            if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;var thinkKeep2=tb4.querySelector('.think-stream');tb4.innerHTML='';if(thinkKeep2)tb4.appendChild(thinkKeep2)}tb4.insertAdjacentHTML('beforeend',edata.text.replace(/</g,'&lt;'))}}
+            if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4._streamBuf='';var thinkKeep2=tb4.querySelector('.think-stream');tb4.innerHTML='';if(thinkKeep2)tb4.appendChild(thinkKeep2);tb4._thinkEl=thinkKeep2||null}tb4._streamBuf+=(edata.text||'');if(!tb4._renderPending){tb4._renderPending=true;requestAnimationFrame(function(){if(!tb4._renderPending)return;tb4._renderPending=false;var buf=tb4._streamBuf||'';var fences=(buf.match(/```/g)||[]).length;if(fences%2!==0)buf+='```';var rendered=renderMd(buf);var tEl=tb4._thinkEl;tb4.innerHTML='';if(tEl)tb4.appendChild(tEl);tb4.insertAdjacentHTML('beforeend',rendered);var chatEl=document.getElementById('chat');if(chatEl)chatEl.scrollTop=chatEl.scrollHeight;})}}
           }else if(etype==='ui_cmd'){
             /* AI-driven UI control */
             var act=edata.action,val=edata.value||'';
@@ -1465,6 +1465,12 @@ window._i18n={
         if(_vk.indexOf('telegram_owner_id')>=0){var _to=document.getElementById('sk-telegram-owner');if(_to)_to.placeholder='••••••••• (saved)'}
         if(_vk.indexOf('discord_token')>=0){var _di=document.getElementById('sk-discord-token');if(_di)_di.placeholder='••••••••• (saved)'}
         if(_vk.indexOf('discord_guild_id')>=0){var _dg=document.getElementById('sk-discord-guild');if(_dg)_dg.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('anthropic_api_key')>=0){var _an=document.getElementById('sk-anthropic');if(_an)_an.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('openai_api_key')>=0){var _oa=document.getElementById('sk-openai');if(_oa)_oa.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('xai_api_key')>=0){var _xa=document.getElementById('sk-xai');if(_xa)_xa.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('google_api_key')>=0){var _ga=document.getElementById('sk-google');if(_ga)_ga.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('brave_api_key')>=0){var _ba=document.getElementById('sk-brave');if(_ba)_ba.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('openrouter_api_key')>=0){var _or=document.getElementById('sk-openrouter');if(_or)_or.placeholder='••••••••• (saved)'}
       });
     if(window.checkGoogleStatus)window.checkGoogleStatus();
     /* Load engine optimization settings */

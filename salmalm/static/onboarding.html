@@ -82,7 +82,7 @@ button:disabled{opacity:0.5;cursor:not-allowed}
   <h2>🔑 API Keys</h2>
   <p class="sub">Enter at least one API key to connect to an AI provider.</p>
   <div class="field">
-    <label class="required">Anthropic API Key (Claude)</label>
+    <label>Anthropic API Key (Claude)</label>
     <input type="password" id="anthropic" placeholder="sk-ant-...">
     <div class="hint">Recommended — Best for most tasks. <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
   </div>
@@ -243,6 +243,12 @@ function goStep(n){
   document.getElementById('step-'+n).classList.add('active');
   const dots=document.querySelectorAll('.progress .dot');
   dots.forEach((d,i)=>{d.className='dot';if(i<n)d.classList.add('done');if(i===n)d.classList.add('active');});
+  // Clear test status when navigating away from step 2
+  const st=document.getElementById('test-status');
+  if(st&&n!==2){st.textContent='';st.className='test-status';}
+  // Re-enable test button if returning to step 2
+  const btn=document.getElementById('btn-test');
+  if(btn&&n===2)btn.disabled=false;
   currentStep=n;
 }
 
@@ -291,11 +297,12 @@ async function testAndNext(){
       if(d.all_ok !== false){
         status.textContent='✅ Connection successful! ('+d.saved.join(', ')+' saved)';
         status.className='test-status success';
+        // Keep button disabled during redirect delay — goStep will re-enable if user goes back
         setTimeout(()=>goStep(3),1000);
+        return; // skip btn.disabled=false below
       }else{
         status.textContent='⚠️ Keys saved but test failed: '+d.test_result;
         status.className='test-status fail';
-        btn.disabled=false;
       }
     }else{
       status.textContent='❌ '+d.error;

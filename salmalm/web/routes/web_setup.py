@@ -243,6 +243,24 @@ class WebSetupMixin:
                 test_results.append("✅ Google OK")
             except Exception as e:
                 test_results.append(f"⚠️ Google: {str(e)[:80]}")
+        if body.get("openrouter_api_key"):
+            try:
+                _http_post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    {
+                        "Authorization": f"Bearer {body['openrouter_api_key']}",
+                        "Content-Type": "application/json",
+                    },
+                    {
+                        "model": "openai/gpt-4o-mini",
+                        "max_tokens": 10,
+                        "messages": [{"role": "user", "content": "ping"}],
+                    },
+                    timeout=15,
+                )
+                test_results.append("✅ OpenRouter OK")
+            except Exception as e:
+                test_results.append(f"⚠️ OpenRouter: {str(e)[:80]}")
         audit_log("onboarding", f"keys: {', '.join(saved)}")
         # Auto-optimize routing based on available keys
         routing_config = {}
@@ -250,7 +268,7 @@ class WebSetupMixin:
             from salmalm.core.model_selection import auto_optimize_and_save
 
             available_keys = []
-            for key_name in ("anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key"):
+            for key_name in ("anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key", "openrouter_api_key"):
                 if vault.get(key_name):
                     available_keys.append(key_name)
             if available_keys:
@@ -290,10 +308,10 @@ class WebSetupMixin:
         template = persona_templates.get(persona, persona_templates["expert"])
         try:
             soul_path = os.path.join(str(DATA_DIR), "SOUL.md")
-            if not os.path.exists(soul_path):
-                os.makedirs(os.path.dirname(soul_path), exist_ok=True)
-                with open(soul_path, "w", encoding="utf-8") as f:
-                    f.write(template)
+            os.makedirs(os.path.dirname(soul_path), exist_ok=True)
+            with open(soul_path, "w", encoding="utf-8") as f:
+                f.write(template)
+            log.info(f"[SETUP] SOUL.md written for persona={persona!r}")
         except Exception as e:
             log.debug(f"Suppressed: {e}")
         audit_log("onboarding", f"preferences: model={model}, persona={persona}")
