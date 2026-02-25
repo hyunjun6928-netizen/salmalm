@@ -3,7 +3,7 @@
 Extracted from IntelligenceEngine._get_tools_for_provider to reduce god object.
 """
 
-from salmalm.core.classifier import INTENT_TOOLS, _KEYWORD_TOOLS
+from salmalm.core.classifier import INTENT_TOOLS, _KEYWORD_TOOLS, get_extra_tools
 
 
 def get_tools_for_provider(provider: str, intent: str = None, user_message: str = "") -> list:
@@ -39,13 +39,15 @@ def get_tools_for_provider(provider: str, intent: str = None, user_message: str 
         "web_fetch",
     }
 
-    # Check keyword matches first
+    # Check keyword matches first (text keywords + emoji + time patterns + question words)
     keyword_matched = set()
     if user_message:
         msg_lower = user_message.lower()
         for kw, tool_names in _KEYWORD_TOOLS.items():
             if kw in msg_lower:
                 keyword_matched.update(tool_names)
+        # Emoji intent + time pattern + question-word detection
+        keyword_matched.update(get_extra_tools(user_message))
 
     # Zero-tool path: chat/memory/creative with no keyword triggers
     if intent in _NO_TOOL_INTENTS and not keyword_matched:

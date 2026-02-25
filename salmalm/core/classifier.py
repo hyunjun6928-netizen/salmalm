@@ -1093,6 +1093,170 @@ _KEYWORD_TOOLS = {
     "repl":             ["exec_session", "python_eval"],
 }
 
+# ── Emoji → tool injection ────────────────────────────────────────────────────
+# When user message contains these emoji, inject corresponding tools
+_EMOJI_TOOLS: dict[str, list[str]] = {
+    # Screenshot / Image capture
+    "📸": ["screenshot", "screen_capture"],
+    "🖼️": ["screenshot", "screen_capture"],
+    "📷": ["screenshot", "screen_capture"],
+    "🤳": ["screenshot", "screen_capture"],
+    # Calendar / Schedule
+    "📅": ["google_calendar", "calendar_list", "calendar_add"],
+    "📆": ["google_calendar", "calendar_list", "calendar_add"],
+    "🗓️": ["google_calendar", "calendar_list", "calendar_add"],
+    # Search / Web
+    "🔍": ["web_search", "brave_search"],
+    "🔎": ["web_search", "brave_search"],
+    "🌐": ["web_search", "web_fetch"],
+    "🌍": ["web_search", "web_fetch"],
+    "🌎": ["web_search", "web_fetch"],
+    # TTS / Audio
+    "🎵": ["tts"],
+    "🎶": ["tts"],
+    "🔊": ["tts"],
+    "📢": ["tts"],
+    # STT / Microphone
+    "🎙️": ["stt"],
+    "🎤": ["stt"],
+    # File operations
+    "📁": ["read_file", "list_files"],
+    "📂": ["read_file", "list_files"],
+    "📄": ["read_file", "write_file"],
+    # Notes / Writing
+    "📝": ["note", "write_file"],
+    "✏️": ["note", "write_file"],
+    "📋": ["note", "write_file"],
+    "📖": ["read_file", "rag_search"],
+    # Reminder / Timer
+    "⏰": ["reminder", "notification"],
+    "⏱️": ["reminder", "notification"],
+    "🔔": ["reminder", "notification"],
+    "⏲️": ["reminder", "notification", "cron_manage"],
+    # Weather
+    "🌤️": ["weather"],
+    "⛅": ["weather"],
+    "☁️": ["weather"],
+    "🌧️": ["weather"],
+    "🌡️": ["weather"],
+    "☀️": ["weather"],
+    "❄️": ["weather"],
+    # Email
+    "📧": ["gmail", "email_inbox", "email_send"],
+    "✉️": ["gmail", "email_inbox", "email_send"],
+    "📨": ["gmail", "email_inbox"],
+    "📩": ["gmail", "email_send"],
+    # Finance / Price
+    "💰": ["brave_search"],
+    "💹": ["brave_search"],
+    "💲": ["brave_search"],
+    "🪙": ["brave_search"],
+    # Data / Chart
+    "📊": ["python_eval", "brave_search"],
+    "📈": ["python_eval", "brave_search"],
+    "📉": ["python_eval", "brave_search"],
+    # Code / Terminal
+    "💻": ["exec", "python_eval"],
+    "🖥️": ["exec", "system_monitor"],
+    "🐍": ["python_eval", "exec"],
+    "⚙️": ["exec", "system_monitor"],
+    "🔧": ["exec", "system_monitor"],
+    "🛠️": ["exec", "system_monitor"],
+    # Security
+    "🔐": ["hash_text", "exec"],
+    "🔒": ["hash_text"],
+    "🔑": ["exec", "hash_text"],
+    # Bookmark / Link
+    "📌": ["note", "bookmark"],
+    "🔖": ["note", "bookmark"],
+    "🔗": ["web_fetch", "web_search"],
+    # Trash / Delete
+    "🗑️": ["exec"],
+    # Map / Location
+    "🗺️": ["web_search", "web_fetch"],
+    "📍": ["web_search"],
+    # Document / Clipboard
+    "🗒️": ["note", "write_file"],
+}
+
+
+import re as _re
+
+# ── Time-pattern regex → remind + cron tool injection ────────────────────────
+# Matches natural language time expressions in Korean and English
+_TIME_PATTERN_RE = _re.compile(
+    r"""
+      (\d+\s*분\s*후)                             # 5분 후
+    | (\d+\s*시간\s*후)                           # 2시간 후
+    | (\d+\s*일\s*후)                             # 3일 후
+    | (\d+\s*주\s*후)                             # 2주 후
+    | (내일\s*(오전|오후|\d)?)                    # 내일 오전 / 내일 9
+    | (모레)                                      # 모레
+    | (다음\s*주)                                 # 다음 주
+    | (이번\s*주)                                 # 이번 주
+    | (오늘\s*(오전|오후|\d)?)                    # 오늘 오후
+    | (\d{1,2}시\s*(에|쯤|까지|전|후)?)          # 3시에
+    | (\d{1,2}:\d{2})                             # 15:30
+    | (in\s+\d+\s*(min|hour|day|week|month)s?)    # in 5 minutes
+    | (at\s+\d{1,2}(:\d{2})?\s*(am|pm)?)         # at 3pm
+    | (remind\s+me)                               # remind me
+    | (set\s+(a\s+)?(reminder|alarm|timer))       # set a reminder
+    | (알람\s*(맞춰|설정|켜))                     # 알람 맞춰
+    | (매일\s*(오전|오후|\d)?)                    # 매일 오전
+    | (every\s+(day|week|hour|morning|night))     # every day
+    """,
+    _re.IGNORECASE | _re.VERBOSE,
+)
+_TIME_INJECT_TOOLS = ["reminder", "notification", "cron_manage"]
+
+# ── Question-word → web_search injection ─────────────────────────────────────
+# When user asks a factual question, inject search tools even if intent == "chat"
+_QUESTION_WORDS = [
+    # Korean question words
+    "어떻게", "어떡해", "어떤", "왜", "누가", "누구", "무엇", "무슨",
+    "뭐야", "뭔지", "뭔가", "뭐가", "언제", "어디서", "어디에", "어디야",
+    "가르쳐줘", "설명해줘", "설명해", "가르쳐", "알고 싶",
+    # English question starters
+    "how do", "how to", "how does", "how can", "how should", "how would",
+    "what is", "what are", "what does", "what's", "what was", "what were",
+    "why is", "why does", "why are", "why did", "why can't", "why won't",
+    "who is", "who are", "who was", "who were", "who made", "who created",
+    "when is", "when did", "when was", "when will", "when does",
+    "where is", "where are", "where can", "where do",
+    "which is", "which one", "which are",
+    "explain ", "define ", "tell me about",
+    "뜻이 뭐", "의미가 뭐", "뜻은", "의미는", "정의가", "정의는",
+]
+_QUESTION_INJECT_TOOLS = ["web_search", "brave_search", "web_fetch"]
+
+
+def get_extra_tools(message: str) -> list[str]:
+    """Return extra tools based on emoji, time patterns, and question words.
+
+    Called by tool_selector to augment keyword-based tool injection.
+    """
+    tools: list[str] = []
+    # 1. Emoji detection
+    for emoji, emoji_tools in _EMOJI_TOOLS.items():
+        if emoji in message:
+            tools.extend(emoji_tools)
+    # 2. Time pattern detection
+    if _TIME_PATTERN_RE.search(message):
+        tools.extend(_TIME_INJECT_TOOLS)
+    # 3. Question word detection → inject search tools
+    msg_lower = message.lower()
+    if any(qw in msg_lower for qw in _QUESTION_WORDS):
+        tools.extend(_QUESTION_INJECT_TOOLS)
+    # Deduplicate preserving order
+    seen: set[str] = set()
+    result: list[str] = []
+    for t in tools:
+        if t not in seen:
+            seen.add(t)
+            result.append(t)
+    return result
+
+
 # Dynamic max_tokens per intent
 import os as _os
 

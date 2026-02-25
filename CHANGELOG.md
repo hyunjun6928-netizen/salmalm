@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.27.0 (2026-02-25)
+### UX Convenience Upgrade
+- **Emoji intent injection** — 80 emoji (📸📅🔍🎵⏰🌤️📧💻 등) → 해당 tool 자동 inject
+- **Time-pattern tool injection** — "5분 후", "내일 오전", "in 3 hours", "at 3pm" → reminder/cron_manage 자동 inject
+- **Question-word web search** — "어떻게", "왜", "what is", "how do" 등 의문형 질문 → web_search 자동 inject
+- **Slash command autocomplete** — 채팅 입력창에 `/` 타이핑 시 Discord 스타일 드롭다운 (Arrow키 탐색, Tab/Enter 선택)
+- **Model badge quick-switch** — 모델 뱃지 클릭 시 최근 3개 모델 팝업 + "All models" 링크
+- `get_extra_tools()` 함수 추출 — classifier.py → tool_selector.py에서 호출
+- app.js: 39 → 41 모듈 (3628 lines)
+
 > **Note:** Versions v0.10.x through v0.18.x were rapid iteration releases during initial development (2026-02-19 ~ 2026-02-23). Daily version bumps reflect active development, not production releases. Stable releases begin from v0.19.x.
 
 ## v0.19.48 (2026-02-24)

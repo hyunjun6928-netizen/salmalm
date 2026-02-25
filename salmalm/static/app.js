@@ -2515,6 +2515,208 @@ window._i18n={
   });
 
 
+  /* ═══ 91-slash-autocomplete.js ═══ */
+/* --- Slash Command Inline Autocomplete ---
+ * Discord-style: type "/" as first char → dropdown with matching commands
+ * Arrow keys: navigate | Enter/Tab: select | Escape: close
+ */
+(function(){
+  var _CMDS = [
+    {cmd:'/help',       en:'Show all commands',             kr:'모든 명령어 표시'},
+    {cmd:'/model',      en:'Switch model',                  kr:'모델 변경'},
+    {cmd:'/new',        en:'New session',                   kr:'새 세션'},
+    {cmd:'/clear',      en:'Clear session',                 kr:'세션 초기화'},
+    {cmd:'/reset',      en:'Reset conversation',            kr:'대화 리셋'},
+    {cmd:'/status',     en:'Server status',                 kr:'서버 상태'},
+    {cmd:'/usage',      en:'Usage stats',                   kr:'사용량 통계'},
+    {cmd:'/compact',    en:'Compact context',               kr:'컨텍스트 압축'},
+    {cmd:'/think',      en:'Thinking level (off|low|med|high)', kr:'사고 단계 설정'},
+    {cmd:'/verbose',    en:'Verbose mode (on|off)',         kr:'상세 출력'},
+    {cmd:'/reasoning',  en:'Show reasoning (on|off|stream)',kr:'추론 표시'},
+    {cmd:'/vault',      en:'Vault operations',              kr:'보안 저장소'},
+    {cmd:'/bash',       en:'Execute shell command',         kr:'셸 명령 실행'},
+    {cmd:'/subagents',  en:'Sub-agent management',          kr:'서브 에이전트'},
+    {cmd:'/skill',      en:'Run skill',                     kr:'스킬 실행'},
+    {cmd:'/workflow',   en:'Workflow management',           kr:'워크플로우'},
+    {cmd:'/screen',     en:'Screen capture & analysis',     kr:'화면 캡처'},
+    {cmd:'/mcp',        en:'MCP marketplace',               kr:'MCP 마켓플레이스'},
+    {cmd:'/persona',    en:'Persona management',            kr:'페르소나 설정'},
+    {cmd:'/branch',     en:'Branch conversation',           kr:'대화 분기'},
+    {cmd:'/rollback',   en:'Rollback to previous state',    kr:'이전 상태로'},
+    {cmd:'/split',      en:'Split response',                kr:'응답 분할'},
+    {cmd:'/capsule',    en:'Time capsule',                  kr:'타임캡슐'},
+    {cmd:'/life',       en:'Life dashboard',                kr:'생활 대시보드'},
+    {cmd:'/evolve',     en:'Self-evolution',                kr:'자체 진화'},
+    {cmd:'/whoami',     en:'Current user ID',               kr:'현재 사용자'},
+    {cmd:'/commands',   en:'Full command list',             kr:'전체 명령어 목록'},
+    {cmd:'/stop',       en:'Stop execution',                kr:'실행 중지'},
+    {cmd:'/setup',      en:'Re-run setup wizard',           kr:'설정 마법사'},
+    {cmd:'/queue',      en:'Queue status',                  kr:'대기열 상태'},
+    {cmd:'/shadow',     en:'Shadow mode',                   kr:'그림자 모드'},
+    {cmd:'/context',    en:'Show context info',             kr:'컨텍스트 정보'},
+    {cmd:'/whoami',     en:'Who am I',                      kr:'나는 누구'},
+    {cmd:'/a2a',        en:'Agent-to-agent',                kr:'에이전트 간 연결'},
+    {cmd:'/mood',       en:'Mood info',                     kr:'무드 정보'},
+  ];
+
+  var _popup = null;
+  var _activeIdx = 0;
+  var _visibleCmds = [];
+
+  function _show(matches) {
+    _hide();
+    if (!matches.length) return;
+    _visibleCmds = matches;
+    _activeIdx = 0;
+
+    var ia = document.getElementById('input-area');
+    if (!ia) return;
+
+    var popup = document.createElement('div');
+    popup.id = 'slash-ac';
+    popup.style.cssText = [
+      'position:absolute',
+      'z-index:9999',
+      'background:var(--panel,#1e1e1e)',
+      'border:1px solid var(--border,#333)',
+      'border-radius:10px',
+      'box-shadow:0 -4px 24px rgba(0,0,0,0.45)',
+      'max-height:280px',
+      'overflow-y:auto',
+      'min-width:300px',
+      'max-width:480px',
+      'bottom:calc(100% + 8px)',
+      'left:0',
+      'padding:4px',
+    ].join(';');
+
+    matches.forEach(function(m, i) {
+      var row = document.createElement('div');
+      row.className = 'slash-ac-row';
+      row.dataset.i = i;
+      row.style.cssText = 'display:flex;align-items:baseline;gap:10px;padding:8px 12px;cursor:pointer;border-radius:7px;transition:background 0.08s';
+      if (i === 0) row.style.background = 'var(--accent-dim,rgba(99,140,255,0.18))';
+
+      var cEl = document.createElement('span');
+      cEl.style.cssText = 'font-family:monospace;font-size:13px;font-weight:600;color:var(--accent2,#82aaff);min-width:100px;flex-shrink:0';
+      cEl.textContent = m.cmd;
+
+      var dEl = document.createElement('span');
+      dEl.style.cssText = 'font-size:12px;color:var(--text2,#888);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      dEl.textContent = (typeof _lang !== 'undefined' && _lang === 'ko') ? m.kr : m.en;
+
+      row.appendChild(cEl);
+      row.appendChild(dEl);
+
+      row.addEventListener('mouseenter', function() { _setActive(i); });
+      row.addEventListener('mousedown', function(e) { e.preventDefault(); _select(m.cmd); });
+      popup.appendChild(row);
+    });
+
+    ia.style.position = ia.style.position || 'relative';
+    ia.appendChild(popup);
+    _popup = popup;
+  }
+
+  function _setActive(idx) {
+    if (!_popup) return;
+    var rows = _popup.querySelectorAll('.slash-ac-row');
+    rows.forEach(function(r, i) {
+      r.style.background = (i === idx) ? 'var(--accent-dim,rgba(99,140,255,0.18))' : '';
+    });
+    _activeIdx = idx;
+  }
+
+  function _hide() {
+    if (_popup) { _popup.remove(); _popup = null; }
+    _visibleCmds = [];
+    _activeIdx = 0;
+  }
+
+  function _select(cmd) {
+    var inp = document.getElementById('input');
+    if (!inp) return;
+    inp.value = cmd + ' ';
+    inp.focus();
+    // Move cursor to end
+    inp.selectionStart = inp.selectionEnd = inp.value.length;
+    _hide();
+    // Trigger height resize
+    inp.dispatchEvent(new Event('input'));
+  }
+
+  function _update(val) {
+    // Only show when "/" is the first (non-whitespace) character
+    var trimmed = val.trimStart();
+    if (!trimmed.startsWith('/')) { _hide(); return; }
+    var q = trimmed.slice(1).toLowerCase();
+    // Hide once user typed a space after the command (command already entered)
+    if (q.includes(' ')) { _hide(); return; }
+    var matches = _CMDS.filter(function(c) {
+      return q === '' || c.cmd.toLowerCase().startsWith('/' + q);
+    });
+    // Deduplicate by cmd
+    var seen = {};
+    matches = matches.filter(function(m) {
+      if (seen[m.cmd]) return false;
+      seen[m.cmd] = true;
+      return true;
+    });
+    _show(matches.slice(0, 9));
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var inp = document.getElementById('input');
+    if (!inp) return;
+
+    inp.addEventListener('input', function() {
+      _update(inp.value);
+    });
+
+    inp.addEventListener('keydown', function(e) {
+      if (!_popup) return;
+      var rows = _popup.querySelectorAll('.slash-ac-row');
+      var len = rows.length;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _setActive(Math.min(_activeIdx + 1, len - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _setActive(Math.max(_activeIdx - 1, 0));
+      } else if (e.key === 'Tab') {
+        // Tab: complete without sending
+        if (len > 0) {
+          e.preventDefault();
+          _select(_visibleCmds[_activeIdx] ? _visibleCmds[_activeIdx].cmd : _visibleCmds[0].cmd);
+        }
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        // Enter: only intercept if popup is open AND exactly one match
+        // (if multiple matches, Enter would normally send — let it)
+        if (len === 1) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          _select(_visibleCmds[0].cmd);
+        } else if (_activeIdx > 0) {
+          // User explicitly navigated → select
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          _select(_visibleCmds[_activeIdx].cmd);
+        } else {
+          _hide();
+        }
+      } else if (e.key === 'Escape') {
+        _hide();
+      }
+    }, true); // capture phase so we beat the send handler
+
+    inp.addEventListener('blur', function() {
+      // Delay to allow mousedown on popup rows
+      setTimeout(_hide, 160);
+    });
+  });
+})();
+
+
   /* ═══ 92-pwa.js ═══ */
   /* --- PWA Install Prompt --- */
   var _deferredPrompt=null;
@@ -2744,6 +2946,220 @@ window._i18n={
     if(a==='go'&&typeof go==='function')go();
     else if(a==='unlock'&&typeof unlock==='function')unlock();
   });
+
+
+  /* ═══ 96-model-quickswitch.js ═══ */
+/* --- Model Badge Quick-Switch ---
+ * Click model badge → popup with recently used models + "All models" link
+ * Tracks last 3 used models in localStorage
+ */
+(function(){
+  var _KEY = 'salm_recent_models';
+  var _MAX = 3;
+  var _popup = null;
+
+  /* ── localStorage helpers ── */
+  function _getRecent() {
+    try { return JSON.parse(localStorage.getItem(_KEY) || '[]'); }
+    catch(e) { return []; }
+  }
+
+  function _pushRecent(model) {
+    if (!model || model === 'auto routing' || model.startsWith('Auto →') || model === 'auto') return;
+    // Normalize: strip provider prefix for storage key but store full model name
+    var recent = _getRecent().filter(function(m) { return m !== model; });
+    recent.unshift(model);
+    try { localStorage.setItem(_KEY, JSON.stringify(recent.slice(0, _MAX))); }
+    catch(e) {}
+  }
+
+  /* ── Toast notification ── */
+  function _toast(msg) {
+    var el = document.createElement('div');
+    el.style.cssText = [
+      'position:fixed',
+      'bottom:90px',
+      'left:50%',
+      'transform:translateX(-50%)',
+      'background:var(--panel,#222)',
+      'border:1px solid var(--border,#333)',
+      'border-radius:8px',
+      'padding:8px 18px',
+      'font-size:13px',
+      'z-index:10001',
+      'pointer-events:none',
+      'color:var(--text,#fff)',
+      'transition:opacity 0.3s',
+      'white-space:nowrap',
+    ].join(';');
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function() {
+      el.style.opacity = '0';
+      setTimeout(function() { el.remove(); }, 320);
+    }, 1600);
+  }
+
+  /* ── Model switch API call ── */
+  function _switchModel(model, badge) {
+    var hdr = {
+      'Content-Type': 'application/json',
+      'X-Session-Token': (typeof _tok !== 'undefined' ? _tok : ''),
+    };
+    if (typeof _currentSession !== 'undefined' && _currentSession) {
+      hdr['X-Session-Id'] = _currentSession;
+    }
+    fetch('/api/model/switch', {
+      method: 'POST',
+      headers: hdr,
+      body: JSON.stringify({model: model}),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      var short = model.split('/').pop();
+      if (badge) badge.textContent = short;
+      _pushRecent(short);
+      _toast('✅ ' + short);
+      _hide();
+    })
+    .catch(function(e) {
+      console.warn('[QuickSwitch] model switch failed:', e);
+      _toast('❌ Failed');
+    });
+  }
+
+  /* ── Open model router tab ── */
+  function _openModelRouter() {
+    _hide();
+    // Try clicking the model-router settings tab
+    var mrTab = document.querySelector('[data-settings-tab="model-router"]');
+    if (mrTab) {
+      // Ensure settings panel is visible first
+      var settingsPanel = document.getElementById('settings');
+      if (settingsPanel && settingsPanel.style.display === 'none') {
+        var settingsBtn = document.getElementById('settings-btn') ||
+                          document.querySelector('[data-action="openSettings"]') ||
+                          document.querySelector('[onclick*="showSettings"]');
+        if (settingsBtn) settingsBtn.click();
+        setTimeout(function() { mrTab.click(); }, 120);
+      } else {
+        mrTab.click();
+      }
+    } else {
+      // Fallback: open settings
+      if (typeof window.showSettings === 'function') window.showSettings();
+    }
+  }
+
+  /* ── Popup UI ── */
+  function _hide() {
+    if (_popup) { _popup.remove(); _popup = null; }
+  }
+
+  function _show(badge) {
+    _hide();
+    var recent = _getRecent();
+
+    var popup = document.createElement('div');
+    popup.id = 'model-qs-popup';
+    popup.style.cssText = [
+      'position:absolute',
+      'z-index:9998',
+      'background:var(--panel,#1e1e1e)',
+      'border:1px solid var(--border,#333)',
+      'border-radius:10px',
+      'box-shadow:0 4px 24px rgba(0,0,0,0.5)',
+      'padding:6px',
+      'min-width:210px',
+      'top:calc(100% + 6px)',
+      'right:0',
+    ].join(';');
+
+    var kr = (typeof _lang !== 'undefined' && _lang === 'ko');
+
+    /* Header */
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'font-size:10px;color:var(--text2,#888);padding:4px 8px 6px;text-transform:uppercase;letter-spacing:0.06em;user-select:none';
+    hdr.textContent = kr ? '최근 모델' : 'Recent Models';
+    popup.appendChild(hdr);
+
+    if (recent.length === 0) {
+      var empty = document.createElement('div');
+      empty.style.cssText = 'font-size:12px;color:var(--text2,#888);padding:6px 10px';
+      empty.textContent = kr ? '아직 사용한 모델이 없습니다' : 'No recent models yet';
+      popup.appendChild(empty);
+    } else {
+      recent.forEach(function(model) {
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text,#fff);transition:background 0.08s';
+        var dot = document.createElement('span');
+        dot.style.cssText = 'width:7px;height:7px;border-radius:50%;background:var(--accent,#7c9fff);flex-shrink:0';
+        var name = document.createElement('span');
+        name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        name.textContent = model.split('/').pop();
+        name.title = model;
+        row.appendChild(dot);
+        row.appendChild(name);
+        row.addEventListener('mouseenter', function() { row.style.background = 'var(--accent-dim,rgba(99,140,255,0.18))'; });
+        row.addEventListener('mouseleave', function() { row.style.background = ''; });
+        row.addEventListener('mousedown', function(e) { e.preventDefault(); _switchModel(model, badge); });
+        popup.appendChild(row);
+      });
+    }
+
+    /* Divider */
+    var sep = document.createElement('div');
+    sep.style.cssText = 'height:1px;background:var(--border,#333);margin:4px 0';
+    popup.appendChild(sep);
+
+    /* "All models" button */
+    var more = document.createElement('div');
+    more.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--text2,#888);transition:background 0.08s';
+    more.innerHTML = '⚙️&nbsp;' + (kr ? '모든 모델 보기' : 'All models…');
+    more.addEventListener('mouseenter', function() { more.style.background = 'var(--accent-dim,rgba(99,140,255,0.18))'; });
+    more.addEventListener('mouseleave', function() { more.style.background = ''; });
+    more.addEventListener('mousedown', function(e) { e.preventDefault(); _openModelRouter(); });
+    popup.appendChild(more);
+
+    /* Position relative to badge */
+    badge.style.position = badge.style.position || 'relative';
+    badge.appendChild(popup);
+    _popup = popup;
+  }
+
+  /* ── Bootstrap ── */
+  document.addEventListener('DOMContentLoaded', function() {
+    var badge = document.getElementById('model-badge');
+    if (!badge) return;
+
+    badge.style.cursor = 'pointer';
+    badge.title = (typeof _lang !== 'undefined' && _lang === 'ko')
+      ? '클릭: 최근 모델 빠른 전환'
+      : 'Click: recent model quick-switch';
+
+    /* Click: toggle popup */
+    badge.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (_popup) { _hide(); return; }
+      _show(badge);
+    });
+
+    /* Click outside → close */
+    document.addEventListener('click', function(e) {
+      if (_popup && !badge.contains(e.target)) { _hide(); }
+    });
+
+    /* Track model changes via MutationObserver → auto-push to recent */
+    var obs = new MutationObserver(function() {
+      var text = badge.textContent.trim();
+      // Push the new model if it looks like a real model name
+      if (text && text !== 'auto routing' && !text.startsWith('Auto →') && text.length > 2) {
+        _pushRecent(text);
+      }
+    });
+    obs.observe(badge, {childList: true, subtree: true, characterData: true});
+  });
+})();
 
 
   /* ═══ 97-voice.js ═══ */
