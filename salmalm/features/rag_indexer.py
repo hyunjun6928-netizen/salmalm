@@ -9,6 +9,8 @@ from typing import Dict, List, Tuple
 
 log = logging.getLogger(__name__)
 
+from salmalm.constants import DATA_DIR, BASE_DIR, MEMORY_DIR, MEMORY_FILE, WORKSPACE_DIR  # noqa: E402
+
 REINDEX_INTERVAL = 120
 from salmalm.features.rag_utils import CHUNK_SIZE, CHUNK_OVERLAP, MAX_CHUNK_CHARS, compute_tf  # noqa: E402  # default seconds
 

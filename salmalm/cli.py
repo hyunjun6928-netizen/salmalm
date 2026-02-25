@@ -376,6 +376,60 @@ def _read_pid() -> int | None:
         return None
 
 
+def _find_pid_by_port(port: int) -> "int | None":
+    """Try multiple methods to find PID listening on port. WSL/Linux/macOS compatible."""
+    import subprocess
+
+    # 1. lsof (macOS + most Linux)
+    try:
+        out = subprocess.check_output(
+            ["lsof", "-ti", f":{port}"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+        pids = [int(x) for x in out.split() if x.isdigit()]
+        if pids:
+            return pids[0]
+    except Exception:
+        pass
+
+    # 2. ss (Linux/WSL — preferred over lsof on WSL2)
+    try:
+        out = subprocess.check_output(
+            ["ss", "-tlnp", f"sport = :{port}"], text=True, stderr=subprocess.DEVNULL
+        )
+        import re
+        m = re.search(r"pid=(\d+)", out)
+        if m:
+            return int(m.group(1))
+    except Exception:
+        pass
+
+    # 3. fuser (Linux fallback)
+    try:
+        out = subprocess.check_output(
+            ["fuser", f"{port}/tcp"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+        pids = [int(x) for x in out.split() if x.strip("-").isdigit()]
+        if pids:
+            return pids[0]
+    except Exception:
+        pass
+
+    # 4. ps — find by process name + module
+    try:
+        out = subprocess.check_output(
+            ["ps", "aux"], text=True, stderr=subprocess.DEVNULL
+        )
+        for line in out.splitlines():
+            if "salmalm" in line and "stop" not in line and "grep" not in line:
+                parts = line.split()
+                if len(parts) > 1 and parts[1].isdigit():
+                    return int(parts[1])
+    except Exception:
+        pass
+
+    return None
+
+
 def _stop_server() -> bool:
     """Stop running SalmAlm server. Returns True if stopped."""
     import signal as _signal
@@ -383,20 +437,11 @@ def _stop_server() -> bool:
 
     pid = _read_pid()
     if pid is None:
-        # Fallback: scan port 18800
+        # Fallback: scan port
         port = int(os.environ.get("SALMALM_PORT", 18800))
-        try:
-            import subprocess
-            out = subprocess.check_output(
-                ["lsof", "-ti", f":{port}"], text=True, stderr=subprocess.DEVNULL
-            ).strip()
-            if out:
-                pid = int(out.split()[0])
-            else:
-                print("⚠️  SalmAlm is not running.")
-                return False
-        except Exception:
-            print("⚠️  SalmAlm is not running (no PID file, no process on port).")
+        pid = _find_pid_by_port(port)
+        if pid is None:
+            print("⚠️  SalmAlm is not running.")
             return False
 
     print(f"⏹  Stopping SalmAlm (PID {pid})...")
