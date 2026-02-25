@@ -142,8 +142,14 @@ def _fetch_provider_models(provider: str) -> List[str]:
             )
             with urllib.request.urlopen(req, timeout=8) as r:
                 data = json.loads(r.read())
-            return [m["id"] for m in data.get("data", [])
-                    if m.get("type", "model") == "model"]
+            import re
+            return [
+                m["id"] for m in data.get("data", [])
+                if m.get("type", "model") == "model"
+                and not re.search(r"-\d{8}$", m["id"])   # skip date-pinned snapshots
+                and not re.search(r"-\d{4}-\d{2}-\d{2}$", m["id"])  # ISO date snapshots
+                and "claude-3-" not in m["id"]            # skip legacy claude-3 family
+            ]
 
         elif provider == "google":
             url = f"{base}/models?key={key}&pageSize=100"
