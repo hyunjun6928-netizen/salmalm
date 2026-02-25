@@ -1639,24 +1639,54 @@ window._i18n={
     fetch('/api/soul',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
       var ed=document.getElementById('soul-editor');if(ed)ed.value=d.content||'';
     }).catch(function(){});
-    fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'keys'})})
-      .then(function(r){return r.json()}).then(function(d){
-        document.getElementById('vault-keys').innerHTML=d.keys.map(function(k){return '<div style="padding:4px 0;font-size:13px;color:var(--text2)">🔑 '+k+'</div>'}).join('');
-        /* Show saved indicator on Telegram/Discord fields */
-        var _vk=d.keys||[];
-        window._configuredKeys=_vk; // share globally for tool badge filtering
-        if(typeof _renderToolsList==='function')_renderToolsList(document.getElementById('tools-search')?document.getElementById('tools-search').value:'');
-        if(_vk.indexOf('telegram_token')>=0){var _ti=document.getElementById('sk-telegram-token');if(_ti)_ti.placeholder='••••••••• (saved)'}
-        if(_vk.indexOf('telegram_owner_id')>=0){var _to=document.getElementById('sk-telegram-owner');if(_to)_to.placeholder='••••••••• (saved)'}
-        if(_vk.indexOf('discord_token')>=0){var _di=document.getElementById('sk-discord-token');if(_di)_di.placeholder='••••••••• (saved)'}
-        if(_vk.indexOf('discord_guild_id')>=0){var _dg=document.getElementById('sk-discord-guild');if(_dg)_dg.placeholder='••••••••• (saved)'}
-        if(_vk.indexOf('anthropic_api_key')>=0){var _an=document.getElementById('sk-anthropic');if(_an)_an.placeholder='••••••••• (saved)'}
-        if(_vk.indexOf('openai_api_key')>=0){var _oa=document.getElementById('sk-openai');if(_oa)_oa.placeholder='••••••••• (saved)'}
-        if(_vk.indexOf('xai_api_key')>=0){var _xa=document.getElementById('sk-xai');if(_xa)_xa.placeholder='••••••••• (saved)'}
-        if(_vk.indexOf('google_api_key')>=0){var _ga=document.getElementById('sk-google');if(_ga)_ga.placeholder='••••••••• (saved)'}
-        if(_vk.indexOf('brave_api_key')>=0){var _ba=document.getElementById('sk-brave');if(_ba)_ba.placeholder='••••••••• (saved)'}
-        if(_vk.indexOf('openrouter_api_key')>=0){var _or=document.getElementById('sk-openrouter');if(_or)_or.placeholder='••••••••• (saved)'}
+    /* vault key → input element id mapping */
+    var _vkMap={
+      'anthropic_api_key':'sk-anthropic','openai_api_key':'sk-openai',
+      'xai_api_key':'sk-xai','google_api_key':'sk-google',
+      'brave_api_key':'sk-brave','openrouter_api_key':'sk-openrouter',
+      'telegram_token':'sk-telegram-token','telegram_owner_id':'sk-telegram-owner',
+      'discord_token':'sk-discord-token','discord_guild_id':'sk-discord-guild',
+      'google_client_id':'sk-google-client-id','google_client_secret':'sk-google-client-secret'
+    };
+    window._deleteVaultKey=function(vaultKey){
+      if(!confirm((document.documentElement.lang==='kr'?'삭제하시겠습니까? ':'Delete vault key? ')+vaultKey))return;
+      fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete',key:vaultKey})})
+        .then(function(r){return r.json()}).then(function(){
+          /* Remove from _configuredKeys */
+          if(window._configuredKeys){window._configuredKeys=window._configuredKeys.filter(function(k){return k!==vaultKey})}
+          /* Reset input placeholder */
+          var inp=document.getElementById(_vkMap[vaultKey]);if(inp){inp.placeholder=inp.getAttribute('data-orig-ph')||'';inp.value=''}
+          /* Remove delete btn */
+          var btn=document.getElementById('del-'+vaultKey);if(btn)btn.remove();
+          /* Re-render tool badges */
+          if(typeof _renderToolsList==='function')_renderToolsList(document.getElementById('tools-search')?document.getElementById('tools-search').value:'');
+          var re=document.getElementById('key-test-result');if(re)re.innerHTML='<span style="color:#f87171">🗑 '+vaultKey+' deleted</span>';
+        }).catch(function(){alert('Delete failed')});
+    };
+    window._applyVaultKeys=function _applyVaultKeys(keys){
+      document.getElementById('vault-keys').innerHTML=keys.map(function(k){return '<div style="padding:4px 0;font-size:13px;color:var(--text2)">🔑 '+k+'</div>'}).join('');
+      window._configuredKeys=keys;
+      if(typeof _renderToolsList==='function')_renderToolsList(document.getElementById('tools-search')?document.getElementById('tools-search').value:'');
+      keys.forEach(function(vk){
+        var inputId=_vkMap[vk];if(!inputId)return;
+        var inp=document.getElementById(inputId);if(!inp)return;
+        /* Save original placeholder */
+        if(!inp.getAttribute('data-orig-ph'))inp.setAttribute('data-orig-ph',inp.placeholder);
+        inp.placeholder='••••••••• (saved)';
+        /* Add delete button if not already present */
+        var delId='del-'+vk;
+        if(!document.getElementById(delId)){
+          var btn=document.createElement('button');
+          btn.id=delId;btn.className='btn';
+          btn.style.cssText='background:#7f1d1d;color:#fca5a5;padding:0 10px;font-size:12px;white-space:nowrap';
+          btn.textContent='🗑';btn.title='Delete '+vk;
+          btn.onclick=function(){window._deleteVaultKey(vk)};
+          inp.parentNode.appendChild(btn);
+        }
       });
+    }
+    fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'keys'})})
+      .then(function(r){return r.json()}).then(function(d){_applyVaultKeys(d.keys||[])});
     if(window.checkGoogleStatus)window.checkGoogleStatus();
     /* Load engine optimization settings */
     fetch('/api/engine/settings').then(function(r){return r.json()}).then(function(d){
@@ -2258,10 +2288,11 @@ window._i18n={
       var re=document.getElementById('key-test-result');
       re.innerHTML='<span style="color:#4ade80">✅ '+vaultKey+' Saved</span>';
       document.getElementById(inputId).value='';
-      // Update global configured keys so tool badges refresh immediately
+      // Update global configured keys + re-apply vault UI (saved badge + delete btn)
       if(!window._configuredKeys)window._configuredKeys=[];
       if(window._configuredKeys.indexOf(vaultKey)<0)window._configuredKeys.push(vaultKey);
-      if(typeof _renderToolsList==='function')_renderToolsList(document.getElementById('tools-search')?document.getElementById('tools-search').value:'');
+      if(typeof window._applyVaultKeys==='function')window._applyVaultKeys(window._configuredKeys);
+      else if(typeof _renderToolsList==='function')_renderToolsList(document.getElementById('tools-search')?document.getElementById('tools-search').value:'');
       // Auto-optimize routing when an LLM provider key is saved
       var llmKeys=['anthropic_api_key','openai_api_key','xai_api_key','google_api_key'];
       if(llmKeys.indexOf(vaultKey)!==-1){

@@ -324,6 +324,12 @@ def create_asgi_app() -> FastAPI:
             else:
                 raise _JSONResp({"error": "Method not allowed"}, 405)
 
+            # ── Redirect response (302/301/307/308) ──────────────────────────
+            if handler._streaming and 300 <= handler._resp_status < 400:
+                location = handler._resp_headers.get("location", "/")
+                from starlette.responses import RedirectResponse
+                return RedirectResponse(url=location, status_code=handler._resp_status)
+
             # If handler returned normally (raw wfile writes for non-SSE streams like SW.js)
             if handler._streaming and not handler._sse_queue._q.empty():
                 chunks = []
