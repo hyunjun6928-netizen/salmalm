@@ -385,10 +385,11 @@ class TestStabilityInternals(unittest.TestCase):
     """Test stability internals."""
 
     def test_auto_recover(self):
+        import asyncio
         from salmalm.features.stability import HealthMonitor
         hm = HealthMonitor()
-        # Should not raise
-        hm.auto_recover()
+        # auto_recover is async — run it properly to avoid RuntimeWarning
+        asyncio.run(hm.auto_recover())
 
     def test_startup_selftest(self):
         from salmalm.features.stability import HealthMonitor

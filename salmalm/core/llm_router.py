@@ -220,8 +220,10 @@ def _fetch_provider_models(provider: str) -> List[str]:
                         "tts",              # any text-to-speech models
                         "speech",           # speech synthesis
                         "transcription",    # audio transcription
+                        "audio",            # generic audio models (grok-audio, etc.)
                         "compound",         # Groq compound-beta agent variants
                         "image",            # xAI image generation models
+                        "diffusion",        # xAI image diffusion models
                     )
                 )]
                 ids.sort()
