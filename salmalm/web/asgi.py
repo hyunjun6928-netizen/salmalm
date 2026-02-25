@@ -28,19 +28,23 @@ import uuid
 
 # ── Response signal exceptions ─────────────────────────────────────────────
 
-class _JSONResp(Exception):
+class _JSONResp(BaseException):
+    """Signals a JSON response — inherits BaseException so that
+    'except Exception' blocks in mixin route handlers do NOT catch it.
+    (e.g. try: do_work(); self._json(ok); except Exception: self._json(fail)
+     would incorrectly treat the successful _json raise as a failure.)"""
     def __init__(self, data: dict, status: int = 200):
         self.data = data
         self.status = status
 
 
-class _HTMLResp(Exception):
+class _HTMLResp(BaseException):
     def __init__(self, content: str, status: int = 200):
         self.content = content
         self.status = status
 
 
-class _RawResp(Exception):
+class _RawResp(BaseException):
     """Raw bytes response (SVG, JS, etc.)."""
     def __init__(self, body: bytes, content_type: str, status: int = 200):
         self.body = body
@@ -370,6 +374,16 @@ async def _handle_sse_stream(handler: FastHandler) -> StreamingResponse:
     def _run_handler() -> None:
         try:
             handler._post_api_chat()
+        except _JSONResp as resp_err:
+            # _post_api_chat called self._json() for an early error (e.g. vault locked,
+            # bad request). Convert to SSE error event.
+            try:
+                err_payload = f"event: error\ndata: {json.dumps(resp_err.data)}\n\n"
+                sse_q.write(err_payload.encode())
+            except Exception:
+                pass
+        except (_HTMLResp, _RawResp):
+            pass  # Not expected from chat handler; just close the stream
         except Exception as e:
             log.error(f"[SSE] handler error: {e}")
             try:
