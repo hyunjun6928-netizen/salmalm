@@ -572,6 +572,212 @@ _KEYWORD_TOOLS = {
     "언어":         ["ui_control"],
     "폰트":         ["ui_control"],
     "font":         ["ui_control"],
+
+    # ── 한글 누락 보완 ─────────────────────────────────────────────────────────
+
+    # what is / who is / how to / where is → 웹 검색 자연어
+    "뭐야":         ["brave_search", "web_search"],
+    "뭔가요":       ["brave_search", "web_search"],
+    "뭔지":         ["brave_search", "web_search"],
+    "뭔데":         ["brave_search", "web_search"],
+    "뭐임":         ["brave_search", "web_search"],
+    "뭔가":         ["brave_search", "web_search"],
+    "누구야":       ["brave_search", "web_search"],
+    "누구임":       ["brave_search", "web_search"],
+    "누군지":       ["brave_search", "web_search"],
+    "누군가요":     ["brave_search", "web_search"],
+    "방법":         ["brave_search", "web_search", "web_fetch"],
+    "어떻게":       ["brave_search", "web_search"],
+    "하는 법":      ["brave_search", "web_search"],
+    "하는 방법":    ["brave_search", "web_search"],
+    "어디야":       ["brave_search", "web_search"],
+    "어디에":       ["brave_search", "web_search"],
+    "어디 있어":    ["brave_search", "web_search"],
+    "어디임":       ["brave_search", "web_search"],
+    "정보 알려줘":  ["brave_search", "web_search"],
+    "알려줘":       ["brave_search", "web_search", "reminder", "notification"],
+    "알려주세요":   ["brave_search", "web_search"],
+    "언제":         ["brave_search", "web_search"],
+    "왜":           ["brave_search", "web_search"],
+    "어때":         ["brave_search", "web_search", "weather"],
+
+    # URL / 링크 열기
+    "주소":         ["web_fetch", "browser"],
+    "링크 열어줘":  ["web_fetch", "browser"],
+    "열어줘":       ["web_fetch", "browser", "read_file"],
+    "웹 열어줘":    ["web_fetch", "browser"],
+
+    # 파일 자연어 동사형
+    "파일 보여줘":  ["read_file"],
+    "파일 열어줘":  ["read_file"],
+    "파일 만들어줘": ["write_file"],
+    "파일 고쳐줘":  ["edit_file"],
+    "파일 바꿔줘":  ["edit_file"],
+    "파일 수정해줘": ["edit_file"],
+    "다른 점":      ["diff_files"],
+    "차이점":       ["diff_files"],
+    "뭐가 달라":    ["diff_files"],
+
+    # 코드 자연어 동사형
+    "돌려줘":       ["exec", "python_eval"],
+    "실행해줘":     ["exec", "python_eval"],
+    "코드 짜줘":    ["python_eval", "exec"],
+    "코드 써줘":    ["python_eval", "exec"],
+    "프로그램 실행": ["exec"],
+    "계산해줘":     ["python_eval"],
+    "셸":           ["exec"],
+    "쉘":           ["exec"],
+    "배시":         ["exec"],
+    "샌드박스":     ["sandbox_exec"],
+    "격리 실행":    ["sandbox_exec"],
+    "정규 표현식":  ["regex_test"],
+
+    # 시스템 자연어
+    "CPU 사용률":   ["system_monitor"],
+    "CPU 사용량":   ["system_monitor"],
+    "메모리 얼마나": ["system_monitor"],
+    "메모리 부족":  ["system_monitor"],
+    "디스크 용량":  ["system_monitor"],
+    "헬스체크":     ["health_check"],
+    "시스템 점검":  ["health_check", "system_monitor"],
+    "서비스 점검":  ["health_check"],
+    "서버 점검":    ["health_check", "system_monitor"],
+
+    # 이미지 자연어
+    "사진 만들어줘": ["image_generate"],
+    "이미지 만들어줘": ["image_generate"],
+    "그림 만들어줘": ["image_generate"],
+    "사진 봐줘":    ["image_analyze"],
+    "사진 분석해줘": ["image_analyze"],
+    "이미지 봐줘":  ["image_analyze"],
+    "화면 찍어줘":  ["screenshot"],
+    "사진 찍어줘":  ["screenshot"],
+
+    # TTS/STT 자연어
+    "음성 합성":    ["tts", "tts_generate"],
+    "TTS 변환":     ["tts", "tts_generate"],
+    "문자를 음성으로": ["tts", "tts_generate"],
+    "소리로 들려줘": ["tts", "tts_generate"],
+    "음성으로 읽어줘": ["tts", "tts_generate"],
+    "불러줘":       ["tts", "tts_generate"],
+    "음성 텍스트":  ["stt"],
+    "음성 받아쓰기": ["stt"],
+    "녹음 텍스트":  ["stt"],
+
+    # 날씨 자연어
+    "우산 필요해":  ["weather"],
+    "비 올까":      ["weather"],
+    "비 오냐":      ["weather"],
+    "날씨 어때":    ["weather"],
+    "오늘 날씨":    ["weather"],
+    "내일 날씨":    ["weather"],
+    "몇 도야":      ["weather"],
+    "춥냐":         ["weather"],
+    "더워":         ["weather"],
+
+    # 번역 자연어
+    "번역해줘":     ["translate"],
+    "번역해주세요": ["translate"],
+    "다른 언어로":  ["translate"],
+    "외국어로":     ["translate"],
+    "영어로 번역":  ["translate"],
+    "한국어로 번역": ["translate"],
+
+    # 메모/기억 자연어
+    "적어줘":       ["note", "memory_write"],
+    "메모해줘":     ["note", "memory_write"],
+    "기억해뒀어":   ["memory_read"],
+    "기억나":       ["memory_read", "memory_search"],
+    "뭐 기억해":    ["memory_read", "memory_search"],
+    "기록 찾아줘":  ["memory_search"],
+    "노트 써줘":    ["note"],
+    "노트":         ["note"],
+
+    # 지출/가계부 자연어
+    "돈 썼어":      ["expense"],
+    "돈 쓴":        ["expense"],
+    "영수증":       ["expense"],
+    "지출 얼마":    ["expense"],
+
+    # 사용량/비용 자연어
+    "얼마나 사용":  ["usage_report"],
+    "API 비용":     ["usage_report"],
+    "비용 확인":    ["usage_report"],
+    "토큰 얼마":    ["usage_report"],
+    "사용 내역":    ["usage_report"],
+
+    # 크론/예약 자연어
+    "정기 실행":    ["cron_manage"],
+    "자동 반복":    ["cron_manage"],
+    "주기 설정":    ["cron_manage"],
+    "매일":         ["cron_manage", "routine"],
+    "매주":         ["cron_manage", "routine"],
+
+    # 서브 에이전트 자연어
+    "병렬 처리":    ["sub_agent"],
+    "백그라운드에서": ["sub_agent"],
+    "동시에 여러":  ["sub_agent"],
+
+    # RAG / 문서 자연어
+    "문서에서 찾아":  ["rag_search", "file_index"],
+    "파일에서 검색":  ["rag_search", "file_index"],
+    "파일에서 찾아":  ["rag_search", "file_index"],
+    "PDF 읽어줘":     ["rag_search", "read_file"],
+    "PDF 분석":       ["rag_search", "read_file"],
+
+    # 브라우저/캔버스 자연어
+    "크롬":         ["browser"],
+    "웹 브라우저":  ["browser"],
+    "시각화":       ["canvas"],
+    "그래프 그려줘": ["canvas"],
+    "차트 그려줘":  ["canvas"],
+
+    # 노드/기기 자연어
+    "연결된 기기":  ["node_manage"],
+    "페어링된 기기": ["node_manage"],
+    "기기 목록":    ["node_manage"],
+
+    # 클립보드 자연어
+    "복사한 내용":  ["clipboard"],
+    "붙여넣기 내용": ["clipboard"],
+    "클립보드에":   ["clipboard"],
+
+    # 워크플로우/자동화 자연어
+    "자동화":       ["workflow", "cron_manage"],
+    "자동화 흐름":  ["workflow"],
+    "작업 흐름":    ["workflow"],
+    "파이프라인":   ["workflow"],
+
+    # 스킬/플러그인 자연어
+    "기능 추가":    ["skill_manage", "plugin_manage"],
+    "새 기능":      ["skill_manage"],
+    "확장 기능":    ["plugin_manage"],
+
+    # 알림/타이머 추가 자연어
+    "몇 분 뒤":     ["reminder", "notification"],
+    "잊지 않게":    ["reminder", "notification"],
+    "리마인더":     ["reminder", "notification"],
+    "미리 알려줘":  ["reminder", "notification"],
+
+    # 브리핑/정리 자연어
+    "오늘 뭐 있어": ["briefing", "google_calendar"],
+    "오늘 요약":    ["briefing"],
+    "일일 요약":    ["briefing"],
+    "아침 정리":    ["briefing"],
+    "하루 정리":    ["briefing"],
+
+    # 이메일 추가 자연어
+    "메일 왔어":    ["gmail", "email_inbox"],
+    "메일 확인":    ["gmail", "email_inbox"],
+    "이메일 보내줘": ["gmail", "email_send"],
+    "답장":         ["gmail", "email_send", "email_read"],
+
+    # 일정 추가 자연어
+    "오늘 일정":    ["google_calendar", "calendar_list"],
+    "이번 주 일정": ["google_calendar", "calendar_list"],
+    "일정 추가":    ["google_calendar", "calendar_add"],
+    "일정 잡아줘":  ["google_calendar", "calendar_add"],
+    "회의 잡아줘":  ["google_calendar", "calendar_add"],
 }
 
 # Dynamic max_tokens per intent
