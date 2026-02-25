@@ -3,7 +3,7 @@
 import json
 import base64
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from salmalm.tools.tool_registry import register
 from salmalm.security.crypto import vault
 
@@ -52,6 +52,7 @@ def _google_oauth_headers() -> dict:
 @register("google_calendar")
 def handle_google_calendar(args: dict) -> str:
     """Handle google calendar."""
+    import urllib.error as _ue
     action = args.get("action", "list")
     cal_id = args.get("calendar_id", "primary")
     base_url = f"https://www.googleapis.com/calendar/v3/calendars/{cal_id}"
@@ -60,16 +61,18 @@ def handle_google_calendar(args: dict) -> str:
     if action == "list":
         days = args.get("days", 7)
         now = datetime.utcnow()
-        from datetime import timedelta
-
         time_min = now.isoformat() + "Z"
         time_max = (now + timedelta(days=days)).isoformat() + "Z"
         url = (
             f"{base_url}/events?timeMin={time_min}&timeMax={time_max}&maxResults=20&singleEvents=true&orderBy=startTime"
         )
         req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read())
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+        except _ue.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")[:300]
+            return f"❌ Calendar API {e.code} {e.reason}: {body}"
         events = data.get("items", [])
         if not events:
             return f"📅 No events in the next {days} days."
