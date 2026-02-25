@@ -360,7 +360,8 @@ class WebFilesMixin:
         port = getattr(getattr(self, "server", None), "server_address", [None, None])[1] or int(_os.environ.get("SALMALM_PORT", 18800))
         redirect_uri = f"http://localhost:{port}/api/google/callback"
         try:
-            data = json.dumps(
+            import urllib.parse as _urlparse
+            data = _urlparse.urlencode(
                 {
                     "code": code,
                     "client_id": client_id,
@@ -372,11 +373,15 @@ class WebFilesMixin:
             req = urllib.request.Request(
                 "https://oauth2.googleapis.com/token",
                 data=data,
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                result = json.loads(resp.read())
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    result = json.loads(resp.read())
+            except urllib.error.HTTPError as http_err:
+                err_body = http_err.read().decode("utf-8", errors="replace")
+                raise Exception(f"HTTP {http_err.code}: {err_body[:300]}")
             access_token = result.get("access_token", "")
             refresh_token = result.get("refresh_token", "")
             if refresh_token:
