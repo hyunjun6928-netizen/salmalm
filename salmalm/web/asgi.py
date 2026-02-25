@@ -18,8 +18,10 @@ import queue
 import time
 from typing import AsyncIterator
 
+from pathlib import Path
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from salmalm.security.crypto import log
 from salmalm.utils.logging_ext import request_logger, set_correlation_id
@@ -258,6 +260,11 @@ def create_asgi_app() -> FastAPI:
     _inject_mixin_methods(FastHandler, WebHandler)
 
     app = FastAPI(title="SalmAlm", docs_url=None, redoc_url=None)
+
+    # ── Static files (React bundles, dist assets) ───────────────────────────
+    _static_dist = Path(__file__).parent.parent / "static" / "dist"
+    _static_dist.mkdir(parents=True, exist_ok=True)
+    app.mount("/static/dist", StaticFiles(directory=str(_static_dist)), name="static_dist")
 
     # ── WebSocket endpoint ──────────────────────────────────────────────────
     try:

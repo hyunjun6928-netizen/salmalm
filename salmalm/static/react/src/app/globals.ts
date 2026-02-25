@@ -1,0 +1,27 @@
+// Shared DOM references and mutable state
+export const chat = document.getElementById('chat') as HTMLElement;
+export const input = document.getElementById('input') as HTMLTextAreaElement;
+export const btn = document.getElementById('send-btn') as HTMLButtonElement;
+export const costEl = document.getElementById('cost-display') as HTMLElement;
+export const modelBadge = document.getElementById('model-badge') as HTMLElement;
+export const settingsEl = document.getElementById('settings') as HTMLElement;
+export const filePrev = document.getElementById('file-preview') as HTMLElement;
+export const fileIconEl = document.getElementById('file-icon') as HTMLElement;
+export const fileNameEl = document.getElementById('file-name') as HTMLElement;
+export const fileSizeEl = document.getElementById('file-size') as HTMLElement;
+export const imgPrev = document.getElementById('img-preview') as HTMLElement;
+export const inputArea = document.getElementById('input-area') as HTMLElement;
+
+export let _tok: string = sessionStorage.getItem('tok') || '';
+export let pendingFile: File | null = null;
+export let pendingFiles: File[] = [];
+export let _currentSession: string = localStorage.getItem('salm_active_session') || 'web';
+export let _sessionCache: Record<string, any> = {};
+export let _isAutoRouting: boolean = true;
+
+export function set_tok(v: string) { _tok = v; }
+export function set_pendingFile(v: File | null) { pendingFile = v; }
+export function set_pendingFiles(v: File[]) { pendingFiles = v; }
+export function set_currentSession(v: string) { _currentSession = v; }
+export function set_sessionCache(v: Record<string, any>) { _sessionCache = v; }
+export function set_isAutoRouting(v: boolean) { _isAutoRouting = v; }

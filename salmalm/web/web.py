@@ -40,6 +40,7 @@ from salmalm.web.routes.web_files import WebFilesMixin
 from salmalm.web.routes.web_system import SystemMixin as WebSystemMixin
 from salmalm.web.routes.web_manage import ManageMixin as WebManageMixin
 from salmalm.web.routes.web_content import ContentMixin as WebContentMixin
+from salmalm.web.routes.web_agents import AgentsMixin
 
 # Google OAuth CSRF state tokens {state: timestamp}
 _google_oauth_pending_states: dict = {}
@@ -62,6 +63,7 @@ class WebHandler(
     WebSystemMixin,
     WebManageMixin,
     WebContentMixin,
+    AgentsMixin,
     http.server.BaseHTTPRequestHandler,
 ):
     """HTTP handler for web UI and API."""
@@ -373,6 +375,7 @@ class WebHandler(
         "/static/app.js": "_get_static_app_js",
         "/dashboard": "_get_dashboard",
         "/docs": "_get_docs",
+        "/api/agent/tasks": "_get_api_agent_tasks",
     }
 
     def _get_api_notifications(self):
@@ -713,6 +716,9 @@ self.addEventListener('fetch',e=>{{
         "/api/node/execute": "_post_api_node_execute",
         "/api/thoughts": "_post_api_thoughts",
         "/api/engine/settings": "_post_api_engine_settings",
+        "/api/agent/task": "_post_api_agent_task",
+        "/api/agent/task/cancel": "_delete_api_agent_task",
+        "/api/directive": "_post_api_directive",
     }
 
     def _do_post_inner(self):

@@ -301,6 +301,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
     <button class="settings-tab" data-settings-tab="model-router" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px">🤖 Model</button>
     <button class="settings-tab" data-settings-tab="debug" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-debug">🔬 Debug</button>
     <button class="settings-tab" data-settings-tab="logs" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px" data-i18n="tab-logs">📋 Logs</button>
+    <button class="settings-tab" data-settings-tab="agents" style="padding:10px 20px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px">🤖 Agents</button>
   </div>
   <div id="settings-general">
   <div class="settings-card">
@@ -1261,6 +1262,13 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
       <div id="log-viewer" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.6;max-height:600px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:var(--text)"></div>
     </div>
   </div>
+  <!-- Agents Tab -->
+  <div id="settings-agents" style="display:none;padding:16px">
+    <div id="agent-panel-root">
+      <!-- React AgentPanel mounts here -->
+      <div style="color:var(--text2);font-size:13px;padding:20px;text-align:center">Loading agent panel...</div>
+    </div>
+  </div>
 </div>
 
 <div id="input-area">
@@ -1398,4 +1406,29 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
   </div>
 </div>
 
-<script src="/static/app.js?v={{VERSION}}"></script></body></html>
+<script src="/static/app.js?v={{VERSION}}"></script>
+<script>
+// Load React agent panel bundle lazily when agents tab is activated
+(function(){
+  var _agentLoaded=false;
+  function _loadAgentPanel(){
+    if(_agentLoaded)return;
+    _agentLoaded=true;
+    var s=document.createElement('script');
+    s.src='/static/dist/agent-panel.js';
+    s.onerror=function(){
+      var el=document.getElementById('agent-panel-root');
+      if(el)el.innerHTML='<div style="color:var(--text2);padding:20px;text-align:center;font-size:13px">⚠️ Agent panel not built yet.<br><code style="font-size:11px">python scripts/bundle_js.py</code> 실행 후 새로고침</div>';
+    };
+    document.head.appendChild(s);
+  }
+  // Hook into tab switching
+  document.addEventListener('click',function(e){
+    var tab=e.target.closest('[data-settings-tab]');
+    if(tab&&tab.getAttribute('data-settings-tab')==='agents'){
+      setTimeout(_loadAgentPanel,50);
+    }
+  });
+})();
+</script>
+</body></html>

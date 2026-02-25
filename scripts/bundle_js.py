@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# NOTE: Legacy concat bundler — kept for reference only.
+# Production build: cd salmalm/static/react && npm run build
+# Vite output: static/app.js (TypeScript-compiled, tree-shaken)
 """Bundle JS modules from static/js/ into static/app.js.
 
 Usage:
