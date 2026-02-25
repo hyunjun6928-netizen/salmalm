@@ -342,7 +342,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
     </div>
     <div id="google-result" style="margin-top:8px;font-size:12px"></div>
     <details style="margin-top:12px">
-      <summary style="font-size:12px;color:var(--text2);cursor:pointer">📋 Setup Guide (click to expand)</summary>
+      <summary style="font-size:12px;color:var(--text2);cursor:pointer" data-i18n="google-guide-title">📋 Setup Guide (click to expand)</summary>
       <ol class="google-guide-en" style="font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2.2">
         <li>Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener" style="color:var(--accent2)">console.cloud.google.com</a> → Create or select a project</li>
         <li>☰ Menu → <b>APIs & Services</b> → <b>Enabled APIs</b> → <b>+ ENABLE APIS AND SERVICES</b></li>
@@ -357,14 +357,14 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
       </ol>
       <ol class="google-guide-kr" style="display:none;font-size:12px;color:var(--text2);margin-top:8px;padding-left:20px;line-height:2.2">
         <li><a href="https://console.cloud.google.com" target="_blank" rel="noopener" style="color:var(--accent2)">console.cloud.google.com</a> 접속 → 프로젝트 생성 (또는 기존 프로젝트 선택)</li>
-        <li>좌측 ≡ 메뉴 → <b>APIs & Services</b> → <b>Enabled APIs</b> → <b>+ ENABLE APIS AND SERVICES</b></li>
-        <li><b>Google Calendar API</b>와 <b>Gmail API</b> 검색하여 각각 <b>Enable</b></li>
-        <li>좌측 ≡ 메뉴 → <b>APIs & Services</b> → <b>OAuth consent screen</b> → <b>Audience</b> 탭 → <b>Add users</b> → 본인 Gmail 입력</li>
-        <li>좌측 메뉴 → <b>Credentials</b> → <b>+ CREATE CREDENTIALS</b> → <b>OAuth client ID</b></li>
-        <li>Application type: <b>Web application</b></li>
-        <li>Authorized redirect URIs → <b>+ ADD URI</b> → <code class="google-redirect-uri" style="background:var(--bg);padding:2px 6px;border-radius:4px"></code></li>
-        <li><b>CREATE</b> 클릭 → Client ID와 Client Secret 복사</li>
-        <li>위 입력란에 붙여넣기 후 <b>Save</b></li>
+        <li>좌측 ≡ 메뉴 → <b>API 및 서비스</b> → <b>사용 설정된 API 및 서비스</b> → <b>+ API 및 서비스 사용 설정</b></li>
+        <li><b>Google Calendar API</b>와 <b>Gmail API</b> 검색 후 각각 <b>사용 설정</b></li>
+        <li>좌측 ≡ 메뉴 → <b>API 및 서비스</b> → <b>OAuth 동의 화면</b> → <b>대상</b> 탭 → <b>사용자 추가</b> → 본인 Gmail 입력</li>
+        <li>좌측 메뉴 → <b>사용자 인증 정보</b> → <b>+ 사용자 인증 정보 만들기</b> → <b>OAuth 클라이언트 ID</b></li>
+        <li>애플리케이션 유형: <b>웹 애플리케이션</b></li>
+        <li>승인된 리디렉션 URI → <b>+ URI 추가</b> → <code class="google-redirect-uri" style="background:var(--bg);padding:2px 6px;border-radius:4px"></code></li>
+        <li><b>만들기</b> 클릭 → 클라이언트 ID와 클라이언트 보안 비밀 복사</li>
+        <li>위 입력란에 붙여넣기 후 <b>저장</b></li>
         <li>🔗 <b>Google 계정 연결</b> 클릭</li>
       </ol>
     </details>
