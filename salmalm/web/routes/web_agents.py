@@ -259,6 +259,12 @@ class AgentsMixin:
             try:
                 from salmalm.core.llm_router import llm_router
                 msg = llm_router.switch_model(args)
+                # Persist as global force_model (same as UI model switch)
+                try:
+                    from salmalm.core.core import router as _router
+                    _router.set_force_model(None if args == "auto" else args)
+                except Exception:
+                    pass
                 self._json({"ok": True, "type": "model", "result": f"✅ {msg}"})
             except Exception as e:
                 self._json({"ok": False, "result": f"❌ {e}"})
