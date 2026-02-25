@@ -144,9 +144,12 @@ def _route_model(model_override, user_message: str, session) -> tuple:
        ``model_selection.select_model`` directly for new code.
     """
     from salmalm.core.model_selection import select_model as _select_model, fix_model_name as _fix_model_name
+    from salmalm.constants import MODEL_ALIASES as _ALIASES
 
     if model_override:
-        return _fix_model_name(model_override), "auto"
+        # Resolve short aliases (sonnet → anthropic/claude-sonnet-4-6, etc.)
+        resolved = _ALIASES.get(model_override, model_override)
+        return _fix_model_name(resolved), "auto"
     selected, complexity = _select_model(user_message, session)
     log.info(f"[ROUTE] Multi-model: {complexity} → {selected}")
     return _fix_model_name(selected), complexity
