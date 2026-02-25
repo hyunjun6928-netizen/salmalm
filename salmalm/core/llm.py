@@ -689,14 +689,15 @@ def _call_openai_responses(
                 if block.get("type") == "output_text":
                     output_text += block.get("text", "")
         elif itype == "function_call":
-            try:
-                args = json.loads(item.get("arguments", "{}"))
-            except Exception:
-                args = {}
+            raw_args = item.get("arguments", "{}")
+            # Store in standard OpenAI chat format so engine/sanitize code works uniformly
             tool_calls_out.append({
                 "id": item.get("id", ""),
-                "name": item.get("name", ""),
-                "arguments": args,
+                "type": "function",
+                "function": {
+                    "name": item.get("name", ""),
+                    "arguments": raw_args if isinstance(raw_args, str) else json.dumps(raw_args),
+                },
             })
 
     usage = resp.get("usage", {})
