@@ -318,6 +318,7 @@ class WebFilesMixin:
     def _get_api_google_callback(self) -> None:
         """Handle GET /api/google/callback routes."""
         import urllib.parse
+        from salmalm.web.web import _google_oauth_pending_states
 
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
