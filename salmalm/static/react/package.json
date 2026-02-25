@@ -5,7 +5,7 @@
   "scripts": {
     "build": "vite build --config vite.config.ts && vite build --config vite.app.config.ts",
     "build:agents": "vite build --config vite.config.ts",
-    "build:app": "vite build --config vite.app.config.ts",
+    "build:app": "echo 'WARNING: app.js is managed by bundle_js.py. Vite output → dist-app/app.vite.js (dev only)' && vite build --config vite.app.config.ts",
     "dev": "vite build --watch"
   },
   "dependencies": {
