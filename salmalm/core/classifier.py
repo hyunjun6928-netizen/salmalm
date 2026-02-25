@@ -1231,20 +1231,23 @@ _TIME_INJECT_TOOLS = ["reminder", "notification", "cron_manage"]
 # ── Question-word → web_search injection ─────────────────────────────────────
 # When user asks a factual question, inject search tools even if intent == "chat"
 _QUESTION_WORDS = [
-    # Korean question words
-    "어떻게", "어떡해", "어떤", "왜", "누가", "누구", "무엇", "무슨",
-    "뭐야", "뭔지", "뭔가", "뭐가", "언제", "어디서", "어디에", "어디야",
-    "가르쳐줘", "설명해줘", "설명해", "가르쳐", "알고 싶",
-    # English question starters
-    "how do", "how to", "how does", "how can", "how should", "how would",
+    # Korean — only specific factual question words (NOT generic "tell me" phrases)
+    # Removed: "어떻게", "설명해줘", "가르쳐줘", "알고 싶" → too broad, trigger on code/task questions
+    "왜",           # why — factual
+    "누가", "누구", # who — factual
+    "무엇", "뭐야", "뭔지", "뭐가",  # what is — factual
+    "언제",         # when — factual
+    "어디서", "어디에", "어디야",     # where — factual
+    "뜻이 뭐", "의미가 뭐", "뜻은", "의미는", "정의가", "정의는",  # definition
+    # English — only specific factual starters (NOT "explain" / "define" — too broad for code)
+    "how do", "how to", "how does",
     "what is", "what are", "what does", "what's", "what was", "what were",
     "why is", "why does", "why are", "why did", "why can't", "why won't",
     "who is", "who are", "who was", "who were", "who made", "who created",
     "when is", "when did", "when was", "when will", "when does",
-    "where is", "where are", "where can", "where do",
+    "where is", "where are", "where can",
     "which is", "which one", "which are",
-    "explain ", "define ", "tell me about",
-    "뜻이 뭐", "의미가 뭐", "뜻은", "의미는", "정의가", "정의는",
+    "tell me about",
 ]
 _QUESTION_INJECT_TOOLS = ["web_search", "brave_search", "web_fetch"]
 

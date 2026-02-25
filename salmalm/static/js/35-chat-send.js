@@ -100,7 +100,14 @@
               var tc2=thinkEl2.querySelector('.think-content');if(tc2){tc2.textContent+=edata.text||'';tc2.scrollTop=tc2.scrollHeight}
             }}
           }else if(etype==='chunk'){
-            if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4._streamBuf='';var thinkKeep2=tb4.querySelector('.think-stream');tb4.innerHTML='';if(thinkKeep2)tb4.appendChild(thinkKeep2);tb4._thinkEl=thinkKeep2||null}tb4._streamBuf+=(edata.text||'');if(!tb4._renderPending){tb4._renderPending=true;requestAnimationFrame(function(){if(!tb4._renderPending)return;tb4._renderPending=false;var buf=tb4._streamBuf||'';var fences=(buf.match(/```/g)||[]).length;if(fences%2!==0)buf+='```';var rendered=renderMd(buf);var tEl=tb4._thinkEl;tb4.innerHTML='';if(tEl)tb4.appendChild(tEl);tb4.insertAdjacentHTML('beforeend',rendered);var chatEl=document.getElementById('chat');if(chatEl)chatEl.scrollTop=chatEl.scrollHeight;})}}}
+            if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4._streamBuf='';var thinkKeep2=tb4.querySelector('.think-stream');tb4.innerHTML='';if(thinkKeep2)tb4.appendChild(thinkKeep2);tb4._thinkEl=thinkKeep2||null}tb4._streamBuf+=(edata.text||'');if(!tb4._renderPending){tb4._renderPending=true;requestAnimationFrame(function(){if(!tb4._renderPending)return;tb4._renderPending=false;var buf=tb4._streamBuf||'';
+              /* Close unclosed code fences */
+              var fences=(buf.match(/```/g)||[]).length;if(fences%2!==0)buf+='```';
+              /* Close unclosed **bold** — prevents raw ** during streaming */
+              if((buf.match(/\*\*/g)||[]).length%2!==0)buf+='**';
+              /* Close unclosed ~~strikethrough~~ */
+              if((buf.match(/~~/g)||[]).length%2!==0)buf+='~~';
+              var rendered=renderMd(buf);var tEl=tb4._thinkEl;tb4.innerHTML='';if(tEl)tb4.appendChild(tEl);tb4.insertAdjacentHTML('beforeend',rendered);var chatEl=document.getElementById('chat');if(chatEl)chatEl.scrollTop=chatEl.scrollHeight;})}}}
           }else if(etype==='ui_cmd'){
             /* AI-driven UI control */
             var act=edata.action,val=edata.value||'';
@@ -164,9 +171,17 @@
         if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
         return;
       }
+      /* CRITICAL: Abort the SSE stream before falling back to HTTP POST.
+         Without this, the server-side SSE processing continues in parallel with
+         the HTTP POST fallback, causing duplicate user messages in session history.
+         _currentAbort.abort() triggers BrokenPipeError on server → SSE loop stops. */
+      if(_currentAbort){try{_currentAbort.abort();}catch(e){} _currentAbort=null;}
+      clearTimeout(_stallTimer);
+      /* Small delay (200ms) to let server-side SSE detect the abort before HTTP POST arrives */
+      await new Promise(function(r){setTimeout(r,200)});
       /* Do NOT remove salm_sse_pending here — page refresh triggers abort,
          and we need the flag to survive for recovery on reload */
-      console.warn('SSE failed, falling back:',streamErr);
+      console.warn('SSE failed, falling back:',streamErr.message);
       var typRow=document.getElementById('typing-row');
       if(typRow){var tb3=typRow.querySelector('.bubble');if(tb3)tb3.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> Processing...'}
       try{

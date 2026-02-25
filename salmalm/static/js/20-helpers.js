@@ -37,20 +37,40 @@
     t=t.replace(/`([^`]+)`/g,function(_,c){return '<code>'+c+'</code>'});
     t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
     t=t.replace(/\*([^*]+)\*/g,'<em>$1</em>');
-    /* Tables */
+    /* Tables — separator row → <!--TSEP--> marker for header detection */
     t=t.replace(/^\|(.+)\|\s*$/gm,function(_,row){
       var cells=row.split('|').map(function(c){return c.trim()});
-      if(cells.every(function(c){return /^[-:]+$/.test(c)}))return '';
+      if(cells.every(function(c){return /^[-:]+$/.test(c)}))return '<!--TSEP-->';
       return '<tr>'+cells.map(function(c){return '<td style="padding:4px 8px;border:1px solid var(--border)">'+c+'</td>'}).join('')+'</tr>';
     });
-    t=t.replace(/((<tr>.*?<[/]tr>\s*)+)/g,'<table style="border-collapse:collapse;margin:8px 0;font-size:13px">$1</table>');
+    /* Wrap consecutive rows (and TSEP markers) in <table> */
+    t=t.replace(/((<tr>.*?<[/]tr>|<!--TSEP-->)\s*)+/g,function(match){
+      /* Convert first <tr> before TSEP to header row with <th> cells */
+      var processed=match.replace(/(<tr>)(.*?)(<\/tr>)\s*<!--TSEP-->/,function(_,open,cells,close){
+        var hdr=cells
+          .replace(/<td style="([^"]*)"/g,'<th style="$1;background:var(--accent-dim,rgba(99,140,255,0.12));font-weight:600"')
+          .replace(/<\/td>/g,'</th>');
+        return '<thead>'+open+hdr+close+'</thead><tbody>';
+      });
+      /* Remove any remaining TSEP markers (e.g. tables with no header) */
+      processed=processed.replace(/<!--TSEP-->\s*/g,'');
+      /* Close tbody if we opened it */
+      var closeTbody=processed.includes('<tbody>') ? '</tbody>' : '';
+      return '<table style="border-collapse:collapse;margin:8px 0;font-size:13px;width:auto">'+processed+closeTbody+'</table>';
+    });
     t=t.replace(/^### (.+)$/gm,'<h4 style="margin:8px 0 4px;font-size:13px;color:var(--accent2)">$1</h4>');
     t=t.replace(/^## (.+)$/gm,'<h3 style="margin:10px 0 6px;font-size:14px;color:var(--accent2)">$1</h3>');
     t=t.replace(/^# (.+)$/gm,'<h2 style="margin:12px 0 8px;font-size:16px;color:var(--accent2)">$1</h2>');
     t=t.replace(/^-{3,}$/gm,'<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">');
     t=t.replace(/^[•\-] (.+)$/gm,'<div style="padding-left:16px;position:relative"><span style="position:absolute;left:4px">•</span>$1</div>');
     t=t.replace(/^(\d+)\. (.+)$/gm,'<div style="padding-left:16px">$1. $2</div>');
-    t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1</a>');
+    /* Link rendering — sanitize href to block javascript:/data:/vbscript: XSS */
+    t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,function(_,label,url){
+      var safeUrl=url.trim();
+      /* Allow only http/https/ftp/mailto/relative URLs — block js/data/vbscript injection */
+      if(/^(javascript|data|vbscript):/i.test(safeUrl))safeUrl='#blocked';
+      return '<a href="'+safeUrl+'" target="_blank" rel="noopener noreferrer" style="color:var(--accent2);text-decoration:underline">'+label+'</a>';
+    });
     t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" data-action="openImage">');
     t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
     /* Restore code blocks AFTER all markdown transforms */

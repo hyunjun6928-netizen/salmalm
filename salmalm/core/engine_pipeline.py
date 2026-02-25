@@ -335,7 +335,19 @@ async def _process_message_inner(
         ]
         session.messages.append({"role": "user", "content": content})
     else:
-        session.add_user(user_message)
+        # Deduplication guard: if the last message is already this user message
+        # (e.g., SSE path added it before aborting, HTTP fallback is now retrying),
+        # don't add it again to prevent duplicate messages in session history.
+        _last = session.messages[-1] if session.messages else {}
+        _already_added = (
+            _last.get("role") == "user"
+            and isinstance(_last.get("content"), str)
+            and _last.get("content") == user_message
+        )
+        if not _already_added:
+            session.add_user(user_message)
+        else:
+            log.info("[ENGINE] Dedup: user message already in session — skipping add_user (SSE fallback)")
 
     _prepare_context(session, user_message, lang, on_status)
 

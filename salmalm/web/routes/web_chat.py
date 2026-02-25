@@ -16,27 +16,61 @@ _RESP_CACHE: dict = {}
 _RESP_CACHE_TTL = 300  # 5 minutes — enough to cover any SSE→HTTP fallback window
 
 
-def _get_cached_response(req_id: str, session_id: str) -> dict | None:
-    """Return cached response dict for req_id+session or None if not found / expired."""
+def _get_cached_response(req_id: str, session_id: str, wait_if_processing: bool = False) -> dict | None:
+    """Return cached response dict for req_id+session or None if not found / expired.
+
+    If wait_if_processing=True and entry has status='processing', polls up to 12s
+    for the SSE path to finish before returning. Prevents HTTP fallback double-processing
+    when SSE stall fires but server hasn't aborted yet.
+    """
     if not req_id:
         return None
     key = f"{req_id}:{session_id}"
+
+    # If processing: optionally wait for completion
+    if wait_if_processing:
+        for _ in range(24):  # 24 × 0.5s = 12s max wait
+            entry = _RESP_CACHE.get(key)
+            if not entry:
+                break
+            if entry.get("status") == "done":
+                log.info(f"[IDEMPOTENCY] Cache hit (waited) for req_id={req_id[:12]}…")
+                return entry
+            if _time.time() - entry["ts"] > _RESP_CACHE_TTL:
+                break
+            _time.sleep(0.5)
+
     entry = _RESP_CACHE.get(key)
-    if entry and _time.time() - entry["ts"] < _RESP_CACHE_TTL:
-        log.info(f"[IDEMPOTENCY] Cache hit for req_id={req_id[:12]}… — skipping re-process")
-        return entry
-    if key in _RESP_CACHE:
+    if not entry:
+        return None
+    if _time.time() - entry["ts"] >= _RESP_CACHE_TTL:
         del _RESP_CACHE[key]
-    return None
+        return None
+    if entry.get("status") == "processing":
+        return None  # Still running — fall through to HTTP POST path
+    log.info(f"[IDEMPOTENCY] Cache hit for req_id={req_id[:12]}… — skipping re-process")
+    return entry
+
+
+def _mark_processing(req_id: str, session_id: str) -> None:
+    """Mark a request as in-progress at SSE start.
+    Prevents HTTP fallback from reprocessing while SSE engine is still running.
+    """
+    if not req_id:
+        return
+    _RESP_CACHE[f"{req_id}:{session_id}"] = {"status": "processing", "ts": _time.time()}
 
 
 def _cache_response(req_id: str, session_id: str, response: str, model: str, complexity: str) -> None:
-    """Cache SSE response for idempotency. Prunes expired entries."""
+    """Cache completed SSE response for idempotency. Prunes expired entries."""
     if not req_id:
         return
     key = f"{req_id}:{session_id}"
-    _RESP_CACHE[key] = {"response": response, "model": model, "complexity": complexity, "ts": _time.time()}
-    # Prune expired entries (keep memory bounded)
+    _RESP_CACHE[key] = {
+        "status": "done",
+        "response": response, "model": model, "complexity": complexity,
+        "ts": _time.time(),
+    }
     now = _time.time()
     expired = [k for k, v in list(_RESP_CACHE.items()) if now - v["ts"] > _RESP_CACHE_TTL]
     for k in expired:
@@ -82,6 +116,8 @@ class WebChatMixin:
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "keep-alive")
             self.end_headers()
+            # Mark request as processing immediately — HTTP fallback will wait/skip
+            _mark_processing(req_id, session_id)
 
             # Fix #2: track client disconnect state
             _client_disconnected = [False]
@@ -226,9 +262,10 @@ class WebChatMixin:
             except Exception as done_err:
                 log.error(f"[SSE] Failed to send done event: {done_err}")
         else:
-            # Idempotency check: if SSE already processed this req_id, return cached response
-            # Prevents duplicate assistant messages when SSE fails + client falls back to HTTP POST
-            _cached = _get_cached_response(req_id, session_id)
+            # Idempotency check: if SSE already processed this req_id, return cached response.
+            # wait_if_processing=True: if SSE marked "processing", poll up to 12s for completion.
+            # This handles the race where stall timer fires before server finishes generating.
+            _cached = _get_cached_response(req_id, session_id, wait_if_processing=True)
             if _cached:
                 self._json({
                     "response": _cached["response"],

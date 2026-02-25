@@ -289,20 +289,40 @@
     t=t.replace(/`([^`]+)`/g,function(_,c){return '<code>'+c+'</code>'});
     t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
     t=t.replace(/\*([^*]+)\*/g,'<em>$1</em>');
-    /* Tables */
+    /* Tables — separator row → <!--TSEP--> marker for header detection */
     t=t.replace(/^\|(.+)\|\s*$/gm,function(_,row){
       var cells=row.split('|').map(function(c){return c.trim()});
-      if(cells.every(function(c){return /^[-:]+$/.test(c)}))return '';
+      if(cells.every(function(c){return /^[-:]+$/.test(c)}))return '<!--TSEP-->';
       return '<tr>'+cells.map(function(c){return '<td style="padding:4px 8px;border:1px solid var(--border)">'+c+'</td>'}).join('')+'</tr>';
     });
-    t=t.replace(/((<tr>.*?<[/]tr>\s*)+)/g,'<table style="border-collapse:collapse;margin:8px 0;font-size:13px">$1</table>');
+    /* Wrap consecutive rows (and TSEP markers) in <table> */
+    t=t.replace(/((<tr>.*?<[/]tr>|<!--TSEP-->)\s*)+/g,function(match){
+      /* Convert first <tr> before TSEP to header row with <th> cells */
+      var processed=match.replace(/(<tr>)(.*?)(<\/tr>)\s*<!--TSEP-->/,function(_,open,cells,close){
+        var hdr=cells
+          .replace(/<td style="([^"]*)"/g,'<th style="$1;background:var(--accent-dim,rgba(99,140,255,0.12));font-weight:600"')
+          .replace(/<\/td>/g,'</th>');
+        return '<thead>'+open+hdr+close+'</thead><tbody>';
+      });
+      /* Remove any remaining TSEP markers (e.g. tables with no header) */
+      processed=processed.replace(/<!--TSEP-->\s*/g,'');
+      /* Close tbody if we opened it */
+      var closeTbody=processed.includes('<tbody>') ? '</tbody>' : '';
+      return '<table style="border-collapse:collapse;margin:8px 0;font-size:13px;width:auto">'+processed+closeTbody+'</table>';
+    });
     t=t.replace(/^### (.+)$/gm,'<h4 style="margin:8px 0 4px;font-size:13px;color:var(--accent2)">$1</h4>');
     t=t.replace(/^## (.+)$/gm,'<h3 style="margin:10px 0 6px;font-size:14px;color:var(--accent2)">$1</h3>');
     t=t.replace(/^# (.+)$/gm,'<h2 style="margin:12px 0 8px;font-size:16px;color:var(--accent2)">$1</h2>');
     t=t.replace(/^-{3,}$/gm,'<hr style="border:none;border-top:1px solid var(--border);margin:8px 0">');
     t=t.replace(/^[•\-] (.+)$/gm,'<div style="padding-left:16px;position:relative"><span style="position:absolute;left:4px">•</span>$1</div>');
     t=t.replace(/^(\d+)\. (.+)$/gm,'<div style="padding-left:16px">$1. $2</div>');
-    t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" style="color:var(--accent2);text-decoration:underline">$1</a>');
+    /* Link rendering — sanitize href to block javascript:/data:/vbscript: XSS */
+    t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,function(_,label,url){
+      var safeUrl=url.trim();
+      /* Allow only http/https/ftp/mailto/relative URLs — block js/data/vbscript injection */
+      if(/^(javascript|data|vbscript):/i.test(safeUrl))safeUrl='#blocked';
+      return '<a href="'+safeUrl+'" target="_blank" rel="noopener noreferrer" style="color:var(--accent2);text-decoration:underline">'+label+'</a>';
+    });
     t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" data-action="openImage">');
     t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
     /* Restore code blocks AFTER all markdown transforms */
@@ -893,7 +913,14 @@
               var tc2=thinkEl2.querySelector('.think-content');if(tc2){tc2.textContent+=edata.text||'';tc2.scrollTop=tc2.scrollHeight}
             }}
           }else if(etype==='chunk'){
-            if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4._streamBuf='';var thinkKeep2=tb4.querySelector('.think-stream');tb4.innerHTML='';if(thinkKeep2)tb4.appendChild(thinkKeep2);tb4._thinkEl=thinkKeep2||null}tb4._streamBuf+=(edata.text||'');if(!tb4._renderPending){tb4._renderPending=true;requestAnimationFrame(function(){if(!tb4._renderPending)return;tb4._renderPending=false;var buf=tb4._streamBuf||'';var fences=(buf.match(/```/g)||[]).length;if(fences%2!==0)buf+='```';var rendered=renderMd(buf);var tEl=tb4._thinkEl;tb4.innerHTML='';if(tEl)tb4.appendChild(tEl);tb4.insertAdjacentHTML('beforeend',rendered);var chatEl=document.getElementById('chat');if(chatEl)chatEl.scrollTop=chatEl.scrollHeight;})}}}
+            if(typingEl){var tb4=typingEl.querySelector('.bubble');if(tb4){if(!tb4._streaming){tb4._streaming=true;tb4._streamBuf='';var thinkKeep2=tb4.querySelector('.think-stream');tb4.innerHTML='';if(thinkKeep2)tb4.appendChild(thinkKeep2);tb4._thinkEl=thinkKeep2||null}tb4._streamBuf+=(edata.text||'');if(!tb4._renderPending){tb4._renderPending=true;requestAnimationFrame(function(){if(!tb4._renderPending)return;tb4._renderPending=false;var buf=tb4._streamBuf||'';
+              /* Close unclosed code fences */
+              var fences=(buf.match(/```/g)||[]).length;if(fences%2!==0)buf+='```';
+              /* Close unclosed **bold** — prevents raw ** during streaming */
+              if((buf.match(/\*\*/g)||[]).length%2!==0)buf+='**';
+              /* Close unclosed ~~strikethrough~~ */
+              if((buf.match(/~~/g)||[]).length%2!==0)buf+='~~';
+              var rendered=renderMd(buf);var tEl=tb4._thinkEl;tb4.innerHTML='';if(tEl)tb4.appendChild(tEl);tb4.insertAdjacentHTML('beforeend',rendered);var chatEl=document.getElementById('chat');if(chatEl)chatEl.scrollTop=chatEl.scrollHeight;})}}}
           }else if(etype==='ui_cmd'){
             /* AI-driven UI control */
             var act=edata.action,val=edata.value||'';
@@ -957,9 +984,17 @@
         if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
         return;
       }
+      /* CRITICAL: Abort the SSE stream before falling back to HTTP POST.
+         Without this, the server-side SSE processing continues in parallel with
+         the HTTP POST fallback, causing duplicate user messages in session history.
+         _currentAbort.abort() triggers BrokenPipeError on server → SSE loop stops. */
+      if(_currentAbort){try{_currentAbort.abort();}catch(e){} _currentAbort=null;}
+      clearTimeout(_stallTimer);
+      /* Small delay (200ms) to let server-side SSE detect the abort before HTTP POST arrives */
+      await new Promise(function(r){setTimeout(r,200)});
       /* Do NOT remove salm_sse_pending here — page refresh triggers abort,
          and we need the flag to survive for recovery on reload */
-      console.warn('SSE failed, falling back:',streamErr);
+      console.warn('SSE failed, falling back:',streamErr.message);
       var typRow=document.getElementById('typing-row');
       if(typRow){var tb3=typRow.querySelector('.bubble');if(tb3)tb3.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> Processing...'}
       try{
