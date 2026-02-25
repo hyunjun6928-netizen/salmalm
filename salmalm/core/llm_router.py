@@ -111,10 +111,13 @@ _OPENAI_EXCLUDE = {
     "tts", "whisper", "dall-e", "embedding", "moderation", "babbage",
     "davinci", "text-", "chatgpt-image", "omni-moderation", "realtime",
     "audio", "gpt-3.5-turbo-instruct",
-    "codex",          # v1/responses-only (gpt-5-codex, gpt-5.2-codex, …)
-    "computer-use",   # tool-specific
-    "gpt-image",      # image generation (gpt-image-1, gpt-image-1.5, gpt-image-1-mini)
-    "search-api",     # search-specific endpoint (gpt-5-search-api)
+    "codex",            # v1/responses-only (gpt-5-codex, …)
+    "computer-use",     # tool-specific
+    "gpt-image",        # image generation
+    "search-api",       # search endpoint (gpt-5-search-api)
+    "search-preview",   # search preview (gpt-4o-search-preview, gpt-4o-mini-search-preview)
+    "transcribe",       # audio transcription (gpt-4o-transcribe, gpt-4o-mini-transcribe, …)
+    "gpt-3.5",          # all GPT-3.5 models — superseded by gpt-4o-mini
 }
 
 
@@ -127,6 +130,10 @@ def _is_chat_model_openai(model_id: str) -> bool:
             return False
     # Skip date-pinned snapshots (e.g. gpt-4o-2024-08-06)
     if re.search(r"-\d{4}-\d{2}-\d{2}$", mid):
+        return False
+    # Skip old gpt-4 base variants (gpt-4, gpt-4-turbo, gpt-4-0613, gpt-4-1106-preview…)
+    # gpt-4o and gpt-4.1 are modern — they start with gpt-4o / gpt-4.
+    if re.match(r"^gpt-4($|-)", mid):
         return False
     return any(mid.startswith(p) for p in ("gpt-", "o1", "o3", "o4"))
 
