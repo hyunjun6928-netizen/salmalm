@@ -414,28 +414,39 @@ async def _handle_sse_stream(handler: FastHandler) -> StreamingResponse:
 # ── Helper: inject mixin methods from WebHandler ─────────────────────────────
 
 def _inject_mixin_methods(target_cls, source_cls) -> None:
-    """Copy all methods from source_cls MRO (excluding BaseHTTPRequestHandler
-    and object) into target_cls so route handlers are available."""
+    """Copy all methods from source_cls MRO (including source_cls itself,
+    excluding BaseHTTPRequestHandler and object) into target_cls so all
+    route handlers and dispatch methods are available on FastHandler.
+
+    IMPORTANT: source_cls (WebHandler) is now included so that methods
+    defined directly on it (_do_get_inner, _do_post_inner, _require_auth,
+    _get_static_app_js, etc.) are copied in.  FastHandler's own override
+    methods are protected by the exclusion list below.
+    """
     import http.server
 
     skip_bases = {http.server.BaseHTTPRequestHandler, http.server.StreamRequestHandler,
                   http.server.BaseRequestHandler, object}
 
+    # Methods that FastHandler overrides — never overwrite these
+    _protected = frozenset({
+        "__init__", "_json", "_html", "_cors", "_security_headers",
+        "_maybe_gzip", "send_response", "send_header", "end_headers",
+        "send_error", "wfile", "_get_client_ip", "_check_origin",
+        "_check_rate_limit", "log_message", "log_error",
+    })
+
     for base in reversed(source_cls.__mro__):
-        if base in skip_bases or base is source_cls or base is target_cls:
-            continue
-        if base.__name__ in ("FastHandler",):
-            continue
+        if base in skip_bases or base is target_cls:
+            continue  # NOTE: source_cls (WebHandler) is intentionally included
         for name, val in base.__dict__.items():
-            if name.startswith("__") and name != "__init__":
+            if name.startswith("__") and name not in ("__init__",):
                 continue
-            if name in ("__init__", "_json", "_html", "_cors", "_security_headers",
-                        "_maybe_gzip", "send_response", "send_header", "end_headers",
-                        "send_error", "wfile", "_get_client_ip", "_check_origin",
-                        "_check_rate_limit", "log_message", "log_error"):
+            if name in _protected:
                 continue  # keep FastHandler's own implementations
-            if not hasattr(target_cls, name):
-                setattr(target_cls, name, val)
+            # setattr always (later bases in reversed MRO override earlier ones,
+            # matching normal Python MRO resolution order)
+            setattr(target_cls, name, val)
 
 
 # ── CORS helper ───────────────────────────────────────────────────────────────

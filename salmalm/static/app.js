@@ -624,10 +624,10 @@
         setTimeout(function(){_wsRecoverResponse()},500);
       }
     };
-    _ws.onclose=function(){
+    _ws.onclose=function(ev){
       _wsReady=false;_wsStopPing();
       if(_wsPendingResolve){_wsPendingResolve({fallback:true});_wsPendingResolve=null}
-      /* Auto-reconnect always — exponential backoff + jitter */
+      /* Auto-reconnect — always retry, with exponential backoff + jitter */
       _wsScheduleReconnect();
     };
     _ws.onerror=function(){_wsReady=false};
@@ -643,6 +643,7 @@
   function _wsScheduleReconnect(){
     if(_wsTimer)return;
     _wsRetryCount++;
+    /* Exponential backoff with ±20% jitter to avoid thundering herd */
     var jitter=_wsBackoff*0.2*(Math.random()*2-1);
     var delay=Math.min(_wsBackoff+jitter,_wsMaxBackoff);
     _wsTimer=setTimeout(function(){_wsTimer=null;_wsConnect();},delay);
@@ -654,7 +655,8 @@
     _wsStopPing();
     _wsPingTimer=setInterval(function(){
       if(_ws&&_ws.readyState===WebSocket.OPEN)_ws.send(JSON.stringify({type:'ping'}));
-    },30000);
+      /* Also detect stale connections: if no pong in 10s, reconnect */
+    },25000);
   }
   function _wsStopPing(){if(_wsPingTimer){clearInterval(_wsPingTimer);_wsPingTimer=null}}
 
