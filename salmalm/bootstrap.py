@@ -524,17 +524,53 @@ async def run_server():
         exposure_warnings = check_external_exposure_safety(bind_addr, WebHandler)
         for w in exposure_warnings:
             log.warning(w)
-    http.server.ThreadingHTTPServer.allow_reuse_address = True
-    server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
-
-    # Auto-generate self-signed cert for HTTPS (enables microphone, camera, etc.)
-    _start_https_if_configured(bind_addr)
-
-    web_thread = threading.Thread(target=server.serve_forever, daemon=True)
-    web_thread.start()
     url = f"http://{bind_addr}:{port}"
+
+    # ── Try uvicorn (ASGI) first; fall back to ThreadingHTTPServer ──────────
+    _uvicorn_ok = False
+    server = None
+    web_thread = None
+
+    try:
+        import uvicorn
+        from salmalm.web.asgi import create_asgi_app
+        asgi_app = create_asgi_app()
+        uvicorn_config = uvicorn.Config(
+            asgi_app,
+            host=bind_addr,
+            port=port,
+            log_level="warning",
+            access_log=False,
+            loop="asyncio",
+            ws="websockets",
+            timeout_keep_alive=75,   # > nginx default 60s
+            timeout_graceful_shutdown=10,
+        )
+        uvicorn_server = uvicorn.Server(uvicorn_config)
+        web_thread = threading.Thread(
+            target=uvicorn_server.run, daemon=True,
+        )
+        web_thread.start()
+        # Give uvicorn a moment to bind port
+        import time as _time
+        _time.sleep(0.3)
+        _uvicorn_ok = True
+        log.info("[WEB] Running on uvicorn (ASGI)")
+        server = uvicorn_server  # keep reference for shutdown
+    except ImportError:
+        log.warning("[WEB] uvicorn not installed — falling back to ThreadingHTTPServer")
+        log.warning("[WEB] Install for better stability: pip install 'uvicorn[standard]'")
+    except Exception as e:
+        log.warning(f"[WEB] uvicorn startup failed ({e}) — falling back to ThreadingHTTPServer")
+
+    if not _uvicorn_ok:
+        http.server.ThreadingHTTPServer.allow_reuse_address = True
+        server = http.server.ThreadingHTTPServer((bind_addr, port), WebHandler)
+        _start_https_if_configured(bind_addr)
+        web_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        web_thread.start()
+
     log.info(f"[WEB] Web UI: {url}")
-    # Always print to stdout so users see the URL even without logging config
     print(f"\n  😈 SalmAlm v{VERSION} running at {url}\n  Press Ctrl+C to stop.\n", flush=True)
 
     # Auto-open browser if requested (--open flag or SALMALM_OPEN_BROWSER=1)

@@ -601,8 +601,9 @@
 
   /* ═══ 30-websocket.js ═══ */
   /* --- WebSocket Connection Manager --- */
-  var _ws=null,_wsReady=false,_wsBackoff=500,_wsMaxBackoff=5000,_wsTimer=null,_wsPingTimer=null;
+  var _ws=null,_wsReady=false,_wsBackoff=500,_wsMaxBackoff=30000,_wsTimer=null,_wsPingTimer=null;
   var _wsPendingResolve=null,_wsSendStart=0,_wsRequestPending=false,_wsRequestMsgCount=0;
+  var _wsRetryCount=0,_wsLastConnectedAt=0;
 
   function _wsUrl(){
     var proto=location.protocol==='https:'?'wss:':'ws:';
@@ -614,7 +615,7 @@
     if(_ws&&(_ws.readyState===WebSocket.CONNECTING||_ws.readyState===WebSocket.OPEN))return;
     try{_ws=new WebSocket(_wsUrl())}catch(e){console.warn('WS connect error:',e);_wsScheduleReconnect();return}
     _ws.onopen=function(){
-      _wsReady=true;_wsBackoff=500;
+      _wsReady=true;_wsBackoff=500;_wsRetryCount=0;_wsLastConnectedAt=Date.now();
       console.log('WS connected');
       _wsStartPing();
       /* Recover lost response after reconnect */
@@ -626,6 +627,7 @@
     _ws.onclose=function(){
       _wsReady=false;_wsStopPing();
       if(_wsPendingResolve){_wsPendingResolve({fallback:true});_wsPendingResolve=null}
+      /* Auto-reconnect always — exponential backoff + jitter */
       _wsScheduleReconnect();
     };
     _ws.onerror=function(){_wsReady=false};
@@ -640,8 +642,12 @@
 
   function _wsScheduleReconnect(){
     if(_wsTimer)return;
-    _wsTimer=setTimeout(function(){_wsTimer=null;_wsConnect()},_wsBackoff);
-    _wsBackoff=Math.min(_wsBackoff*2,_wsMaxBackoff);
+    _wsRetryCount++;
+    var jitter=_wsBackoff*0.2*(Math.random()*2-1);
+    var delay=Math.min(_wsBackoff+jitter,_wsMaxBackoff);
+    _wsTimer=setTimeout(function(){_wsTimer=null;_wsConnect();},delay);
+    _wsBackoff=Math.min(_wsBackoff*1.5,_wsMaxBackoff);
+    if(_wsRetryCount<=3)console.log('WS reconnect in '+(delay|0)+'ms (attempt '+_wsRetryCount+')');
   }
 
   function _wsStartPing(){
@@ -776,14 +782,17 @@
           if(polls<30)setTimeout(_rpoll,2000);
           return;
         }
-        /* Fix #6: compare raw text (dataset.rawtext) not rendered HTML — markdown mismatch fix */
+        /* Fix #6: check if already displayed — compare raw text (dataset.rawtext) not rendered HTML */
         var snippet=d.message.substring(0,80);
+        /* Strip markdown symbols for textContent fallback comparison */
         var snippetPlain=snippet.replace(/[*#`_\[\]()!>~]/g,'').replace(/\s+/g,' ').trim();
         var bubbles=chat.querySelectorAll('.msg-row.assistant .bubble');
         var alreadyShown=false;
         for(var i=bubbles.length-1;i>=Math.max(0,bubbles.length-5);i--){
+          /* Primary: compare against stored raw text (exact) */
           var rawText=bubbles[i].dataset.rawtext||'';
           if(rawText&&rawText.indexOf(snippet.substring(0,rawText.length||80))>-1){alreadyShown=true;break}
+          /* Fallback: compare markdown-stripped snippet against textContent */
           if(snippetPlain&&bubbles[i].textContent.indexOf(snippetPlain)>-1){alreadyShown=true;break}
         }
         if(!alreadyShown){
@@ -1001,8 +1010,8 @@
     if(_sendBtnEl){_sendBtnEl.style.display='none'}
     /* Safety timeout: if typing still showing after 3 minutes, abort SSE + force cleanup */
     var _safetyTimer=setTimeout(function(){
-      /* Fix #4: abort SSE stream — prevents duplicate message when server responds late */
-      if(_currentAbort){try{_currentAbort.abort();}catch(e){} _currentAbort=null;}
+      /* Fix #4: abort SSE stream first — prevents duplicate message when server responds late */
+      if(_currentAbort){try{_currentAbort.abort();}catch(e){}  _currentAbort=null;}
       /* Fix #7: reset _sending so user can send new messages immediately */
       _sending=false;
       var tr=document.getElementById('typing-row');

@@ -1,6 +1,7 @@
   /* --- WebSocket Connection Manager --- */
-  var _ws=null,_wsReady=false,_wsBackoff=500,_wsMaxBackoff=5000,_wsTimer=null,_wsPingTimer=null;
+  var _ws=null,_wsReady=false,_wsBackoff=500,_wsMaxBackoff=30000,_wsTimer=null,_wsPingTimer=null;
   var _wsPendingResolve=null,_wsSendStart=0,_wsRequestPending=false,_wsRequestMsgCount=0;
+  var _wsRetryCount=0,_wsLastConnectedAt=0;
 
   function _wsUrl(){
     var proto=location.protocol==='https:'?'wss:':'ws:';
@@ -12,7 +13,7 @@
     if(_ws&&(_ws.readyState===WebSocket.CONNECTING||_ws.readyState===WebSocket.OPEN))return;
     try{_ws=new WebSocket(_wsUrl())}catch(e){console.warn('WS connect error:',e);_wsScheduleReconnect();return}
     _ws.onopen=function(){
-      _wsReady=true;_wsBackoff=500;
+      _wsReady=true;_wsBackoff=500;_wsRetryCount=0;_wsLastConnectedAt=Date.now();
       console.log('WS connected');
       _wsStartPing();
       /* Recover lost response after reconnect */
@@ -21,9 +22,10 @@
         setTimeout(function(){_wsRecoverResponse()},500);
       }
     };
-    _ws.onclose=function(){
+    _ws.onclose=function(ev){
       _wsReady=false;_wsStopPing();
       if(_wsPendingResolve){_wsPendingResolve({fallback:true});_wsPendingResolve=null}
+      /* Auto-reconnect — always retry, with exponential backoff + jitter */
       _wsScheduleReconnect();
     };
     _ws.onerror=function(){_wsReady=false};
@@ -38,15 +40,21 @@
 
   function _wsScheduleReconnect(){
     if(_wsTimer)return;
-    _wsTimer=setTimeout(function(){_wsTimer=null;_wsConnect()},_wsBackoff);
-    _wsBackoff=Math.min(_wsBackoff*2,_wsMaxBackoff);
+    _wsRetryCount++;
+    /* Exponential backoff with ±20% jitter to avoid thundering herd */
+    var jitter=_wsBackoff*0.2*(Math.random()*2-1);
+    var delay=Math.min(_wsBackoff+jitter,_wsMaxBackoff);
+    _wsTimer=setTimeout(function(){_wsTimer=null;_wsConnect();},delay);
+    _wsBackoff=Math.min(_wsBackoff*1.5,_wsMaxBackoff);
+    if(_wsRetryCount<=3)console.log('WS reconnect in '+(delay|0)+'ms (attempt '+_wsRetryCount+')');
   }
 
   function _wsStartPing(){
     _wsStopPing();
     _wsPingTimer=setInterval(function(){
       if(_ws&&_ws.readyState===WebSocket.OPEN)_ws.send(JSON.stringify({type:'ping'}));
-    },30000);
+      /* Also detect stale connections: if no pong in 10s, reconnect */
+    },25000);
   }
   function _wsStopPing(){if(_wsPingTimer){clearInterval(_wsPingTimer);_wsPingTimer=null}}
 
