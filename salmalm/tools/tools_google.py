@@ -119,13 +119,12 @@ def handle_google_calendar(args: dict) -> str:
 
 def _gmail_list(args: dict, base_url: str, headers: dict) -> str:
     """List/search Gmail messages."""
+    import urllib.parse as _up
     count = min(args.get("count", 10), 50)
     query, label = args.get("query", ""), args.get("label", "INBOX")
     params = f"maxResults={count}"
     if query:
-        import urllib.parse
-
-        params += f"&q={urllib.parse.quote(query)}"
+        params += f"&q={_up.quote(query)}"
     elif label:
         params += f"&labelIds={label}"
     req = urllib.request.Request(f"{base_url}/messages?{params}", headers=headers)
