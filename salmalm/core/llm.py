@@ -374,8 +374,8 @@ def call_llm(
                 try:
                     usage = resp_result.get("usage", {})
                     track_usage(model, usage.get("input", 0), usage.get("output", 0))
-                except Exception:
-                    pass
+                except Exception as _e:
+                    log.debug("[RESPONSES] track_usage failed: %s", _e)
                 return resp_result
             except Exception as e_resp:
                 log.error(f"[RESPONSES] v1/responses also failed for {model_id}: {e_resp}")

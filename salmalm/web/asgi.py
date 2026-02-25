@@ -26,8 +26,8 @@ from fastapi.staticfiles import StaticFiles
 from salmalm.security.crypto import log
 from salmalm.utils.logging_ext import request_logger, set_correlation_id
 from salmalm.web.auth import (
-    rate_limiter, llm_rate_limiter, ip_ban_list,
-    RateLimitExceeded, extract_auth,
+    rate_limiter, llm_rate_limiter, ip_ban_list, daily_quota,
+    RateLimitExceeded, DailyQuotaExceeded, extract_auth,
 )
 import uuid
 
@@ -377,6 +377,20 @@ def create_asgi_app() -> FastAPI:
                     status_code=429,
                     headers={"Retry-After": str(_ra)},
                 )
+            # 5b. Daily token quota check
+            try:
+                daily_quota.check(_uid_key, _role)
+            except DailyQuotaExceeded as _e:
+                return JSONResponse(
+                    {
+                        "error": "Daily token quota exceeded",
+                        "used": _e.used,
+                        "limit": _e.limit,
+                        "retry_after": "tomorrow",
+                    },
+                    status_code=429,
+                    headers={"X-Quota-Used": str(_e.used), "X-Quota-Limit": str(_e.limit)},
+                )
         # ── End Abuse Guard ──────────────────────────────────────────────────
 
         # Read body for write methods
@@ -472,8 +486,8 @@ async def _handle_sse_stream(handler: FastHandler) -> StreamingResponse:
             try:
                 err_payload = f"event: error\ndata: {json.dumps(resp_err.data)}\n\n"
                 sse_q.write(err_payload.encode())
-            except Exception:
-                pass
+            except Exception as _e:
+                log.debug("[SSE] error payload write failed: %s", _e)
         except (_HTMLResp, _RawResp):
             pass  # Not expected from chat handler; just close the stream
         except Exception as e:
@@ -481,8 +495,8 @@ async def _handle_sse_stream(handler: FastHandler) -> StreamingResponse:
             try:
                 err_payload = f"event: error\ndata: {json.dumps({'text': str(e)[:200]})}\n\n"
                 sse_q.write(err_payload.encode())
-            except Exception:
-                pass
+            except Exception as _e:
+                log.debug("[SSE] error payload write (fallback) failed: %s", _e)
         finally:
             sse_q.close()  # always signal end
 

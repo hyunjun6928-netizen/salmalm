@@ -361,6 +361,8 @@ class WebHandler(
         "/api/hooks": "_get_api_hooks",
         "/api/security/report": "_get_api_security_report",
         "/api/security/bans": "_get_api_security_bans",
+        "/api/quota/usage": "_get_api_quota_usage",
+        "/api/quota/my": "_get_api_quota_my",
         "/api/health/providers": "_get_api_health_providers",
         "/api/bookmarks": "_get_api_bookmarks",
         "/api/paste/detect": "_get_api_paste_detect",
@@ -480,6 +482,31 @@ class WebHandler(
             return
         from salmalm.web.auth import ip_ban_list
         self._json({"bans": ip_ban_list.list_banned()})
+
+    def _get_api_quota_usage(self):
+        """Admin: view all users' daily token usage for today."""
+        if not self._require_auth("admin"):
+            return
+        from salmalm.web.auth import daily_quota
+        self._json({"date": daily_quota._today(), "usage": daily_quota.get_all_today()})
+
+    def _get_api_quota_my(self):
+        """User: view own daily token usage and limit."""
+        if not self._require_auth("user"):
+            return
+        from salmalm.web.auth import daily_quota, extract_auth
+        user = extract_auth({k.lower(): v for k, v in self.headers.items()})
+        uid = str(user["id"]) if user else "anonymous"
+        role = user.get("role", "anonymous") if user else "anonymous"
+        used = daily_quota.get_usage(uid)
+        limit = daily_quota.limit_for(role)
+        self._json({
+            "date": daily_quota._today(),
+            "used": used,
+            "limit": limit,
+            "remaining": max(0, limit - used) if limit >= 0 else -1,
+            "unlimited": limit < 0,
+        })
 
     def _post_api_security_unban(self):
         """Manually lift an IP ban. Admin only.

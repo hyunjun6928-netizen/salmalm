@@ -591,14 +591,14 @@ class WebSocketHandler:
                 async def on_tool(name: str, args) -> None:
                     try:
                         await ws.send_json({"type": "tool_call", "name": name, "input": args})
-                    except Exception:
-                        pass
+                    except Exception as _e:
+                        log.debug("[WS] on_tool send failed: %s", _e)
 
                 async def on_status(status_type, detail) -> None:
                     try:
                         await ws.send_json({"type": "typing", "status": status_type, "detail": detail})
-                    except Exception:
-                        pass
+                    except Exception as _e:
+                        log.debug("[WS] on_status send failed: %s", _e)
 
                 try:
                     from salmalm.core.engine import process_message
@@ -621,5 +621,5 @@ class WebSocketHandler:
                     await ws.send_json({"type": "done", "text": response, "elapsed": round(_elapsed, 2)})
                 except Exception as e:
                     await ws.send_json({"type": "error", "error": str(e)[:200]})
-        except Exception:
-            pass
+        except Exception as _e:
+            log.debug("[WS] WebSocketHandler outer loop exception: %s", _e)

@@ -245,8 +245,8 @@ class AgentsMixin:
                 try:
                     from salmalm.core.core import router as _router
                     _router.set_force_model(None if args == "auto" else args)
-                except Exception:
-                    pass
+                except Exception as _e:
+                    log.warning("[AGENT] set_force_model failed: %s", _e)
                 self._json({"ok": True, "type": "model", "result": f"✅ {msg}"})
             except Exception as e:
                 self._json({"ok": False, "result": f"❌ {e}"})

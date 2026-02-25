@@ -51,7 +51,7 @@ class WebAuthMixin:
             import warnings
 
             warnings.warn(
-                "SALMALM_VAULT_PW env var is deprecated and will be removed in v0.20. "
+                "SALMALM_VAULT_PW env var is deprecated and will be removed in v1.0. "
                 "Use OS keychain instead: vault password is auto-saved on first unlock.",
                 FutureWarning,
                 stacklevel=2,

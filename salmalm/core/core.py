@@ -397,6 +397,13 @@ def track_usage(model: str, input_tokens: int, output_tokens: int, user_id: Opti
                 user_manager.record_cost(user_id, cost)
             except Exception as e:
                 log.debug(f"Quota record error: {e}")
+        # Increment daily token quota counter
+        try:
+            from salmalm.web.auth import daily_quota as _dq
+            _quota_uid = str(user_id) if user_id else "anonymous"
+            _dq.add_usage(_quota_uid, input_tokens + output_tokens)
+        except Exception as _e:
+            log.debug("daily_quota.add_usage failed: %s", _e)
 
 
 def get_usage_report() -> dict:

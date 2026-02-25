@@ -381,9 +381,16 @@ class IPBanList:
 
     Tracks violation counts per IP in a sliding window. After
     ``ban_threshold`` violations, the IP is blocked for ``ban_duration``
-    seconds. All state is in-memory; restarting the server resets bans
-    (acceptable for a personal-use gateway — persistent bans would require
-    SQLite and are future work).
+    seconds. State is persisted to ``auth.db`` so bans survive restarts.
+    """
+
+    _DB_TABLE = """
+        CREATE TABLE IF NOT EXISTS ip_bans (
+            ip          TEXT PRIMARY KEY,
+            violations  INTEGER NOT NULL DEFAULT 0,
+            first_at    REAL    NOT NULL,
+            banned_until REAL   NOT NULL DEFAULT 0
+        )
     """
 
     def __init__(self, ban_threshold: int = 10, ban_duration: int = 3600) -> None:
@@ -393,6 +400,59 @@ class IPBanList:
         self._lock = threading.Lock()
         self._ban_threshold = ban_threshold  # violations before ban
         self._ban_duration = ban_duration    # seconds to ban (default 1 h)
+        self._init_db()
+        self._load_from_db()
+
+    def _get_conn(self):
+        """Return a SQLite connection to auth.db."""
+        import sqlite3 as _sq
+        conn = _sq.connect(str(AUTH_DB))
+        conn.execute(self._DB_TABLE)
+        conn.commit()
+        return conn
+
+    def _init_db(self) -> None:
+        """Ensure ip_bans table exists."""
+        try:
+            conn = self._get_conn()
+            conn.close()
+        except Exception as _e:
+            log.warning("[BAN] DB init failed: %s", _e)
+
+    def _load_from_db(self) -> None:
+        """Load active bans from DB into memory on startup."""
+        try:
+            conn = self._get_conn()
+            now = time.time()
+            rows = conn.execute(
+                "SELECT ip, violations, first_at, banned_until FROM ip_bans WHERE banned_until > ?",
+                (now,),
+            ).fetchall()
+            conn.close()
+            with self._lock:
+                for ip, violations, first_at, banned_until in rows:
+                    self._records[ip] = {
+                        "count": violations,
+                        "first_at": first_at,
+                        "banned_until": banned_until,
+                    }
+            if rows:
+                log.info("[BAN] Loaded %d active ban(s) from DB", len(rows))
+        except Exception as _e:
+            log.warning("[BAN] DB load failed: %s", _e)
+
+    def _persist(self, ip: str, rec: dict) -> None:
+        """Upsert a single record to DB (called inside self._lock)."""
+        try:
+            conn = self._get_conn()
+            conn.execute(
+                "INSERT OR REPLACE INTO ip_bans (ip, violations, first_at, banned_until) VALUES (?,?,?,?)",
+                (ip, rec["count"], rec["first_at"], rec["banned_until"]),
+            )
+            conn.commit()
+            conn.close()
+        except Exception as _e:
+            log.debug("[BAN] DB persist failed: %s", _e)
 
     def is_banned(self, ip: str) -> "tuple[bool, int]":
         """Return (is_banned, seconds_remaining). Pure read — no side effects."""
@@ -434,8 +494,10 @@ class IPBanList:
                     "[BAN] IP %s auto-banned for %ds after %d violations",
                     ip, self._ban_duration, rec["count"],
                 )
+                self._persist(ip, rec)
                 return True
 
+            self._persist(ip, rec)
             return False
 
     def unban(self, ip: str) -> None:
@@ -444,6 +506,14 @@ class IPBanList:
             if ip in self._records:
                 self._records[ip]["banned_until"] = 0.0
                 self._records[ip]["count"] = 0
+                self._persist(ip, self._records[ip])
+        try:
+            conn = self._get_conn()
+            conn.execute("DELETE FROM ip_bans WHERE ip = ?", (ip,))
+            conn.commit()
+            conn.close()
+        except Exception as _e:
+            log.debug("[BAN] unban DB delete failed: %s", _e)
         log.info("[BAN] IP %s manually unbanned", ip)
 
     def list_banned(self) -> list:
@@ -457,7 +527,7 @@ class IPBanList:
             ]
 
     def cleanup(self) -> None:
-        """Evict expired records to prevent unbounded memory growth."""
+        """Evict expired records from memory and DB."""
         with self._lock:
             now = time.time()
             expired = [
@@ -466,6 +536,170 @@ class IPBanList:
             ]
             for ip in expired:
                 del self._records[ip]
+        try:
+            conn = self._get_conn()
+            conn.execute("DELETE FROM ip_bans WHERE banned_until < ? AND first_at < ?",
+                         (time.time(), time.time() - 7200))
+            conn.commit()
+            conn.close()
+        except Exception as _e:
+            log.debug("[BAN] cleanup DB failed: %s", _e)
+
+
+# ── Daily Token Quota ────────────────────────────────────────
+
+
+class DailyQuotaExceeded(Exception):
+    """Raised when a user exceeds their daily token quota."""
+
+    def __init__(self, used: int, limit: int) -> None:
+        """Init  ."""
+        self.used = used
+        self.limit = limit
+        super().__init__(f"Daily token quota exceeded: {used}/{limit}")
+
+
+class DailyQuotaManager:
+    """Per-user daily token quota enforced across all LLM calls.
+
+    Limits are role-based (tokens = input + output combined):
+      - admin:     unlimited (-1)
+      - user:      500 000 tokens / day
+      - readonly:  100 000 tokens / day
+      - anonymous:  50 000 tokens / day
+
+    Override via SALMALM_DAILY_QUOTA_USER / SALMALM_DAILY_QUOTA_ANON env vars.
+    """
+
+    _DB_TABLE = """
+        CREATE TABLE IF NOT EXISTS daily_quota (
+            user_id TEXT    NOT NULL,
+            date    TEXT    NOT NULL,
+            tokens  INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, date)
+        )
+    """
+
+    # Default daily token limits per role (-1 = unlimited)
+    _ROLE_LIMITS: Dict[str, int] = {
+        "admin":     -1,
+        "user":      500_000,
+        "readonly":  100_000,
+        "anonymous":  50_000,
+    }
+
+    def __init__(self) -> None:
+        """Init  ."""
+        self._lock = threading.Lock()
+        self._cache: Dict[str, int] = {}   # "user_id:date" -> token count (in-memory write-through)
+        self._init_db()
+        # Allow env-var override
+        import os as _os
+        _u = int(_os.environ.get("SALMALM_DAILY_QUOTA_USER", 0))
+        _a = int(_os.environ.get("SALMALM_DAILY_QUOTA_ANON", 0))
+        if _u > 0:
+            self._ROLE_LIMITS["user"] = _u
+        if _a > 0:
+            self._ROLE_LIMITS["anonymous"] = _a
+
+    def _get_conn(self):
+        """Return a SQLite connection to auth.db."""
+        import sqlite3 as _sq
+        conn = _sq.connect(str(AUTH_DB))
+        conn.execute(self._DB_TABLE)
+        conn.commit()
+        return conn
+
+    def _init_db(self) -> None:
+        try:
+            conn = self._get_conn()
+            conn.close()
+        except Exception as _e:
+            log.warning("[QUOTA] DB init failed: %s", _e)
+
+    def _today(self) -> str:
+        """Return today's date string in UTC (YYYY-MM-DD)."""
+        import datetime
+        return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+
+    def get_usage(self, user_id: str) -> int:
+        """Return today's token count for *user_id*."""
+        key = f"{user_id}:{self._today()}"
+        with self._lock:
+            if key in self._cache:
+                return self._cache[key]
+        try:
+            conn = self._get_conn()
+            row = conn.execute(
+                "SELECT tokens FROM daily_quota WHERE user_id=? AND date=?",
+                (user_id, self._today()),
+            ).fetchone()
+            conn.close()
+            val = row[0] if row else 0
+        except Exception:
+            val = 0
+        with self._lock:
+            self._cache[key] = val
+        return val
+
+    def limit_for(self, role: str) -> int:
+        """Return the daily token limit for *role*. -1 = unlimited."""
+        return self._ROLE_LIMITS.get(role, self._ROLE_LIMITS["anonymous"])
+
+    def check(self, user_id: str, role: str) -> None:
+        """Raise DailyQuotaExceeded if *user_id* is over their daily limit."""
+        limit = self.limit_for(role)
+        if limit < 0:
+            return   # unlimited
+        used = self.get_usage(user_id)
+        if used >= limit:
+            raise DailyQuotaExceeded(used, limit)
+
+    def add_usage(self, user_id: str, tokens: int) -> None:
+        """Increment today's token counter for *user_id*."""
+        if tokens <= 0:
+            return
+        today = self._today()
+        key = f"{user_id}:{today}"
+        with self._lock:
+            self._cache[key] = self._cache.get(key, 0) + tokens
+        try:
+            conn = self._get_conn()
+            conn.execute(
+                """INSERT INTO daily_quota (user_id, date, tokens) VALUES (?,?,?)
+                   ON CONFLICT(user_id, date) DO UPDATE SET tokens = tokens + excluded.tokens""",
+                (user_id, today, tokens),
+            )
+            conn.commit()
+            conn.close()
+        except Exception as _e:
+            log.debug("[QUOTA] DB add_usage failed: %s", _e)
+
+    def get_all_today(self) -> List[dict]:
+        """Admin view — all users' today usage."""
+        today = self._today()
+        try:
+            conn = self._get_conn()
+            rows = conn.execute(
+                "SELECT user_id, tokens FROM daily_quota WHERE date=? ORDER BY tokens DESC",
+                (today,),
+            ).fetchall()
+            conn.close()
+            return [{"user_id": uid, "tokens": t} for uid, t in rows]
+        except Exception:
+            return []
+
+    def cleanup_old(self, keep_days: int = 30) -> None:
+        """Delete quota records older than *keep_days* days."""
+        import datetime
+        cutoff = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=keep_days)).strftime("%Y-%m-%d")
+        try:
+            conn = self._get_conn()
+            conn.execute("DELETE FROM daily_quota WHERE date < ?", (cutoff,))
+            conn.commit()
+            conn.close()
+        except Exception as _e:
+            log.debug("[QUOTA] cleanup failed: %s", _e)
 
 
 # ── User Database ───────────────────────────────────────────
@@ -786,3 +1020,4 @@ auth_manager = AuthManager()
 rate_limiter = RateLimiter()
 llm_rate_limiter = LLMRateLimiter()
 ip_ban_list = IPBanList(ban_threshold=10, ban_duration=3600)
+daily_quota = DailyQuotaManager()

@@ -208,8 +208,8 @@ def select_model(message: str, session) -> Tuple[str, str]:
             from salmalm.core.core import router
             if router.force_model:
                 override = router.force_model
-        except Exception:
-            pass
+        except Exception as _e:
+            log.debug("[MODEL-SELECT] router.force_model unavailable: %s", _e)
     log.info(f"[MODEL-SELECT] effective_override={override!r}, session.id={getattr(session, 'id', '?')}")
     if override and override != "auto":
         _OVERRIDE_MAP = {"haiku": ("simple", "haiku"), "sonnet": ("moderate", "sonnet"), "opus": ("complex", "opus")}
