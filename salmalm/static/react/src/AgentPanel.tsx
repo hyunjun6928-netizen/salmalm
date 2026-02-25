@@ -11,18 +11,19 @@ interface Task {
   output: string;
 }
 
+// Use main app CSS variables so agent panel respects light/dark theme
 const colors = {
-  bg: '#1a1a2e',
-  bgCard: '#16213e',
-  accent: '#7c3aed',
-  accentHover: '#6d28d9',
-  text: '#e2e8f0',
-  textMuted: '#94a3b8',
-  success: '#4ade80',
-  error: '#f87171',
-  border: '#334155',
-  danger: '#dc2626',
-  dangerHover: '#b91c1c',
+  bg: 'var(--bg)',
+  bgCard: 'var(--bg2)',
+  accent: 'var(--accent)',
+  accentHover: 'var(--accent2)',
+  text: 'var(--text)',
+  textMuted: 'var(--text2)',
+  success: 'var(--green)',
+  error: 'var(--red)',
+  border: 'var(--border)',
+  danger: 'var(--red)',
+  dangerHover: 'var(--red)',
 };
 
 const styles: Record<string, CSSProperties> = {
@@ -100,7 +101,7 @@ const styles: Record<string, CSSProperties> = {
     background: colors.accent,
     border: 'none',
     borderRadius: '6px',
-    color: '#fff',
+    color: 'white',
     padding: '6px 16px',
     fontSize: '13px',
     fontWeight: 600,
@@ -109,7 +110,7 @@ const styles: Record<string, CSSProperties> = {
     transition: 'background 0.15s',
   },
   spawnBtnDisabled: {
-    background: '#4c1d95',
+    background: 'var(--accent-dim, rgba(99,140,255,0.3))',
     cursor: 'not-allowed',
     opacity: 0.6,
   },
@@ -156,8 +157,8 @@ const styles: Record<string, CSSProperties> = {
     flexShrink: 0,
   },
   modelBadge: {
-    background: '#312e81',
-    color: '#a5b4fc',
+    background: 'var(--accent-dim, rgba(99,140,255,0.15))',
+    color: 'var(--accent)',
     borderRadius: '4px',
     padding: '2px 6px',
     fontSize: '11px',

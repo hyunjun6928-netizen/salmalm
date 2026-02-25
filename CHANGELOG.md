@@ -1,8 +1,16 @@
 # Changelog
 
+## v0.27.8 (2026-02-25)
+### Improvement
+- Agent panel now follows main app CSS theme variables (--bg, --text, --accent, --border etc) — works in both light and dark mode
+
 ## v0.27.7 (2026-02-25)
 ### Bug Fix
 - Agent panel: `process is not defined` ReferenceError fixed — Vite IIFE build now inlines `process.env.NODE_ENV = "production"` at compile time. Bundle size 595KB → 202KB (React dev warnings stripped)
+
+## v0.27.8 (2026-02-25)
+### Improvement
+- Agent panel now follows main app CSS theme variables (--bg, --text, --accent, --border etc) — works in both light and dark mode
 
 ## v0.27.7 (2026-02-25)
 ### Bug Fix
