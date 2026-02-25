@@ -266,6 +266,8 @@ def stream_anthropic(
         yield {"type": "error", "error": "❌ Anthropic API key not configured."}
         return
 
+    from salmalm.core.llm import _sanitize_messages_for_provider
+    messages = _sanitize_messages_for_provider(messages, "anthropic")
     system_msgs = [m["content"] for m in messages if m["role"] == "system"]
     chat_msgs = [m for m in messages if m["role"] != "system"]
 
