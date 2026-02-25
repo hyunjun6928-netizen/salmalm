@@ -14,6 +14,8 @@
     try{_ws=new WebSocket(_wsUrl())}catch(e){console.warn('WS connect error:',e);_wsScheduleReconnect();return}
     _ws.onopen=function(){
       _wsReady=true;_wsBackoff=500;_wsRetryCount=0;_wsLastConnectedAt=Date.now();
+      /* Restore badge color silently on reconnect */
+      if(modelBadge)modelBadge.style.opacity='';
       console.log('WS connected');
       _wsStartPing();
       /* Recover lost response after reconnect */
@@ -24,6 +26,8 @@
     };
     _ws.onclose=function(ev){
       _wsReady=false;_wsStopPing();
+      /* Dim badge slightly — silent visual cue, no modal/error */
+      if(modelBadge)modelBadge.style.opacity='0.45';
       if(_wsPendingResolve){_wsPendingResolve({fallback:true});_wsPendingResolve=null}
       /* Auto-reconnect — always retry, with exponential backoff + jitter */
       _wsScheduleReconnect();
@@ -113,6 +117,13 @@
       addMsg('assistant','⚠️ '+(data.message||'Server is shutting down...'));
       var _sb3=document.getElementById('stop-btn');var _sb3Send=document.getElementById('send-btn');if(_sb3)_sb3.style.display='none';if(_sb3Send)_sb3Send.style.display='flex';
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
+    }else if(data.type==='update_status'){
+      if(data.status==='installing'){
+        addMsg('assistant','⏳ Updating SalmAlm... please wait.');
+      }else if(data.status==='complete'){
+        addMsg('assistant','✅ Updated to v'+(data.version||'?')+'. Restarting in 3s...');
+        setTimeout(function(){location.reload();},3000);
+      }
     }
   }
 

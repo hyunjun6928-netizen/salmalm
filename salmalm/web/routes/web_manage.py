@@ -14,6 +14,35 @@ from salmalm.web.auth import extract_auth, auth_manager  # noqa: F401
 log = logging.getLogger(__name__)
 
 
+def _systemd_restart_after_upgrade() -> None:
+    """Schedule a `systemctl --user restart salmalm` 2s after upgrade completes.
+
+    Non-blocking: spawns a background thread so the HTTP response returns first.
+    Silently no-ops if systemd is unavailable or service isn't installed.
+    """
+    import threading
+    import subprocess
+    import time
+
+    def _restart():
+        time.sleep(2)  # Let the HTTP response flush to client
+        try:
+            r = subprocess.run(
+                ["systemctl", "--user", "is-active", "salmalm.service"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if r.stdout.strip() == "active":
+                subprocess.run(
+                    ["systemctl", "--user", "restart", "salmalm.service"],
+                    capture_output=True, timeout=10,
+                )
+                log.info("[UPDATE] systemd service restarted with new binary")
+        except Exception as e:
+            log.debug(f"[UPDATE] systemd restart skipped: {e}")
+
+    threading.Thread(target=_restart, daemon=True, name="systemd-restart").start()
+
+
 class ManageMixin:
     def _post_api_cooldowns_reset(self):
         """POST /api/cooldowns/reset — Clear all model cooldowns."""
@@ -181,6 +210,9 @@ class ManageMixin:
                 )
                 new_ver = ver_result.stdout.strip() or "?"
                 audit_log("update", f"upgraded to v{new_ver}")
+                # If running under systemd, schedule a service restart so the
+                # new binary is loaded (non-blocking — response returns first)
+                _systemd_restart_after_upgrade()
                 self._json({"ok": True, "version": new_ver, "output": result.stdout[-200:]})
             else:
                 self._json({"ok": False, "error": result.stderr[-200:]})
@@ -222,6 +254,7 @@ class ManageMixin:
             return
         try:
             import subprocess
+            import shutil
 
             # Broadcast update start via WebSocket
             try:
@@ -233,33 +266,35 @@ class ManageMixin:
                     asyncio.ensure_future(ws_server.broadcast({"type": "update_status", "status": "installing"}))
             except Exception as e:
                 log.debug(f"Suppressed: {e}")
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "--upgrade",
-                    "--no-cache-dir",
-                    "salmalm",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
+
+            # pipx first (preferred), fallback to pip
+            _use_pipx = shutil.which("pipx") is not None
+            if _use_pipx:
+                _update_cmd = ["pipx", "install", "salmalm", "--force"]
+            else:
+                _update_cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "salmalm"]
+
+            result = subprocess.run(_update_cmd, capture_output=True, text=True, timeout=120)
             if result.returncode == 0:
                 ver_result = subprocess.run(
-                    [
-                        sys.executable,
-                        "-c",
-                        "from salmalm.constants import VERSION; print(VERSION)",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
+                    [sys.executable, "-c", "from salmalm.constants import VERSION; print(VERSION)"],
+                    capture_output=True, text=True, timeout=10,
                 )
                 new_ver = ver_result.stdout.strip() or "?"
                 audit_log("update", f"upgraded to v{new_ver}")
+                # Broadcast completion + schedule systemd reload
+                try:
+                    from salmalm.web.ws import ws_server
+                    import asyncio
+
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.ensure_future(ws_server.broadcast({
+                            "type": "update_status", "status": "complete", "version": new_ver
+                        }))
+                except Exception as e:
+                    log.debug(f"Suppressed: {e}")
+                _systemd_restart_after_upgrade()
                 self._json({"ok": True, "version": new_ver, "output": result.stdout[-200:]})
             else:
                 self._json({"ok": False, "error": result.stderr[-200:]})

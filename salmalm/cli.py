@@ -270,7 +270,7 @@ def _run_service(subcmd: str) -> None:
             f.write(unit_content)
         _systemctl("daemon-reload")
         _systemctl("enable", "salmalm.service")
-        r = _systemctl("start", "salmalm.service")
+        r = _systemctl("restart", "salmalm.service")   # restart = start if stopped, restart if running
         if r.returncode == 0:
             print("✅ SalmAlm service installed and started.")
             print("   Auto-restarts on crash. Starts on login.")

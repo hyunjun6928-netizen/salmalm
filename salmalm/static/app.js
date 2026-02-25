@@ -3,8 +3,8 @@
   const chat = document.getElementById("chat");
   const input = document.getElementById("input");
   const btn = document.getElementById("send-btn");
-  const costEl = document.getElementById("cost-display");
-  const modelBadge = document.getElementById("model-badge");
+  document.getElementById("cost-display");
+  const modelBadge$1 = document.getElementById("model-badge");
   const settingsEl = document.getElementById("settings");
   const filePrev = document.getElementById("file-preview");
   const fileIconEl = document.getElementById("file-icon");
@@ -12,12 +12,11 @@
   const fileSizeEl = document.getElementById("file-size");
   const imgPrev = document.getElementById("img-preview");
   const inputArea = document.getElementById("input-area");
-  let _tok = sessionStorage.getItem("tok") || "";
+  let _tok$1 = sessionStorage.getItem("tok") || "";
   let pendingFile = null;
   let pendingFiles = [];
   let _currentSession = localStorage.getItem("salm_active_session") || "web";
   let _sessionCache = {};
-  let _isAutoRouting = true;
   function set_pendingFile(v) {
     pendingFile = v;
   }
@@ -29,9 +28,6 @@
   }
   function set_sessionCache(v) {
     _sessionCache = v;
-  }
-  function set_isAutoRouting(v) {
-    _isAutoRouting = v;
   }
   const _origFetch = window.fetch;
   window.fetch = function(url, opts) {
@@ -54,7 +50,7 @@
     return "salm_chat_" + sid;
   }
   function loadSessionList$1() {
-    fetch("/api/agents", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/agents", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var sel = document.getElementById("agent-select");
@@ -65,7 +61,7 @@
       }).join("");
     }).catch(function() {
     });
-    fetch("/api/sessions", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/sessions", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var el = document.getElementById("session-list");
@@ -166,7 +162,7 @@
     if (!confirm(t("confirm-delete"))) return;
     fetch("/api/sessions/delete", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+      headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
       body: JSON.stringify({ session_id: sid })
     }).then(function() {
       localStorage.removeItem(_storageKey$1(sid));
@@ -196,7 +192,7 @@
     if (!confirm(t("confirm-clear-all"))) return;
     fetch("/api/sessions/clear", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+      headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
       body: JSON.stringify({ keep: _currentSession })
     }).then(function() {
       for (var i = localStorage.length - 1; i >= 0; i--) {
@@ -511,7 +507,7 @@
       if (idx < 0) return;
       fetch("/api/sessions/branch", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+        headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
         body: JSON.stringify({ session_id: _currentSession, message_index: idx })
       }).then(function(r) {
         return r.json();
@@ -694,6 +690,7 @@
     _ws$1.onopen = function() {
       _wsBackoff = 500;
       _wsRetryCount = 0;
+      if (modelBadge) modelBadge.style.opacity = "";
       console.log("WS connected");
       _wsStartPing();
       if (_wsRequestPending) {
@@ -705,6 +702,7 @@
     };
     _ws$1.onclose = function(ev) {
       _wsStopPing();
+      if (modelBadge) modelBadge.style.opacity = "0.45";
       _wsScheduleReconnect();
     };
     _ws$1.onerror = function() {
@@ -806,7 +804,7 @@
       var _secs = ((Date.now() - _wsSendStart$1) / 1e3).toFixed(1);
       var _wcIcons = { simple: "⚡", moderate: "🔧", complex: "💎" };
       var _wcLabel = data.complexity && data.complexity !== "auto" && data.complexity !== "manual" ? (_wcIcons[data.complexity] || "") + data.complexity + " → " : "";
-      if (data.complexity === "manual") set_isAutoRouting(false);
+      if (data.complexity === "manual") _isAutoRouting = false;
       var _wmShort = (data.model || "").split("/").pop();
       addMsg("assistant", data.text || "", _wcLabel + _wmShort + " · ⏱️" + _secs + "s");
       if (_wmShort) modelBadge.textContent = _isAutoRouting ? "Auto → " + _wmShort : _wmShort;
@@ -844,6 +842,15 @@
       var _sb3Send = document.getElementById("send-btn");
       if (_sb3) _sb3.style.display = "none";
       if (_sb3Send) _sb3Send.style.display = "flex";
+    } else if (data.type === "update_status") {
+      if (data.status === "installing") {
+        addMsg("assistant", "⏳ Updating SalmAlm... please wait.");
+      } else if (data.status === "complete") {
+        addMsg("assistant", "✅ Updated to v" + (data.version || "?") + ". Restarting in 3s...");
+        setTimeout(function() {
+          location.reload();
+        }, 3e3);
+      }
     }
   }
   function _wsRecoverResponse() {
@@ -886,7 +893,7 @@
     var polls = 0;
     function _rpoll() {
       polls++;
-      fetch("/api/sessions/" + encodeURIComponent(sid) + "/last", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+      fetch("/api/sessions/" + encodeURIComponent(sid) + "/last", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
         return r.json();
       }).then(function(d) {
         if (!d.ok || !d.message) {
@@ -940,7 +947,7 @@
       var _dEl = addMsg("assistant", "⏳ Processing directive...");
       fetch("/api/directive", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Session-Token": _tok, "X-Requested-With": "XMLHttpRequest" },
+        headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1, "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ text: _inputText, model: window._currentModel || "auto" })
       }).then(function(r) {
         return r.json();
@@ -968,7 +975,7 @@
       var cnt = parseInt(rollMatch[1]);
       fetch("/api/sessions/rollback", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+        headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
         body: JSON.stringify({ session_id: _currentSession, count: cnt })
       }).then(function(r) {
         return r.json();
@@ -989,7 +996,7 @@
       var idx = allMsgs.length - 1;
       fetch("/api/sessions/branch", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+        headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
         body: JSON.stringify({ session_id: _currentSession, message_index: idx })
       }).then(function(r) {
         return r.json();
@@ -1684,7 +1691,7 @@
     ui_control: { icon: "🎛️", en: "UI Control", kr: "UI 제어", cmd: "Change theme to dark" }
   };
   var _allTools = [];
-  fetch("/api/tools/list", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+  fetch("/api/tools/list", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
     return r.json();
   }).then(function(d) {
     _allTools = (d.tools || []).map(function(t2) {
@@ -1827,7 +1834,7 @@
     if (window._loadDoctor) window._loadDoctor();
     if (window._loadUsageChart) window._loadUsageChart();
     if (window.loadUsers) window.loadUsers();
-    fetch("/api/routing", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/routing", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var cfg = d.config || {};
@@ -1867,7 +1874,7 @@
       });
     }).catch(function() {
     });
-    fetch("/api/soul", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/soul", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var ed = document.getElementById("soul-editor");
@@ -2051,7 +2058,7 @@
     return _MODEL_PRICES[short] || null;
   }
   window._loadModelRouter = function() {
-    var hdr = { "X-Session-Token": _tok, "X-Session-Id": _currentSession };
+    var hdr = { "X-Session-Token": _tok$1, "X-Session-Id": _currentSession };
     fetch("/api/llm-router/providers", { headers: hdr }).then(function(r) {
       return r.json();
     }).then(function(d) {
@@ -2116,7 +2123,7 @@
     if (!el) return;
     var kr = document.documentElement.lang === "kr";
     el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2)">⏳ ' + (kr ? "진단 중..." : "Running diagnostics...") + "</div>";
-    fetch("/api/doctor", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/doctor", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var h = '<div style="margin-bottom:12px;font-size:14px;font-weight:600">📊 ' + d.passed + "/" + d.total + " " + (kr ? "통과" : "passed") + "</div>";
@@ -2226,10 +2233,10 @@
     var kr = document.documentElement.lang === "kr";
     el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:12px">⏳...</div>';
     Promise.all([
-      fetch("/api/usage/daily", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+      fetch("/api/usage/daily", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
         return r.json();
       }),
-      fetch("/api/usage/models", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+      fetch("/api/usage/models", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
         return r.json();
       })
     ]).then(function(res) {
@@ -2305,7 +2312,7 @@
     var a = document.createElement("a");
     a.href = "/api/backup";
     a.download = "salmalm_backup.zip";
-    fetch("/api/backup", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/backup", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.blob();
     }).then(function(blob) {
@@ -2334,7 +2341,7 @@
       if (btn2) btn2.textContent = "⏳...";
       fetch("/api/backup/restore", {
         method: "POST",
-        headers: { "X-Session-Token": _tok },
+        headers: { "X-Session-Token": _tok$1 },
         body: inp.files[0]
       }).then(function(r) {
         return r.json();
@@ -2386,7 +2393,7 @@
     renderFeatures$1(this.value);
   });
   window.loadUsers = function() {
-    fetch("/api/users", { headers: { "Authorization": "Bearer " + (_tok || localStorage.getItem("salm_token") || "") } }).then(function(r) {
+    fetch("/api/users", { headers: { "Authorization": "Bearer " + (_tok$1 || localStorage.getItem("salm_token") || "") } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       if (d.error) {
@@ -2434,7 +2441,7 @@
     }
     fetch("/api/users/register", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok || localStorage.getItem("salm_token") || "") },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok$1 || localStorage.getItem("salm_token") || "") },
       body: JSON.stringify({ username: name, password: pw, role })
     }).then(function(r) {
       return r.json();
@@ -2449,7 +2456,7 @@
   window.toggleUser = function(uid, enabled) {
     fetch("/api/users/toggle", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok || localStorage.getItem("salm_token") || "") },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok$1 || localStorage.getItem("salm_token") || "") },
       body: JSON.stringify({ user_id: uid, enabled })
     }).then(function() {
       window.loadUsers();
@@ -2459,7 +2466,7 @@
     if (!confirm("Delete user " + username + "?")) return;
     fetch("/api/users/delete", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok || localStorage.getItem("salm_token") || "") },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok$1 || localStorage.getItem("salm_token") || "") },
       body: JSON.stringify({ username })
     }).then(function() {
       window.loadUsers();
@@ -2468,14 +2475,14 @@
   document.getElementById("mt-toggle").addEventListener("change", function() {
     fetch("/api/tenant/config", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok || localStorage.getItem("salm_token") || "") },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok$1 || localStorage.getItem("salm_token") || "") },
       body: JSON.stringify({ multi_tenant: this.checked })
     });
   });
   document.getElementById("reg-mode").addEventListener("change", function() {
     fetch("/api/tenant/config", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok || localStorage.getItem("salm_token") || "") },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + (_tok$1 || localStorage.getItem("salm_token") || "") },
       body: JSON.stringify({ registration_mode: this.value })
     });
   });
@@ -2494,7 +2501,7 @@
   window._refreshDash = function() {
     var dc = document.getElementById("dashboard-content");
     dc.innerHTML = '<p style="color:var(--text2)">Loading...</p>';
-    var hdr = { "X-Session-Token": _tok };
+    var hdr = { "X-Session-Token": _tok$1 };
     Promise.all([
       fetch("/api/dashboard", { headers: hdr }).then(function(r) {
         return r.json();
@@ -2794,7 +2801,7 @@
       document.getElementById(inputId).value = "";
       var llmKeys = ["anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key"];
       if (llmKeys.indexOf(vaultKey) !== -1) {
-        fetch("/api/routing/optimize", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: "{}" }).then(function(r) {
+        fetch("/api/routing/optimize", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: "{}" }).then(function(r) {
           return r.json();
         }).then(function(od) {
           if (od.ok) {
@@ -2907,8 +2914,7 @@
     });
   };
   window.setModel = function(m) {
-    set_isAutoRouting(m === "auto");
-    modelBadge.textContent = m === "auto" ? "auto routing" : m.split("/").pop();
+    modelBadge$1.textContent = m === "auto" ? "auto routing" : m.split("/").pop();
     var cn = document.getElementById("mr-current-name");
     if (cn) cn.textContent = m === "auto" ? "🔄 Auto Routing" : m;
     var sel = document.getElementById("s-model");
@@ -2917,13 +2923,12 @@
     if (hint) {
       hint.style.display = m === "auto" ? "none" : "block";
     }
-    fetch("/api/model/switch", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ model: m, session: _currentSession }) }).then(function(r) {
+    fetch("/api/model/switch", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ model: m, session: _currentSession }) }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var eff = d.current_model || m;
       if (cn) cn.textContent = eff === "auto" ? "🔄 Auto Routing" : eff;
-      set_isAutoRouting(eff === "auto");
-      modelBadge.textContent = eff === "auto" ? "auto routing" : eff.split("/").pop();
+      modelBadge$1.textContent = eff === "auto" ? "auto routing" : eff.split("/").pop();
       if (sel) sel.value = eff;
       if (hint) {
         hint.style.display = eff === "auto" ? "none" : "block";
@@ -3139,7 +3144,7 @@
       return;
     }
     _searchTimer = setTimeout(function() {
-      fetch("/api/search?q=" + encodeURIComponent(q) + "&limit=15", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+      fetch("/api/search?q=" + encodeURIComponent(q) + "&limit=15", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
         return r.json();
       }).then(function(d) {
         if (!d.results || !d.results.length) {
@@ -3165,15 +3170,13 @@
   input.focus();
   fetch("/api/status?session=" + encodeURIComponent(_currentSession)).then((r) => r.json()).then((d) => {
     if (d.model && d.model !== "auto") {
-      set_isAutoRouting(false);
       var sel = document.getElementById("s-model");
       if (sel) {
         sel.value = d.model;
-        modelBadge.textContent = d.model.split("/").pop();
+        modelBadge$1.textContent = d.model.split("/").pop();
       }
     } else {
-      set_isAutoRouting(true);
-      modelBadge.textContent = "auto routing";
+      modelBadge$1.textContent = "auto routing";
     }
     var ch = d.channels || {};
     var tgB = document.querySelector("#tg-status .badge");
@@ -3191,9 +3194,9 @@
   }).catch(() => {
   });
   setInterval(async () => {
-    if (!_tok) return;
+    if (!_tok$1) return;
     try {
-      var r = await fetch("/api/notifications", { headers: { "X-Session-Token": _tok } });
+      var r = await fetch("/api/notifications", { headers: { "X-Session-Token": _tok$1 } });
       if (!r.ok) return;
       var d = await r.json();
       if (d.notifications && d.notifications.length) {
@@ -3244,7 +3247,7 @@
             return;
           }
           var title = data.title || data.session || "Imported Chat";
-          fetch("/api/sessions/import", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ messages: msgs, title }) }).then(function(r) {
+          fetch("/api/sessions/import", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ messages: msgs, title }) }).then(function(r) {
             return r.json();
           }).then(function(d) {
             if (d.ok) {
@@ -3400,16 +3403,16 @@
     } else if (a === "saveCron") {
       window._saveCron();
     } else if (a === "toggleCronJob") {
-      fetch("/api/cron/toggle", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ id: el.getAttribute("data-cron-id") }) }).then(function() {
+      fetch("/api/cron/toggle", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ id: el.getAttribute("data-cron-id") }) }).then(function() {
         window._loadCron();
       });
     } else if (a === "deleteCronJob") {
-      if (confirm(_lang === "ko" ? "삭제하시겠습니까?" : "Delete this job?")) fetch("/api/cron/delete", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ id: el.getAttribute("data-cron-id") }) }).then(function() {
+      if (confirm(_lang === "ko" ? "삭제하시겠습니까?" : "Delete this job?")) fetch("/api/cron/delete", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ id: el.getAttribute("data-cron-id") }) }).then(function() {
         window._loadCron();
       });
     } else if (a === "runCronJob") {
       el.textContent = "⏳";
-      fetch("/api/cron/run", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok, "X-Requested-With": "XMLHttpRequest" }, body: JSON.stringify({ id: el.getAttribute("data-cron-id") }) }).then(function(r2) {
+      fetch("/api/cron/run", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1, "X-Requested-With": "XMLHttpRequest" }, body: JSON.stringify({ id: el.getAttribute("data-cron-id") }) }).then(function(r2) {
         return r2.json();
       }).then(function(d) {
         el.textContent = d.ok ? "✅" : "❌";
@@ -3434,7 +3437,7 @@
     else if (a === "sess-delete") {
       var sid = el.getAttribute("data-sid");
       if (sid && confirm((_lang === "ko" ? "세션을 삭제하시겠습니까?" : "Delete this session?") + "\n" + sid)) {
-        fetch("/api/sessions/delete", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ session_id: sid }) }).then(function() {
+        fetch("/api/sessions/delete", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ session_id: sid }) }).then(function() {
           window._loadSessions();
           loadSessions();
         });
@@ -3609,7 +3612,7 @@
       }
     } else if (a === "resetCooldowns") {
       el.textContent = "⏳...";
-      fetch("/api/cooldowns/reset", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok, "X-Requested-With": "XMLHttpRequest" }, body: "{}" }).then(function(r2) {
+      fetch("/api/cooldowns/reset", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1, "X-Requested-With": "XMLHttpRequest" }, body: "{}" }).then(function(r2) {
         return r2.json();
       }).then(function(d) {
         if (d.ok) {
@@ -3649,7 +3652,7 @@
     } else if (a === "autoOptimizeRouting") {
       var st = document.getElementById("route-status");
       if (st) st.textContent = "⏳...";
-      fetch("/api/routing/optimize", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: "{}" }).then(function(r2) {
+      fetch("/api/routing/optimize", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: "{}" }).then(function(r2) {
         return r2.json();
       }).then(function(d) {
         if (d.ok && d.config) {
@@ -3682,7 +3685,7 @@
       });
     } else if (a === "saveRouting") {
       var rc = { simple: document.getElementById("route-simple").value, moderate: document.getElementById("route-moderate").value, complex: document.getElementById("route-complex").value };
-      fetch("/api/routing", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify(rc) }).then(function(r2) {
+      fetch("/api/routing", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify(rc) }).then(function(r2) {
         return r2.json();
       }).then(function(d) {
         var st2 = document.getElementById("route-status");
@@ -3698,24 +3701,24 @@
       });
     } else if (a === "saveSoul") {
       var sc = document.getElementById("soul-editor").value;
-      fetch("/api/soul", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ content: sc }) }).then(function(r2) {
+      fetch("/api/soul", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ content: sc }) }).then(function(r2) {
         return r2.json();
       }).then(function(d) {
         document.getElementById("soul-result").innerHTML = '<span style="color:#4ade80">' + (d.message || "Saved") + "</span>";
       });
     } else if (a === "resetSoul") {
       document.getElementById("soul-editor").value = "";
-      fetch("/api/soul", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ content: "" }) }).then(function(r2) {
+      fetch("/api/soul", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ content: "" }) }).then(function(r2) {
         return r2.json();
       }).then(function(d) {
         document.getElementById("soul-result").innerHTML = '<span style="color:#4ade80">' + (d.message || "Reset") + "</span>";
       });
     } else if (a === "reloadPlugins") {
-      fetch("/api/plugins/manage", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ action: "reload" }) }).then(function() {
+      fetch("/api/plugins/manage", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ action: "reload" }) }).then(function() {
         window.showSettings();
       });
     } else if (a === "reloadHooks") {
-      fetch("/api/hooks", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ action: "reload" }) }).then(function() {
+      fetch("/api/hooks", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ action: "reload" }) }).then(function() {
         window.showSettings();
       });
     } else if (a === "closeShortcutModal" || a === "closeFilterModal") {
@@ -3781,7 +3784,7 @@
       btn2.style.color = "#fff";
       fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+        headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
         body: JSON.stringify({ message: "/thinking on", session: _currentSession })
       }).catch(function() {
       });
@@ -3791,7 +3794,7 @@
       btn2.style.color = "var(--text2)";
       fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+        headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
         body: JSON.stringify({ message: "/thinking off", session: _currentSession })
       }).catch(function() {
       });
@@ -3824,7 +3827,7 @@
           btn2.textContent = "⏳";
           fetch("/api/stt", {
             method: "POST",
-            headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+            headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
             body: JSON.stringify({ audio_base64: b64, language: "ko" })
           }).then(function(r) {
             return r.json();
@@ -3873,7 +3876,7 @@
       if (newTitle !== oldTitle) {
         fetch("/api/sessions/rename", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+          headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
           body: JSON.stringify({ session_id: sid, title: newTitle })
         }).catch(function() {
         });
@@ -3912,7 +3915,7 @@
     window.open("/api/agent/export?sessions=" + s + "&data=" + d + "&vault=" + v, "_blank");
   };
   window.quickSyncExport = function() {
-    fetch("/api/agent/sync", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ action: "export" }) }).then(function(r) {
+    fetch("/api/agent/sync", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ action: "export" }) }).then(function(r) {
       return r.json();
     }).then(function(d) {
       if (d.ok) {
@@ -3956,7 +3959,7 @@
       document.getElementById("import-btn").disabled = false;
       var fd = new FormData();
       fd.append("file", file);
-      fetch("/api/agent/import/preview", { method: "POST", headers: { "X-Session-Token": _tok }, body: fd }).then(function(r) {
+      fetch("/api/agent/import/preview", { method: "POST", headers: { "X-Session-Token": _tok$1 }, body: fd }).then(function(r) {
         return r.json();
       }).then(function(d) {
         var prev = document.getElementById("import-preview");
@@ -3981,7 +3984,7 @@
     fd.append("file", blob, "agent-export.zip");
     fd.append("conflict_mode", mode);
     document.getElementById("import-result").textContent = "⏳ Importing...";
-    fetch("/api/agent/import", { method: "POST", headers: { "X-Session-Token": _tok }, body: fd }).then(function(r) {
+    fetch("/api/agent/import", { method: "POST", headers: { "X-Session-Token": _tok$1 }, body: fd }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var res = document.getElementById("import-result");
@@ -4022,7 +4025,7 @@
     var c = document.getElementById("cron-table");
     if (!c) return;
     c.innerHTML = "Loading...";
-    fetch("/api/cron", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/cron", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var jobs = d.jobs || [];
@@ -4082,7 +4085,7 @@
     if (runAt) payload.run_at = runAt;
     fetch("/api/cron/add", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Session-Token": _tok },
+      headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
       body: JSON.stringify(payload)
     }).then(function(r) {
       return r.json();
@@ -4097,7 +4100,7 @@
     var fl = document.getElementById("mem-file-list");
     if (!fl) return;
     fl.innerHTML = '<div style="padding:12px;color:var(--text2);font-size:12px">Loading...</div>';
-    fetch("/api/memory/files", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/memory/files", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var files = d.files || [];
@@ -4121,7 +4124,7 @@
     var mc = document.getElementById("mem-file-content");
     if (!mc) return;
     mc.innerHTML = '<div style="color:var(--text2)">Loading...</div>';
-    fetch("/api/memory/read?file=" + encodeURIComponent(path), { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/memory/read?file=" + encodeURIComponent(path), { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       if (d.error) {
@@ -4140,7 +4143,7 @@
     var container = document.getElementById("sessions-table");
     if (!container) return;
     container.innerHTML = "Loading...";
-    fetch("/api/sessions", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/sessions", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var sessions = d.sessions || [];
@@ -4307,7 +4310,7 @@
     var panel = document.getElementById("debug-panel");
     if (!panel) return;
     panel.innerHTML = '<div style="grid-column:1/-1;color:var(--text2);font-size:12px">Loading...</div>';
-    fetch("/api/debug", { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/debug", { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var kr = _lang === "ko";
@@ -4350,7 +4353,7 @@
     var lines = document.getElementById("log-lines").value;
     var viewer = document.getElementById("log-viewer");
     viewer.textContent = "Loading...";
-    fetch("/api/logs?lines=" + lines + "&level=" + level, { headers: { "X-Session-Token": _tok } }).then(function(r) {
+    fetch("/api/logs?lines=" + lines + "&level=" + level, { headers: { "X-Session-Token": _tok$1 } }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var logs = d.logs || [];
