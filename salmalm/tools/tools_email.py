@@ -35,12 +35,17 @@ def _fetch_message_summary(msg_id: str, headers: dict) -> str:
 @register("email_inbox")
 def handle_email_inbox(args: dict) -> str:
     """List recent inbox messages."""
+    import urllib.error as _ue
     headers = _google_oauth_headers()
     count = min(int(args.get("count", 10)), 30)
     url = f"{_BASE_URL}/messages?maxResults={count}&labelIds=INBOX"
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        data = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+    except _ue.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:300]
+        return f"❌ Gmail API {e.code} {e.reason}: {body}"
 
     messages = data.get("messages", [])
     if not messages:
@@ -123,18 +128,22 @@ def handle_email_send(args: dict) -> str:
 @register("email_search")
 def handle_email_search(args: dict) -> str:
     """Search emails with Gmail query syntax."""
+    import urllib.parse as _up
+    import urllib.error as _ue
     headers = _google_oauth_headers()
     query = args.get("query", "")
     if not query:
         return "❌ query is required"
 
     count = min(int(args.get("count", 10)), 30)
-    import urllib.parse
-
-    url = f"{_BASE_URL}/messages?maxResults={count}&q={urllib.parse.quote(query)}"
+    url = f"{_BASE_URL}/messages?maxResults={count}&q={_up.quote(query)}"
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        data = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+    except _ue.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:300]
+        return f"❌ Gmail API {e.code} {e.reason}: {body}"
 
     messages = data.get("messages", [])
     if not messages:
