@@ -28,9 +28,15 @@ class WebSessionsMixin:
             rows = conn.execute(
                 "SELECT session_id, updated_at, title, parent_session_id FROM session_store ORDER BY updated_at DESC"
             ).fetchall()
+        # Prefixes that are internal/ephemeral — never show in UI
+        _HIDDEN_PREFIXES = ("agent_", "subagent_", "cron-", "test_msg_", "e2e-", "save_test")
+
         sessions = []
         for r in rows:
             sid = r[0]
+            # Hide internal agent/cron/test sessions from the sidebar
+            if any(sid.startswith(p) for p in _HIDDEN_PREFIXES):
+                continue
             stored_title = r[2] if len(r) > 2 else ""
             parent_sid = r[3] if len(r) > 3 else None
             if stored_title:
