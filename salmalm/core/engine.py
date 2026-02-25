@@ -395,7 +395,26 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 [{"tool_use_id": tc["id"], "content": tool_outputs[tc["id"]]} for tc in tool_calls]
             )
         else:
-            session.add_assistant(result.get("content", ""))
+            import json as _json
+            # Store assistant message WITH tool_calls in OpenAI format
+            # so _sanitize_messages_for_provider can convert to tool_use for Anthropic fallback
+            asst_tool_calls = [
+                {
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {
+                        "name": tc["name"],
+                        "arguments": _json.dumps(tc["arguments"]) if isinstance(tc["arguments"], dict) else str(tc["arguments"]),
+                    },
+                }
+                for tc in tool_calls
+            ]
+            session.messages.append({
+                "role": "assistant",
+                "content": result.get("content", "") or "",
+                "tool_calls": asst_tool_calls,
+            })
+            session.last_active = __import__("time").time()
             for tc in tool_calls:
                 session.messages.append(
                     {"role": "tool", "tool_call_id": tc["id"], "name": tc["name"], "content": tool_outputs[tc["id"]]}

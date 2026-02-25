@@ -178,32 +178,29 @@ def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
     """
     if provider == "anthropic":
         import json as _json
+
+        # ── Pass 1: convert all messages to Anthropic format ──
         sanitized = []
         for msg in messages:
             role = msg.get("role", "")
             if role == "tool":
-                # Convert OpenAI tool result → Anthropic user message with tool_result
-                sanitized.append(
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": msg.get("tool_call_id", "unknown"),
-                                "content": str(msg.get("content", "")),
-                            }
-                        ],
-                    }
-                )
+                sanitized.append({
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": msg.get("tool_call_id", "unknown"),
+                        "content": str(msg.get("content", "")),
+                    }],
+                })
             elif role == "model":
                 sanitized.append({**msg, "role": "assistant"})
             elif role == "assistant":
                 tool_calls = msg.get("tool_calls") or []
                 content = msg.get("content") or ""
-                # If assistant has OpenAI-format tool_calls, convert to Anthropic tool_use blocks
-                if tool_calls and not (
-                    isinstance(content, list) and any(b.get("type") == "tool_use" for b in content)
-                ):
+                already_converted = isinstance(content, list) and any(
+                    b.get("type") == "tool_use" for b in content
+                )
+                if tool_calls and not already_converted:
                     blocks = []
                     if isinstance(content, str) and content.strip():
                         blocks.append({"type": "text", "text": content})
@@ -227,7 +224,30 @@ def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
                     sanitized.append(msg)
             else:
                 sanitized.append(msg)
-        return sanitized
+
+        # ── Pass 2: drop orphaned tool_result blocks (no matching tool_use) ──
+        known_tool_use_ids: set = set()
+        for msg in sanitized:
+            content = msg.get("content")
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "tool_use":
+                        known_tool_use_ids.add(block["id"])
+
+        cleaned = []
+        for msg in sanitized:
+            content = msg.get("content")
+            if isinstance(content, list) and all(
+                isinstance(b, dict) and b.get("type") == "tool_result" for b in content
+            ):
+                # This is a tool_result-only user message — filter orphans
+                valid = [b for b in content if b.get("tool_use_id") in known_tool_use_ids]
+                if valid:
+                    cleaned.append({**msg, "content": valid})
+                # else: drop entire message (all tool_results were orphaned)
+            else:
+                cleaned.append(msg)
+        return cleaned
     elif provider == "google":
         # _build_gemini_contents handles all format conversion:
         #   system → user, assistant+tool_calls → model+functionCall,
