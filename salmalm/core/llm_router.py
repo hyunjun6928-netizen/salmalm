@@ -117,10 +117,6 @@ _OPENAI_EXCLUDE = {
     "search-api",     # search-specific endpoint (gpt-5-search-api)
 }
 
-# gpt-5* models with these suffixes are v1/responses-only, NOT v1/chat/completions
-# Note: o1-pro, o3-pro etc. are valid chat models — only gpt-5-family "pro" is excluded
-_GPT5_RESPONSES_SUFFIXES = ("-pro",)
-
 
 def _is_chat_model_openai(model_id: str) -> bool:
     """Return True if an OpenAI model ID looks like a chat model."""
@@ -129,9 +125,6 @@ def _is_chat_model_openai(model_id: str) -> bool:
     for excl in _OPENAI_EXCLUDE:
         if excl in mid:
             return False
-    # gpt-5* variants that are v1/responses-only
-    if mid.startswith("gpt-5") and any(mid.endswith(s) for s in _GPT5_RESPONSES_SUFFIXES):
-        return False
     # Skip date-pinned snapshots (e.g. gpt-4o-2024-08-06)
     if re.search(r"-\d{4}-\d{2}-\d{2}$", mid):
         return False
