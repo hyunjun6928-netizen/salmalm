@@ -13,6 +13,7 @@ import hmac
 import json
 import os
 import secrets
+import threading
 from typing import Any, Dict, List, Optional
 
 from salmalm.constants import VAULT_FILE, PBKDF2_ITER, VAULT_VERSION
@@ -118,6 +119,7 @@ class Vault:
         self._data: Dict[str, Any] = {}
         self._password: Optional[str] = None
         self._salt: Optional[bytes] = None
+        self._lock = threading.RLock()  # Reentrant lock for thread-safe vault ops
 
     @property
     def is_unlocked(self) -> bool:
@@ -133,14 +135,15 @@ class Vault:
         """
         if not HAS_CRYPTO and not _ALLOW_FALLBACK:
             raise RuntimeError("Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1")
-        if not force and VAULT_FILE.exists():
-            raise RuntimeError(
-                "Vault already exists. Unlock it instead, or pass force=True to overwrite."
-            )
-        self._password = password
-        self._salt = secrets.token_bytes(16)
-        self._data = {}
-        self._save()
+        with self._lock:
+            if not force and VAULT_FILE.exists():
+                raise RuntimeError(
+                    "Vault already exists. Unlock it instead, or pass force=True to overwrite."
+                )
+            self._password = password
+            self._salt = secrets.token_bytes(16)
+            self._data = {}
+            self._save()
         if save_to_keychain and password:
             _keychain_set(password)
 
@@ -155,41 +158,42 @@ class Vault:
 
     def unlock(self, password: str, save_to_keychain: bool = False) -> bool:
         """Unlock an existing vault. Returns True on success."""
-        if not VAULT_FILE.exists():
-            return False
-        raw: bytes = VAULT_FILE.read_bytes()
-        if len(raw) < 17:
-            return False
-        version: bytes = raw[0:1]
-        self._salt = raw[1:17]
-        ciphertext: bytes = raw[17:]
-        self._password = password
-        try:
-            key = _derive_key(password, self._salt)
-            plaintext: bytes
-            if version == b"\x03" and HAS_CRYPTO:
-                nonce, ct = ciphertext[:12], ciphertext[12:]
-                plaintext = AESGCM(key).decrypt(nonce, ct, None)
-            elif version in (b"\x02", b"\x03"):
-                plaintext = self._unlock_hmac_ctr(password, ciphertext)
-            else:
+        with self._lock:
+            if not VAULT_FILE.exists():
                 return False
-            self._data = json.loads(plaintext.decode("utf-8"))
-            if save_to_keychain and password:
-                _keychain_set(password)
-            return True
-        except json.JSONDecodeError as e:
-            log.warning(f"[VAULT] Unlock failed: corrupted vault data: {e}")
-            self._password = None
-            return False
-        except ValueError as e:
-            log.warning(f"[VAULT] Unlock failed: bad decryption (wrong password?): {e}")
-            self._password = None
-            return False
-        except Exception as e:  # noqa: broad-except
-            log.warning(f"[VAULT] Unlock failed: {type(e).__name__}: {e}")
-            self._password = None
-            return False
+            raw: bytes = VAULT_FILE.read_bytes()
+            if len(raw) < 17:
+                return False
+            version: bytes = raw[0:1]
+            self._salt = raw[1:17]
+            ciphertext: bytes = raw[17:]
+            self._password = password
+            try:
+                key = _derive_key(password, self._salt)
+                plaintext: bytes
+                if version == b"\x03" and HAS_CRYPTO:
+                    nonce, ct = ciphertext[:12], ciphertext[12:]
+                    plaintext = AESGCM(key).decrypt(nonce, ct, None)
+                elif version in (b"\x02", b"\x03"):
+                    plaintext = self._unlock_hmac_ctr(password, ciphertext)
+                else:
+                    return False
+                self._data = json.loads(plaintext.decode("utf-8"))
+                if save_to_keychain and password:
+                    _keychain_set(password)
+                return True
+            except json.JSONDecodeError as e:
+                log.warning(f"[VAULT] Unlock failed: corrupted vault data: {e}")
+                self._password = None
+                return False
+            except ValueError as e:
+                log.warning(f"[VAULT] Unlock failed: bad decryption (wrong password?): {e}")
+                self._password = None
+                return False
+            except Exception as e:  # noqa: broad-except
+                log.warning(f"[VAULT] Unlock failed: {type(e).__name__}: {e}")
+                self._password = None
+                return False
 
     def _unlock_hmac_ctr(self, password: str, ciphertext: bytes) -> bytes:
         """Decrypt HMAC-CTR vault (new format with IV, legacy without)."""
@@ -212,35 +216,55 @@ class Vault:
         raise ValueError("Ciphertext too short")
 
     def _save(self) -> None:
-        """Encrypt and write vault to disk."""
+        """Encrypt and write vault to disk.
+
+        Must only be called while self._lock is held (create/unlock/set/delete/change_password
+        all acquire the lock before calling _save).
+        Writes an atomic backup (.vault.enc.bak) AFTER a successful save so we can
+        recover from corruption on the next startup.
+        """
         if self._password is None or self._salt is None:
             return
         VAULT_FILE.parent.mkdir(parents=True, exist_ok=True)
         plaintext: bytes = json.dumps(self._data).encode("utf-8")
         key = _derive_key(self._password, self._salt)
+        _backup_file = VAULT_FILE.parent / (VAULT_FILE.name + ".bak")
         if HAS_CRYPTO:
             nonce = secrets.token_bytes(12)
             ct = AESGCM(key).encrypt(nonce, plaintext, None)
-            VAULT_FILE.write_bytes(VAULT_VERSION + self._salt + nonce + ct)
+            new_bytes = VAULT_VERSION + self._salt + nonce + ct
+            VAULT_FILE.write_bytes(new_bytes)
             try:
                 import os as _os
-
                 _os.chmod(VAULT_FILE, 0o600)
             except OSError:
                 pass
+            # Only update backup when vault is non-trivially large (has real keys)
+            if len(new_bytes) > 100:
+                try:
+                    _backup_file.write_bytes(new_bytes)
+                    _os.chmod(_backup_file, 0o600)
+                except OSError:
+                    pass
         elif _ALLOW_FALLBACK:
             iv = secrets.token_bytes(16)
             enc_key = _derive_key(self._password, self._salt + b"enc" + iv, 32)
             ct = self._ctr_encrypt(enc_key, plaintext)
             hmac_key = _derive_key(self._password, self._salt + b"hmac", 32)
             tag = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
-            VAULT_FILE.write_bytes(b"\x02" + self._salt + tag + iv + ct)
+            new_bytes = b"\x02" + self._salt + tag + iv + ct
+            VAULT_FILE.write_bytes(new_bytes)
             try:
                 import os as _os
-
                 _os.chmod(VAULT_FILE, 0o600)
             except OSError:
                 pass
+            if len(new_bytes) > 100:
+                try:
+                    _backup_file.write_bytes(new_bytes)
+                    _os.chmod(_backup_file, 0o600)
+                except OSError:
+                    pass
         else:
             raise RuntimeError("Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1")
 
@@ -287,25 +311,28 @@ class Vault:
 
     def set(self, key: str, value: Any) -> None:
         """Store a value (triggers re-encryption)."""
-        self._data[key] = value
-        self._save()
+        with self._lock:
+            self._data[key] = value
+            self._save()
 
     def delete(self, key: str) -> None:
         """Delete a key."""
-        self._data.pop(key, None)
-        self._save()
+        with self._lock:
+            self._data.pop(key, None)
+            self._save()
 
     def change_password(self, old_password: str, new_password: str) -> bool:
         """Change vault master password. Returns True on success."""
-        if not self.is_unlocked:
-            return False
-        # Verify old password matches current (timing-safe comparison)
-        if not hmac.compare_digest((self._password or "").encode("utf-8"), old_password.encode("utf-8")):
-            return False
-        # Re-encrypt with new password
-        self._password = new_password
-        self._salt = secrets.token_bytes(16)
-        self._save()
+        with self._lock:
+            if not self.is_unlocked:
+                return False
+            # Verify old password matches current (timing-safe comparison)
+            if not hmac.compare_digest((self._password or "").encode("utf-8"), old_password.encode("utf-8")):
+                return False
+            # Re-encrypt with new password
+            self._password = new_password
+            self._salt = secrets.token_bytes(16)
+            self._save()
         _keychain_set(new_password)
         return True
 

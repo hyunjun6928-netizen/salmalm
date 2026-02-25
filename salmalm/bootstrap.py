@@ -165,25 +165,78 @@ def _auto_unlock_vault() -> None:
     # 1. Try OS keychain
     if vault.try_keychain_unlock():
         log.info("[UNLOCK] Vault auto-unlocked from keychain")
+        _refresh_vault_backup()
         return
     # 2. Try .vault_auto file (WSL/no-keychain fallback)
     _try_vault_auto_file()
     if vault.is_unlocked:
+        _refresh_vault_backup()
         return
     # 3. Try env var (deprecated)
     vault_pw = os.environ.get("SALMALM_VAULT_PW")
     if vault_pw and vault.unlock(vault_pw, save_to_keychain=True):
         log.info("[UNLOCK] Vault auto-unlocked from env")
+        _refresh_vault_backup()
         return
     # 4. Try empty password
     if vault.unlock(""):
         log.info("[UNLOCK] Vault auto-unlocked (no password)")
+        _refresh_vault_backup()
         return
-    # 5. All methods failed — warn but DO NOT delete vault data
+    # 5. Vault file is corrupt/wrong password — try to restore from backup
+    _backup = VAULT_FILE.parent / (VAULT_FILE.name + ".bak")
+    if _backup.exists() and _backup.stat().st_size > 100:
+        log.warning("[VAULT] All unlock methods failed. Attempting restore from backup...")
+        import shutil as _shutil
+        _corrupt = VAULT_FILE.parent / (VAULT_FILE.name + ".corrupt")
+        try:
+            _shutil.copy2(str(VAULT_FILE), str(_corrupt))
+            _shutil.copy2(str(_backup), str(VAULT_FILE))
+            log.info("[VAULT] Restored from backup. Retrying unlock...")
+            _try_vault_auto_file()
+            if vault.is_unlocked:
+                log.info("[VAULT] Vault restored and unlocked from backup.")
+                return
+            if vault.unlock(""):
+                log.info("[VAULT] Vault restored and unlocked (no password).")
+                return
+            log.warning("[VAULT] Backup restore did not unlock vault either.")
+        except OSError as _e:
+            log.warning(f"[VAULT] Backup restore failed: {_e}")
+    # 6. All methods failed — warn but DO NOT delete vault data
     log.warning(
         "[VAULT] All auto-unlock methods failed. "
         "Visit the web UI to unlock manually, or reset with: salmalm doctor --reset-vault"
     )
+
+
+def _refresh_vault_backup() -> None:
+    """After a successful unlock, ensure .vault.enc.bak is up-to-date.
+
+    The backup is the last line of defence when vault corruption occurs.
+    Only updates the backup if the current vault file is substantively larger
+    than a skeleton vault (> 100 bytes), so we never backup an empty vault.
+    """
+    try:
+        if not VAULT_FILE.exists():
+            return
+        size = VAULT_FILE.stat().st_size
+        if size <= 100:
+            return
+        _backup = VAULT_FILE.parent / (VAULT_FILE.name + ".bak")
+        # Only overwrite backup if current file is larger (more data = better)
+        if _backup.exists() and _backup.stat().st_size >= size:
+            return
+        import shutil as _shutil
+        _shutil.copy2(str(VAULT_FILE), str(_backup))
+        try:
+            import os as _os
+            _os.chmod(_backup, 0o600)
+        except OSError:
+            pass
+        log.debug(f"[VAULT] Backup updated ({size} bytes)")
+    except OSError as _e:
+        log.debug(f"[VAULT] Backup refresh skipped: {_e}")
 
 
 def _try_vault_auto_file() -> None:
