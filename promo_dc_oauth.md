@@ -53,6 +53,6 @@ GitHub: https://github.com/hyunjun6928-netizen/salmalm
 PyPI: https://pypi.org/project/salmalm/
 
 혼자 바이브코딩으로 만들었음
-Python 192파일 / 52,760줄 / 테스트 1,879개 / 도구 62개 / stdlib only
+Python 192파일 / 52,760줄 / 테스트 1,908개 / 도구 66개 / 의존성 3개(uvicorn, fastapi, websockets)
 
 질문이나 피드백 환영

@@ -383,7 +383,7 @@ class ContentMixin:
         manifest = {
             "name": "SalmAlm — Personal AI Gateway",
             "short_name": "SalmAlm",
-            "description": "Your personal AI gateway. 67 tools, 6 providers, zero dependencies.",
+            "description": "Your personal AI gateway. 66 tools, 6 providers, 3 core dependencies (uvicorn, fastapi, websockets).",
             "start_url": "/",
             "display": "standalone",
             "background_color": "#0b0d14",

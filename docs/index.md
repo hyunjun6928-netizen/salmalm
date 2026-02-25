@@ -67,7 +67,7 @@ On first launch, the setup wizard guides you through API key configuration.
 
 - [Getting Started](getting-started.md) — Installation and first setup
 - [Commands](commands.md) — Slash commands reference
-- [Tools](tools.md) — All 62 tools documented
+- [Tools](tools.md) — All 66 tools documented
 - [Features](features/index.md) — Deep dive into each feature
 - [Configuration](configuration.md) — Environment variables and settings
 - [Architecture](architecture.md) — Internal design and module structure

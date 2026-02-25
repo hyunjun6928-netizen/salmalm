@@ -7,8 +7,8 @@
 [![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1%2C879%20passed-brightgreen)]()
-[![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
+[![Tests](https://img.shields.io/badge/tests-1%2C908%20passed-brightgreen)]()
+[![Tools](https://img.shields.io/badge/tools-66-blueviolet)]()
 
 **[English README](README.md)**
 
@@ -18,7 +18,7 @@
 
 ## 삶앎이 뭔가요?
 
-**셀프호스팅 AI 비서**입니다. 웹 UI, 텔레그램/디스코드 봇, 62개 도구, 메모리 시스템, 서브에이전트, 멀티 모델 라우팅을 하나의 Python 패키지로 제공합니다.
+**셀프호스팅 AI 비서**입니다. 웹 UI, 텔레그램/디스코드 봇, 66개 도구, 메모리 시스템, 서브에이전트, 멀티 모델 라우팅을 하나의 Python 패키지로 제공합니다.
 
 Docker 없이. Node.js 없이. 설정 파일 없이.
 
@@ -141,7 +141,7 @@ SSRF 방어, CSRF 보호, CSP, 감사 로그, 메모리 스크러빙, 150+ 보�
 | Python 파일 | 192개 |
 | 코드 라인 | ~52,760 |
 | 도구 | 62개 |
-| 테스트 | 1,879 통과 |
+| 테스트 | 1,908 통과 |
 | 최대 순환복잡도 | ≤20 |
 
 ---
