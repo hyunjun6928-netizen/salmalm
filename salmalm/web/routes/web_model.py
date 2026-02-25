@@ -216,6 +216,12 @@ class WebModelMixin:
             self._json({"error": "model required"}, 400)
             return
         msg = llm_router.switch_model(model)
+        # Persist as global force_model so new sessions inherit it after clear/restart
+        try:
+            from salmalm.core.core import router as _router
+            _router.set_force_model(None if model == "auto" else model)
+        except Exception as e:
+            log.debug(f"[MODEL-SWITCH] force_model persist failed: {e}")
         # Also update session-level override so auto-routing respects UI selection
         sid = self.headers.get("X-Session-Id") or body.get("session") or "web"
         try:
