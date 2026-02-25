@@ -795,12 +795,25 @@ _KEYWORD_TOOLS = {
     "what is this":     ["web_fetch", "rag_search"],
     "이게 뭐야":        ["web_fetch", "rag_search", "brave_search"],
     "이게 뭔지":        ["web_fetch", "rag_search", "brave_search"],
-    "이 링크":          ["web_fetch"],
-    "이 URL":           ["web_fetch"],
-    "동영상 요약":      ["web_fetch", "rag_search"],
-    "유튜브 요약":      ["web_fetch", "rag_search"],
+    "이 링크":          ["web_fetch", "rag_search"],
+    "이 url":           ["web_fetch", "rag_search"],
+    "이 URL":           ["web_fetch", "rag_search"],
+    "링크 내용":        ["web_fetch", "rag_search"],
+    "링크 요약":        ["web_fetch", "rag_search"],
+    "링크 뭐야":        ["web_fetch", "rag_search"],
+    "이 비디오":        ["web_fetch", "stt"],
+    "이 영상":          ["web_fetch", "stt"],
+    "동영상 요약":      ["web_fetch", "rag_search", "stt"],
+    "유튜브 요약":      ["web_fetch", "rag_search", "stt"],
     "유튜브":           ["web_fetch", "brave_search"],
     "youtube":          ["web_fetch", "brave_search"],
+    "이 글":            ["web_fetch", "rag_search"],
+    "this article":     ["web_fetch", "rag_search"],
+    "this link":        ["web_fetch", "rag_search"],
+    "this url":         ["web_fetch", "rag_search"],
+    "this video":       ["web_fetch", "stt"],
+    "summarize this":   ["web_fetch", "rag_search"],
+    "summarize url":    ["web_fetch", "rag_search"],
     "article":          ["web_fetch", "rag_search"],
     "기사 요약":        ["web_fetch", "rag_search"],
 
@@ -1177,6 +1190,12 @@ _EMOJI_TOOLS: dict[str, list[str]] = {
     "📍": ["web_search"],
     # Document / Clipboard
     "🗒️": ["note", "write_file"],
+    # Summarize / Document (OpenClaw summarize skill)
+    "🧾": ["web_fetch", "rag_search"],
+    # Coding agent / Plugin (OpenClaw coding-agent skill)
+    "🧩": ["exec", "python_eval", "write_file"],
+    # GitHub / Code review (OpenClaw github skill)
+    "🐙": ["exec", "web_fetch"],
 }
 
 

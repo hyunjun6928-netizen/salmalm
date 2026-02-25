@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.27.1 (2026-02-25)
+### Stability + Keyword
+- **SSE per-chunk stall timeout (60s)** — 서버가 접속 유지하면서 데이터 안 보낼 때 60초 후 자동 abort → HTTP POST fallback. 기존 180초 전체 타이머만으론 청크 단위 stall 감지 불가
+- **URL/링크 컨텍스트 키워드** — `this link`, `this url`, `what's this`, `summarize this`, `링크 내용`, `링크 요약`, `이 글`, `이 영상`, `this video` 등 12개 추가 (OpenClaw summarize 스킬 trigger phrases 참조)
+- **이모지 3종 추가** — 🧾→web_fetch/rag_search (summarize), 🧩→exec/python_eval (coding-agent), 🐙→exec/web_fetch (github)
+
 ## v0.27.0 (2026-02-25)
 ### UX Convenience Upgrade
 - **Emoji intent injection** — 80 emoji (📸📅🔍🎵⏰🌤️📧💻 등) → 해당 tool 자동 inject
