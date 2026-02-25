@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.27.5 (2026-02-25)
+### Packaging Fix
+- `static/dist/*.js` (agent-panel.js) now included in PyPI wheel — Agents tab no longer shows "not built yet"
+
 ## v0.27.2 (2026-02-25)
 ### Stability Hardening (OpenClaw patterns)
 - **SSE 중복 응답 방지 (Idempotency)** — 클라이언트가 send마다 `req_id` 생성, SSE 완료 시 서버가 5분 캐시 저장. HTTP POST fallback 시 캐시 히트 → 재처리 없이 즉시 반환. `❌ 응답 2개` 버그 근본 해결
