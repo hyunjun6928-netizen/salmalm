@@ -145,13 +145,30 @@ def _fetch_provider_models(provider: str) -> List[str]:
             with urllib.request.urlopen(req, timeout=8) as r:
                 data = json.loads(r.read())
             import re
-            return [
+            _date_pat = re.compile(r"-(\d{8}|\d{4}-\d{2}-\d{2})$")
+
+            def _claude_family(mid: str) -> str:
+                """Extract model family: 'haiku', 'sonnet', 'opus', etc."""
+                parts = mid.split("-")
+                return parts[1] if len(parts) > 1 else mid  # claude-{family}-...
+
+            all_ids = [
                 m["id"] for m in data.get("data", [])
                 if m.get("type", "model") == "model"
-                and not re.search(r"-\d{8}$", m["id"])   # skip date-pinned snapshots
-                and not re.search(r"-\d{4}-\d{2}-\d{2}$", m["id"])  # ISO date snapshots
-                and "claude-3-" not in m["id"]            # skip legacy claude-3 family
+                and "claude-3-" not in m["id"]  # drop legacy claude-3 family
             ]
+            # Canonical = no date suffix (e.g. claude-sonnet-4-6)
+            canonical_set = {m for m in all_ids if not _date_pat.search(m)}
+            canonical_families = {_claude_family(m) for m in canonical_set}
+            # Dated: keep latest per family, only if that family has no canonical
+            dated_by_family: Dict[str, str] = {}
+            for m in all_ids:
+                if _date_pat.search(m):
+                    fam = _claude_family(m)
+                    if fam not in canonical_families:
+                        if fam not in dated_by_family or m > dated_by_family[fam]:
+                            dated_by_family[fam] = m
+            return sorted(canonical_set) + sorted(dated_by_family.values())
 
         elif provider == "google":
             url = f"{base}/models?key={key}&pageSize=100"
