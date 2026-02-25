@@ -633,6 +633,27 @@ async def run_server():
             log.warning(w)
     url = f"http://{bind_addr}:{port}"
 
+    # ── Pre-flight: check port availability ──────────────────────────────────
+    import socket as _socket
+    def _port_in_use(host: str, p: int) -> bool:
+        with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as _s:
+            _s.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+            try:
+                _s.bind((host, p))
+                return False
+            except OSError:
+                return True
+
+    if _port_in_use(bind_addr, port):
+        print(
+            f"\n❌  Port {port} is already in use.\n"
+            f"   SalmAlm may already be running.\n\n"
+            f"   To check:  salmalm service status\n"
+            f"   To stop:   salmalm service stop\n"
+            f"   To use a different port: SALMALM_PORT=18802 salmalm\n"
+        )
+        raise SystemExit(1)
+
     # ── Try uvicorn (ASGI) first; fall back to ThreadingHTTPServer ──────────
     _uvicorn_ok = False
     server = None
@@ -656,11 +677,14 @@ async def run_server():
         uvicorn_server = uvicorn.Server(uvicorn_config)
         web_thread = threading.Thread(
             target=uvicorn_server.run, daemon=True,
+            name="uvicorn-main",
         )
         web_thread.start()
-        # Give uvicorn a moment to bind port
+        # Give uvicorn time to bind; verify thread is still alive
         import time as _time
-        _time.sleep(0.3)
+        _time.sleep(0.5)
+        if not web_thread.is_alive():
+            raise OSError(f"uvicorn thread died immediately — port {port} likely stolen between check and bind")
         _uvicorn_ok = True
         log.info("[WEB] Running on uvicorn (ASGI)")
         server = uvicorn_server  # keep reference for shutdown

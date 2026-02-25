@@ -140,10 +140,10 @@
         var msg='✅ v'+d.version+' installed! Restart to apply.';
         if(re){re.innerHTML='<span style="color:#4ade80">'+msg+'</span>';
           var rb=document.createElement('button');rb.className='btn';rb.style.marginTop='8px';rb.textContent='🔄 Restart Now';
-          rb.onclick=function(){fetch('/api/restart',{method:'POST'});setTimeout(function(){location.reload()},3000)};re.appendChild(rb);
+          rb.onclick=function(){fetch('/api/restart',{method:'POST'});window._waitForServerThenReload&&_waitForServerThenReload()||setTimeout(function(){location.reload()},5000)};re.appendChild(rb);
         }
         if(bannerBtn){bannerBtn.textContent='🔄 Restart';bannerBtn.disabled=false;
-          bannerBtn.onclick=function(){fetch('/api/restart',{method:'POST'});bannerBtn.textContent='Restarting...';bannerBtn.disabled=true;setTimeout(function(){location.reload()},3000)};
+          bannerBtn.onclick=function(){fetch('/api/restart',{method:'POST'});bannerBtn.textContent='Restarting...';bannerBtn.disabled=true;window._waitForServerThenReload?_waitForServerThenReload():setTimeout(function(){location.reload()},5000)};
         }
       }else{
         var errMsg='❌ '+(d.error||'Update failed');

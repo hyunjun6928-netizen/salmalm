@@ -15,7 +15,7 @@
   let _tok$1 = sessionStorage.getItem("tok") || "";
   let pendingFile = null;
   let pendingFiles = [];
-  let _currentSession = localStorage.getItem("salm_active_session") || "web";
+  let _currentSession$1 = localStorage.getItem("salm_active_session") || "web";
   let _sessionCache = {};
   function set_pendingFile(v) {
     pendingFile = v;
@@ -24,7 +24,7 @@
     pendingFiles = v;
   }
   function set_currentSession(v) {
-    _currentSession = v;
+    _currentSession$1 = v;
   }
   function set_sessionCache(v) {
     _sessionCache = v;
@@ -95,7 +95,7 @@
       function renderSession(s, indent) {
         if (rendered[s.id]) return "";
         rendered[s.id] = true;
-        var active = s.id === _currentSession ? ' style="background:var(--accent-dim);border-radius:8px"' : "";
+        var active = s.id === _currentSession$1 ? ' style="background:var(--accent-dim);border-radius:8px"' : "";
         var title = s.title || s.id;
         title = title.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1").replace(/`([^`]+)`/g, "$1");
         if (title.length > 40) title = title.slice(0, 40) + "...";
@@ -120,8 +120,8 @@
     });
   }
   window.switchSession = function(sid) {
-    _sessionCache[_currentSession] = chat.innerHTML;
-    localStorage.setItem(_storageKey$1(_currentSession), localStorage.getItem("salm_chat") || "[]");
+    _sessionCache[_currentSession$1] = chat.innerHTML;
+    localStorage.setItem(_storageKey$1(_currentSession$1), localStorage.getItem("salm_chat") || "[]");
     set_currentSession(sid);
     localStorage.setItem("salm_active_session", sid);
     chat.innerHTML = "";
@@ -146,8 +146,8 @@
   };
   window.newSession = function() {
     var sid = _genId();
-    _sessionCache[_currentSession] = chat.innerHTML;
-    localStorage.setItem(_storageKey$1(_currentSession), localStorage.getItem("salm_chat") || "[]");
+    _sessionCache[_currentSession$1] = chat.innerHTML;
+    localStorage.setItem(_storageKey$1(_currentSession$1), localStorage.getItem("salm_chat") || "[]");
     set_currentSession(sid);
     localStorage.setItem("salm_active_session", sid);
     localStorage.removeItem("salm_chat");
@@ -167,7 +167,7 @@
     }).then(function() {
       localStorage.removeItem(_storageKey$1(sid));
       delete _sessionCache[sid];
-      if (sid === _currentSession) {
+      if (sid === _currentSession$1) {
         set_currentSession("web");
         localStorage.setItem("salm_active_session", "web");
         var webData = localStorage.getItem(_storageKey$1("web")) || "[]";
@@ -193,11 +193,11 @@
     fetch("/api/sessions/clear", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
-      body: JSON.stringify({ keep: _currentSession })
+      body: JSON.stringify({ keep: _currentSession$1 })
     }).then(function() {
       for (var i = localStorage.length - 1; i >= 0; i--) {
         var k = localStorage.key(i);
-        if (k && k.startsWith("salm_chat_") && k !== _storageKey$1(_currentSession)) localStorage.removeItem(k);
+        if (k && k.startsWith("salm_chat_") && k !== _storageKey$1(_currentSession$1)) localStorage.removeItem(k);
       }
       set_sessionCache({});
       loadSessionList$1();
@@ -205,7 +205,7 @@
     });
   };
   window._pendingRestore = function() {
-    var stored = localStorage.getItem(_storageKey(_currentSession));
+    var stored = localStorage.getItem(_storageKey(_currentSession$1));
     if (stored) localStorage.setItem("salm_chat", stored);
     var hist = JSON.parse(localStorage.getItem("salm_chat") || "[]");
     if (hist.length) {
@@ -508,7 +508,7 @@
       fetch("/api/sessions/branch", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
-        body: JSON.stringify({ session_id: _currentSession, message_index: idx })
+        body: JSON.stringify({ session_id: _currentSession$1, message_index: idx })
       }).then(function(r) {
         return r.json();
       }).then(function(d) {
@@ -537,7 +537,7 @@
       hist.push({ role, text, model: null });
       if (hist.length > 200) hist = hist.slice(-200);
       localStorage.setItem("salm_chat", JSON.stringify(hist));
-      localStorage.setItem(_storageKey(_currentSession), JSON.stringify(hist));
+      localStorage.setItem(_storageKey(_currentSession$1), JSON.stringify(hist));
     }
   }
   window._cancelGeneration = function() {
@@ -846,10 +846,8 @@
       if (data.status === "installing") {
         addMsg("assistant", "⏳ Updating SalmAlm... please wait.");
       } else if (data.status === "complete") {
-        addMsg("assistant", "✅ Updated to v" + (data.version || "?") + ". Restarting in 3s...");
-        setTimeout(function() {
-          location.reload();
-        }, 3e3);
+        addMsg("assistant", "✅ Updated to v" + (data.version || "?") + ". Restarting...");
+        _waitForServerThenReload$1();
       }
     }
   }
@@ -885,6 +883,31 @@
     }
     _poll();
   }
+  function _waitForServerThenReload$1(maxTries, interval) {
+    maxTries = maxTries || 30;
+    interval = interval || 1e3;
+    var tries = 0;
+    function _poll() {
+      tries++;
+      fetch("/api/health", { cache: "no-store" }).then(function(r) {
+        if (r.ok) {
+          location.reload();
+        } else if (tries < maxTries) {
+          setTimeout(_poll, interval);
+        } else {
+          location.reload();
+        }
+      }).catch(function() {
+        if (tries < maxTries) {
+          setTimeout(_poll, interval);
+        } else {
+          location.reload();
+        }
+      });
+    }
+    setTimeout(_poll, 1e3);
+  }
+  window._waitForServerThenReload = _waitForServerThenReload$1;
   _wsConnect();
   window._checkPendingRecovery = function() {
     var sid = localStorage.getItem("salm_sse_pending");
@@ -976,13 +999,13 @@
       fetch("/api/sessions/rollback", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
-        body: JSON.stringify({ session_id: _currentSession, count: cnt })
+        body: JSON.stringify({ session_id: _currentSession$1, count: cnt })
       }).then(function(r) {
         return r.json();
       }).then(function(d) {
         if (d.ok) {
           addMsg("assistant", t("rollback-done") + " " + d.removed + " " + t("rollback-pairs"));
-          switchSession(_currentSession);
+          switchSession(_currentSession$1);
         } else {
           addMsg("assistant", t("rollback-fail") + " " + (d.error || ""));
         }
@@ -997,7 +1020,7 @@
       fetch("/api/sessions/branch", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
-        body: JSON.stringify({ session_id: _currentSession, message_index: idx })
+        body: JSON.stringify({ session_id: _currentSession$1, message_index: idx })
       }).then(function(r) {
         return r.json();
       }).then(function(d) {
@@ -1087,7 +1110,7 @@
     }, 18e4);
     var _sendStart = Date.now();
     _wsSendStart = _sendStart;
-    var chatBody = { message: msg, session: _currentSession, lang: _lang };
+    var chatBody = { message: msg, session: _currentSession$1, lang: _lang };
     if (imgData) {
       chatBody.image_base64 = imgData;
       chatBody.image_mime = imgMime;
@@ -2058,7 +2081,7 @@
     return _MODEL_PRICES[short] || null;
   }
   window._loadModelRouter = function() {
-    var hdr = { "X-Session-Token": _tok$1, "X-Session-Id": _currentSession };
+    var hdr = { "X-Session-Token": _tok$1, "X-Session-Id": _currentSession$1 };
     fetch("/api/llm-router/providers", { headers: hdr }).then(function(r) {
       return r.json();
     }).then(function(d) {
@@ -2501,7 +2524,7 @@
   window._refreshDash = function() {
     var dc = document.getElementById("dashboard-content");
     dc.innerHTML = '<p style="color:var(--text2)">Loading...</p>';
-    var hdr = { "X-Session-Token": _tok$1 };
+    var hdr = { "X-Session-Token": _tok };
     Promise.all([
       fetch("/api/dashboard", { headers: hdr }).then(function(r) {
         return r.json();
@@ -2734,9 +2757,9 @@
           rb.textContent = "🔄 Restart Now";
           rb.onclick = function() {
             fetch("/api/restart", { method: "POST" });
-            setTimeout(function() {
+            window._waitForServerThenReload && _waitForServerThenReload() || setTimeout(function() {
               location.reload();
-            }, 3e3);
+            }, 5e3);
           };
           re.appendChild(rb);
         }
@@ -2747,9 +2770,9 @@
             fetch("/api/restart", { method: "POST" });
             bannerBtn.textContent = "Restarting...";
             bannerBtn.disabled = true;
-            setTimeout(function() {
+            window._waitForServerThenReload ? _waitForServerThenReload() : setTimeout(function() {
               location.reload();
-            }, 3e3);
+            }, 5e3);
           };
         }
       } else {
@@ -2801,7 +2824,7 @@
       document.getElementById(inputId).value = "";
       var llmKeys = ["anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key"];
       if (llmKeys.indexOf(vaultKey) !== -1) {
-        fetch("/api/routing/optimize", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: "{}" }).then(function(r) {
+        fetch("/api/routing/optimize", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: "{}" }).then(function(r) {
           return r.json();
         }).then(function(od) {
           if (od.ok) {
@@ -2914,7 +2937,8 @@
     });
   };
   window.setModel = function(m) {
-    modelBadge$1.textContent = m === "auto" ? "auto routing" : m.split("/").pop();
+    _isAutoRouting = m === "auto";
+    modelBadge.textContent = m === "auto" ? "auto routing" : m.split("/").pop();
     var cn = document.getElementById("mr-current-name");
     if (cn) cn.textContent = m === "auto" ? "🔄 Auto Routing" : m;
     var sel = document.getElementById("s-model");
@@ -2923,12 +2947,13 @@
     if (hint) {
       hint.style.display = m === "auto" ? "none" : "block";
     }
-    fetch("/api/model/switch", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 }, body: JSON.stringify({ model: m, session: _currentSession }) }).then(function(r) {
+    fetch("/api/model/switch", { method: "POST", headers: { "Content-Type": "application/json", "X-Session-Token": _tok }, body: JSON.stringify({ model: m, session: _currentSession }) }).then(function(r) {
       return r.json();
     }).then(function(d) {
       var eff = d.current_model || m;
       if (cn) cn.textContent = eff === "auto" ? "🔄 Auto Routing" : eff;
-      modelBadge$1.textContent = eff === "auto" ? "auto routing" : eff.split("/").pop();
+      _isAutoRouting = eff === "auto";
+      modelBadge.textContent = eff === "auto" ? "auto routing" : eff.split("/").pop();
       if (sel) sel.value = eff;
       if (hint) {
         hint.style.display = eff === "auto" ? "none" : "block";
@@ -3168,7 +3193,7 @@
     addMsg("assistant", t("welcome-msg"), "system");
   }
   input.focus();
-  fetch("/api/status?session=" + encodeURIComponent(_currentSession)).then((r) => r.json()).then((d) => {
+  fetch("/api/status?session=" + encodeURIComponent(_currentSession$1)).then((r) => r.json()).then((d) => {
     if (d.model && d.model !== "auto") {
       var sel = document.getElementById("s-model");
       if (sel) {
@@ -3225,11 +3250,11 @@
   };
   window.exportServerMd = function() {
     document.getElementById("export-menu").classList.remove("open");
-    window.open("/api/sessions/" + encodeURIComponent(_currentSession) + "/export?format=md");
+    window.open("/api/sessions/" + encodeURIComponent(_currentSession$1) + "/export?format=md");
   };
   window.exportServerJson = function() {
     document.getElementById("export-menu").classList.remove("open");
-    window.open("/api/sessions/" + encodeURIComponent(_currentSession) + "/export?format=json");
+    window.open("/api/sessions/" + encodeURIComponent(_currentSession$1) + "/export?format=json");
   };
   window.importChat = function() {
     var inp = document.createElement("input");
@@ -3785,7 +3810,7 @@
       fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
-        body: JSON.stringify({ message: "/thinking on", session: _currentSession })
+        body: JSON.stringify({ message: "/thinking on", session: _currentSession$1 })
       }).catch(function() {
       });
       addMsg("system", t("thinking-on"));
@@ -3795,7 +3820,7 @@
       fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Session-Token": _tok$1 },
-        body: JSON.stringify({ message: "/thinking off", session: _currentSession })
+        body: JSON.stringify({ message: "/thinking off", session: _currentSession$1 })
       }).catch(function() {
       });
       addMsg("system", t("thinking-off"));

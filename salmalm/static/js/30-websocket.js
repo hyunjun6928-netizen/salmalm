@@ -121,8 +121,8 @@
       if(data.status==='installing'){
         addMsg('assistant','⏳ Updating SalmAlm... please wait.');
       }else if(data.status==='complete'){
-        addMsg('assistant','✅ Updated to v'+(data.version||'?')+'. Restarting in 3s...');
-        setTimeout(function(){location.reload();},3000);
+        addMsg('assistant','✅ Updated to v'+(data.version||'?')+'. Restarting...');
+        _waitForServerThenReload();
       }
     }
   }
@@ -157,6 +157,28 @@
     }
     _poll();
   }
+
+  /* Poll /api/health until server is back up, then reload — prevents blank page on restart */
+  function _waitForServerThenReload(maxTries,interval){
+    maxTries=maxTries||30;interval=interval||1000;
+    var tries=0;
+    function _poll(){
+      tries++;
+      fetch('/api/health',{cache:'no-store'})
+      .then(function(r){
+        if(r.ok){location.reload();}
+        else if(tries<maxTries){setTimeout(_poll,interval);}
+        else{location.reload();} /* give up and reload anyway */
+      })
+      .catch(function(){
+        if(tries<maxTries){setTimeout(_poll,interval);}
+        else{location.reload();}
+      });
+    }
+    /* Wait 1s before first attempt (server is shutting down) */
+    setTimeout(_poll,1000);
+  }
+  window._waitForServerThenReload=_waitForServerThenReload;
 
   /* Connect on load */
   _wsConnect();
