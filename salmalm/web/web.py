@@ -159,6 +159,7 @@ class WebHandler(
         "/api/setup",
         "/docs",
         "/api/google/callback",
+        "/api/google/auth",
         "/webhook/telegram",
         "/webhook/slack",
         "/api/check-update",
