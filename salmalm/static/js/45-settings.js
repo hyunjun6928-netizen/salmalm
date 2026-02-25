@@ -14,7 +14,7 @@
   window.showMemory=function(){_hideAll();memView.style.display='block';window._loadMemory()};
   window.showSettings=function(){_hideAll();settingsEl.style.display='block';
     /* Auto-fill Google redirect URI with current origin */
-    var _rUri=document.querySelector('.google-redirect-uri');if(_rUri)_rUri.textContent=location.origin+'/api/google/callback';
+    var _rUri=document.querySelector('.google-redirect-uri');if(_rUri)_rUri.textContent=location.origin.replace('127.0.0.1','localhost')+'/api/google/callback';
     /* Load personas */
     if(window.loadPersonas)window.loadPersonas();
     /* Auto-run doctor + usage chart */

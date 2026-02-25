@@ -227,7 +227,7 @@
   setTimeout(function(){
     var dots=document.querySelectorAll('.color-dot');dots.forEach(function(d){if(d.getAttribute('data-color')===_color)d.style.outline='2px solid var(--text)'});
     /* Fill Google redirect URI on page load */
-    var _rUris=document.querySelectorAll('.google-redirect-uri');_rUris.forEach(function(el){el.textContent=location.origin+'/api/google/callback'});
+    var _rUris=document.querySelectorAll('.google-redirect-uri');var _oauthOrigin=location.origin.replace('127.0.0.1','localhost');_rUris.forEach(function(el){el.textContent=_oauthOrigin+'/api/google/callback'});
   },100);
 
 
@@ -1607,7 +1607,7 @@ window._i18n={
   window.showMemory=function(){_hideAll();memView.style.display='block';window._loadMemory()};
   window.showSettings=function(){_hideAll();settingsEl.style.display='block';
     /* Auto-fill Google redirect URI with current origin */
-    var _rUri=document.querySelector('.google-redirect-uri');if(_rUri)_rUri.textContent=location.origin+'/api/google/callback';
+    var _rUri=document.querySelector('.google-redirect-uri');if(_rUri)_rUri.textContent=location.origin.replace('127.0.0.1','localhost')+'/api/google/callback';
     /* Load personas */
     if(window.loadPersonas)window.loadPersonas();
     /* Auto-run doctor + usage chart */

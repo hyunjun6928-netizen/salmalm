@@ -20,5 +20,5 @@
   setTimeout(function(){
     var dots=document.querySelectorAll('.color-dot');dots.forEach(function(d){if(d.getAttribute('data-color')===_color)d.style.outline='2px solid var(--text)'});
     /* Fill Google redirect URI on page load */
-    var _rUris=document.querySelectorAll('.google-redirect-uri');_rUris.forEach(function(el){el.textContent=location.origin+'/api/google/callback'});
+    var _rUris=document.querySelectorAll('.google-redirect-uri');var _oauthOrigin=location.origin.replace('127.0.0.1','localhost');_rUris.forEach(function(el){el.textContent=_oauthOrigin+'/api/google/callback'});
   },100);
