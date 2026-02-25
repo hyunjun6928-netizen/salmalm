@@ -385,18 +385,24 @@ class WebFilesMixin:
                 vault.set("google_access_token", access_token)
             scopes = result.get("scope", "")
             self._html(f"""<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
-                <h2 style="color:#22c55e">\\u2705 Google Connected!</h2>
-                <p>Refresh token saved to vault.</p>
+                <h2 style="color:#22c55e">✅ Google 연동 완료!</h2>
+                <p>Refresh token이 vault에 저장되었습니다.</p>
                 <p style="font-size:0.85em;color:#666">Scopes: {scopes}</p>
-                <p><a href="/" style="color:#6366f1">\\u2190 Back to SalmAlm</a></p>
+                <p><a href="/" style="color:#6366f1">← SalmAlm으로 돌아가기</a></p>
+                <script>
+                  if(window.opener&&!window.opener.closed){{
+                    try{{window.opener.checkGoogleStatus&&window.opener.checkGoogleStatus()}}catch(e){{}}
+                    setTimeout(function(){{window.close()}},1500);
+                  }}
+                </script>
                 </body></html>""")
             log.info(f"[OK] Google OAuth2 connected (scopes: {scopes})")
         except Exception as e:
             log.error(f"Google OAuth2 token exchange failed: {e}")
             self._html(f"""<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
-                <h2 style="color:#ef4444">\\u274c Token Exchange Failed</h2>
+                <h2 style="color:#ef4444">❌ 토큰 교환 실패</h2>
                 <p>{str(e)[:200]}</p>
-                <p><a href="/" style="color:#6366f1">\\u2190 Back</a></p>
+                <p><a href="/" style="color:#6366f1">← SalmAlm으로 돌아가기</a></p>
                 </body></html>""")
 
     def _get_api_agent_export(self) -> None:

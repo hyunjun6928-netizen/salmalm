@@ -2355,8 +2355,22 @@ window._i18n={
     fetch('/api/vault',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'get',key:'google_refresh_token'})})
     .then(function(r){return r.json()}).then(function(d){
-      if(d.value){st.innerHTML='<span style="color:#4ade80">'+t('google-connected')+'</span>'}
-      else{st.innerHTML='<span style="color:var(--text2)">'+t('google-not-connected')+'</span>'}
+      if(d.value){
+        st.innerHTML='<span style="color:#4ade80">'+t('google-connected')+'</span>';
+        /* Sync badge: add google_refresh_token to _configuredKeys and re-render */
+        if(!window._configuredKeys)window._configuredKeys=[];
+        if(window._configuredKeys.indexOf('google_refresh_token')<0){
+          window._configuredKeys.push('google_refresh_token');
+          if(typeof window._applyVaultKeys==='function')window._applyVaultKeys(window._configuredKeys);
+        }
+      }else{
+        st.innerHTML='<span style="color:var(--text2)">'+t('google-not-connected')+'</span>';
+        /* Remove token from badge keys */
+        if(window._configuredKeys){
+          var idx=window._configuredKeys.indexOf('google_refresh_token');
+          if(idx>-1){window._configuredKeys.splice(idx,1);if(typeof window._applyVaultKeys==='function')window._applyVaultKeys(window._configuredKeys);}
+        }
+      }
     }).catch(function(){st.innerHTML=''})
   };
   window.setModel=function(m){
