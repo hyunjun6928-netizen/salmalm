@@ -144,6 +144,17 @@ class AgentsMixin:
             _tasks[task_id]["status"] = "cancelled"
         self._json({"ok": True})
 
+    def _post_api_agent_tasks_clear(self) -> None:
+        """POST /api/agent/tasks/clear — remove all completed/failed/cancelled tasks."""
+        if not self._require_auth("user"):
+            return
+        _DONE_STATUSES = {"done", "failed", "cancelled"}
+        with _tasks_lock:
+            to_remove = [tid for tid, t in _tasks.items() if t.get("status") in _DONE_STATUSES]
+            for tid in to_remove:
+                del _tasks[tid]
+        self._json({"ok": True, "removed": len(to_remove)})
+
     def _post_api_directive(self) -> None:
         """POST /api/directive — handle $-prefixed CEO directives from chat."""
         if not self._require_auth("user"):

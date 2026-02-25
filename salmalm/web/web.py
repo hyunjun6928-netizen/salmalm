@@ -721,6 +721,7 @@ self.addEventListener('fetch',e=>{{
         "/api/engine/settings": "_post_api_engine_settings",
         "/api/agent/task": "_post_api_agent_task",
         "/api/agent/task/cancel": "_delete_api_agent_task",
+        "/api/agent/tasks/clear": "_post_api_agent_tasks_clear",
         "/api/directive": "_post_api_directive",
     }
 

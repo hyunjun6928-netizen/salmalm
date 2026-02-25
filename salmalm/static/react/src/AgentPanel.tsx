@@ -396,11 +396,11 @@ export default function AgentPanel() {
 
   const handleClearCompleted = async () => {
     try {
-      await Promise.all(
-        completedTasks.map(t =>
-          fetch(`/api/agent/task/${t.id}`, { method: 'DELETE', headers: authHeaders() })
-        )
-      );
+      await fetch('/api/agent/tasks/clear', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: '{}',
+      });
       await fetchTasks();
     } catch {
       // ignore
