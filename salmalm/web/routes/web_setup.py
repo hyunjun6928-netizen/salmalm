@@ -33,6 +33,7 @@ class WebSetupMixin:
             "openai_api_key",
             "xai_api_key",
             "google_api_key",
+            "openrouter_api_key",
         ]
         has_api_key = any(vault.get(k) for k in providers)
         has_ollama = bool(vault.get("ollama_url"))
@@ -151,6 +152,7 @@ class WebSetupMixin:
             "xai_api_key",
             "google_api_key",
             "brave_api_key",
+            "openrouter_api_key",
         ):
             val = body.get(key, "").strip()
             if val:
@@ -257,7 +259,9 @@ class WebSetupMixin:
         except Exception as e:
             log.warning(f"[ONBOARDING] Auto-routing failed (ignored): {e}")
         test_result = " | ".join(test_results) if test_results else "Keys saved."
-        self._json({"ok": True, "saved": saved, "test_result": test_result, "routing": routing_config})
+        # all_ok: True only when every tested key passed (no ⚠️ in any result)
+        all_ok = not any("⚠️" in r for r in test_results)
+        self._json({"ok": True, "saved": saved, "test_result": test_result, "all_ok": all_ok, "routing": routing_config})
         return
 
     def _post_api_onboarding_preferences(self):

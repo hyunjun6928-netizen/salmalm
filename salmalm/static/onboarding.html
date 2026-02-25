@@ -96,6 +96,16 @@ button:disabled{opacity:0.5;cursor:not-allowed}
     <input type="password" id="google" placeholder="AIza...">
     <div class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
   </div>
+  <div class="field">
+    <label>xAI API Key (Grok)</label>
+    <input type="password" id="xai" placeholder="xai-...">
+    <div class="hint"><a href="https://console.x.ai/" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
+  </div>
+  <div class="field">
+    <label>OpenRouter API Key <span style="color:#888">(150+ models)</span></label>
+    <input type="password" id="openrouter" placeholder="sk-or-...">
+    <div class="hint">Access GPT, Claude, Gemini, Llama and more via one key. <a href="https://openrouter.ai/keys" target="_blank" style="color:#7c5cfc">Get Key →</a></div>
+  </div>
   <div class="divider"></div>
   <div id="ollama-detect-banner" style="display:none;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #7c5cfc;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center">
     <div style="font-size:24px;margin-bottom:8px">🦙✨</div>
@@ -207,14 +217,25 @@ let currentStep=0, selectedModel='auto', selectedPersona='expert';
   }).catch(function(){});
 })();
 
-function skipWithOllama(){
+async function skipWithOllama(){
   var url=document.getElementById('ollama').value||'http://localhost:11434/v1';
-  fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ollama_url:url})})
-  .then(r=>r.json()).then(d=>{
-    if(d.ok){window.location.href='/';}
-    else{alert(d.error||'Failed');}
-  });
+  try{
+    const r=await fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ollama_url:url})});
+    const d=await r.json();
+    if(d.ok){
+      // Also save model + persona preferences before redirecting
+      try{
+        await fetch('/api/onboarding/preferences',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({model:selectedModel,persona:selectedPersona})});
+      }catch(e){/* best effort */}
+      window.location.href='/';
+    }else{
+      alert(d.error||'Failed');
+    }
+  }catch(e){
+    alert('Network error: '+e);
+  }
 }
 
 function goStep(n){
@@ -239,7 +260,7 @@ function pickPersona(el){
 
 function getKeys(){
   const body={};
-  ['anthropic','openai','google'].forEach(k=>{
+  ['anthropic','openai','google','xai','openrouter'].forEach(k=>{
     const v=document.getElementById(k).value.trim();
     if(v) body[k+'_api_key']=v;
   });
@@ -255,7 +276,7 @@ async function testAndNext(){
   const status=document.getElementById('test-status');
   const keys=getKeys();
   if(!Object.keys(keys).length){
-    status.textContent='⚠️ Please enter at least one API key first (Step 2)';
+    status.textContent='⚠️ Please enter at least one API key first (Step 1)';
     status.className='test-status fail';
     return;
   }
@@ -266,14 +287,15 @@ async function testAndNext(){
     const r=await fetch('/api/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(keys)});
     const d=await r.json();
     if(d.ok){
-      const isTestFail=d.test_result&&d.test_result.includes('fail');
-      if(!isTestFail){
+      // Use explicit all_ok flag from server (not string matching)
+      if(d.all_ok !== false){
         status.textContent='✅ Connection successful! ('+d.saved.join(', ')+' saved)';
         status.className='test-status success';
         setTimeout(()=>goStep(3),1000);
       }else{
-        status.textContent='⚠️ Keys saved but test failed — check your keys';
+        status.textContent='⚠️ Keys saved but test failed: '+d.test_result;
         status.className='test-status fail';
+        btn.disabled=false;
       }
     }else{
       status.textContent='❌ '+d.error;
@@ -304,6 +326,8 @@ if(_lang==='ko'){
   document.querySelector('#step-0 button').textContent='시작하기! →';
   document.querySelector('#step-1 h2').textContent='🔑 API 키';
   document.querySelector('#step-1 .sub').textContent='AI 제공자에 연결하려면 최소 1개의 API 키를 입력하세요.';
+  document.querySelector('#xai').previousElementSibling.textContent='xAI API 키 (Grok)';
+  document.querySelector('#openrouter').previousElementSibling.textContent='OpenRouter API 키 (150개+ 모델)';
   document.querySelector('#step-2 h2').textContent='🤖 기본 모델';
   document.querySelector('#step-2 .sub').innerHTML='선호하는 AI 모델을 선택하세요. <code>/model</code>로 언제든 변경 가능합니다.';
   document.querySelector('#step-3 h2').textContent='🎭 AI 성격';
