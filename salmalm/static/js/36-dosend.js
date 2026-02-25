@@ -74,9 +74,17 @@
     var _sendBtnEl=document.getElementById('send-btn');
     if(_stopBtn){_stopBtn.style.display='flex'}
     if(_sendBtnEl){_sendBtnEl.style.display='none'}
-    /* Safety timeout: if typing still showing after 3 minutes, force cleanup */
+    /* Safety timeout: if typing still showing after 3 minutes, abort SSE + force cleanup */
     var _safetyTimer=setTimeout(function(){
-      var tr=document.getElementById('typing-row');if(tr){tr.remove();addMsg('assistant','⚠️ '+(t('timeout-msg')||'Response timed out. Please try again.'));btn.disabled=false;var sb=document.getElementById('stop-btn');var sb2=document.getElementById('send-btn');if(sb)sb.style.display='none';if(sb2)sb2.style.display='flex'}
+      /* Fix #4: abort SSE stream first — prevents duplicate message when server responds late */
+      if(_currentAbort){try{_currentAbort.abort();}catch(e){}  _currentAbort=null;}
+      /* Fix #7: reset _sending so user can send new messages immediately */
+      _sending=false;
+      var tr=document.getElementById('typing-row');
+      if(tr){tr.remove();addMsg('assistant','⚠️ '+(t('timeout-msg')||'Response timed out. Please try again.'));}
+      btn.disabled=false;
+      var sb=document.getElementById('stop-btn');var sb2=document.getElementById('send-btn');
+      if(sb)sb.style.display='none';if(sb2)sb2.style.display='flex';
     },180000);
     var _sendStart=Date.now();
     _wsSendStart=_sendStart;

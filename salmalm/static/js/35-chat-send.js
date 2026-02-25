@@ -28,12 +28,18 @@
           if(polls<30)setTimeout(_rpoll,2000);
           return;
         }
-        /* Check if this message is already displayed in chat */
-        var snippet=d.message.substring(0,80).replace(/<[^>]*>/g,'');
-        var bubbles=chat.querySelectorAll('.msg-row .bubble');
+        /* Fix #6: check if already displayed — compare raw text (dataset.rawtext) not rendered HTML */
+        var snippet=d.message.substring(0,80);
+        /* Strip markdown symbols for textContent fallback comparison */
+        var snippetPlain=snippet.replace(/[*#`_\[\]()!>~]/g,'').replace(/\s+/g,' ').trim();
+        var bubbles=chat.querySelectorAll('.msg-row.assistant .bubble');
         var alreadyShown=false;
         for(var i=bubbles.length-1;i>=Math.max(0,bubbles.length-5);i--){
-          if(bubbles[i].textContent.indexOf(snippet)>-1){alreadyShown=true;break}
+          /* Primary: compare against stored raw text (exact) */
+          var rawText=bubbles[i].dataset.rawtext||'';
+          if(rawText&&rawText.indexOf(snippet.substring(0,rawText.length||80))>-1){alreadyShown=true;break}
+          /* Fallback: compare markdown-stripped snippet against textContent */
+          if(snippetPlain&&bubbles[i].textContent.indexOf(snippetPlain)>-1){alreadyShown=true;break}
         }
         if(!alreadyShown){
           addMsg('assistant',d.message,'🔄 recovered');

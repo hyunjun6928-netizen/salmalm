@@ -80,6 +80,8 @@
     var _btnLabels=[];
     var _cleanText=text.replace(/<!--buttons:(\[.*?\])-->/g,function(_,j){try{_btnLabels=JSON.parse(j)}catch(e){}return ''});
     bubble.innerHTML=renderMd(_cleanText);
+    /* Fix #6: store raw text for SSE recovery dedup comparison */
+    bubble.dataset.rawtext=_cleanText.substring(0,200);
     if(role==='assistant'&&_btnLabels.length>0){
       var _btnRow=document.createElement('div');_btnRow.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-top:8px';
       _btnLabels.forEach(function(label){

@@ -1,6 +1,7 @@
 """Chat API endpoints — send, abort, regenerate, compare, edit, delete messages."""
 
 import asyncio
+import threading
 
 
 from salmalm.security.crypto import vault, log
@@ -35,28 +36,70 @@ class WebChatMixin:
             self.send_header("Connection", "keep-alive")
             self.end_headers()
 
-            def send_sse(event, data: dict) -> None:
-                """Send sse."""
+            # Fix #2: track client disconnect state
+            _client_disconnected = [False]
+            # Fix #3: keepalive thread control
+            _keepalive_stop = [False]
+
+            def send_sse(event, data: dict) -> bool:
+                """Send SSE event. Returns False if client disconnected."""
+                if _client_disconnected[0]:
+                    return False
                 try:
                     payload = f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
                     self.wfile.write(payload.encode())
                     self.wfile.flush()
+                    return True
+                except (BrokenPipeError, ConnectionResetError, OSError) as e:
+                    # Fix #2: client disconnected — signal abort so engine stops
+                    log.info(f"[SSE] Client disconnected: {type(e).__name__}")
+                    _client_disconnected[0] = True
+                    try:
+                        from salmalm.features.edge_cases import abort_controller
+                        abort_controller.set_abort(session_id)
+                    except Exception:
+                        pass
+                    return False
                 except Exception as e:
-                    log.debug(f"Suppressed: {e}")
+                    log.debug(f"[SSE] send error: {e}")
+                    _client_disconnected[0] = True
+                    return False
+
+            # Fix #3: keepalive ping thread — prevents proxy/nginx 60s idle timeout
+            def _keepalive_worker():
+                import time
+                while not _keepalive_stop[0]:
+                    time.sleep(15)
+                    if _keepalive_stop[0]:
+                        break
+                    try:
+                        self.wfile.write(b": keep-alive\n\n")
+                        self.wfile.flush()
+                    except Exception:
+                        break
+
+            _ka_thread = threading.Thread(target=_keepalive_worker, daemon=True)
+            _ka_thread.start()
 
             send_sse("status", {"text": "🤔 Thinking..."})
             tool_count = [0]
 
             def on_tool_sse(name: str, args) -> None:
                 """On tool sse."""
+                if _client_disconnected[0]:
+                    return
                 tool_count[0] += 1
-                send_sse("tool", {"name": name, "args": str(args)[:200], "count": tool_count[0]})
+                # Fix #5: use "input" key (client checks edata.input, not edata.args)
+                send_sse("tool", {"name": name, "input": str(args)[:200], "count": tool_count[0]})
                 send_sse("status", {"text": f"🔧 Running {name}..."})
 
             streamed_text = [""]
 
             def on_token_sse(event) -> None:
                 """On token sse."""
+                # Fix #2: stop generating if client is gone
+                if _client_disconnected[0]:
+                    raise RuntimeError("[SSE] Client disconnected — aborting generation")
                 try:
                     etype = event.get("type", "")
                     if etype == "text_delta":
@@ -72,12 +115,14 @@ class WebChatMixin:
                         send_sse("tool", {"name": event.get("name", ""), "count": tool_count[0]})
                     elif etype == "error":
                         send_sse("error", {"text": event.get("error", "")})
+                except RuntimeError:
+                    raise  # propagate disconnect signal
                 except Exception as e:
-                    log.debug(f"Suppressed: {e}")
+                    log.debug(f"[SSE] on_token error: {e}")
 
+            # Fix #1: always close loop via try/finally
+            loop = asyncio.new_event_loop()
             try:
-                loop = asyncio.new_event_loop()
-                # Pass session-level model override to engine
                 from salmalm.core import get_session as _gs_pre
 
                 _sess_pre = _gs_pre(session_id)
@@ -95,10 +140,18 @@ class WebChatMixin:
                         lang=ui_lang,
                     )
                 )
-                loop.close()
             except Exception as e:
-                log.error(f"SSE process_message error: {e}")
+                log.error(f"[SSE] process_message error: {e}")
                 response = f"❌ Internal error: {type(e).__name__}"
+            finally:
+                loop.close()  # Fix #1: always close loop
+                _keepalive_stop[0] = True  # Fix #3: stop keepalive thread
+
+            # If client disconnected mid-stream, nothing to send
+            if _client_disconnected[0]:
+                log.info(f"[SSE] Skipping done event — client already disconnected")
+                return
+
             from salmalm.core import get_session as _gs2
 
             _sess2 = _gs2(session_id)
@@ -121,15 +174,10 @@ class WebChatMixin:
                 log.info(f"[SSE] Done event sent ({len(response)} chars)")
             except Exception as done_err:
                 log.error(f"[SSE] Failed to send done event: {done_err}")
-            try:
-                self.wfile.write(b"event: close\ndata: {}\n\n")
-                self.wfile.flush()
-            except Exception as e:
-                log.debug(f"Suppressed: {e}")
         else:
+            # Fix #1: always close loop via try/finally (non-stream path)
+            loop = asyncio.new_event_loop()
             try:
-                loop = asyncio.new_event_loop()
-                # Pass session-level model override to engine
                 from salmalm.core import get_session as _gs_pre2
 
                 _sess_pre2 = _gs_pre2(session_id)
@@ -145,10 +193,11 @@ class WebChatMixin:
                         lang=ui_lang,
                     )
                 )
-                loop.close()
             except Exception as e:
-                log.error(f"Chat process_message error: {e}")
+                log.error(f"[Chat] process_message error: {e}")
                 response = f"❌ Internal error: {type(e).__name__}"
+            finally:
+                loop.close()
             from salmalm.core import get_session as _gs
 
             _sess = _gs(session_id)
@@ -186,16 +235,17 @@ class WebChatMixin:
             return
         from salmalm.features.edge_cases import conversation_fork
 
+        loop = asyncio.new_event_loop()
         try:
-            loop = asyncio.new_event_loop()
             response = loop.run_until_complete(conversation_fork.regenerate(session_id, int(message_index)))
-            loop.close()
             if response:
                 self._json({"ok": True, "response": response})
             else:
                 self._json({"ok": False, "error": "Could not regenerate"}, 400)
         except Exception as e:
             self._json({"ok": False, "error": str(e)[:200]}, 500)
+        finally:
+            loop.close()
         return
 
     def _post_api_chat_compare(self):
@@ -212,13 +262,14 @@ class WebChatMixin:
             return
         from salmalm.features.edge_cases import compare_models
 
+        loop = asyncio.new_event_loop()
         try:
-            loop = asyncio.new_event_loop()
             results = loop.run_until_complete(compare_models(session_id, message, models or None))
-            loop.close()
             self._json({"ok": True, "results": results})
         except Exception as e:
             self._json({"ok": False, "error": str(e)[:200]}, 500)
+        finally:
+            loop.close()
         return
 
     def _post_api_alternatives_switch(self):

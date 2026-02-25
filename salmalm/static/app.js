@@ -332,6 +332,8 @@
     var _btnLabels=[];
     var _cleanText=text.replace(/<!--buttons:(\[.*?\])-->/g,function(_,j){try{_btnLabels=JSON.parse(j)}catch(e){}return ''});
     bubble.innerHTML=renderMd(_cleanText);
+    /* Fix #6: store raw text for SSE recovery dedup comparison */
+    bubble.dataset.rawtext=_cleanText.substring(0,200);
     if(role==='assistant'&&_btnLabels.length>0){
       var _btnRow=document.createElement('div');_btnRow.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-top:8px';
       _btnLabels.forEach(function(label){
@@ -774,12 +776,15 @@
           if(polls<30)setTimeout(_rpoll,2000);
           return;
         }
-        /* Check if this message is already displayed in chat */
-        var snippet=d.message.substring(0,80).replace(/<[^>]*>/g,'');
-        var bubbles=chat.querySelectorAll('.msg-row .bubble');
+        /* Fix #6: compare raw text (dataset.rawtext) not rendered HTML — markdown mismatch fix */
+        var snippet=d.message.substring(0,80);
+        var snippetPlain=snippet.replace(/[*#`_\[\]()!>~]/g,'').replace(/\s+/g,' ').trim();
+        var bubbles=chat.querySelectorAll('.msg-row.assistant .bubble');
         var alreadyShown=false;
         for(var i=bubbles.length-1;i>=Math.max(0,bubbles.length-5);i--){
-          if(bubbles[i].textContent.indexOf(snippet)>-1){alreadyShown=true;break}
+          var rawText=bubbles[i].dataset.rawtext||'';
+          if(rawText&&rawText.indexOf(snippet.substring(0,rawText.length||80))>-1){alreadyShown=true;break}
+          if(snippetPlain&&bubbles[i].textContent.indexOf(snippetPlain)>-1){alreadyShown=true;break}
         }
         if(!alreadyShown){
           addMsg('assistant',d.message,'🔄 recovered');
@@ -994,9 +999,17 @@
     var _sendBtnEl=document.getElementById('send-btn');
     if(_stopBtn){_stopBtn.style.display='flex'}
     if(_sendBtnEl){_sendBtnEl.style.display='none'}
-    /* Safety timeout: if typing still showing after 3 minutes, force cleanup */
+    /* Safety timeout: if typing still showing after 3 minutes, abort SSE + force cleanup */
     var _safetyTimer=setTimeout(function(){
-      var tr=document.getElementById('typing-row');if(tr){tr.remove();addMsg('assistant','⚠️ '+(t('timeout-msg')||'Response timed out. Please try again.'));btn.disabled=false;var sb=document.getElementById('stop-btn');var sb2=document.getElementById('send-btn');if(sb)sb.style.display='none';if(sb2)sb2.style.display='flex'}
+      /* Fix #4: abort SSE stream — prevents duplicate message when server responds late */
+      if(_currentAbort){try{_currentAbort.abort();}catch(e){} _currentAbort=null;}
+      /* Fix #7: reset _sending so user can send new messages immediately */
+      _sending=false;
+      var tr=document.getElementById('typing-row');
+      if(tr){tr.remove();addMsg('assistant','⚠️ '+(t('timeout-msg')||'Response timed out. Please try again.'));}
+      btn.disabled=false;
+      var sb=document.getElementById('stop-btn');var sb2=document.getElementById('send-btn');
+      if(sb)sb.style.display='none';if(sb2)sb2.style.display='flex';
     },180000);
     var _sendStart=Date.now();
     _wsSendStart=_sendStart;
