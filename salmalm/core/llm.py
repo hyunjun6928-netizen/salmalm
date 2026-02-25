@@ -177,6 +177,7 @@ def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
     - Google uses 'model' instead of 'assistant'
     """
     if provider == "anthropic":
+        import json as _json
         sanitized = []
         for msg in messages:
             role = msg.get("role", "")
@@ -189,13 +190,41 @@ def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
                             {
                                 "type": "tool_result",
                                 "tool_use_id": msg.get("tool_call_id", "unknown"),
-                                "content": msg.get("content", ""),
+                                "content": str(msg.get("content", "")),
                             }
                         ],
                     }
                 )
             elif role == "model":
                 sanitized.append({**msg, "role": "assistant"})
+            elif role == "assistant":
+                tool_calls = msg.get("tool_calls") or []
+                content = msg.get("content") or ""
+                # If assistant has OpenAI-format tool_calls, convert to Anthropic tool_use blocks
+                if tool_calls and not (
+                    isinstance(content, list) and any(b.get("type") == "tool_use" for b in content)
+                ):
+                    blocks = []
+                    if isinstance(content, str) and content.strip():
+                        blocks.append({"type": "text", "text": content})
+                    elif isinstance(content, list):
+                        blocks.extend(content)
+                    for tc in tool_calls:
+                        fn = tc.get("function", {})
+                        raw_args = fn.get("arguments", "{}")
+                        try:
+                            parsed_args = _json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                        except Exception:
+                            parsed_args = {"raw": raw_args}
+                        blocks.append({
+                            "type": "tool_use",
+                            "id": tc.get("id", "unknown"),
+                            "name": fn.get("name", "unknown"),
+                            "input": parsed_args,
+                        })
+                    sanitized.append({"role": "assistant", "content": blocks})
+                else:
+                    sanitized.append(msg)
             else:
                 sanitized.append(msg)
         return sanitized
