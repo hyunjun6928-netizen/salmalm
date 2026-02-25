@@ -111,6 +111,8 @@ _OPENAI_EXCLUDE = {
     "tts", "whisper", "dall-e", "embedding", "moderation", "babbage",
     "davinci", "text-", "chatgpt-image", "omni-moderation", "realtime",
     "audio", "gpt-3.5-turbo-instruct",
+    "codex",          # v1/responses-only models (gpt-5-codex, gpt-5.2-codex, etc.)
+    "computer-use",   # tool-specific, not general chat
 }
 
 
@@ -379,11 +381,54 @@ class LLMRouter:
             # Convert OpenAI format → Anthropic format
             system = ""
             conv_msgs = []
+            pending_tool_results: List[Dict] = []  # accumulate tool results for next user turn
             for m in messages:
-                if m["role"] == "system":
+                role = m.get("role", "")
+                if role == "system":
                     system += m.get("content", "") + "\n"
+                elif role == "tool":
+                    # OpenAI tool result → Anthropic tool_result content block
+                    pending_tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": m.get("tool_call_id", "unknown"),
+                        "content": str(m.get("content", "")),
+                    })
+                elif role == "assistant":
+                    # Flush any pending tool results as a user turn first
+                    if pending_tool_results:
+                        conv_msgs.append({"role": "user", "content": pending_tool_results})
+                        pending_tool_results = []
+                    tool_calls = m.get("tool_calls") or []
+                    content_text = m.get("content") or ""
+                    if tool_calls:
+                        # Convert OpenAI tool_calls → Anthropic tool_use blocks
+                        content_blocks: List[Dict] = []
+                        if content_text:
+                            content_blocks.append({"type": "text", "text": content_text})
+                        for tc in tool_calls:
+                            fn = tc.get("function", {})
+                            try:
+                                inp = json.loads(fn.get("arguments", "{}"))
+                            except Exception:
+                                inp = {}
+                            content_blocks.append({
+                                "type": "tool_use",
+                                "id": tc.get("id", ""),
+                                "name": fn.get("name", ""),
+                                "input": inp,
+                            })
+                        conv_msgs.append({"role": "assistant", "content": content_blocks})
+                    else:
+                        conv_msgs.append({"role": "assistant", "content": content_text})
                 else:
-                    conv_msgs.append({"role": m["role"], "content": m.get("content", "")})
+                    # user or unknown role
+                    if pending_tool_results:
+                        conv_msgs.append({"role": "user", "content": pending_tool_results})
+                        pending_tool_results = []
+                    conv_msgs.append({"role": "user", "content": m.get("content", "")})
+            # Flush any remaining tool results
+            if pending_tool_results:
+                conv_msgs.append({"role": "user", "content": pending_tool_results})
             body: dict = {
                 "model": model,
                 "max_tokens": max_tokens,
