@@ -1531,11 +1531,16 @@ window._i18n={
     var filtered=ql?_allTools.filter(function(t){return t.name.toLowerCase().indexOf(ql)>=0||t.en.toLowerCase().indexOf(ql)>=0||t.kr.indexOf(ql)>=0}):_allTools;
     c.innerHTML=filtered.map(function(t){
       var label=_lang==='ko'?t.kr:t.en;
-      var needsSetup=t.req&&!_isReqMet(t.req);
-      var reqAttr=needsSetup?' data-tool-req="'+t.req+'"':'';
+      var needsSetup=t.req&&!_isReqMet(t.req); // true = key missing → show popup on click
       var reqLabels={google:'Google',brave:'Brave',openai:'OpenAI',browser:'Browser'};
-      var reqBadge=needsSetup?' <span style="font-size:9px;color:#f59e0b;margin-left:auto;background:#fef3c7;padding:1px 6px;border-radius:8px">🔗 '+reqLabels[t.req]+'</span>':'';
-      return '<div class="nav-item" data-action="tool-run" data-tool-cmd="'+t.cmd.replace(/"/g,'&quot;')+'" data-tool-name="'+t.name+'"'+reqAttr+' title="'+(needsSetup?(_lang==='ko'?'설정 필요: ':'Setup required: ')+reqLabels[t.req]:t.name)+'">'+t.icon+' '+label+reqBadge+'</div>';
+      // data-tool-req only set when key is missing (controls popup on click)
+      var reqAttr=needsSetup?' data-tool-req="'+t.req+'"':'';
+      // badge always visible when tool has a req (informational), color changes by status
+      var badgeColor=needsSetup?'#f59e0b':'#6ee7b7'; // amber=missing, green=configured
+      var badgeBg=needsSetup?'#fef3c7':'#d1fae5';
+      var reqBadge=t.req?' <span style="font-size:9px;color:'+badgeColor+';margin-left:auto;background:'+badgeBg+';padding:1px 6px;border-radius:8px">'+(needsSetup?'🔗 ':'✓ ')+reqLabels[t.req]+'</span>':'';
+      var titleStr=needsSetup?(_lang==='ko'?'설정 필요: ':'Setup required: ')+reqLabels[t.req]:t.name;
+      return '<div class="nav-item" data-action="tool-run" data-tool-cmd="'+t.cmd.replace(/"/g,'&quot;')+'" data-tool-name="'+t.name+'"'+reqAttr+' title="'+titleStr+'">'+t.icon+' '+label+reqBadge+'</div>';
     }).join('');
     if(!filtered.length)c.innerHTML='<div style="padding:8px 12px;color:var(--text2);font-size:12px">'+(_lang==='ko'?'검색 결과 없음':'No results')+'</div>';
   }
