@@ -16,8 +16,10 @@ import os as _os
 
 from salmalm.constants import DEFAULT_MAX_TOKENS, FALLBACK_MODELS
 
-# Runtime blacklist: OpenAI models that only work on v1/responses (not v1/chat/completions).
-# Auto-populated when a model returns 404 "not a chat model".
+# Models confirmed to use v1/responses endpoint (auto-populated on first 404).
+_RESPONSES_API_MODELS: set = set()
+
+# Legacy blacklist — now used only if v1/responses also fails.
 _RESPONSES_API_BLACKLIST: set = set()
 
 
@@ -278,9 +280,12 @@ def call_llm(
             "model": model,
         }
 
-    # Runtime blacklist: skip models known to be v1/responses-only
-    if model_id in _RESPONSES_API_BLACKLIST:
-        log.warning(f"[BLACKLIST] {model} skipped (responses-only), using fallback")
+    # v1/responses models: route directly without chat/completions attempt
+    if provider == "openai" and model_id in _RESPONSES_API_MODELS:
+        log.info(f"[RESPONSES] {model} → direct v1/responses (cached route)")
+    # Hard blacklist: both endpoints failed, skip to cross-provider fallback
+    elif model_id in _RESPONSES_API_BLACKLIST:
+        log.warning(f"[BLACKLIST] {model} skipped (both endpoints failed), using fallback")
         fb = _try_fallback(provider, model, messages, tools, max_tokens, time.time())
         if fb:
             return fb
@@ -318,10 +323,24 @@ def call_llm(
             f"LLM error ({model}): {err_str} [latency={_elapsed:.2f}s, cost_so_far=${_metrics['total_cost']:.4f}]"
         )
 
-        # ── v1/responses-only model — blacklist and fallback immediately ──
-        if isinstance(e, _ResponsesOnlyModel):
-            _RESPONSES_API_BLACKLIST.add(model_id)
-            log.warning(f"[BLACKLIST] {model} is responses-only, added to runtime blacklist, falling back")
+        # ── v1/responses-only model — retry with v1/responses before cross-provider fallback ──
+        if isinstance(e, _ResponsesOnlyModel) and provider == "openai":
+            log.info(f"[RESPONSES] {model} → retrying with v1/responses endpoint")
+            try:
+                resp_result = _call_openai_responses(api_key, model_id, messages, tools or [], max_tokens)
+                resp_result["model"] = model
+                _RESPONSES_API_MODELS.add(model_id)  # cache for future calls
+                log.info(f"[RESPONSES] v1/responses succeeded for {model_id} — registered")
+                try:
+                    usage = resp_result.get("usage", {})
+                    track_usage(model, usage.get("input", 0), usage.get("output", 0))
+                except Exception:
+                    pass
+                return resp_result
+            except Exception as e_resp:
+                log.error(f"[RESPONSES] v1/responses also failed for {model_id}: {e_resp}")
+                _RESPONSES_API_BLACKLIST.add(model_id)
+                log.warning(f"[BLACKLIST] {model_id} failed on both endpoints, blacklisted")
 
         # ── Token overflow detection — don't fallback, truncate instead ──
         elif "prompt is too long" in err_str or "maximum context" in err_str.lower():
@@ -361,6 +380,9 @@ def _call_provider(
     if provider == "anthropic":
         return _call_anthropic(api_key, model_id, messages, tools, max_tokens, thinking=thinking, timeout=timeout)
     elif provider in ("openai", "xai"):
+        if provider == "openai" and model_id in _RESPONSES_API_MODELS:
+            # Known responses-only model — go straight to v1/responses
+            return _call_openai_responses(api_key, model_id, messages, tools, max_tokens)
         base_url = "https://api.x.ai/v1" if provider == "xai" else "https://api.openai.com/v1"
         return _call_openai(api_key, model_id, messages, tools, max_tokens, base_url)
     elif provider == "google":
@@ -535,6 +557,116 @@ def _call_openai(
         "content": choice.get("content", ""),
         "tool_calls": tool_calls,
         "usage": {"input": usage.get("prompt_tokens", 0), "output": usage.get("completion_tokens", 0)},
+    }
+
+
+def _call_openai_responses(
+    api_key: str,
+    model_id: str,
+    messages: List[Dict[str, Any]],
+    tools: Optional[List[dict]],
+    max_tokens: int,
+) -> Dict[str, Any]:
+    """Call OpenAI v1/responses endpoint (for models that reject v1/chat/completions).
+
+    Converts OpenAI chat-format messages → Responses API input items:
+      user/assistant text  → {"role": "...", "content": "..."}
+      assistant tool_calls → {"type": "function_call", "id": ..., "name": ..., "arguments": ...}
+      tool result          → {"type": "function_call_output", "call_id": ..., "output": ...}
+      system               → body["instructions"]
+    """
+    input_items: List[Dict] = []
+    instructions_parts: List[str] = []
+
+    for m in messages:
+        role = m.get("role", "")
+        content = m.get("content") or ""
+
+        if role == "system":
+            instructions_parts.append(content)
+
+        elif role == "user":
+            if isinstance(content, list):
+                # Multimodal: keep as-is (Responses API accepts same content block format)
+                input_items.append({"role": "user", "content": content})
+            else:
+                input_items.append({"role": "user", "content": content})
+
+        elif role == "assistant":
+            tool_calls = m.get("tool_calls") or []
+            if tool_calls:
+                for tc in tool_calls:
+                    fn = tc.get("function", {})
+                    input_items.append({
+                        "type": "function_call",
+                        "id": tc.get("id", ""),
+                        "name": fn.get("name", ""),
+                        "arguments": fn.get("arguments", "{}"),
+                    })
+            else:
+                if content:
+                    input_items.append({"role": "assistant", "content": content})
+
+        elif role == "tool":
+            input_items.append({
+                "type": "function_call_output",
+                "call_id": m.get("tool_call_id", ""),
+                "output": str(content),
+            })
+
+    body: dict = {
+        "model": model_id,
+        "input": input_items,
+        "max_output_tokens": max_tokens,
+    }
+    if instructions_parts:
+        body["instructions"] = "\n".join(instructions_parts).strip()
+
+    if tools:
+        body["tools"] = [
+            {
+                "type": "function",
+                "name": t.get("name", ""),
+                "description": t.get("description", ""),
+                "parameters": t.get("parameters", t.get("input_schema", {})),
+            }
+            for t in tools
+        ]
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+    resp = _http_post("https://api.openai.com/v1/responses", headers, body)
+
+    # Parse output items
+    output_text = ""
+    tool_calls_out = []
+    for item in resp.get("output", []):
+        itype = item.get("type", "")
+        if itype == "message":
+            for block in item.get("content", []):
+                if block.get("type") == "output_text":
+                    output_text += block.get("text", "")
+        elif itype == "function_call":
+            try:
+                args = json.loads(item.get("arguments", "{}"))
+            except Exception:
+                args = {}
+            tool_calls_out.append({
+                "id": item.get("id", ""),
+                "name": item.get("name", ""),
+                "arguments": args,
+            })
+
+    usage = resp.get("usage", {})
+    return {
+        "content": output_text,
+        "tool_calls": tool_calls_out,
+        "usage": {
+            "input": usage.get("input_tokens", 0),
+            "output": usage.get("output_tokens", 0),
+        },
     }
 
 
