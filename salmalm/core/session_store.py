@@ -102,7 +102,7 @@ class Session:
             # Persist session metadata (model_override, thinking, tts)
             _meta = json.dumps(
                 {
-                    "model_override": self.model_override,
+                    "model_override": self.model_override if self.model_override and self.model_override != "auto" else None,
                     "thinking_enabled": self.thinking_enabled,
                     "thinking_level": self.thinking_level,
                     "tts_enabled": self.tts_enabled,
@@ -253,8 +253,9 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                     try:
                         _meta_json = row[1] if len(row) > 1 and row[1] else "{}"
                         _meta = json.loads(_meta_json)
-                        if _meta.get("model_override"):
-                            _sessions[session_id].model_override = _meta["model_override"]
+                        _saved_ov = _meta.get("model_override")
+                        if _saved_ov and _saved_ov != "auto":
+                            _sessions[session_id].model_override = _saved_ov
                         if _meta.get("thinking_enabled") is not None:
                             _sessions[session_id].thinking_enabled = _meta["thinking_enabled"]
                         if _meta.get("thinking_level"):
