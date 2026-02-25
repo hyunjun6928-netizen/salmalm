@@ -160,12 +160,21 @@ class WebSessionsMixin:
             self._json({"ok": False, "error": "Missing session_id"}, 400)
             return
         from salmalm.core import _sessions, _get_db
+        from salmalm.core.session_store import _SESSIONS_DIR
 
         if sid in _sessions:
             del _sessions[sid]
         conn = _get_db()
         conn.execute("DELETE FROM session_store WHERE session_id=?", (sid,))
         conn.commit()
+        # Also delete the on-disk JSON file — without this the session
+        # resurrects on every server restart (dual-persistence bug)
+        _json_path = _SESSIONS_DIR / f"{sid}.json"
+        try:
+            if _json_path.exists():
+                _json_path.unlink()
+        except Exception as _e:
+            log.warning(f"[SESSION] Could not delete session file {_json_path}: {_e}")
         audit_log("session_delete", sid, session_id=sid, detail_dict={"session_id": sid})
         self._json({"ok": True})
 
@@ -177,6 +186,8 @@ class WebSessionsMixin:
         keep = body.get("keep", "web")
         from salmalm.core import _sessions, _get_db
 
+        from salmalm.core.session_store import _SESSIONS_DIR
+
         conn = _get_db()
         # Get all session ids except the one to keep
         rows = conn.execute(
@@ -187,6 +198,13 @@ class WebSessionsMixin:
             sid = r[0]
             if sid in _sessions:
                 del _sessions[sid]
+            # Delete on-disk JSON file
+            _json_path = _SESSIONS_DIR / f"{sid}.json"
+            try:
+                if _json_path.exists():
+                    _json_path.unlink()
+            except Exception:
+                pass
             deleted += 1
         conn.execute("DELETE FROM session_store WHERE session_id != ?", (keep,))
         conn.commit()

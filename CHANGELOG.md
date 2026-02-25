@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.27.6 (2026-02-25)
+### Bug Fix
+- Session delete now also removes on-disk JSON file (`~/SalmAlm/sessions/{id}.json`) — previously deleted sessions would resurrect on every server restart
+
 ## v0.27.5 (2026-02-25)
 ### Packaging Fix
 - `static/dist/*.js` (agent-panel.js) now included in PyPI wheel — Agents tab no longer shows "not built yet"
