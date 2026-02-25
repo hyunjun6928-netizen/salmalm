@@ -175,6 +175,7 @@ class CommandRouter:
         self._handlers["/reset"] = self._cmd_reset
         self._handlers["/stop"] = self._cmd_stop
         self._handlers["/new"] = self._cmd_new
+        self._handlers["/context"] = self._cmd_context
 
         self._prefix_handlers.extend(
             [
@@ -198,6 +199,7 @@ class CommandRouter:
                 ("/mcp", self._cmd_mcp),
                 ("/brave", self._cmd_brave),
                 ("/queue", self._cmd_queue),
+                ("/context ", self._cmd_context),
             ]
         )
 
@@ -353,6 +355,95 @@ class CommandRouter:
         if model_hint:
             msg += f" Model hint: `{model_hint}`"
         return msg
+
+    @staticmethod
+    def _cmd_context(cmd: str, session, **_) -> str:
+        """Show context window breakdown — OpenClaw-style /context list."""
+        try:
+            from salmalm.core.session_manager import estimate_context_window
+            from salmalm.core import router as _router
+
+            parts = cmd.strip().split()
+            detail = len(parts) > 1 and parts[1] in ("detail", "full", "d")
+
+            if not session or not hasattr(session, "messages"):
+                return "⚠️ No active session."
+
+            msgs = session.messages
+            model = getattr(session, "last_model", None) or getattr(session, "model_override", None) or "claude-3-5-sonnet"
+            ctx_window = estimate_context_window(model)
+
+            # Count by role
+            role_counts: dict = {}
+            total_chars = 0
+            tool_result_chars = 0
+            system_chars = 0
+
+            for m in msgs:
+                role = m.get("role", "unknown")
+                role_counts[role] = role_counts.get(role, 0) + 1
+                content = m.get("content", "")
+                if isinstance(content, str):
+                    chars = len(content)
+                elif isinstance(content, list):
+                    chars = sum(len(str(b.get("content", b.get("text", "")))) for b in content if isinstance(b, dict))
+                else:
+                    chars = 0
+                if role == "system":
+                    system_chars += chars
+                elif m.get("role") == "user" and isinstance(m.get("content"), list):
+                    # Check if this is a tool_result message
+                    if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in m.get("content", [])):
+                        tool_result_chars += chars
+                    else:
+                        total_chars += chars
+                else:
+                    total_chars += chars
+
+            conv_tokens = total_chars // 4
+            tool_tokens = tool_result_chars // 4
+            sys_tokens = system_chars // 4
+            total_tokens = (total_chars + tool_result_chars + system_chars) // 4
+            fill_pct = min(100, int(total_tokens / ctx_window * 100))
+
+            # Visual fill bar
+            bar_len = 20
+            filled = int(bar_len * fill_pct / 100)
+            bar_color = "🟩" if fill_pct < 50 else ("🟨" if fill_pct < 75 else "🟥")
+            bar = bar_color * filled + "⬜" * (bar_len - filled)
+
+            lines = [
+                f"🧠 **Context Breakdown** — `{model.split('/')[-1]}`",
+                f"",
+                f"```",
+                f"Context window : {ctx_window:,} tokens",
+                f"Est. used      : {total_tokens:,} tokens ({fill_pct}%)",
+                f"  Conversation : {conv_tokens:,} tok  ({len([m for m in msgs if m['role'] in ('user','assistant')])} msgs)",
+                f"  Tool results : {tool_tokens:,} tok",
+                f"  System prompt: {sys_tokens:,} tok",
+                f"```",
+                f"{bar} {fill_pct}%",
+            ]
+
+            if detail:
+                lines += [
+                    f"",
+                    f"**Message breakdown:**",
+                ]
+                for role, count in sorted(role_counts.items()):
+                    lines.append(f"  `{role}` × {count}")
+
+            # Recommendations
+            if fill_pct >= 80:
+                lines += ["", "⚠️ **Context nearly full.** Run `/compact` to free space."]
+            elif fill_pct >= 60:
+                lines += ["", "💡 Context is getting full. Consider `/compact` soon."]
+            else:
+                lines += ["", f"✅ Context healthy. ~{ctx_window - total_tokens:,} tokens remaining."]
+
+            return "\n".join(lines)
+        except Exception as e:
+            return f"❌ /context error: {e}"
 
     # -- debug --
 

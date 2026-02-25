@@ -63,6 +63,18 @@ class WebChatMixin:
         req_id = body.get("req_id", "")  # idempotency key (generated per-send by client)
         use_stream = self.path.endswith("/stream")
 
+        # Input message length cap: prevents context explosion from very large pastes
+        # OpenClaw pattern: bootstrapMaxChars per-file cap; we apply same idea to user messages
+        _MAX_MSG_CHARS = 50_000  # ~12,500 tokens — a reasonable ceiling
+        if len(message) > _MAX_MSG_CHARS:
+            log.warning(f"[INPUT] Message too large ({len(message):,} chars) — truncating to {_MAX_MSG_CHARS:,}")
+            message = (
+                message[:_MAX_MSG_CHARS]
+                + f"\n\n⚠️ **[Message truncated at {_MAX_MSG_CHARS:,} chars]** "
+                f"Original was {len(message):,} chars. "
+                f"For large content, use file upload instead."
+            )
+
         if use_stream:
             self.send_response(200)
             self._cors()
