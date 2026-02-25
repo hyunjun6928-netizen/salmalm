@@ -316,6 +316,71 @@ def list_available_models() -> List[Dict[str, str]]:
     return result
 
 
+def _sanitize_messages(provider: str, messages: List[Dict]) -> List[Dict]:
+    """Normalize message history for the target provider.
+
+    Handles cross-provider fallback where messages may contain tool turns
+    from a different provider's format.
+
+    - anthropic: handled separately inside _build_request (full conversion)
+    - openai / xai: native format, no change needed
+    - google / groq: OpenAI-compat but some models don't support tools →
+        strip orphaned tool-role messages; keep assistant text, drop tool_calls
+    - ollama: raw /api/chat passthrough; strip all tool turns entirely since
+        most models (mistral, etc.) don't support OpenAI tool format
+    """
+    if provider in ("anthropic",):
+        return messages  # handled inside _build_request with full conversion
+
+    if provider in ("openai", "xai"):
+        return messages  # native OpenAI format — no conversion needed
+
+    has_tool_turns = any(m.get("role") == "tool" for m in messages)
+    if not has_tool_turns:
+        return messages  # fast path — no tool contamination
+
+    if provider == "ollama":
+        # Ollama models are inconsistent; safest: collapse tool turns into text
+        cleaned: List[Dict] = []
+        for m in messages:
+            role = m.get("role", "")
+            if role == "tool":
+                # Convert tool result → plain user message
+                content = str(m.get("content", ""))
+                if content:
+                    cleaned.append({"role": "user", "content": f"[Tool result] {content}"})
+            elif role == "assistant":
+                text = m.get("content") or ""
+                tool_calls = m.get("tool_calls") or []
+                if tool_calls and not text:
+                    # Pure tool-call turn with no text — skip it
+                    continue
+                # Drop tool_calls field; keep text content
+                cleaned.append({"role": "assistant", "content": text})
+            else:
+                cleaned.append(m)
+        return cleaned
+
+    else:
+        # google / groq / xai: OpenAI-compat — format is correct but some models
+        # may reject tool messages; strip orphaned role="tool" turns as safety net
+        # (a tool turn without matching model support causes HTTP 400/422)
+        cleaned2: List[Dict] = []
+        for m in messages:
+            role = m.get("role", "")
+            if role == "tool":
+                # Collapse to user message so context isn't lost
+                content = str(m.get("content", ""))
+                if content:
+                    cleaned2.append({"role": "user", "content": f"[Tool result] {content}"})
+            elif role == "assistant":
+                # Keep assistant turn but also keep tool_calls — provider may handle it
+                cleaned2.append(m)
+            else:
+                cleaned2.append(m)
+        return cleaned2
+
+
 class LLMRouter:
     """Multi-provider LLM router with fallback."""
 
@@ -366,6 +431,7 @@ class LLMRouter:
         self, provider: str, model: str, messages: List[Dict], max_tokens: int = 4096, tools: Optional[List] = None
     ) -> Tuple[str, Dict[str, str], dict]:
         """Build HTTP request for provider. Returns (url, headers, body)."""
+        messages = _sanitize_messages(provider, messages)
         prov_cfg = PROVIDERS.get(provider, PROVIDERS["openai"])
         base = prov_cfg["base_url"]
         endpoint = prov_cfg["chat_endpoint"]
