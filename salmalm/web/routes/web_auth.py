@@ -130,7 +130,8 @@ class WebAuthMixin:
 
         import os as _os
         port = getattr(getattr(self, "server", None), "server_address", [None, None])[1] or int(_os.environ.get("SALMALM_PORT", 18800))
-        redirect_uri = f"http://localhost:{port}/api/google/callback"
+        _host = self.headers.get("Host", f"localhost:{port}")
+        redirect_uri = f"http://{_host}/api/google/callback"
         # CSRF protection: generate and store state token
         state = secrets.token_urlsafe(32)
         from salmalm.web.web import _google_oauth_pending_states
