@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.27.7 (2026-02-25)
+### Bug Fix
+- Agent panel: `process is not defined` ReferenceError fixed — Vite IIFE build now inlines `process.env.NODE_ENV = "production"` at compile time. Bundle size 595KB → 202KB (React dev warnings stripped)
+
+## v0.27.7 (2026-02-25)
+### Bug Fix
+- Agent panel: `Uncaught ReferenceError: process is not defined` — Vite IIFE build was not replacing `process.env.NODE_ENV` for browser. Added `define: { 'process.env.NODE_ENV': '"production"' }` to vite.config.ts. Bundle size: 595KB → 202KB (dev code stripped)
+
 ## v0.27.6 (2026-02-25)
 ### Bug Fix
 - Session delete now also removes on-disk JSON file (`~/SalmAlm/sessions/{id}.json`) — previously deleted sessions would resurrect on every server restart
