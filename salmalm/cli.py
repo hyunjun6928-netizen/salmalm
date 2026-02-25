@@ -225,8 +225,102 @@ def setup_workdir() -> None:
         _ensure_windows_shortcut()
 
 
+def _run_service(subcmd: str) -> None:
+    """Handle `salmalm service <install|uninstall|start|stop|status|logs>`."""
+    import shutil
+    import subprocess
+    import textwrap
+    import getpass
+
+    exe = shutil.which("salmalm") or sys.executable + " -m salmalm"
+    user = getpass.getuser()
+    home = os.path.expanduser("~")
+    unit_dir = os.path.join(home, ".config", "systemd", "user")
+    unit_path = os.path.join(unit_dir, "salmalm.service")
+
+    unit_content = textwrap.dedent(f"""\
+        [Unit]
+        Description=SalmAlm — Personal AI Gateway
+        After=network.target
+        StartLimitIntervalSec=60
+        StartLimitBurst=5
+
+        [Service]
+        Type=simple
+        ExecStart={exe} start
+        Restart=on-failure
+        RestartSec=5s
+        Environment=HOME={home}
+        Environment=PATH={os.path.dirname(exe)}:/usr/local/bin:/usr/bin:/bin
+        StandardOutput=journal
+        StandardError=journal
+        SyslogIdentifier=salmalm
+
+        [Install]
+        WantedBy=default.target
+    """)
+
+    def _systemctl(*args):
+        return subprocess.run(["systemctl", "--user"] + list(args),
+                              capture_output=True, text=True)
+
+    if subcmd == "install":
+        os.makedirs(unit_dir, exist_ok=True)
+        with open(unit_path, "w") as f:
+            f.write(unit_content)
+        _systemctl("daemon-reload")
+        _systemctl("enable", "salmalm.service")
+        r = _systemctl("start", "salmalm.service")
+        if r.returncode == 0:
+            print("✅ SalmAlm service installed and started.")
+            print("   Auto-restarts on crash. Starts on login.")
+        else:
+            print(f"⚠️  Service installed but start failed: {r.stderr.strip()}")
+
+        # Try linger (survives after logout) — optional, needs sudo
+        linger_r = subprocess.run(
+            ["sudo", "-n", "loginctl", "enable-linger", user],
+            capture_output=True, text=True,
+        )
+        if linger_r.returncode == 0:
+            print("✅ Linger enabled — service stays alive even without active login.")
+        else:
+            print("ℹ️  Tip: to keep SalmAlm running after logout (servers/headless):")
+            print(f"        sudo loginctl enable-linger {user}")
+
+    elif subcmd == "uninstall":
+        _systemctl("stop", "salmalm.service")
+        _systemctl("disable", "salmalm.service")
+        if os.path.exists(unit_path):
+            os.remove(unit_path)
+        _systemctl("daemon-reload")
+        print("✅ SalmAlm service removed.")
+
+    elif subcmd == "start":
+        r = _systemctl("start", "salmalm.service")
+        print("✅ Started." if r.returncode == 0 else f"❌ {r.stderr.strip()}")
+
+    elif subcmd == "stop":
+        r = _systemctl("stop", "salmalm.service")
+        print("✅ Stopped." if r.returncode == 0 else f"❌ {r.stderr.strip()}")
+
+    elif subcmd == "status":
+        r = _systemctl("status", "salmalm.service")
+        print(r.stdout or r.stderr)
+
+    elif subcmd == "logs":
+        os.execlp("journalctl", "journalctl", "--user", "-u", "salmalm", "-f", "--no-pager")
+
+    else:
+        print("Usage: salmalm service <install|uninstall|start|stop|status|logs>")
+
+
 def dispatch_cli() -> bool:
     """Handle CLI flags. Returns True if a flag was handled (caller should exit)."""
+    if "service" in sys.argv[1:2]:
+        subcmd = sys.argv[2] if len(sys.argv) > 2 else "install"
+        _run_service(subcmd)
+        return True
     if "--update" in sys.argv or "update" in sys.argv[1:2]:
         _run_update()
         return True
