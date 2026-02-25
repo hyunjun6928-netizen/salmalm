@@ -9,23 +9,20 @@ from salmalm.security.crypto import vault
 
 
 def _google_oauth_headers() -> dict:
-    """Get OAuth2 headers for Google APIs."""
-    token = vault.get("google_access_token") or ""
+    """Get OAuth2 headers for Google APIs. Always refreshes via refresh_token for reliability."""
     refresh = vault.get("google_refresh_token") or ""
     client_id = vault.get("google_client_id") or ""
     client_secret = vault.get("google_client_secret") or ""
 
-    if not token and not refresh:
+    if not refresh:
         raise ValueError(
-            "Google API credentials not configured. "
-            "Set google_refresh_token, google_client_id, google_client_secret in vault."
+            "Google OAuth not connected. "
+            "Go to Settings → Google Integration → Connect Google Account."
         )
 
-    if token:
-        return {"Authorization": f"Bearer {token}"}
-
     if refresh and client_id and client_secret:
-        data = json.dumps(
+        import urllib.parse as _urlparse
+        data = _urlparse.urlencode(
             {
                 "client_id": client_id,
                 "client_secret": client_secret,
@@ -36,7 +33,7 @@ def _google_oauth_headers() -> dict:
         req = urllib.request.Request(
             "https://oauth2.googleapis.com/token",
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
             method="POST",
         )
         try:
