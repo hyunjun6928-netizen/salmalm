@@ -55,6 +55,12 @@
         if(_vk.indexOf('telegram_owner_id')>=0){var _to=document.getElementById('sk-telegram-owner');if(_to)_to.placeholder='••••••••• (saved)'}
         if(_vk.indexOf('discord_token')>=0){var _di=document.getElementById('sk-discord-token');if(_di)_di.placeholder='••••••••• (saved)'}
         if(_vk.indexOf('discord_guild_id')>=0){var _dg=document.getElementById('sk-discord-guild');if(_dg)_dg.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('anthropic_api_key')>=0){var _an=document.getElementById('sk-anthropic');if(_an)_an.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('openai_api_key')>=0){var _oa=document.getElementById('sk-openai');if(_oa)_oa.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('xai_api_key')>=0){var _xa=document.getElementById('sk-xai');if(_xa)_xa.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('google_api_key')>=0){var _ga=document.getElementById('sk-google');if(_ga)_ga.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('brave_api_key')>=0){var _ba=document.getElementById('sk-brave');if(_ba)_ba.placeholder='••••••••• (saved)'}
+        if(_vk.indexOf('openrouter_api_key')>=0){var _or=document.getElementById('sk-openrouter');if(_or)_or.placeholder='••••••••• (saved)'}
       });
     if(window.checkGoogleStatus)window.checkGoogleStatus();
     /* Load engine optimization settings */
