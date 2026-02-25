@@ -35,6 +35,7 @@ class WebModelMixin:
             PROVIDERS,
             is_provider_available,
             list_available_models,
+            get_provider_models,
             llm_router,
         )
 
@@ -67,12 +68,13 @@ class WebModelMixin:
                     }
                 )
             else:
+                live_models = get_provider_models(name)
                 providers.append(
                     {
                         "name": name,
                         "available": is_provider_available(name),
                         "env_key": cfg.get("env_key", ""),
-                        "models": [{"name": m, "full": f"{name}/{m}"} for m in cfg["models"]],
+                        "models": [{"name": m, "full": f"{name}/{m}"} for m in live_models],
                     }
                 )
         # Check session-level override (more accurate than global router state)
@@ -104,6 +106,14 @@ class WebModelMixin:
         from salmalm.core.llm_router import llm_router
 
         self._json({"current_model": llm_router.current_model})
+
+    def _post_api_models_refresh(self):
+        """POST /api/models/refresh — force-refresh live model list from all provider APIs."""
+        if not self._require_auth("user"):
+            return
+        from salmalm.core.llm_router import refresh_model_cache
+        result = refresh_model_cache()
+        self._json({"ok": True, "counts": result})
 
     def _get_api_health_providers(self):
         # Provider health check — Open WebUI style (프로바이더 상태 확인)

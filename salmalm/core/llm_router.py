@@ -97,6 +97,126 @@ PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# ---------------------------------------------------------------------------
+# Dynamic model discovery — fetches real model lists from provider APIs
+# Cache TTL: 1 hour. Falls back to PROVIDERS["x"]["models"] on failure.
+# ---------------------------------------------------------------------------
+
+_MODEL_CACHE: Dict[str, Dict] = {}   # provider → {models: [...], ts: float}
+_MODEL_CACHE_TTL = 3600              # 1 hour
+
+
+# Models to EXCLUDE from OpenAI/Groq/xAI listings (non-chat)
+_OPENAI_EXCLUDE = {
+    "tts", "whisper", "dall-e", "embedding", "moderation", "babbage",
+    "davinci", "text-", "chatgpt-image", "omni-moderation", "realtime",
+    "audio", "gpt-3.5-turbo-instruct",
+}
+
+
+def _is_chat_model_openai(model_id: str) -> bool:
+    """Return True if an OpenAI model ID looks like a chat model."""
+    mid = model_id.lower()
+    for excl in _OPENAI_EXCLUDE:
+        if excl in mid:
+            return False
+    # Keep gpt-*, o1-*, o3-*, o4-* (but not date-pinned duplicates like gpt-4o-2024-08-06)
+    import re
+    if re.search(r"-\d{4}-\d{2}-\d{2}$", mid):
+        return False   # skip date-pinned versions
+    return any(mid.startswith(p) for p in ("gpt-", "o1", "o3", "o4"))
+
+
+def _fetch_provider_models(provider: str) -> List[str]:
+    """Fetch live model list from provider API. Returns [] on failure."""
+    key = get_api_key(provider)
+    if not key:
+        return []
+    cfg = PROVIDERS.get(provider, {})
+    base = cfg.get("base_url", "")
+    try:
+        if provider == "anthropic":
+            req = urllib.request.Request(
+                f"{base}/models?limit=100",
+                headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
+            )
+            with urllib.request.urlopen(req, timeout=8) as r:
+                data = json.loads(r.read())
+            return [m["id"] for m in data.get("data", [])
+                    if m.get("type", "model") == "model"]
+
+        elif provider == "google":
+            url = f"{base}/models?key={key}&pageSize=100"
+            with urllib.request.urlopen(url, timeout=8) as r:
+                data = json.loads(r.read())
+            return [
+                m["name"].replace("models/", "")
+                for m in data.get("models", [])
+                if "generateContent" in m.get("supportedGenerationMethods", [])
+            ]
+
+        elif provider in ("openai", "groq", "xai"):
+            req = urllib.request.Request(
+                f"{base}/models",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+            with urllib.request.urlopen(req, timeout=8) as r:
+                data = json.loads(r.read())
+            ids = [m["id"] for m in data.get("data", [])]
+            if provider == "openai":
+                ids = [m for m in ids if _is_chat_model_openai(m)]
+                # Sort: latest first (gpt-4.1 before gpt-4o before gpt-4)
+                ids.sort(reverse=True)
+            elif provider in ("groq", "xai"):
+                ids = [m for m in ids if not any(
+                    x in m.lower() for x in ("whisper", "embed", "guard", "vision-tool")
+                )]
+                ids.sort()
+            return ids
+
+    except Exception as e:
+        log.debug(f"[MODELS] Live fetch failed for {provider}: {e}")
+    return []
+
+
+def get_provider_models(provider: str) -> List[str]:
+    """Return model list for provider — live from API if possible, cached for 1h.
+
+    Falls back to hardcoded PROVIDERS list if fetch fails or provider is local.
+    """
+    if provider == "ollama":
+        result = detect_ollama()
+        return result.get("models", PROVIDERS["ollama"]["models"])
+
+    now = time.time()
+    cached = _MODEL_CACHE.get(provider)
+    if cached and now - cached["ts"] < _MODEL_CACHE_TTL:
+        return cached["models"]
+
+    live = _fetch_provider_models(provider)
+    if live:
+        _MODEL_CACHE[provider] = {"models": live, "ts": now}
+        log.info(f"[MODELS] Fetched {len(live)} models for {provider}")
+        return live
+
+    # Fall back to hardcoded list
+    fallback = PROVIDERS.get(provider, {}).get("models", [])
+    log.debug(f"[MODELS] Using hardcoded fallback for {provider} ({len(fallback)} models)")
+    return fallback
+
+
+def refresh_model_cache() -> Dict[str, int]:
+    """Force-refresh model cache for all providers. Returns {provider: count}."""
+    _MODEL_CACHE.clear()
+    result = {}
+    for prov in PROVIDERS:
+        if prov == "ollama":
+            continue
+        models = get_provider_models(prov)
+        result[prov] = len(models)
+    return result
+
+
 # Provider prefix → provider name
 _PREFIX_MAP = {
     "anthropic/": "anthropic",
@@ -178,19 +298,13 @@ def is_provider_available(provider: str) -> bool:
 
 
 def list_available_models() -> List[Dict[str, str]]:
-    """List all available models across configured providers."""
+    """List all available models across configured providers (live from API)."""
     result = []
-    for prov_name, prov in PROVIDERS.items():
+    for prov_name in PROVIDERS:
         if not is_provider_available(prov_name):
             continue
-        for m in prov["models"]:
-            result.append(
-                {
-                    "provider": prov_name,
-                    "model": f"{prov_name}/{m}",
-                    "name": m,
-                }
-            )
+        for m in get_provider_models(prov_name):
+            result.append({"provider": prov_name, "model": f"{prov_name}/{m}", "name": m})
     return result
 
 

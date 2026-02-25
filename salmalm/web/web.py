@@ -665,6 +665,7 @@ self.addEventListener('fetch',e=>{{
         "/api/persona/create": "_post_api_persona_create",
         "/api/persona/delete": "_post_api_persona_delete",
         "/api/test-key": "_post_api_test_key",
+        "/api/models/refresh": "_post_api_models_refresh",
         "/api/unlock": "_post_api_unlock",
         "/api/auto-unlock": "_post_api_auto_unlock",
         "/api/stt": "_post_api_stt",
