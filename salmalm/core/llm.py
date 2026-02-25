@@ -16,6 +16,14 @@ import os as _os
 
 from salmalm.constants import DEFAULT_MAX_TOKENS, FALLBACK_MODELS
 
+# Runtime blacklist: OpenAI models that only work on v1/responses (not v1/chat/completions).
+# Auto-populated when a model returns 404 "not a chat model".
+_RESPONSES_API_BLACKLIST: set = set()
+
+
+class _ResponsesOnlyModel(Exception):
+    """Raised when a model is v1/responses-only (404 'not a chat model')."""
+
 
 def _get_temperature(tools: Optional[list]) -> float:
     """Return temperature based on mode: lower for tool-calling (precision), higher for chat."""
@@ -74,6 +82,8 @@ def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120
                 from salmalm.core.exceptions import LLMError
 
                 raise LLMError("Insufficient API credits (402). Check billing info.") from e
+            elif e.code == 404 and "not a chat model" in err_body.lower():
+                raise _ResponsesOnlyModel(err_body[:120]) from e
             raise  # Let retry logic handle 429, 5xx, 529
 
     return retry_call(_do_post, max_attempts=3)
@@ -108,8 +118,9 @@ def _try_fallback(provider, model, messages, tools, max_tokens, t0) -> Optional[
         log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id} [after {time.time() - t0:.2f}s]")
         try:
             fb_tools = _adapt_tools_for_provider(tools, fb_provider)
+            fb_messages = _sanitize_messages_for_provider(messages, fb_provider)
             result = _call_provider(
-                fb_provider, fb_key, fb_model_id, messages, fb_tools, max_tokens, timeout=_LLM_TIMEOUT
+                fb_provider, fb_key, fb_model_id, fb_messages, fb_tools, max_tokens, timeout=_LLM_TIMEOUT
             )
             result["model"] = f"{fb_provider}/{fb_model_id}"
             usage = result.get("usage", {})
@@ -267,6 +278,15 @@ def call_llm(
             "model": model,
         }
 
+    # Runtime blacklist: skip models known to be v1/responses-only
+    if model_id in _RESPONSES_API_BLACKLIST:
+        log.warning(f"[BLACKLIST] {model} skipped (responses-only), using fallback")
+        fb = _try_fallback(provider, model, messages, tools, max_tokens, time.time())
+        if fb:
+            return fb
+        return {"content": f"❌ {model} is not a chat model and no fallback available.",
+                "tool_calls": [], "usage": {"input": 0, "output": 0}, "model": model}
+
     # Sanitize messages for provider compatibility
     messages = _sanitize_messages_for_provider(messages, provider)
 
@@ -298,8 +318,13 @@ def call_llm(
             f"LLM error ({model}): {err_str} [latency={_elapsed:.2f}s, cost_so_far=${_metrics['total_cost']:.4f}]"
         )
 
+        # ── v1/responses-only model — blacklist and fallback immediately ──
+        if isinstance(e, _ResponsesOnlyModel):
+            _RESPONSES_API_BLACKLIST.add(model_id)
+            log.warning(f"[BLACKLIST] {model} is responses-only, added to runtime blacklist, falling back")
+
         # ── Token overflow detection — don't fallback, truncate instead ──
-        if "prompt is too long" in err_str or "maximum context" in err_str.lower():
+        elif "prompt is too long" in err_str or "maximum context" in err_str.lower():
             log.warning(f"[ERR] Token overflow detected ({len(messages)} msgs). Force-truncating.")
             return {
                 "content": "",
@@ -366,6 +391,8 @@ def _call_anthropic(
     timeout: int = 0,
 ) -> Dict[str, Any]:
     """Call anthropic."""
+    # Defensive: ensure tool-role messages are converted regardless of call path
+    messages = _sanitize_messages_for_provider(messages, "anthropic")
     system_msgs = [m["content"] for m in messages if m["role"] == "system"]
     chat_msgs = [m for m in messages if m["role"] != "system"]
 
