@@ -355,8 +355,111 @@ def _run_nginx(subcmd: str) -> None:
         print("Usage: salmalm nginx <show|install|test>")
 
 
+def _pid_file_path():
+    """Return path to PID file."""
+    from pathlib import Path
+    from salmalm.constants import DATA_DIR
+    return DATA_DIR / "salmalm.pid"
+
+
+def _read_pid() -> int | None:
+    """Read PID from file. Returns None if missing/stale."""
+    try:
+        p = _pid_file_path()
+        if not p.exists():
+            return None
+        pid = int(p.read_text().strip())
+        # Verify process is actually running
+        os.kill(pid, 0)
+        return pid
+    except (ValueError, ProcessLookupError, PermissionError, OSError):
+        return None
+
+
+def _stop_server() -> bool:
+    """Stop running SalmAlm server. Returns True if stopped."""
+    import signal as _signal
+    import time
+
+    pid = _read_pid()
+    if pid is None:
+        # Fallback: scan port 18800
+        port = int(os.environ.get("SALMALM_PORT", 18800))
+        try:
+            import subprocess
+            out = subprocess.check_output(
+                ["lsof", "-ti", f":{port}"], text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            if out:
+                pid = int(out.split()[0])
+            else:
+                print("⚠️  SalmAlm is not running.")
+                return False
+        except Exception:
+            print("⚠️  SalmAlm is not running (no PID file, no process on port).")
+            return False
+
+    print(f"⏹  Stopping SalmAlm (PID {pid})...")
+    try:
+        os.kill(pid, _signal.SIGTERM)
+        # Wait up to 5s for graceful shutdown
+        for _ in range(10):
+            time.sleep(0.5)
+            try:
+                os.kill(pid, 0)  # still alive?
+            except ProcessLookupError:
+                break
+        else:
+            # Force kill
+            try:
+                os.kill(pid, _signal.SIGKILL)
+                print(f"⚡ Force-killed PID {pid}")
+            except ProcessLookupError:
+                pass
+    except ProcessLookupError:
+        pass  # already dead
+
+    # Clean up PID file
+    try:
+        _pid_file_path().unlink(missing_ok=True)
+    except Exception:
+        pass
+    print("✅ Stopped.")
+    return True
+
+
 def dispatch_cli() -> bool:
     """Handle CLI flags. Returns True if a flag was handled (caller should exit)."""
+    # ── stop / start / restart (PID-file based, no systemd required) ──
+    if "stop" in sys.argv[1:2]:
+        _stop_server()
+        return True
+
+    if "restart" in sys.argv[1:2]:
+        _stop_server()
+        import subprocess
+        subprocess.Popen(
+            [sys.executable, "-m", "salmalm"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        print("🔄 SalmAlm restarting in background…")
+        return True
+
+    if "start" in sys.argv[1:2]:
+        import subprocess
+        pid = _read_pid()
+        if pid:
+            print(f"⚠️  SalmAlm already running (PID {pid}). Use 'salmalm restart' to restart.")
+            return True
+        subprocess.Popen(
+            [sys.executable, "-m", "salmalm"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        print("🚀 SalmAlm started in background. Visit http://localhost:18800")
+        return True
+
     if "service" in sys.argv[1:2]:
         subcmd = sys.argv[2] if len(sys.argv) > 2 else "install"
         _run_service(subcmd)

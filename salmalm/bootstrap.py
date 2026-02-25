@@ -589,6 +589,13 @@ def _start_tunnel(port: int) -> None:
 
 async def run_server():
     """Main async entry point — boot all services."""
+    # ── PID file — enables `salmalm stop` without systemd ──
+    _pid_path = DATA_DIR / "salmalm.pid"
+    try:
+        _pid_path.write_text(str(os.getpid()))
+    except Exception as _e:
+        log.warning(f"[PID] Could not write PID file: {_e}")
+
     # ── Phase 1: Database & Core State ──
     _init_audit_db()
     _restore_usage()
@@ -808,4 +815,11 @@ async def run_server():
         audit_log("shutdown", f"{APP_NAME} v{VERSION} graceful shutdown")
     except Exception as e:  # noqa: broad-except
         pass  # DB may already be closed
+    # ── PID file cleanup ──
+    try:
+        _pid_path = DATA_DIR / "salmalm.pid"
+        if _pid_path.exists():
+            _pid_path.unlink()
+    except Exception:
+        pass
     log.info("[SHUTDOWN] Complete. Goodbye! 😈")
