@@ -111,21 +111,30 @@ _OPENAI_EXCLUDE = {
     "tts", "whisper", "dall-e", "embedding", "moderation", "babbage",
     "davinci", "text-", "chatgpt-image", "omni-moderation", "realtime",
     "audio", "gpt-3.5-turbo-instruct",
-    "codex",          # v1/responses-only models (gpt-5-codex, gpt-5.2-codex, etc.)
-    "computer-use",   # tool-specific, not general chat
+    "codex",          # v1/responses-only (gpt-5-codex, gpt-5.2-codex, …)
+    "computer-use",   # tool-specific
+    "gpt-image",      # image generation (gpt-image-1, gpt-image-1.5, gpt-image-1-mini)
+    "search-api",     # search-specific endpoint (gpt-5-search-api)
 }
+
+# gpt-5* models with these suffixes are v1/responses-only, NOT v1/chat/completions
+# Note: o1-pro, o3-pro etc. are valid chat models — only gpt-5-family "pro" is excluded
+_GPT5_RESPONSES_SUFFIXES = ("-pro",)
 
 
 def _is_chat_model_openai(model_id: str) -> bool:
     """Return True if an OpenAI model ID looks like a chat model."""
+    import re
     mid = model_id.lower()
     for excl in _OPENAI_EXCLUDE:
         if excl in mid:
             return False
-    # Keep gpt-*, o1-*, o3-*, o4-* (but not date-pinned duplicates like gpt-4o-2024-08-06)
-    import re
+    # gpt-5* variants that are v1/responses-only
+    if mid.startswith("gpt-5") and any(mid.endswith(s) for s in _GPT5_RESPONSES_SUFFIXES):
+        return False
+    # Skip date-pinned snapshots (e.g. gpt-4o-2024-08-06)
     if re.search(r"-\d{4}-\d{2}-\d{2}$", mid):
-        return False   # skip date-pinned versions
+        return False
     return any(mid.startswith(p) for p in ("gpt-", "o1", "o3", "o4"))
 
 
