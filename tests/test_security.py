@@ -512,7 +512,9 @@ class TestSecurityHeaders(unittest.TestCase):
     def test_cors_restriction(self):
         """CORS should only allow specific origins."""
         from salmalm.web import WebHandler
-        allowed = WebHandler._ALLOWED_ORIGINS
+        # _ALLOWED_ORIGINS is lazily built on first request; force initialization
+        allowed = WebHandler._ALLOWED_ORIGINS or WebHandler._build_allowed_origins()
+        self.assertIsNotNone(allowed, "CORS allowed origins must not be None")
         self.assertNotIn('*', allowed, "CORS allows all origins")
         self.assertNotIn('http://evil.com', allowed)
 

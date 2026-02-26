@@ -395,13 +395,26 @@ class IPBanList:
 
     def __init__(self, ban_threshold: int = 10, ban_duration: int = 3600) -> None:
         """Init  ."""
-        # ip -> {"count": int, "first_at": float, "banned_until": float}
+        # ip -> {"count": int, "first_at": float, "last_at": float, "banned_until": float}
         self._records: Dict[str, dict] = {}
         self._lock = threading.Lock()
         self._ban_threshold = ban_threshold  # violations before ban
         self._ban_duration = ban_duration    # seconds to ban (default 1 h)
         self._init_db()
         self._load_from_db()
+        self._start_cleanup_thread()
+
+    def _start_cleanup_thread(self) -> None:
+        """Spawn a daemon thread that evicts expired ban records every 30 min."""
+        def _loop():
+            while True:
+                time.sleep(1800)
+                try:
+                    self.cleanup()
+                except Exception:
+                    pass
+        t = threading.Thread(target=_loop, daemon=True, name="IPBanList-cleanup")
+        t.start()
 
     def _get_conn(self):
         """Return a SQLite connection to auth.db."""
@@ -473,7 +486,10 @@ class IPBanList:
         with self._lock:
             now = time.time()
             if ip not in self._records:
-                self._records[ip] = {"count": 0, "first_at": now, "banned_until": 0.0}
+                self._records[ip] = {
+                    "count": 0, "first_at": now,
+                    "last_at": now, "banned_until": 0.0,
+                }
 
             rec = self._records[ip]
 
@@ -481,11 +497,13 @@ class IPBanList:
             if rec["banned_until"] > now:
                 return True
 
-            # Reset sliding window after 1 h of no bans
-            if now - rec["first_at"] > 3600:
+            # Reset sliding window after 1 h of *no new violations*
+            # (use last_at, not first_at — otherwise 9 violations/hour loop beats the ban)
+            if now - rec.get("last_at", rec["first_at"]) > 3600:
                 rec["count"] = 0
                 rec["first_at"] = now
 
+            rec["last_at"] = now
             rec["count"] += 1
 
             if rec["count"] >= self._ban_threshold:
@@ -503,10 +521,7 @@ class IPBanList:
     def unban(self, ip: str) -> None:
         """Manually lift a ban (admin use)."""
         with self._lock:
-            if ip in self._records:
-                self._records[ip]["banned_until"] = 0.0
-                self._records[ip]["count"] = 0
-                self._persist(ip, self._records[ip])
+            self._records.pop(ip, None)   # remove entirely — no lingering violation count
         try:
             conn = self._get_conn()
             conn.execute("DELETE FROM ip_bans WHERE ip = ?", (ip,))
@@ -537,9 +552,10 @@ class IPBanList:
             for ip in expired:
                 del self._records[ip]
         try:
+            _t = time.time()
             conn = self._get_conn()
             conn.execute("DELETE FROM ip_bans WHERE banned_until < ? AND first_at < ?",
-                         (time.time(), time.time() - 7200))
+                         (_t, _t - 7200))
             conn.commit()
             conn.close()
         except Exception as _e:
@@ -626,7 +642,8 @@ class DailyQuotaManager:
 
     def get_usage(self, user_id: str) -> int:
         """Return today's token count for *user_id*."""
-        key = f"{user_id}:{self._today()}"
+        today = self._today()   # capture once — avoids day-boundary cache/DB mismatch
+        key = f"{user_id}:{today}"
         with self._lock:
             if key in self._cache:
                 return self._cache[key]
@@ -634,7 +651,7 @@ class DailyQuotaManager:
             conn = self._get_conn()
             row = conn.execute(
                 "SELECT tokens FROM daily_quota WHERE user_id=? AND date=?",
-                (user_id, self._today()),
+                (user_id, today),
             ).fetchone()
             conn.close()
             val = row[0] if row else 0
@@ -665,6 +682,12 @@ class DailyQuotaManager:
         key = f"{user_id}:{today}"
         with self._lock:
             self._cache[key] = self._cache.get(key, 0) + tokens
+            # Prune stale date keys to prevent unbounded cache growth.
+            # Keys with a different date suffix are yesterday (or older) — evict them.
+            if len(self._cache) > 200:
+                stale = [k for k in self._cache if not k.endswith(f":{today}")]
+                for k in stale:
+                    del self._cache[k]
         try:
             conn = self._get_conn()
             conn.execute(

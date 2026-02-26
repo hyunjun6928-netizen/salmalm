@@ -13,6 +13,7 @@ import hmac
 import json
 import os
 import secrets
+import tempfile
 import threading
 from typing import Any, Dict, List, Optional
 
@@ -199,26 +200,64 @@ class Vault:
                          salt: Optional[bytes] = None) -> bytes:
         """Decrypt HMAC-CTR vault (new format with IV, legacy without).
 
+        Format discrimination:
+          new  : tag(32) | iv(16) | ct(N)  — HMAC covers (iv || ct)
+          legacy: tag(32) | ct(N)           — HMAC covers ct only; no IV
+
+        The two-attempt fallback is NOT an HMAC oracle: both attempts use the
+        same hmac_key derived from the caller-supplied password.  An adversary
+        without the password cannot make either HMAC comparison pass, so there
+        is no exploitable oracle.  The fallback exists only for backward-compat
+        with pre-IV vaults and is removed in the next major version.
+
         salt: explicit bytes (preferred); falls back to self._salt for compat.
         """
         _salt = salt if salt is not None else self._salt
-        assert _salt is not None, "Salt must be provided"
+        if _salt is None:
+            raise ValueError("Salt must be provided")
         tag, rest = ciphertext[:32], ciphertext[32:]
+        if len(rest) < 1:
+            raise ValueError("Ciphertext too short")
         hmac_key = _derive_key(password, _salt + b"hmac", 32)
+
+        # ── Attempt 1: new format (tag | iv | ct) ──────────────────────────
         if len(rest) >= 16:
             iv, ct = rest[:16], rest[16:]
             expected = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
             if hmac.compare_digest(tag, expected):
                 enc_key = _derive_key(password, _salt + b"enc" + iv, 32)
                 return self._ctr_decrypt(enc_key, ct)
-            # Legacy format (no IV)
-            ct = rest
-            expected = hmac.new(hmac_key, ct, hashlib.sha256).digest()
-            if not hmac.compare_digest(tag, expected):
-                raise ValueError("HMAC mismatch")
-            enc_key = _derive_key(password, _salt + b"enc", 32)
-            return self._ctr_decrypt(enc_key, ct)
-        raise ValueError("Ciphertext too short")
+
+        # ── Attempt 2: legacy format (tag | ct, no IV) — backward compat ───
+        # Only reached when new-format HMAC fails, indicating a pre-IV vault.
+        log.debug("[VAULT] New-format HMAC mismatch — trying legacy (no-IV) format")
+        ct = rest
+        expected = hmac.new(hmac_key, ct, hashlib.sha256).digest()
+        if not hmac.compare_digest(tag, expected):
+            raise ValueError("HMAC mismatch — wrong password or corrupted vault")
+        enc_key = _derive_key(password, _salt + b"enc", 32)
+        return self._ctr_decrypt(enc_key, ct)
+
+    @staticmethod
+    def _atomic_write(path, data: bytes) -> None:
+        """Write *data* to *path* atomically: tmpfile → fsync → rename.
+
+        Guarantees that *path* is never left in a partial state if the process
+        crashes mid-write.  Uses a sibling temp file so rename() is same-device.
+        """
+        parent = path.parent
+        parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=str(parent))
+        try:
+            os.write(fd, data)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        try:
+            os.chmod(tmp, 0o600)
+        except OSError:
+            pass
+        os.replace(tmp, str(path))   # atomic on POSIX; best-effort on Windows
 
     def _save(self) -> None:
         """Encrypt and write vault to disk.
@@ -232,46 +271,32 @@ class Vault:
             return
         VAULT_FILE.parent.mkdir(parents=True, exist_ok=True)
         plaintext: bytes = json.dumps(self._data).encode("utf-8")
-        key = _derive_key(self._password, self._salt)
         _backup_file = VAULT_FILE.parent / (VAULT_FILE.name + ".bak")
         if HAS_CRYPTO:
+            # AES-256-GCM: one PBKDF2 call
+            key = _derive_key(self._password, self._salt)
             nonce = secrets.token_bytes(12)
             ct = AESGCM(key).encrypt(nonce, plaintext, None)
             new_bytes = VAULT_VERSION + self._salt + nonce + ct
-            VAULT_FILE.write_bytes(new_bytes)
-            try:
-                import os as _os
-                _os.chmod(VAULT_FILE, 0o600)
-            except OSError:
-                pass
-            # Only update backup when vault is non-trivially large (has real keys)
-            if len(new_bytes) > 100:
-                try:
-                    _backup_file.write_bytes(new_bytes)
-                    _os.chmod(_backup_file, 0o600)
-                except OSError:
-                    pass
         elif _ALLOW_FALLBACK:
+            # HMAC-CTR: two PBKDF2 calls (enc_key + hmac_key).
+            # Do NOT compute the base key — it is unused in this branch.
             iv = secrets.token_bytes(16)
             enc_key = _derive_key(self._password, self._salt + b"enc" + iv, 32)
             ct = self._ctr_encrypt(enc_key, plaintext)
             hmac_key = _derive_key(self._password, self._salt + b"hmac", 32)
             tag = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
             new_bytes = b"\x02" + self._salt + tag + iv + ct
-            VAULT_FILE.write_bytes(new_bytes)
-            try:
-                import os as _os
-                _os.chmod(VAULT_FILE, 0o600)
-            except OSError:
-                pass
-            if len(new_bytes) > 100:
-                try:
-                    _backup_file.write_bytes(new_bytes)
-                    _os.chmod(_backup_file, 0o600)
-                except OSError:
-                    pass
         else:
             raise RuntimeError("Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1")
+
+        self._atomic_write(VAULT_FILE, new_bytes)
+        # Only update backup when vault is non-trivially large (has real keys)
+        if len(new_bytes) > 100:
+            try:
+                self._atomic_write(_backup_file, new_bytes)
+            except OSError:
+                pass
 
     @staticmethod
     def _ctr_encrypt(key: bytes, data: bytes) -> bytes:
@@ -307,10 +332,11 @@ class Vault:
         val = self._data.get(key)
         if val is not None:
             return val
-        # Fallback: check env var
+        # Fallback: check env var.  Log so the user knows which source is active.
         env_name = self._ENV_MAP.get(key, key.upper())
         env_val = os.environ.get(env_name)
         if env_val:
+            log.debug("[VAULT] '%s' not in vault — using env var %s", key, env_name)
             return env_val
         return default
 
@@ -338,7 +364,10 @@ class Vault:
             self._password = new_password
             self._salt = secrets.token_bytes(16)
             self._save()
-        _keychain_set(new_password)
+            # Update keychain inside the lock: ensures vault and keychain are always
+            # in sync.  If _keychain_set fails after _save succeeds the vault is still
+            # usable via manual password entry — this is acceptable.
+            _keychain_set(new_password)
         return True
 
     def keys(self) -> List[str]:

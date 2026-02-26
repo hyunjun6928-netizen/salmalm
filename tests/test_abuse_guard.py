@@ -167,10 +167,60 @@ class TestIPBanList(unittest.TestCase):
         self.ban_list._records["old.ip"] = {
             "count": 3,
             "first_at": time.time() - 10000,
+            "last_at": time.time() - 10000,
             "banned_until": time.time() - 5000,  # expired
         }
         self.ban_list.cleanup()
         self.assertNotIn("old.ip", self.ban_list._records)
+
+    def test_sliding_window_uses_last_at(self):
+        """Window reset must be based on last violation time, not first.
+
+        P0 security fix: an attacker who violates (threshold-1) times, waits 1 h,
+        then repeats must eventually be banned — not loop forever.
+        The old code reset on 'first_at' which allowed exactly that bypass.
+        """
+        ip = "bypass.attacker"
+        threshold = self.ban_list._ban_threshold  # 3
+
+        # Inject a record that looks 1h old based on first_at but has
+        # a recent last_at — window should NOT reset.
+        now = time.time()
+        self.ban_list._records[ip] = {
+            "count": threshold - 1,          # one away from ban
+            "first_at": now - 7200,          # 2h ago — OLD first_at
+            "last_at":  now - 10,            # 10 s ago — RECENT last violation
+            "banned_until": 0.0,
+        }
+        # Next violation: last_at is recent, so window must NOT reset
+        result = self.ban_list.record_violation(ip)
+        self.assertTrue(result, "Should be banned — last violation was only 10 s ago")
+
+    def test_sliding_window_resets_after_idle(self):
+        """Window resets after 1 h of *no* violations (last_at is stale)."""
+        ip = "idle.attacker"
+        threshold = self.ban_list._ban_threshold  # 3
+        now = time.time()
+        # Record was last violated 2h ago — window should reset
+        self.ban_list._records[ip] = {
+            "count": threshold - 1,    # one away from ban
+            "first_at": now - 7200,
+            "last_at":  now - 7200,    # 2h idle → reset expected
+            "banned_until": 0.0,
+        }
+        result = self.ban_list.record_violation(ip)
+        self.assertFalse(result, "Count reset after idle — should not be banned yet")
+        self.assertEqual(self.ban_list._records[ip]["count"], 1)
+
+    def test_unban_clears_record_entirely(self):
+        """unban() must remove the record from _records, not just zero fields."""
+        for _ in range(3):
+            self.ban_list.record_violation("nuke.me")
+        self.assertTrue(self.ban_list.is_banned("nuke.me")[0])
+        self.ban_list.unban("nuke.me")
+        # Record must be gone — not left with count=0, banned_until=0
+        self.assertNotIn("nuke.me", self.ban_list._records,
+                         "unban() must delete record, not zero it in place")
 
 
 class TestDailyQuotaManager(unittest.TestCase):
