@@ -343,7 +343,7 @@ class WebChatMixin:
             else:
                 self._json({"ok": False, "error": "Could not regenerate"}, 400)
         except Exception as e:
-            self._json({"ok": False, "error": str(e)[:200]}, 500)
+            self._json({"ok": False, "error": "Internal server error"}, 500)
         finally:
             loop.close()
         return
@@ -367,7 +367,7 @@ class WebChatMixin:
             results = loop.run_until_complete(compare_models(session_id, message, models or None))
             self._json({"ok": True, "results": results})
         except Exception as e:
-            self._json({"ok": False, "error": str(e)[:200]}, 500)
+            self._json({"ok": False, "error": "Internal server error"}, 500)
         finally:
             loop.close()
         return

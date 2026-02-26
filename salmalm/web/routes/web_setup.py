@@ -135,7 +135,7 @@ class WebSetupMixin:
             return self._post_api_onboarding_inner()
         except Exception as e:
             log.exception(f"[ONBOARDING] Unhandled error: {e}")
-            self._json({"error": f"Internal error: {str(e)[:200]}"}, 500)
+            self._json({"error": "Internal server error"}, 500)
 
     def _post_api_onboarding_inner(self):
         """Post api onboarding inner."""

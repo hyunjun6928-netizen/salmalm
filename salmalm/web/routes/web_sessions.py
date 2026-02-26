@@ -229,9 +229,18 @@ class WebSessionsMixin:
             return
         from salmalm.core import _get_db
 
+        from salmalm.web.auth import extract_auth
+        user = extract_auth({k.lower(): v for k, v in self.headers.items()})
+        uid = user["id"] if user else None
         conn = _get_db()
-        conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
+        result = conn.execute(
+            "UPDATE session_store SET title=? WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+            (title, sid, uid),
+        )
         conn.commit()
+        if result.rowcount == 0:
+            self._json({"ok": False, "error": "Session not found or permission denied"}, 403)
+            return
         self._json({"ok": True})
 
     def _post_api_sessions_rollback(self):

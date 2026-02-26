@@ -238,7 +238,7 @@ class WebFilesMixin:
             self._json({"error": "No file found"}, 400)
         except Exception as e:
             log.error(f"Upload error: {e}")
-            self._json({"error": str(e)[:200]}, 500)
+            self._json({"error": "Internal server error"}, 500)
             return
 
     def _get_api_sessions_export(self) -> None:
@@ -406,7 +406,7 @@ class WebFilesMixin:
             log.error(f"Google OAuth2 token exchange failed: {e}")
             self._html(f"""<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
                 <h2 style="color:#ef4444">❌ 토큰 교환 실패</h2>
-                <p>{str(e)[:200]}</p>
+                <p>토큰 교환 중 오류가 발생했소. 콘솔 로그를 확인하시오.</p>
                 <p><a href="/" style="color:#6366f1">← SalmAlm으로 돌아가기</a></p>
                 </body></html>""")
 

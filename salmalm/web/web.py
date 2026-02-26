@@ -135,9 +135,15 @@ class WebHandler(
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self._security_headers()
-        # Inject CSP nonce into inline <script> tags (after _security_headers generates nonce)
-        if self._csp_nonce and "<script>" in body_raw:
-            body_raw = body_raw.replace("<script>", f'<script nonce="{self._csp_nonce}">')
+        # Inject CSP nonce into ALL <script> variants (<script>, <script type="module">, etc.)
+        # Uses regex to avoid missing type= / async / defer attributes.
+        # Only injects where nonce= is absent — prevents double injection.
+        if self._csp_nonce:
+            body_raw = re.sub(
+                r'<script\b(?![^>]*\bnonce=)',
+                f'<script nonce="{self._csp_nonce}"',
+                body_raw,
+            )
         body = body_raw.encode("utf-8")
         body = self._maybe_gzip(body)
         self.send_header("Content-Length", str(len(body)))
@@ -196,35 +202,50 @@ class WebHandler(
         self._json({"error": "Authentication required"}, 401)
         return None
 
-    # Trusted proxy subnets — only accept X-Forwarded-For from these
-    _TRUSTED_PROXY_NETS = (
-        "127.",
-        "::1",
-        "10.",
-        "172.16.",
-        "172.17.",
-        "172.18.",
-        "172.19.",
-        "172.2",
-        "172.30.",
-        "172.31.",
-        "192.168.",
-    )
+    # Trusted proxy networks (RFC 1918 private + loopback + Docker defaults).
+    # Evaluated with ipaddress — no string-prefix ambiguity.
+    _TRUSTED_PROXY_NETWORKS = None  # lazily built on first use
+
+    @classmethod
+    def _build_trusted_networks(cls):
+        import ipaddress as _ip
+        cls._TRUSTED_PROXY_NETWORKS = [
+            _ip.ip_network("127.0.0.0/8"),    # loopback IPv4
+            _ip.ip_network("::1/128"),          # loopback IPv6
+            _ip.ip_network("10.0.0.0/8"),       # RFC 1918
+            _ip.ip_network("172.16.0.0/12"),    # RFC 1918 (172.16–172.31)
+            _ip.ip_network("192.168.0.0/16"),   # RFC 1918
+            _ip.ip_network("fc00::/7"),          # IPv6 ULA
+        ]
+
+    @classmethod
+    def _is_trusted_proxy(cls, addr: str) -> bool:
+        import ipaddress as _ip
+        if cls._TRUSTED_PROXY_NETWORKS is None:
+            cls._build_trusted_networks()
+        try:
+            ip_obj = _ip.ip_address(addr)
+            return any(ip_obj in net for net in cls._TRUSTED_PROXY_NETWORKS)
+        except ValueError:
+            return False  # unparseable — not trusted
 
     def _get_client_ip(self) -> str:
-        """Get client IP. Only trusts X-Forwarded-For if:
-        1. SALMALM_TRUST_PROXY is set, AND
-        2. The actual socket peer is from a trusted proxy subnet (private/loopback).
-        This prevents XFF spoofing from untrusted sources.
+        """Get real client IP.
+        Only trusts X-Forwarded-For when SALMALM_TRUST_PROXY is set AND
+        the direct peer address is within a trusted private/loopback network.
+        XFF first-hop is parsed as an IP to reject malformed values.
         """
+        import ipaddress as _ip
         remote_addr = self.client_address[0] if self.client_address else "?"
-        if os.environ.get("SALMALM_TRUST_PROXY"):
-            # Only trust XFF if the direct connection is from a trusted proxy
-            is_trusted = any(remote_addr.startswith(net) for net in self._TRUSTED_PROXY_NETS)
-            if is_trusted:
-                xff = self.headers.get("X-Forwarded-For")
-                if xff:
-                    return xff.split(",")[0].strip()
+        if os.environ.get("SALMALM_TRUST_PROXY") and self._is_trusted_proxy(remote_addr):
+            xff = self.headers.get("X-Forwarded-For", "")
+            if xff:
+                candidate = xff.split(",")[0].strip()
+                try:
+                    _ip.ip_address(candidate)  # validate — reject junk
+                    return candidate
+                except ValueError:
+                    log.warning(f"[IP] Ignoring malformed XFF value: {candidate!r}")
         return remote_addr
 
     def do_PUT(self) -> None:
@@ -266,10 +287,20 @@ class WebHandler(
                 self._json({"ok": False, "error": "Missing title"}, 400)
                 return
             from salmalm.core import _get_db
+            from salmalm.web.auth import extract_auth
 
+            user = extract_auth({k.lower(): v for k, v in self.headers.items()})
+            uid = user["id"] if user else None
             conn = _get_db()
-            conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
+            # Ownership check: only update rows owned by this user (or unowned rows in single-user mode)
+            result = conn.execute(
+                "UPDATE session_store SET title=? WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+                (title, sid, uid),
+            )
             conn.commit()
+            if result.rowcount == 0:
+                self._json({"ok": False, "error": "Session not found or permission denied"}, 403)
+                return
             self._json({"ok": True})
             return
         self._json({"error": "Not found"}, 404)
@@ -278,7 +309,7 @@ class WebHandler(
         """Handle CORS preflight requests."""
         self.send_response(204)
         self._cors()
-        self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
         self.end_headers()
 
     def do_GET(self) -> None:
@@ -384,7 +415,7 @@ class WebHandler(
     }
 
     def _get_api_notifications(self):
-        """Get api notifications."""
+        """GET /api/notifications — read-only. Does NOT clear (idempotent)."""
         if not self._require_auth("user"):
             return
         from salmalm.core import _sessions
@@ -392,9 +423,21 @@ class WebHandler(
         web_session = _sessions.get("web")
         notifications = []
         if web_session and hasattr(web_session, "_notifications"):
-            notifications = web_session._notifications
-            web_session._notifications = []  # clear after read
+            notifications = list(web_session._notifications)  # snapshot, no mutation
         self._json({"notifications": notifications})
+
+    def _post_api_notifications_clear(self):
+        """POST /api/notifications/clear — explicit clear (state-mutating, CSRF-safe)."""
+        if not self._require_auth("user"):
+            return
+        from salmalm.core import _sessions
+
+        web_session = _sessions.get("web")
+        cleared = 0
+        if web_session and hasattr(web_session, "_notifications"):
+            cleared = len(web_session._notifications)
+            web_session._notifications = []
+        self._json({"ok": True, "cleared": cleared})
 
     def _get_api_presence(self):
         """Get api presence."""
@@ -572,21 +615,44 @@ class WebHandler(
         status_code = 200 if report.get("status") == "healthy" else 503
         self._json(report, status=status_code)
 
-    def _get_api_check_update(self):
-        """Get api check update."""
-        try:
-            import urllib.request
+    # PyPI version cache: avoid blocking on every request.
+    # TTL = 10 minutes. Background refresh on cache miss.
+    _pypi_cache: dict = {"version": None, "fetched_at": 0.0}
+    _PYPI_TTL = 600  # seconds
 
-            resp = urllib.request.urlopen("https://pypi.org/pypi/salmalm/json", timeout=10)
-            data = json.loads(resp.read().decode())
-            latest = data.get("info", {}).get("version", VERSION)  # noqa: F405
-            is_exe = getattr(sys, "frozen", False)
-            result = {"current": VERSION, "latest": latest, "exe": is_exe}  # noqa: F405
+    def _get_api_check_update(self):
+        """GET /api/check-update — returns cached PyPI version (TTL 10 min)."""
+        import threading as _threading
+        is_exe = getattr(sys, "frozen", False)
+        cache = self.__class__._pypi_cache
+        now = time.time()
+
+        # Serve cached value immediately if fresh
+        if cache["version"] and (now - cache["fetched_at"]) < self._PYPI_TTL:
+            result = {"current": VERSION, "latest": cache["version"], "exe": is_exe, "cached": True}  # noqa: F405
             if is_exe:
                 result["download_url"] = "https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
             self._json(result)
-        except Exception as e:
-            self._json({"current": VERSION, "latest": None, "error": str(e)[:100]})  # noqa: F405
+            return
+
+        # Stale/empty — fetch in background, return stale immediately if available
+        def _refresh():
+            try:
+                import urllib.request
+                resp = urllib.request.urlopen("https://pypi.org/pypi/salmalm/json", timeout=10)
+                data = json.loads(resp.read().decode())
+                cache["version"] = data.get("info", {}).get("version")
+                cache["fetched_at"] = time.time()
+            except Exception as _e:
+                log.debug(f"PyPI version check failed: {_e}")
+
+        _threading.Thread(target=_refresh, daemon=True).start()
+
+        # Return stale or unknown while refresh runs
+        result = {"current": VERSION, "latest": cache["version"], "exe": is_exe, "cached": bool(cache["version"])}  # noqa: F405
+        if is_exe:
+            result["download_url"] = "https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
+        self._json(result)
 
     def _get_sw_js(self):
         """Service worker — PWA offline cache + install support."""
@@ -607,8 +673,13 @@ self.addEventListener('fetch',e=>{{
 }});"""
         self.send_response(200)
         self._cors()
-        self.send_header("Content-Type", "application/javascript")
-        self.send_header("Cache-Control", "no-cache, no-store")
+        # Service workers need Cache-Control: no-cache to re-check on every load.
+        # We intentionally skip CSP here — SW scope is script-only, not document context.
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Service-Worker-Allowed", "/")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Length", str(len(sw_js.encode())))
         self.end_headers()
         self.wfile.write(sw_js.encode())
 
@@ -664,7 +735,10 @@ self.addEventListener('fetch',e=>{{
 </svg>'''
             self.send_response(200)
             self._cors()
+            self._security_headers()
             self.send_header("Content-Type", "image/svg+xml")
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self.send_header("Content-Length", str(len(svg.encode())))
             self.end_headers()
             self.wfile.write(svg.encode())
 
@@ -696,7 +770,7 @@ self.addEventListener('fetch',e=>{{
             log.error(f"POST {self.path} error: {e}\n{err_detail}")
             print(f"[ERROR] POST {self.path}: {e}", flush=True)
             try:
-                self._json({"error": f"Internal error: {str(e)[:200]}"}, 500)
+                self._json({"error": "Internal server error"}, 500)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass  # Client already gone
         finally:
@@ -738,6 +812,7 @@ self.addEventListener('fetch',e=>{{
         "/api/sessions/create": "_post_api_sessions_create",
         "/api/sessions/delete": "_post_api_sessions_delete",
         "/api/sessions/clear": "_post_api_sessions_clear",
+        "/api/notifications/clear": "_post_api_notifications_clear",
         "/api/sessions/import": "_post_api_sessions_import",
         "/api/soul": "_post_api_soul",
         "/api/routing": "_post_api_routing",
@@ -854,3 +929,43 @@ self.addEventListener('fetch',e=>{{
         ("/api/agent/export", "_get_api_agent_export", None),
         ("/uploads/", "_get_uploads", None),
     ]
+
+
+# ── Route startup validator ─────────────────────────────────────────────────
+def _validate_web_routes() -> None:
+    """Sanity-check WebHandler route tables at import time.
+
+    Detects:
+    - Duplicate route registrations
+    - Handler names that don't resolve to actual methods
+    - /api/ paths listed in PUBLIC_PATHS that might be accidentally exposed
+    """
+    errors: list = []
+    seen: dict = {}
+
+    all_routes = list(WebHandler._GET_ROUTES.items()) + list(WebHandler._POST_ROUTES.items())
+    all_routes += [(prefix, handler) for prefix, handler, _ in WebHandler._GET_PREFIX_ROUTES]
+
+    for path, handler in all_routes:
+        if path in seen:
+            errors.append(f"Duplicate route '{path}' (handlers: {seen[path]!r} and {handler!r})")
+        seen[path] = handler
+        if not hasattr(WebHandler, handler):
+            errors.append(f"Route '{path}' → handler '{handler}' not found on WebHandler")
+
+    # Warn about /api/ paths that are in PUBLIC_PATHS (intentional but worth auditing)
+    exposed_api = [p for p in WebHandler._PUBLIC_PATHS if p.startswith("/api/")]
+    if exposed_api:
+        import logging
+        logging.getLogger(__name__).debug(
+            f"[ROUTES] Public /api/ paths (no auth required): {sorted(exposed_api)}"
+        )
+
+    if errors:
+        import logging
+        _log = logging.getLogger(__name__)
+        for e in errors:
+            _log.warning(f"[ROUTES] {e}")
+
+
+_validate_web_routes()

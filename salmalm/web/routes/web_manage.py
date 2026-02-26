@@ -217,7 +217,7 @@ class ManageMixin:
             else:
                 self._json({"ok": False, "error": result.stderr[-200:]})
         except Exception as e:
-            self._json({"ok": False, "error": str(e)[:200]})
+            self._json({"ok": False, "error": "Internal server error"})
         return
 
     def _post_api_restart(self):
@@ -299,7 +299,7 @@ class ManageMixin:
             else:
                 self._json({"ok": False, "error": result.stderr[-200:]})
         except Exception as e:
-            self._json({"ok": False, "error": str(e)[:200]})
+            self._json({"ok": False, "error": "Internal server error"})
         return
 
     def _post_api_persona_switch(self):
@@ -593,4 +593,4 @@ class ManageMixin:
             result = execute_tool(tool, args)  # type: ignore[assignment]
             self._json({"ok": True, "result": result[:50000]})  # type: ignore[index]
         except Exception as e:
-            self._json({"error": str(e)[:500]}, 500)
+            self._json({"error": "Internal server error"}, 500)
