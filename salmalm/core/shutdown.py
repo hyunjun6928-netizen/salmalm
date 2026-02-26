@@ -65,7 +65,7 @@ class ShutdownManager:
         # Phase 3: Cancel active tool executions
         log.info("[SHUTDOWN] Phase 3: Cancel/wait for active tool executions")
         try:
-            from salmalm.core.engine import _engine
+            from salmalm.core.intelligence_engine import _get_engine as _ie_get; _engine = _ie_get()
 
             if hasattr(_engine, "_tool_executor"):
                 _engine._tool_executor.shutdown(wait=True, cancel_futures=True)

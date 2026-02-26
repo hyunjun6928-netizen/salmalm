@@ -278,7 +278,8 @@ async def _process_message_inner(
     lang: Optional[str] = None,
 ) -> str:
     """Inner implementation of process_message."""
-    from salmalm.core.engine import _engine  # singleton
+    from salmalm.core.intelligence_engine import _get_engine as _ie_get_engine
+    _engine = _ie_get_engine()  # lazy singleton — no circular import
 
     # Input sanitization
     if not _SESSION_ID_RE.match(session_id):
