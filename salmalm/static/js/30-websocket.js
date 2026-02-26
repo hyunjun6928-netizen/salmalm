@@ -113,7 +113,25 @@
     }else if(data.type==='error'){
       _wsRequestPending=false;
       if(typingEl)typingEl.remove();
-      addMsg('assistant','❌ '+data.error);
+      /* Convert technical errors to friendly messages */
+      var _rawErr=data.error||'Unknown error';
+      var _friendlyErr=_rawErr;
+      var _eLow=_rawErr.toLowerCase();
+      if(_eLow.indexOf('rate limit')>=0||_eLow.indexOf('429')>=0)
+        _friendlyErr='⏳ 잠깐 너무 많은 요청이 왔어요. 잠시 후 자동으로 다시 시도합니다...';
+      else if(_eLow.indexOf('timeout')>=0||_eLow.indexOf('timed out')>=0)
+        _friendlyErr='⏰ 응답이 조금 오래 걸렸어요. 다시 시도해주세요.';
+      else if(_eLow.indexOf('overloaded')>=0||_eLow.indexOf('529')>=0)
+        _friendlyErr='🏋️ AI 서버가 잠시 바쁩니다. 곧 복구됩니다...';
+      else if(_eLow.indexOf('api key')>=0||_eLow.indexOf('auth')>=0||_eLow.indexOf('401')>=0)
+        _friendlyErr='🔑 API 키 설정을 확인해주세요. (Settings → API Keys)';
+      else if(_eLow.indexOf('unavailable')>=0||_eLow.indexOf('all ai')>=0)
+        _friendlyErr='😓 AI 모델이 일시적으로 점검 중입니다. 잠시 후 다시 시도해주세요.';
+      else if(_eLow.indexOf('context')>=0||_eLow.indexOf('too long')>=0)
+        _friendlyErr='📏 대화가 너무 길어졌어요. /compact 명령으로 정리해보세요.';
+      else
+        _friendlyErr='😅 잠깐 문제가 생겼어요. 다시 시도해주세요.';
+      addMsg('assistant',_friendlyErr);
       var _sb2=document.getElementById('stop-btn');var _sb2Send=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb2Send)_sb2Send.style.display='flex';
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
     }else if(data.type==='shutdown'){

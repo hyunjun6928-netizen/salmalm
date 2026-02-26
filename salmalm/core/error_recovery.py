@@ -341,3 +341,41 @@ def friendly_error(error: str, provider: str = "") -> str:
         return "📏 Conversation too long. Try /compact to compress context."
 
     return f"❌ {provider}: {error[:200]}"
+
+
+# ── Global Service-Level Circuit Breaker ──
+
+class GlobalCircuitBreaker:
+    """Last-resort guard: if ALL providers are in OPEN state (failed),
+    immediately return a friendly message instead of hammering dead endpoints.
+
+    Threshold: if 3+ providers are unavailable, declare global outage.
+    """
+
+    def __init__(self, threshold: int = 3) -> None:
+        self._threshold = threshold
+
+    def all_models_down(self) -> bool:
+        """True when enough providers are tripped to declare a global outage."""
+        status = circuit_breakers.status()
+        down = sum(1 for v in status.values() if v.get("state") == "open")
+        return down >= self._threshold
+
+    def __call__(self, func: Callable) -> Callable:
+        """Decorator: short-circuit if all providers are down."""
+        import functools
+
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            if self.all_models_down():
+                log.warning("[GLOBAL_CB] All providers down — short-circuiting")
+                return (
+                    "😓 모든 AI 모델 서버가 일시적으로 응답하지 않습니다.\n"
+                    "잠시 후 다시 시도해주세요. / All AI providers are temporarily unavailable. Please try again later."
+                )
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+
+global_circuit_breaker = GlobalCircuitBreaker(threshold=3)

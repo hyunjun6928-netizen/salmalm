@@ -44,7 +44,7 @@ def _sanitize_input(text: str) -> str:
     return "".join(c for c in text if c == "\n" or c == "\t" or c == "\r" or ord(c) >= 32)
 
 
-async def process_message(
+async def _process_message_guarded(
     session_id: str,
     user_message: str,
     model_override: Optional[str] = None,
@@ -54,6 +54,7 @@ async def process_message(
     on_status: Optional[Callable] = None,
     lang: Optional[str] = None,
 ) -> str:
+    """Inner guarded version — wrapped by global_circuit_breaker below."""
     """Process a user message through the Intelligence Engine pipeline.
 
     Edge cases:
@@ -72,11 +73,18 @@ async def process_message(
         sess_lock = _session_locks[session_id]
 
     if not sess_lock.acquire(blocking=False):
-        # Previous request still running — send abort signal and wait
+        # Previous request still running — send abort signal and wait.
+        # IMPORTANT: sess_lock is a threading.Lock. We must NOT call
+        # blocking .acquire() directly in an async context — it would
+        # block the event loop. Use run_in_executor to offload to a thread.
         from salmalm.features.abort import abort_controller
         abort_controller.set_abort(session_id)
         log.info(f"[ENGINE] Session {session_id} busy — aborting previous and waiting")
-        acquired = sess_lock.acquire(timeout=15.0)
+        import asyncio as _asyncio
+        loop = _asyncio.get_event_loop()
+        acquired = await loop.run_in_executor(
+            None, lambda: sess_lock.acquire(blocking=True, timeout=15.0)
+        )
         if not acquired:
             log.warning(f"[ENGINE] Session {session_id} lock timeout — proceeding anyway")
 
@@ -278,6 +286,26 @@ def _post_process(session, session_id: str, user_message: str, response: str, cl
     return response
 
 
+async def _safe(coro_or_fn, *args, fallback=None, label="stage", **kwargs):
+    """Safely call an async coroutine or sync function.
+
+    Returns fallback value on any exception — prevents one stage failure
+    from killing the entire request pipeline.
+    """
+    import asyncio as _asyncio
+    import inspect
+    try:
+        if inspect.iscoroutinefunction(coro_or_fn):
+            return await coro_or_fn(*args, **kwargs)
+        elif inspect.iscoroutine(coro_or_fn):
+            return await coro_or_fn
+        else:
+            return coro_or_fn(*args, **kwargs)
+    except Exception as _e:
+        log.warning(f"[PIPELINE] {label} failed (fallback): {type(_e).__name__}: {_e}")
+        return fallback
+
+
 async def _process_message_inner(
     session_id: str,
     user_message: str,
@@ -363,10 +391,24 @@ async def _process_message_inner(
         else:
             log.info("[ENGINE] Dedup: user message already in session — skipping add_user (SSE fallback)")
 
-    _prepare_context(session, user_message, lang, on_status)
+    await _safe(_prepare_context, session, user_message, lang, on_status,
+                label="prepare_context")
 
-    classification = _classify_task(session, user_message)
-    selected_model, complexity = _route_model(model_override, user_message, session)
+    classification = await _safe(
+        _classify_task, session, user_message,
+        fallback={"tier": 1, "score": 1, "intent": "chat", "thinking": False,
+                  "thinking_level": None, "thinking_budget": 0},
+        label="classify_task",
+    )
+    _route_result = await _safe(
+        _route_model, model_override, user_message, session,
+        fallback=None, label="route_model",
+    )
+    if _route_result is None:
+        from salmalm.constants import DEFAULT_MODEL as _DEF_MODEL
+        selected_model, complexity = _DEF_MODEL, "auto"
+    else:
+        selected_model, complexity = _route_result
 
     # ── SLA: Measure latency (레이턴시 측정) + abort token accumulation ──
     _sla_start = time.time()
@@ -452,6 +494,12 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
             )
             # Keep max 20 notifications
             web_session._notifications = web_session._notifications[-20:]  # type: ignore[attr-defined]
+
+
+from salmalm.core.error_recovery import global_circuit_breaker as _gcb
+
+process_message = _gcb(_process_message_guarded)
+"""Public entry point — global circuit breaker wraps the guarded pipeline."""
 
 
 def begin_shutdown() -> None:

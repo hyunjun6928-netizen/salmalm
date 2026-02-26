@@ -49,7 +49,7 @@ from salmalm.core.llm_stream import (  # noqa: F401
 from salmalm.core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded, _metrics
 
 
-_LLM_TIMEOUT = int(_os.environ.get("SALMALM_LLM_TIMEOUT", "30"))
+_LLM_TIMEOUT = int(_os.environ.get("SALMALM_LLM_TIMEOUT", "120"))
 
 _UA: str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
