@@ -544,8 +544,65 @@ class RAGEngine(RAGIndexerMixin):
         scored.sort(key=lambda x: -x["score"])
         return scored[:max_results]
 
+    # RRF constant k=60 (standard — from Cormack et al. 2009).
+    # Higher k → gentler rank penalty; 60 is the empirically dominant choice.
+    _RRF_K = 60
+
+    # Warn once per engine instance when running without semantic embeddings.
+    _embedding_warned: bool = False
+
+    @staticmethod
+    def _rrf_fuse(
+        ranked_lists: list,
+        weights: list,
+        data_maps: list,
+        k: int = 60,
+    ) -> Dict[int, tuple]:
+        """Reciprocal Rank Fusion across N ranked lists.
+
+        Replaces the previous BM25-rank-normalized + raw-cosine linear mix that
+        suffered from scale incompatibility.  RRF is rank-based so it works
+        regardless of whether the underlying scores are raw BM25, cosine
+        similarity, or embedding dot products.
+
+        Args:
+            ranked_lists: List of ordered chunk_id sequences (highest first).
+            weights:      Per-list weight (must sum to 1.0).
+            data_maps:    Dict[chunk_id → result_dict] per list.
+            k:            Smoothing constant (standard = 60).
+
+        Returns:
+            Dict[chunk_id → (rrf_score, result_dict)]
+        """
+        fused: Dict[int, float] = {}
+        best_data: Dict[int, Dict] = {}
+
+        for ranked, w, dmap in zip(ranked_lists, weights, data_maps):
+            for rank, cid in enumerate(ranked):
+                rrf = w * (1.0 / (k + rank))
+                fused[cid] = fused.get(cid, 0.0) + rrf
+                if cid not in best_data and cid in dmap:
+                    best_data[cid] = dmap[cid]
+
+        return {cid: (score, best_data.get(cid, {})) for cid, score in fused.items()}
+
     def search(self, query: str, max_results: int = 8, min_score: float = 0.1) -> List[Dict]:
-        """Hybrid search (BM25 + Vector). Returns list of {score, source, line, text}."""
+        """Hybrid search — BM25 + semantic embeddings (or TF-IDF fallback).
+
+        Fusion method: Reciprocal Rank Fusion (RRF, k=60).
+        RRF is rank-based, so it is robust to the scale mismatch between raw
+        BM25 scores and cosine/dot-product similarity values.  Previous
+        implementation used a weighted linear combination of incompatible
+        scales (BM25 rank-normalised ≠ cosine [0,1]).
+
+        Search modes (in priority order):
+          1. BM25 + semantic embeddings via OpenAI/Google API  ← best recall
+          2. BM25 + TF-IDF keyword vectors                     ← keyword-only
+          3. BM25 only (hybrid.enabled=false in rag.json)      ← legacy
+
+        Use case 1 activates automatically when an OpenAI or Google API key is
+        configured and embeddings have been generated for indexed chunks.
+        """
         self._ensure_db()
         self.reindex()
 
@@ -556,7 +613,6 @@ class RAGEngine(RAGIndexerMixin):
         if not query_tokens:
             return []
 
-        # Expand query with synonyms
         expanded_tokens = expand_query(query_tokens)
 
         cfg = self.config
@@ -564,77 +620,77 @@ class RAGEngine(RAGIndexerMixin):
         hybrid_enabled = hybrid_cfg.get("enabled", True)
 
         if not hybrid_enabled:
-            # BM25 only (legacy mode)
+            # BM25 only (legacy/explicit opt-out)
             results = self._bm25_search(expanded_tokens, max_results, min_score)
             for r in results:
                 r["score"] = round(r["score"], 4)
                 r.pop("chunk_id", None)
             return results
 
-        # Hybrid search
-        vector_weight = hybrid_cfg.get("vectorWeight", 0.7)
-        text_weight = hybrid_cfg.get("textWeight", 0.3)
-        # Normalize weights
-        total_w = vector_weight + text_weight
-        if total_w > 0:
-            vector_weight /= total_w
-            text_weight /= total_w
-
+        # ── Pool retrieval ────────────────────────────────────────────────────
         candidate_multiplier = 4
         pool_size = max_results * candidate_multiplier
 
-        # Try embedding search first (semantic), fall back to TF-IDF vector search
+        # Semantic embedding search (preferred) or TF-IDF keyword fallback
         use_embeddings = self._has_embedding_api()
         if use_embeddings:
             try:
                 vector_results = self._embedding_search(query, pool_size)
-            except Exception:
+                search_mode = "semantic+bm25"
+            except Exception as _emb_err:
+                log.debug(f"[RAG] Embedding search failed ({_emb_err}), falling back to TF-IDF")
                 vector_results = self._vector_search(expanded_tokens, pool_size)
+                search_mode = "tfidf+bm25"
         else:
+            if not self._embedding_warned:
+                log.warning(
+                    "[RAG] No embedding API configured — running keyword-only search "
+                    "(TF-IDF + BM25).  Semantic recall ('similar meaning, different words') "
+                    "requires an OpenAI or Google API key.  Set one via /vault to enable."
+                )
+                self._embedding_warned = True
             vector_results = self._vector_search(expanded_tokens, pool_size)
+            search_mode = "tfidf+bm25"
+
         bm25_results = self._bm25_search(expanded_tokens, pool_size, 0.0)
 
-        # Build score maps
-        # Vector scores are already cosine similarity [0,1]
-        vector_scores: Dict[int, float] = {}
-        vector_data: Dict[int, Dict] = {}
-        for r in vector_results:
-            cid = r["chunk_id"]
-            vector_scores[cid] = r["score"]
-            vector_data[cid] = r
+        # ── RRF fusion ────────────────────────────────────────────────────────
+        # Weights: semantic carries more signal than BM25 when available.
+        # TF-IDF and BM25 share more overlap, so equal weight is fine.
+        if search_mode == "semantic+bm25":
+            w_vector, w_bm25 = 0.65, 0.35
+        else:
+            w_vector, w_bm25 = 0.50, 0.50
 
-        # BM25: textScore = 1 / (1 + max(0, rank))
-        bm25_scores: Dict[int, float] = {}
-        bm25_data: Dict[int, Dict] = {}
-        for rank, r in enumerate(bm25_results):
-            cid = r["chunk_id"]
-            bm25_scores[cid] = 1.0 / (1.0 + max(0, rank))
-            bm25_data[cid] = r
+        vector_ranked = [r["chunk_id"] for r in vector_results]
+        bm25_ranked = [r["chunk_id"] for r in bm25_results]
+        vector_map = {r["chunk_id"]: r for r in vector_results}
+        bm25_map = {r["chunk_id"]: r for r in bm25_results}
 
-        # Merge all candidate chunk IDs
-        all_ids = set(vector_scores.keys()) | set(bm25_scores.keys())
+        fused = self._rrf_fuse(
+            ranked_lists=[vector_ranked, bm25_ranked],
+            weights=[w_vector, w_bm25],
+            data_maps=[vector_map, bm25_map],
+            k=self._RRF_K,
+        )
 
+        # ── Build final result list ───────────────────────────────────────────
+        # Normalise RRF scores to [0,1] so min_score threshold is meaningful.
+        max_rrf = max((s for s, _ in fused.values()), default=1.0) or 1.0
         final = []
-        for cid in all_ids:
-            vs = vector_scores.get(cid, 0.0)
-            ts = bm25_scores.get(cid, 0.0)
-            final_score = vector_weight * vs + text_weight * ts
-
-            data = vector_data.get(cid) or bm25_data.get(cid)
-            if data and final_score > 0:
-                final.append(
-                    {
-                        "score": round(final_score, 4),
-                        "source": data["source"],
-                        "line": data["line"],
-                        "text": data["text"],
-                    }
-                )
+        for cid, (rrf_score, data) in fused.items():
+            normalised = rrf_score / max_rrf
+            if data and normalised >= min_score:
+                final.append({
+                    "score": round(normalised, 4),
+                    "source": data.get("source", ""),
+                    "line": data.get("line", 0),
+                    "text": data.get("text", ""),
+                    "_search_mode": search_mode,  # diagnostic — stripped by build_context
+                })
 
         final.sort(key=lambda x: -x["score"])
-
-        # Filter by min_score
-        final = [r for r in final if r["score"] >= min_score]
+        log.debug(f"[RAG] {search_mode}: {len(final)} results for {query!r:.60}")
         return final[:max_results]
 
     def build_context(self, query: str, max_chars: int = 4000, max_results: int = 6) -> str:
