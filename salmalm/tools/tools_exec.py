@@ -46,8 +46,20 @@ def _sanitized_env(extra_env: dict | None = None) -> dict:
         else:
             clean[k] = v
     if extra_env:
-        # User-supplied env vars are NOT filtered — they are explicit
-        clean.update(extra_env)
+        # extra_env originates from LLM-generated tool arguments, NOT from the human.
+        # The LLM could emit {"env": {"PYTHONPATH": "/tmp/evil"}} to hijack imports.
+        # check_env_override() in handle_exec() is the primary gate; this is a
+        # secondary defence to ensure the blocked set is enforced even on direct
+        # _sanitized_env() calls (e.g., future callers that skip handle_exec).
+        from salmalm.security.exec_approvals import BLOCKED_ENV_OVERRIDES
+        for k, v in extra_env.items():
+            if k in BLOCKED_ENV_OVERRIDES:
+                log.warning("[EXEC] Stripped blocked env var from extra_env: %s", k)
+                continue
+            if k.startswith(("LD_", "DYLD_", "PYTHON")):
+                log.warning("[EXEC] Stripped suspicious env prefix from extra_env: %s", k)
+                continue
+            clean[k] = v
     return clean
 
 
@@ -346,10 +358,21 @@ def _ast_validate(code: str) -> str | None:
 
 @register("python_eval")
 def handle_python_eval(args: dict) -> str:
-    """Handle python eval. Disabled by default — enable with SALMALM_PYTHON_EVAL=1."""
-    import os as _os
+    """Execute Python code with multi-layer sandboxing.
 
-    if _os.environ.get("SALMALM_PYTHON_EVAL", "0") != "1":
+    Sandbox architecture:
+      1. AST validation — blocks dangerous builtins, imports, dunder access
+      2. String blocklist — defense-in-depth for patterns AST misses
+      3. Subprocess isolation — runs in a child process, not the main process
+      4. Resource limits — CPU/AS/NOFILE/FSIZE capped via RLIMIT
+
+    ⚠️  SECURITY NOTICE: This sandbox does NOT provide hard isolation.
+    A sufficiently motivated attacker can bypass AST + blocklist checks in
+    CPython (e.g., via codec manipulation, C extension loading, etc.).
+    The real protection is SALMALM_PYTHON_EVAL=0 (default).
+    For genuine isolation, run in nsjail/bubblewrap or a separate VM.
+    """
+    if os.environ.get("SALMALM_PYTHON_EVAL", "0") != "1":
         return "⚠️ python_eval is disabled by default for security. Enable with SALMALM_PYTHON_EVAL=1"
     code = args.get("code", "")
     timeout_sec = min(args.get("timeout", 15), 30)
@@ -360,6 +383,8 @@ def handle_python_eval(args: dict) -> str:
         return f"Security blocked: {ast_err}"
 
     # Secondary: string blocklist
+    # NOTE: AST validation is the primary gate; this list is defense-in-depth.
+    # It does NOT fully sandbox CPython — SALMALM_PYTHON_EVAL=0 is the real defense.
     _EVAL_BLOCKLIST = [
         "import os",
         "import sys",
@@ -402,6 +427,19 @@ def handle_python_eval(args: dict) -> str:
         "importlib",
         "ctypes",
         "signal",
+        # Modules with known arbitrary-code-execution gadgets
+        "import pickle",
+        "import builtins",     # direct access to all builtins bypasses AST blocks
+        "import gc",           # gc.get_objects() exposes live Python objects
+        "import types",        # FunctionType(code_obj, globals) → exec arbitrary bytecode
+        "import dis",          # bytecode inspection / manipulation
+        "import marshal",      # load serialised code objects
+        "import inspect",      # inspect.currentframe().f_globals exposes globals
+        "import zipimport",    # load code from zip archives
+        "import importlib",    # duplicate of importlib entry, kept for coverage
+        "import ast",          # can compile+eval arbitrary code objects
+        "import tokenize",     # read source files
+        "import linecache",    # reads source files by line
         # Secret exfiltration prevention
         "salmalm.security",
         "from salmalm",
@@ -423,7 +461,13 @@ def handle_python_eval(args: dict) -> str:
         "auth.json",
         "credentials.json",
     ]
-    code_lower = code.lower().replace(" ", "").replace("\t", "")
+    # Normalise whitespace for pattern matching — strip ALL Unicode whitespace
+    # (NBSP, ZWSP, etc.) to prevent bypass via e.g. "import\u00a0pickle"
+    import unicodedata as _ucd
+    code_lower = "".join(
+        c for c in code.lower()
+        if not (_ucd.category(c).startswith("Z") or c in " \t\n\r\x0b\x0c\u200b\u200c\u200d\u2060\ufeff")
+    )
     for blocked in _EVAL_BLOCKLIST:
         if blocked.lower().replace(" ", "") in code_lower:
             return f"Security blocked: `{blocked}` not allowed."

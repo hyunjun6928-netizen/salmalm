@@ -45,6 +45,7 @@ DANGEROUS_PATTERNS = [
 
 # Env vars that cannot be overridden (binary hijacking prevention)
 BLOCKED_ENV_OVERRIDES = {
+    # Binary hijacking (shared library / dynamic linker)
     "PATH",
     "LD_PRELOAD",
     "LD_LIBRARY_PATH",
@@ -52,6 +53,14 @@ BLOCKED_ENV_OVERRIDES = {
     "DYLD_INSERT_LIBRARIES",
     "DYLD_LIBRARY_PATH",
     "DYLD_FRAMEWORK_PATH",
+    # Python interpreter — import hijacking / startup code injection
+    "PYTHONPATH",          # prepends dirs to sys.path → import attacker-controlled modules
+    "PYTHONSTARTUP",       # executes a file before the interpreter starts
+    "PYTHONHOME",          # overrides Python's standard library location
+    "PYTHONEXECUTABLE",    # changes which Python binary is invoked
+    "PYTHON_PATH",         # non-standard alias used in some environments
+    "PYTHONDONTWRITEBYTECODE",  # minor, but keeps the pattern consistent
+    "PYTHONFAULTHANDLER",  # can dump memory addresses; minimal risk but blocked for safety
 }
 
 
