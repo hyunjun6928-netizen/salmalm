@@ -592,6 +592,8 @@ class DailyQuotaManager:
         """Init  ."""
         self._lock = threading.Lock()
         self._cache: Dict[str, int] = {}   # "user_id:date" -> token count (in-memory write-through)
+        # Make an instance-level copy so env-var overrides don't bleed into the class
+        self._ROLE_LIMITS = dict(self.__class__._ROLE_LIMITS)
         self._init_db()
         # Allow env-var override
         import os as _os

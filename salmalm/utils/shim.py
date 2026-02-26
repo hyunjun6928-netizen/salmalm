@@ -25,8 +25,24 @@ def install_shim(package_name: str, real_module: str, submodules: set) -> None:
             _real_mod = importlib.import_module(real_module)
         return _real_mod
 
+    short_name = package_name.rsplit(".", 1)[-1]
+    _warned = [False]
+
+    def _warn_once():
+        if not _warned[0]:
+            _warned[0] = True
+            warnings.warn(
+                f"{short_name} is a shim; use {real_module} directly",
+                DeprecationWarning,
+                stacklevel=4,
+            )
+
     class _PkgProxy(types.ModuleType):
         def __getattr__(self, name: str):
+            # Only warn when actually proxying attribute access to the real module
+            # (not for submodule imports like salmalm.web.auth which are legitimate)
+            if not name.startswith("_") and name not in submodules:
+                _warn_once()
             return getattr(_get_real(), name)
 
         def __setattr__(self, name: str, value: str):
@@ -46,9 +62,5 @@ def install_shim(package_name: str, real_module: str, submodules: set) -> None:
     proxy.__loader__ = old.__loader__
     proxy.__spec__ = old.__spec__
     sys.modules[package_name] = proxy
-    short_name = package_name.rsplit(".", 1)[-1]
-    warnings.warn(
-        f"{short_name} is a shim; use {real_module} directly",
-        DeprecationWarning,
-        stacklevel=3,
-    )
+    # NOTE: warning is now deferred to first actual shim access,
+    # not emitted on import of legitimate submodules (e.g. salmalm.web.auth).

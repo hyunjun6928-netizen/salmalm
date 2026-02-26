@@ -105,8 +105,8 @@ def get_embedding(text: str, provider: Optional[str] = None, conn: Optional[sqli
             ).fetchone()
             if row:
                 return json.loads(row[0]), row[1]
-        except Exception:
-            pass
+        except Exception as _e:
+            log.debug("[RAG-EMBED] suppressed: %s", _e)
 
     # Determine provider
     if provider is None:
@@ -135,8 +135,8 @@ def get_embedding(text: str, provider: Optional[str] = None, conn: Optional[sqli
                     (text_hash, json.dumps(emb), provider, len(emb)),
                 )
                 conn.commit()
-            except Exception:
-                pass
+            except Exception as _e:
+                log.debug("[RAG-EMBED] suppressed: %s", _e)
         
         return emb, provider
     except Exception as e:
@@ -160,8 +160,8 @@ def get_embedding(text: str, provider: Optional[str] = None, conn: Optional[sqli
                                 (text_hash, json.dumps(emb), fallback, len(emb)),
                             )
                             conn.commit()
-                        except Exception:
-                            pass
+                        except Exception as _e:
+                            log.debug("[RAG-EMBED] suppressed: %s", _e)
                     return emb, fallback
             except Exception:
                 continue
@@ -198,8 +198,8 @@ def batch_embed(texts: List[str], provider: Optional[str] = None, conn: Optional
                 if row:
                     results[i] = (json.loads(row[0]), row[1])
                     continue
-            except Exception:
-                pass
+            except Exception as _e:
+                log.debug("[RAG-EMBED] suppressed: %s", _e)
         uncached_indices.append(i)
         uncached_texts.append(text)
 
@@ -231,14 +231,14 @@ def batch_embed(texts: List[str], provider: Optional[str] = None, conn: Optional
                                 "INSERT OR REPLACE INTO rag_embeddings (chunk_hash, embedding, provider, dimensions) VALUES (?,?,?,?)",
                                 (text_hash, json.dumps(emb), provider, len(emb)),
                             )
-                        except Exception:
-                            pass
+                        except Exception as _e:
+                            log.debug("[RAG-EMBED] suppressed: %s", _e)
             
         if conn:
             try:
                 conn.commit()
-            except Exception:
-                pass
+            except Exception as _e:
+                log.debug("[RAG-EMBED] suppressed: %s", _e)
         
         embedded_count = sum(1 for r in results if r is not None)
         log.info(f"[RAG] Embedded {embedded_count} chunks via {provider}")

@@ -113,8 +113,8 @@ def _check_path_safety(tool_name: str, args: dict) -> Optional[str]:
                     return f"❌ Path outside allowed directories: {key}={val} / 허용 디렉토리 외부 경로 차단: denied"
                 if any(resolved.startswith(s) or val.startswith(s) for s in _SENSITIVE_DIRS):
                     return f"❌ Access denied: {key}={val} / 접근 거부: 보호된 시스템 경로"
-        except Exception:  # noqa: broad-except
-            pass
+        except Exception as _e:  # noqa: broad-except
+            log.warning("[SECURITY] path validation error for %s=%s: %s", key, val, _e)
     return None
 
 

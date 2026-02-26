@@ -209,8 +209,8 @@ class WebSessionsMixin:
             try:
                 if _json_path.exists():
                     _json_path.unlink()
-            except Exception:
-                pass
+            except Exception as _e:
+                log.debug("[SESSIONS] JSON cleanup failed for %s: %s", sid, _e)
             deleted += 1
         conn.execute("DELETE FROM session_store WHERE session_id != ?", (keep,))
         conn.commit()

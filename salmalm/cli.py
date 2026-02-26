@@ -233,28 +233,44 @@ def _run_service(subcmd: str) -> None:
     import getpass
 
     exe = shutil.which("salmalm") or sys.executable + " -m salmalm"
+    python = sys.executable
     user = getpass.getuser()
     home = os.path.expanduser("~")
     unit_dir = os.path.join(home, ".config", "systemd", "user")
     unit_path = os.path.join(unit_dir, "salmalm.service")
+    data_dir = os.path.join(home, "SalmAlm")
+    local_dir = os.path.join(home, ".local", "share", "salmalm")
 
+    # ExecStart must run the server in the foreground (not fork+exit).
+    # `salmalm start` forks a subprocess and exits — systemd would see
+    # that as a crash with Type=simple. Use `python -m salmalm` directly.
     unit_content = textwrap.dedent(f"""\
         [Unit]
         Description=SalmAlm — Personal AI Gateway
-        After=network.target
+        Documentation=https://github.com/hyunjun6928-netizen/salmalm
+        After=network-online.target
+        Wants=network-online.target
         StartLimitIntervalSec=60
         StartLimitBurst=5
 
         [Service]
         Type=simple
-        ExecStart={exe} start
+        ExecStart={python} -m salmalm
+        ExecStop=/usr/bin/env salmalm stop
         Restart=on-failure
         RestartSec=5s
+        TimeoutStopSec=15s
         Environment=HOME={home}
         Environment=PATH={os.path.dirname(exe)}:/usr/local/bin:/usr/bin:/bin
         StandardOutput=journal
         StandardError=journal
         SyslogIdentifier=salmalm
+
+        # Security hardening
+        NoNewPrivileges=true
+        PrivateTmp=true
+        ProtectSystem=strict
+        ReadWritePaths={data_dir} {local_dir}
 
         [Install]
         WantedBy=default.target
