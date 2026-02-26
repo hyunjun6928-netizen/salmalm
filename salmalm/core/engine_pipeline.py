@@ -54,39 +54,48 @@ async def _process_message_guarded(
     on_status: Optional[Callable] = None,
     lang: Optional[str] = None,
 ) -> str:
-    """Inner guarded version — wrapped by global_circuit_breaker below."""
     """Process a user message through the Intelligence Engine pipeline.
 
-    Edge cases:
+    Wrapped by global_circuit_breaker (see bottom of module) before export
+    as the public ``process_message`` symbol.
+
+    Edge cases handled:
     - Shutdown rejection
+    - Per-session concurrent-request guard (threading.Lock via run_in_executor)
     - Unhandled exceptions → graceful error message
     """
-    # Event loop reference is now obtained dynamically via _get_event_loop()
     # Reject new requests during shutdown
     if _shutting_down:
         return "⚠️ Server is shutting down. Please try again later. / 서버가 종료 중입니다."
 
-    # Per-session lock: if previous request still running, abort it and wait
+    # Per-session lock: prevents overlapping requests on the same session.
     with _session_locks_lock:
         if session_id not in _session_locks:
             _session_locks[session_id] = _threading.Lock()
         sess_lock = _session_locks[session_id]
 
+    # Track whether *this coroutine* holds the lock so finally can release safely.
+    _lock_acquired = False
     if not sess_lock.acquire(blocking=False):
         # Previous request still running — send abort signal and wait.
         # IMPORTANT: sess_lock is a threading.Lock. We must NOT call
         # blocking .acquire() directly in an async context — it would
-        # block the event loop. Use run_in_executor to offload to a thread.
+        # stall the entire event loop. Offload to a thread pool instead.
         from salmalm.features.abort import abort_controller
         abort_controller.set_abort(session_id)
         log.info(f"[ENGINE] Session {session_id} busy — aborting previous and waiting")
         import asyncio as _asyncio
         loop = _asyncio.get_event_loop()
-        acquired = await loop.run_in_executor(
+        _lock_acquired = await loop.run_in_executor(
             None, lambda: sess_lock.acquire(blocking=True, timeout=15.0)
         )
-        if not acquired:
-            log.warning(f"[ENGINE] Session {session_id} lock timeout — proceeding anyway")
+        if not _lock_acquired:
+            # Timeout: refuse to proceed — two concurrent requests on the same
+            # session would corrupt session.messages (race condition).
+            log.warning(f"[ENGINE] Session {session_id} lock timeout — rejecting request")
+            return "⏳ 이전 요청이 아직 처리 중입니다. 잠시 후 다시 시도해주세요.\n(Previous request still in progress — please wait.)"
+    else:
+        _lock_acquired = True
 
     with _active_requests_lock:
         global _active_requests
@@ -115,10 +124,11 @@ async def _process_message_guarded(
             _active_requests -= 1
             if _active_requests == 0:
                 _active_requests_event.set()
-        try:
-            sess_lock.release()
-        except RuntimeError:
-            pass  # Already released (timeout path)
+        if _lock_acquired:
+            try:
+                sess_lock.release()
+            except RuntimeError:
+                pass  # Should never happen — guard is belt-and-suspenders
         # Evict lock entry if session no longer exists — prevents unbounded growth.
         # Check lazily here: most sessions are long-lived so eviction is rare.
         try:

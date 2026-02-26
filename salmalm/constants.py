@@ -155,7 +155,9 @@ EXEC_ARG_BLOCKLIST: dict = {
     "find": {"-exec", "-execdir", "-delete", "-ok", "-okdir"},
     "xargs": {"-I", "--replace", "-i"},
     "tar": {"--to-command", "--checkpoint-action", "--use-compress-program"},
-    "git": {"clone", "pull", "push", "fetch", "remote", "submodule", "hook"},
+    # "commit" blocked: pre-commit / post-commit hooks can execute arbitrary code.
+    # "am" / "rebase" blocked: allow hook execution via --exec flag.
+    "git": {"clone", "pull", "push", "fetch", "remote", "submodule", "hook", "commit", "am", "rebase"},
     "sed": {"-i", "--in-place"},
 }
 # Pattern blocklist for inline code execution in awk/sed
@@ -243,7 +245,7 @@ EXEC_BLOCKLIST = {
 EXEC_BLOCKLIST_PATTERNS = [
     r"[;&|`]\s*(rm|dd|mkfs|shutdown|reboot|halt|sudo|su)\b",  # chained dangerous cmds
     r"\$\(",  # command substitution (any)
-    r"`[^`]*`",  # backtick substitution (any, including empty)
+    r"`[^`]+`",  # backtick substitution — requires at least 1 char inside (empty backticks are harmless)
     r">\s*/dev/sd",  # write to raw device
     r">\s*/etc/",  # overwrite system config
     r"/proc/sysrq",  # sysrq trigger

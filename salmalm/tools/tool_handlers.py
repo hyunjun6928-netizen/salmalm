@@ -102,11 +102,15 @@ def _check_path_safety(tool_name: str, args: dict) -> Optional[str]:
         if ".." in val:
             return f'❌ Path traversal blocked: ".." not allowed in {key} / 경로 탈출 차단'
         try:
-            resolved = str(_P(val).resolve())
-            if not _P(val).is_absolute():
-                resolved = str((WORKSPACE_DIR / val).resolve())
+            # Use os.path.realpath (follows symlinks) in addition to Path.resolve()
+            # to prevent symlink-based escapes to paths outside allowed roots.
+            import os as _os_ph
+            if _P(val).is_absolute():
+                resolved = _os_ph.path.realpath(str(_P(val)))
+            else:
+                resolved = _os_ph.path.realpath(str(WORKSPACE_DIR / val))
             resolved_path = _P(resolved)
-            in_allowed = any(resolved_path == _P(r) or resolved_path.is_relative_to(_P(r)) for r in _allowed_roots)
+            in_allowed = any(resolved_path == _P(r) or resolved_path.is_relative_to(_P(_os_ph.path.realpath(r))) for r in _allowed_roots)
             home_read_ok = os.environ.get("SALMALM_ALLOW_HOME_READ") and resolved_path.is_relative_to(_P.home())
             if not in_allowed and not home_read_ok:
                 if tool_name in _WRITE_TOOLS or _P(resolved).exists() or _P(val).exists():

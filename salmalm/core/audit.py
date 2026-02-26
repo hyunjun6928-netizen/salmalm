@@ -36,6 +36,7 @@ def _ensure_audit_v2_table():
     conn.commit()
 
 
+_AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush (moved above _schedule_audit_flush)
 _audit_buffer: list = []
 _audit_flush_timer = None
 _AUDIT_BATCH_SIZE = 20  # flush after this many entries
@@ -95,9 +96,6 @@ def _init_audit_db():
     atexit.register(_flush_audit_buffer)
 
 
-_AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush
-
-
 def _flush_audit_buffer() -> None:
     """Write buffered audit entries to SQLite in a single transaction."""
     global _audit_flush_timer
@@ -152,16 +150,18 @@ def audit_log(
     ts = datetime.now(KST).isoformat()  # noqa: F405
     json_detail = json.dumps(detail_dict, ensure_ascii=False) if detail_dict else json.dumps({"text": detail[:500]})
 
+    _do_flush = False
     with _audit_lock:
         _audit_buffer.append((ts, event, detail, session_id, json_detail))
         if len(_audit_buffer) >= _AUDIT_BATCH_SIZE:
-            pass  # will flush below
+            _do_flush = True
         else:
             _schedule_audit_flush()
-            return
 
-    # Flush immediately when batch is full
-    _flush_audit_buffer()
+    if _do_flush:
+        # Flush outside the append lock to avoid lock inversion with _audit_lock
+        # inside _flush_audit_buffer (which re-acquires _audit_lock itself).
+        _flush_audit_buffer()
 
 
 def audit_checkpoint() -> Optional[str]:

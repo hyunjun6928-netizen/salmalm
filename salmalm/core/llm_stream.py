@@ -20,7 +20,13 @@ def _lazy_track_usage(model, inp, out):
     track_usage(model, inp, out)
 
 
-_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+try:
+    from salmalm.constants import VERSION as _VERSION
+except Exception:
+    _VERSION = "0"
+# Honest User-Agent — Chrome impersonation violates provider ToS and may cause
+# log/proxy systems to leak the API key embedded in Google URLs.
+_UA = f"SalmAlm/{_VERSION} (https://github.com/hyunjun6928-netizen/salmalm)"
 from salmalm.security.crypto import vault
 
 
@@ -83,10 +89,14 @@ def stream_google(
         body["tools"] = gemini_tools
 
     data = json.dumps(body).encode("utf-8")
+    # NOTE: Google REST API requires the key as a query param — there is no
+    # header-based auth alternative for this endpoint. Ensure the URL is never
+    # logged in full; use the masked form for any debug output.
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model_id}:streamGenerateContent?alt=sse&key={api_key}"
     )
+    _url_safe = url.split("&key=")[0] + "&key=***"  # mask for logs
     headers = {"Content-Type": "application/json", "User-Agent": _UA}
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
 
