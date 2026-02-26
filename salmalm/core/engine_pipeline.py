@@ -22,7 +22,7 @@ import re as _re
 
 def _get_thinking_budget_map():
     """Lazy import to avoid circular dependency."""
-    from salmalm.core.engine import _THINKING_BUDGET_MAP
+    from salmalm.core.intelligence_engine import _THINKING_BUDGET_MAP
 
     return _THINKING_BUDGET_MAP
 

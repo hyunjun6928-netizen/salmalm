@@ -601,7 +601,7 @@ class WebSocketHandler:
                         log.debug("[WS] on_status send failed: %s", _e)
 
                 try:
-                    from salmalm.core.engine import process_message
+                    from salmalm.core.engine_pipeline import process_message
                     from salmalm.core import get_session as _gs
 
                     _sess = _gs(sid)

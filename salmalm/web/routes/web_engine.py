@@ -47,7 +47,7 @@ class WebEngineMixin:
         """Get routing."""
         if not self._require_auth("user"):
             return
-        from salmalm.core.engine import get_routing_config
+        from salmalm.core.model_selection import load_routing_config as get_routing_config
 
         config = get_routing_config()
         # Validate: strip models whose provider has no key
@@ -72,7 +72,7 @@ class WebEngineMixin:
         """Get failover."""
         if not self._require_auth("user"):
             return
-        from salmalm.core.engine import get_failover_config
+        from salmalm.core.llm_loop import get_failover_config
         from salmalm.core.llm_loop import get_cooldown_status
 
         self._json({"config": get_failover_config(), "cooldowns": get_cooldown_status()})
@@ -82,7 +82,7 @@ class WebEngineMixin:
         body = self._body
         if not self._require_auth("user"):
             return
-        from salmalm.core.engine import _save_routing_config, get_routing_config
+        from salmalm.core.model_selection import _save_routing_config, load_routing_config as get_routing_config
 
         cfg = get_routing_config()
         for k in ("simple", "moderate", "complex"):
@@ -128,7 +128,7 @@ class WebEngineMixin:
         body = self._body
         if not self._require_auth("user"):
             return
-        from salmalm.core.engine import save_failover_config, get_failover_config
+        from salmalm.core.llm_loop import save_failover_config, get_failover_config
 
         save_failover_config(body)
         self._json({"ok": True, "config": get_failover_config()})

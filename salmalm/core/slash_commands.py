@@ -21,7 +21,7 @@ from salmalm.core.slash_commands_ext import (  # noqa: F401
 
 def _get_engine():
     """Lazy import to avoid circular dependency."""
-    from salmalm.core.engine import _engine
+    from salmalm.core.intelligence_engine import _get_engine as _ie_get_engine; _engine = _ie_get_engine()
 
     return _engine
 

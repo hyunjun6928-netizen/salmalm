@@ -136,7 +136,7 @@ class ConversationFork:
 
         session.messages = msgs[:real_idx]
 
-        from salmalm.core.engine import process_message
+        from salmalm.core.engine_pipeline import process_message
 
         response = await process_message(session_id, user_msg)
 

@@ -784,7 +784,7 @@ self.addEventListener('fetch',e=>{{
 
     def _do_post_inner(self):
         """Do post inner."""
-        from salmalm.core.engine import process_message  # noqa: F401
+        from salmalm.core.engine_pipeline import process_message  # noqa: F401
 
         length = int(self.headers.get("Content-Length", 0))
 

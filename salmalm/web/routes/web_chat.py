@@ -82,7 +82,7 @@ class WebChatMixin:
 
     def _post_api_chat(self):
         """Handle /api/chat and /api/chat/stream — main conversation endpoint."""
-        from salmalm.core.engine import process_message
+        from salmalm.core.engine_pipeline import process_message
 
         body = self._body
         self._auto_unlock_localhost()

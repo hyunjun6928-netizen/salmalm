@@ -283,7 +283,7 @@ class MeshManager:
         log.info(f"[MESH] Task from {from_host}: {task[:80]}")
         try:
             import asyncio
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
             result = asyncio.run(process_message(f"mesh-{from_host}", task, model_override=model))
             return {"result": result[:5000], "status": "completed"}

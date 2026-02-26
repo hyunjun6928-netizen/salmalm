@@ -109,7 +109,7 @@ async def _start_discord_bot() -> None:
                 _channel_id = raw_data.get("channel_id", "")
                 _session_id = f"discord_{_channel_id}"
                 _start = time.time()
-                from salmalm.core.engine import process_message
+                from salmalm.core.engine_pipeline import process_message
 
                 response = await process_message(_session_id, content, on_token=on_token)
                 _elapsed = time.time() - _start
@@ -394,7 +394,7 @@ async def _handle_ws_msg(client, data: dict) -> None:
         await client.send_json({"type": "typing", "status": status_type, "detail": detail})
 
     try:
-        from salmalm.core.engine import process_message
+        from salmalm.core.engine_pipeline import process_message
         from salmalm.core import get_session as _gs_ws
 
         image_data = (image_b64, image_mime) if image_b64 else None
@@ -753,7 +753,7 @@ async def run_server():
 
     # === Shutdown Sequence ===
     log.info("[SHUTDOWN] Phase 1: Stop accepting new requests")
-    from salmalm.core.engine import begin_shutdown, wait_for_active_requests
+    from salmalm.core.engine_pipeline import begin_shutdown, wait_for_active_requests
 
     begin_shutdown()
 

@@ -62,7 +62,7 @@ def _run_task(task_id: str, description: str, model: str) -> None:
 
     loop = _asyncio.new_event_loop()
     try:
-        from salmalm.core.engine import process_message
+        from salmalm.core.engine_pipeline import process_message
 
         session_id = f"agent_{task_id[:8]}"
         model_override = model if model and model != "auto" else None

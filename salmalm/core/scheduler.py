@@ -178,7 +178,7 @@ class HeartbeatManager:
             state_ctx = "\n\nLast checks:\n" + "\n".join(checks)
 
         try:
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
             # Run in isolated session (OpenClaw pattern: no cross-contamination)
             result = await process_message(

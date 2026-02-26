@@ -263,3 +263,7 @@ def select_model(message: str, session) -> Tuple[str, str]:
         return rc["simple"], "simple"
 
     return rc["moderate"], "moderate"
+
+# Backward-compat alias used by callers that imported from engine.py
+_save_routing_config = save_routing_config
+_fix_model_name = fix_model_name  # backward-compat alias

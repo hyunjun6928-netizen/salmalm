@@ -45,7 +45,7 @@ class ShutdownManager:
         # Phase 1: Reject new requests
         log.info("[SHUTDOWN] Phase 1: Reject new requests")
         try:
-            from salmalm.core.engine import begin_shutdown, wait_for_active_requests
+            from salmalm.core.engine_pipeline import begin_shutdown, wait_for_active_requests
 
             begin_shutdown()
         except Exception as e:
@@ -54,7 +54,7 @@ class ShutdownManager:
         # Phase 2: Drain active LLM requests (streaming)
         log.info("[SHUTDOWN] Phase 2: Drain active LLM requests")
         try:
-            from salmalm.core.engine import wait_for_active_requests  # noqa: F811
+            from salmalm.core.engine_pipeline import wait_for_active_requests  # noqa: F811
 
             drained = wait_for_active_requests(timeout=min(timeout, 15.0))
             if not drained:

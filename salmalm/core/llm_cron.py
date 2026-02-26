@@ -227,7 +227,7 @@ class LLMCronManager:
                 continue
             log.info(f"[CRON] LLM cron firing: {job['name']} ({job['id']})")
             try:
-                from salmalm.core.engine import process_message
+                from salmalm.core.engine_pipeline import process_message
 
                 # Track cost before/after to enforce per-cron-job cap
                 cost_before = _usage["total_cost"]

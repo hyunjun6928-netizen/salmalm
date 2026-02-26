@@ -652,7 +652,7 @@ def quick_sync_export() -> dict:
 
     # Routing config
     try:
-        from salmalm.core.engine import get_routing_config
+        from salmalm.core.model_selection import load_routing_config as get_routing_config
 
         data["routing"] = get_routing_config()
     except Exception as e:  # noqa: broad-except
@@ -676,7 +676,7 @@ def quick_sync_export() -> dict:
 
     # Failover config
     try:
-        from salmalm.core.engine import get_failover_config
+        from salmalm.core.llm_loop import get_failover_config
 
         data["failover"] = get_failover_config()
     except Exception as e:  # noqa: broad-except
@@ -703,7 +703,7 @@ def quick_sync_import(data: dict) -> None:
     # Routing config
     if "routing" in data:
         try:
-            from salmalm.core.engine import _save_routing_config
+            from salmalm.core.model_selection import _save_routing_config
 
             _save_routing_config(data["routing"])
         except Exception as e:
@@ -712,7 +712,7 @@ def quick_sync_import(data: dict) -> None:
     # Failover config
     if "failover" in data:
         try:
-            from salmalm.core.engine import save_failover_config
+            from salmalm.core.llm_loop import save_failover_config
 
             save_failover_config(data["failover"])
         except Exception as e:

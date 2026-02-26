@@ -235,7 +235,7 @@ class TelegramMediaMixin:
             pass
 
         _start = time.time()
-        from salmalm.core.engine import process_message
+        from salmalm.core.engine_pipeline import process_message
 
         # Pass session-level model override (same as web_chat.py)
         _model_ov = getattr(_sess_obj, "model_override", None)

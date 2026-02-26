@@ -114,7 +114,7 @@ def _try_fallback(provider, model, messages, tools, max_tokens, t0) -> Optional[
         fb_model_id = FALLBACK_MODELS.get(fb_provider)
         if not fb_model_id:
             continue
-        from salmalm.core.engine import _fix_model_name
+        from salmalm.core.model_selection import _fix_model_name
 
         fb_model_id = _fix_model_name(fb_model_id)
         log.info(f"[SYNC] Fallback: {provider} -> {fb_provider}/{fb_model_id} [after {time.time() - t0:.2f}s]")

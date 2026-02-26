@@ -303,24 +303,87 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     async def _try_llm_call(self, messages, model, tools, max_tokens, thinking, on_token):
         return await _try_llm_call_fn(messages, _fix_model_name(model), tools, max_tokens, thinking, on_token)
 
+    @staticmethod
+    def _role_aware_trim(messages: list, keep_last_exchanges: int) -> list:
+        """Trim messages while preserving structural integrity.
+
+        Rules:
+        1. System messages (role="system") are always kept at the front.
+        2. Tool call sequences are kept atomic:
+           - An assistant message with tool_calls must stay with its following
+             role="tool" messages (same tool_call_id chain).
+        3. We keep the last `keep_last_exchanges` complete exchanges
+           (user → assistant → [tool...] groups), discarding middle history.
+        4. Never leave an orphaned tool result without its assistant tool_call.
+        """
+        if not messages:
+            return messages
+
+        sys_msgs = [m for m in messages if m.get("role") == "system"]
+        non_sys = [m for m in messages if m.get("role") != "system"]
+
+        # Group non-system messages into atomic exchanges.
+        # An exchange starts at each "user" message (or assistant without tool_calls).
+        exchanges: list[list] = []
+        current: list = []
+
+        for msg in non_sys:
+            role = msg.get("role", "")
+            if role == "user":
+                if current:
+                    exchanges.append(current)
+                current = [msg]
+            elif role == "tool":
+                # tool result — always glued to the preceding assistant
+                current.append(msg)
+            else:
+                # assistant (with or without tool_calls)
+                current.append(msg)
+
+        if current:
+            exchanges.append(current)
+
+        # Keep the last N exchanges
+        kept = exchanges[-keep_last_exchanges:] if keep_last_exchanges < len(exchanges) else exchanges
+
+        # Flatten and prepend system
+        result = sys_msgs[:1] + [m for group in kept for m in group]
+        return result
+
     async def _handle_token_overflow(self, session, model, tools, max_tokens, thinking, on_status):
+        """Three-stage token overflow recovery — each stage is role-aware."""
         log.warning(f"[CUT] Token overflow — compacting {len(session.messages)} messages")
+
+        # Stage A: Semantic compaction (summarise middle turns)
         session.messages = compact_messages(session.messages, session=session, on_status=on_status)
-        result, _ = await self._call_with_failover(session.messages, model=model, tools=tools, max_tokens=max_tokens, thinking=thinking)
-        if result.get("error") == "token_overflow" and len(session.messages) > 12:
-            sys_msgs = [m for m in session.messages if m["role"] == "system"][:1]
-            session.messages = sys_msgs + session.messages[-10:]
-            log.warning(f"[CUT] Force-trim → {len(session.messages)} msgs")
-            result, _ = await self._call_with_failover(session.messages, model=model, tools=tools, max_tokens=max_tokens, thinking=False)
-        if result.get("error") == "token_overflow" and len(session.messages) > 4:
-            sys_msgs = [m for m in session.messages if m["role"] == "system"][:1]
-            session.messages = (sys_msgs or []) + session.messages[-4:]
-            log.warning(f"[CUT][CUT] Nuclear → {len(session.messages)} msgs")
-            result, _ = await self._call_with_failover(session.messages, model=model, tools=tools, max_tokens=max_tokens)
-        if result.get("error"):
-            session.add_assistant("⚠️ Context too large. Use /clear to reset.")
-            return result, "⚠️ Context too large. Use /clear to reset."
-        return result, None
+        result, _ = await self._call_with_failover(
+            session.messages, model=model, tools=tools, max_tokens=max_tokens, thinking=thinking
+        )
+        if not result.get("error"):
+            return result, None
+
+        # Stage B: Role-aware trim — keep last 5 complete exchanges
+        if len(session.messages) > 12:
+            session.messages = self._role_aware_trim(session.messages, keep_last_exchanges=5)
+            log.warning(f"[CUT] Stage B (role-aware trim, 5 exchanges) → {len(session.messages)} msgs")
+            result, _ = await self._call_with_failover(
+                session.messages, model=model, tools=tools, max_tokens=max_tokens, thinking=False
+            )
+        if not result.get("error"):
+            return result, None
+
+        # Stage C: Nuclear — keep last 2 complete exchanges only
+        if len(session.messages) > 4:
+            session.messages = self._role_aware_trim(session.messages, keep_last_exchanges=2)
+            log.warning(f"[CUT][CUT] Stage C (nuclear, 2 exchanges) → {len(session.messages)} msgs")
+            result, _ = await self._call_with_failover(
+                session.messages, model=model, tools=tools, max_tokens=max_tokens
+            )
+        if not result.get("error"):
+            return result, None
+
+        session.add_assistant("⚠️ Context too large. Use /clear to reset.")
+        return result, "⚠️ Context too large. Use /clear to reset."
 
     async def _handle_tool_calls(self, result, session, provider, on_tool, on_status, consecutive_errors, recent_tool_calls):
         from salmalm.core.loop_helpers import validate_tool_calls, check_circuit_breaker, check_loop_detection
@@ -538,6 +601,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 # side-effects when consumers import this module for type hints only.
 _engine: Optional[IntelligenceEngine] = None
 _engine_lock = threading.Lock()
+
+# Thinking budget map — referenced by engine_pipeline and external callers
+_THINKING_BUDGET_MAP: dict[str, int] = {"low": 4000, "medium": 10000, "high": 16000, "xhigh": 32000}
 
 
 def _get_engine() -> IntelligenceEngine:

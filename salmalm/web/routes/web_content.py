@@ -46,7 +46,7 @@ class ContentMixin:
         if not tools:
             # Fallback: list all known tools from INTENT_TOOLS
             try:
-                from salmalm.core.engine import INTENT_TOOLS
+                from salmalm.core.classifier import INTENT_TOOLS
 
                 seen = set()
                 for cat_tools in INTENT_TOOLS.values():

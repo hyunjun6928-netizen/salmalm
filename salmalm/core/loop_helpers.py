@@ -47,7 +47,7 @@ def trim_history(session, classification) -> None:
 
 def prune_session_context(session, model: str):
     """Prune context if cache TTL expired."""
-    from salmalm.core.engine import _should_prune_for_cache, estimate_context_window, prune_context
+    from salmalm.core.session_manager import _should_prune_for_cache, estimate_context_window, prune_context
 
     if _should_prune_for_cache():
         _ctx_win = estimate_context_window(model)
@@ -60,7 +60,9 @@ def prune_session_context(session, model: str):
 
 def record_usage(session_id: str, model: str, result, classification, iteration) -> None:
     """Record API usage and audit log."""
-    from salmalm.core.engine import record_response_usage, estimate_cost, audit_log
+    from salmalm.core.slash_commands import record_response_usage
+    from salmalm.core.cost import estimate_cost
+    from salmalm.core import audit_log
 
     usage = result.get("usage", {})
     record_response_usage(session_id, result.get("model", model), usage)

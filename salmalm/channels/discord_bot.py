@@ -437,7 +437,7 @@ class DiscordBot:
                 return execute_tool("usage_report", {})
             elif cmd == "/model":
                 parts = text.split(maxsplit=1)
-                from salmalm.core.engine import router
+                from salmalm.core import router
 
                 if len(parts) > 1:
                     choice = parts[1].strip()

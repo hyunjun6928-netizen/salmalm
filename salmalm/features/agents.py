@@ -106,7 +106,7 @@ class SubAgent:
             try:
                 session_id = f"subagent-{agent_id}"
                 session = _core().get_session(session_id)
-                from salmalm.core.engine import process_message
+                from salmalm.core.engine_pipeline import process_message
 
                 result = asyncio.run(process_message(session_id, task, model_override=model))
                 agent_info["result"] = result
@@ -359,7 +359,7 @@ class SubAgent:
         # Run in the agent's existing session
         session_id = f"subagent-{agent_id}"
         try:
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
             result = asyncio.run(process_message(session_id, message))
             agent["result"] = result  # Update with latest result
@@ -403,7 +403,7 @@ class SubAgent:
                 return {"ok": True, "agent_id": aid, "status": "steered"}
 
             # Completed — re-run with steering message
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
             result = asyncio.run(process_message(session_id, message, model_override=agent.get("model")))
             agent["result"] = result
@@ -430,7 +430,7 @@ class SubAgent:
                 return {"ok": True, "from": from_id, "to": tid, "status": "queued"}
 
             # If target is completed, re-process
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
             result = asyncio.run(process_message(session_id, message, model_override=target.get("model")))
             target["result"] = result
