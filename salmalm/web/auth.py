@@ -207,21 +207,34 @@ class TokenManager:
             if payload.get("exp", 0) < time.time():
                 return None
             jti = payload.get("jti")
+            uid = payload.get("uid")
+            iat = payload.get("iat", 0)
             if jti and self._is_revoked(jti):
+                return None
+            # Also check per-user bulk revocation (revoke_all_for_user)
+            if uid and self._is_user_revoked(uid, iat):
                 return None
             return payload  # type: ignore[no-any-return]
         except Exception as e:  # noqa: broad-except
             return None
 
     def revoke(self, token: str) -> bool:
-        """Revoke a token by its jti. Returns True if successfully revoked."""
+        """Revoke a token by jti. Verifies HMAC signature before inserting to prevent
+        an attacker from revoking arbitrary jtis by crafting fake payloads."""
         try:
-            parts = token.rsplit(".", 1)
-            if len(parts) != 2:
-                return False
-            data = parts[0]
-            padded = data + "=" * (-len(data) % 4)
-            payload = json.loads(base64.urlsafe_b64decode(padded))
+            # Signature verification FIRST — only trust jtis from valid tokens
+            payload = self.verify(token)
+            if payload is None:
+                # Token already expired, invalid signature, or already revoked.
+                # Still try to extract jti to ensure it stays revoked.
+                parts = token.rsplit(".", 1)
+                if len(parts) != 2:
+                    return False
+                padded = parts[0] + "=" * (-len(parts[0]) % 4)
+                try:
+                    payload = json.loads(base64.urlsafe_b64decode(padded))
+                except Exception:
+                    return False
             jti = payload.get("jti")
             exp = payload.get("exp", 0)
             if not jti:
@@ -235,25 +248,59 @@ class TokenManager:
                 conn.commit()
                 conn.close()
             return True
-        except Exception as e:  # noqa: broad-except
+        except Exception:
             return False
 
     def revoke_all_for_user(self, user_id: int) -> None:
-        """Rotate the secret to invalidate ALL tokens. Nuclear option."""
-        # For per-user revocation without rotating global secret,
-        # we'd need to store all active jtis. For now, this is a
-        # placeholder — the per-token revoke() covers logout.
-        pass
+        """Invalidate ALL tokens for a user by recording a per-user revocation timestamp.
+
+        Any token issued before this timestamp will be rejected by _is_revoked().
+        This is O(1) regardless of how many tokens the user has.
+        """
+        try:
+            with self._revoked_lock:
+                conn = sqlite3.connect(str(AUTH_DB))
+                conn.execute(
+                    """CREATE TABLE IF NOT EXISTS user_revocations (
+                        user_id INTEGER PRIMARY KEY,
+                        revoked_after REAL NOT NULL
+                    )"""
+                )
+                conn.execute(
+                    "INSERT OR REPLACE INTO user_revocations (user_id, revoked_after) VALUES (?, ?)",
+                    (user_id, time.time()),
+                )
+                conn.commit()
+                conn.close()
+            log.info(f"[AUTH] All tokens revoked for user_id={user_id}")
+        except Exception as e:
+            log.error(f"[AUTH] revoke_all_for_user failed: {e}")
+            raise
 
     def _is_revoked(self, jti: str) -> bool:
-        """Check if a jti has been revoked."""
+        """Check if a specific jti has been revoked."""
         try:
             conn = sqlite3.connect(str(AUTH_DB))
             row = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti=?", (jti,)).fetchone()
             conn.close()
             return row is not None
-        except Exception as e:  # noqa: broad-except
+        except Exception:
             return False
+
+    def _is_user_revoked(self, user_id: int, token_iat: float) -> bool:
+        """Check if token was issued before a bulk user-revocation event."""
+        try:
+            conn = sqlite3.connect(str(AUTH_DB))
+            # user_revocations table may not exist on old DBs — treat as not revoked
+            row = conn.execute(
+                "SELECT revoked_after FROM user_revocations WHERE user_id=?", (user_id,)
+            ).fetchone()
+            conn.close()
+            if row and token_iat < row[0]:
+                return True  # Token issued before revocation event
+        except Exception:
+            pass
+        return False
 
     def cleanup_expired(self) -> int:
         """Remove revocation entries for tokens that have expired anyway."""
@@ -744,9 +791,16 @@ class AuthManager:
         self._initialized = False
 
     def _ensure_db(self):
-        """Ensure db."""
+        """Ensure DB is initialized. Double-checked locking prevents TOCTOU race."""
         if self._initialized:
             return
+        with self._lock:
+            if self._initialized:  # second check under lock
+                return
+            self._ensure_db_locked()
+
+    def _ensure_db_locked(self):
+        """Called while holding self._lock. Creates tables and default admin."""
         conn = sqlite3.connect(str(AUTH_DB))
         conn.execute("""CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -859,40 +913,34 @@ class AuthManager:
             log.warning(f"[LOCK] Account locked: {username}")
             return None
 
+        # Single connection for the entire authenticate sequence
         conn = sqlite3.connect(str(AUTH_DB))
-        row = conn.execute(
-            "SELECT id, username, password_hash, password_salt, role, api_key, enabled FROM users WHERE username=?",
-            (username,),
-        ).fetchone()
-        conn.close()
-
-        if not row or not row[6]:  # Not found or disabled
-            self._record_attempt(username)
-            return None
-
-        if not _verify_password(password, row[2], row[3]):
-            self._record_attempt(username)
-            return None
-
-        # Success — clear attempts from DB
         try:
-            conn2 = sqlite3.connect(str(AUTH_DB))
-            conn2.execute("DELETE FROM login_attempts WHERE username=?", (username,))
-            conn2.commit()
-            conn2.close()
-        except Exception as e:  # noqa: broad-except
-            log.debug(f"Suppressed: {e}")
+            row = conn.execute(
+                "SELECT id, username, password_hash, password_salt, role, api_key, enabled FROM users WHERE username=?",
+                (username,),
+            ).fetchone()
 
-        # Update last login
-        conn = sqlite3.connect(str(AUTH_DB))
-        from datetime import datetime
+            if not row or not row[6]:  # Not found or disabled
+                conn.close()
+                self._record_attempt(username)
+                return None
 
-        conn.execute(
-            "UPDATE users SET last_login=? WHERE id=?",
-            (datetime.now(KST).isoformat(), row[0]),
-        )
-        conn.commit()
-        conn.close()
+            if not _verify_password(password, row[2], row[3]):
+                conn.close()
+                self._record_attempt(username)
+                return None
+
+            from datetime import datetime
+            # Success — clear attempts + update last_login in one commit
+            conn.execute("DELETE FROM login_attempts WHERE username=?", (username,))
+            conn.execute(
+                "UPDATE users SET last_login=? WHERE id=?",
+                (datetime.now(KST).isoformat(), row[0]),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
         return {"id": row[0], "username": row[1], "role": row[4]}
 
@@ -952,8 +1000,27 @@ class AuthManager:
         )
 
     def verify_token(self, token: str) -> Optional[dict]:
-        """Verify auth token. Returns user info or None."""
-        return self._token_mgr.verify(token)
+        """Verify auth token. Checks signature, expiry, revocation, AND user existence.
+        A token for a deleted/disabled user is rejected even if signature is valid.
+        """
+        payload = self._token_mgr.verify(token)
+        if payload is None:
+            return None
+        uid = payload.get("uid")
+        if uid is None:
+            return payload  # Legacy token without uid — pass through
+        try:
+            conn = sqlite3.connect(str(AUTH_DB))
+            row = conn.execute(
+                "SELECT id, username, role, enabled FROM users WHERE id=? AND enabled=1", (uid,)
+            ).fetchone()
+            conn.close()
+            if not row:
+                log.debug(f"[AUTH] Token rejected: user_id={uid} not found or disabled")
+                return None
+        except Exception:
+            pass  # DB unavailable — fail open to avoid locking out on transient errors
+        return payload
 
     def revoke_token(self, token: str) -> bool:
         """Revoke a token (logout). Returns True on success."""

@@ -19,7 +19,7 @@ from salmalm.security.crypto import vault, log
 # ── Reminder System ──────────────────────────────────────────
 
 _reminders: list = []
-_reminder_lock = threading.Lock()
+_reminder_lock = threading.RLock()  # RLock: _load_reminders may be called while lock held
 _reminder_thread_started = False
 
 
@@ -146,20 +146,36 @@ def _reminders_file() -> Path:
 
 
 def _load_reminders():
-    """Load reminders."""
-    global _reminders
+    """Load reminders from disk — in-place mutation to preserve module-level references."""
     fp = _reminders_file()
+    loaded: list = []
     if fp.exists():
         try:
-            _reminders = json.loads(fp.read_text(encoding="utf-8"))
-        except Exception as e:  # noqa: broad-except
-            _reminders = []
+            loaded = json.loads(fp.read_text(encoding="utf-8"))
+            if not isinstance(loaded, list):
+                loaded = []
+        except Exception:
+            loaded = []
+    _reminders.clear()
+    _reminders.extend(loaded)
 
 
 def _save_reminders():
-    """Save reminders."""
+    """Atomic save — write to temp file then replace (prevents corrupt state on crash)."""
+    import tempfile, os as _os
     fp = _reminders_file()
-    fp.write_text(json.dumps(_reminders, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    data = json.dumps(_reminders, ensure_ascii=False, indent=2, default=str).encode("utf-8")
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=fp.parent, prefix=".reminders_", suffix=".tmp", delete=False
+        ) as tmp:
+            tmp.write(data)
+            tmp.flush()
+            _os.fsync(tmp.fileno())
+            tmp_path = tmp.name
+        _os.replace(tmp_path, fp)
+    except Exception as e:
+        log.warning(f"[REMINDERS] Save failed: {e}")
 
 
 def _send_notification_impl(

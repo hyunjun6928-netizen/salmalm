@@ -94,7 +94,8 @@ def _get_db() -> sqlite3.Connection:
         conn.execute("""CREATE TABLE IF NOT EXISTS usage_stats (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts TEXT NOT NULL, model TEXT NOT NULL,
-            input_tokens INTEGER, output_tokens INTEGER, cost REAL
+            input_tokens INTEGER, output_tokens INTEGER, cost REAL,
+            user_id INTEGER DEFAULT NULL
         )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS session_store (
             session_id TEXT PRIMARY KEY,
@@ -115,6 +116,12 @@ def _get_db() -> sqlite3.Connection:
             log.debug(f"Suppressed: {e}")
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
+        # CRITICAL: usage_stats was missing user_id column — v0.27.57+ INSERT silently failed
+        # This migration backfills the column on existing databases.
+        try:
+            conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER DEFAULT NULL")
         except Exception as e:
             log.debug(f"Suppressed: {e}")
         try:
