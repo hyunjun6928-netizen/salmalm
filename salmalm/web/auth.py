@@ -214,18 +214,21 @@ class TokenManager:
             return None
 
     def revoke(self, token: str) -> bool:
-        """Revoke a token by its jti. Returns True if successfully revoked."""
+        """Revoke a token by its jti. Returns True if successfully revoked.
+
+        Signature is verified before the jti is persisted — prevents an
+        attacker from inserting arbitrary jtis into the revocation table
+        by submitting a forged token payload.
+        """
+        # verify() validates signature, expiry, and revocation status
+        payload = self.verify(token)
+        if not payload:
+            return False  # Invalid / expired / already revoked — nothing to do
+        jti = payload.get("jti")
+        exp = payload.get("exp", 0)
+        if not jti:
+            return False  # Legacy token without jti
         try:
-            parts = token.rsplit(".", 1)
-            if len(parts) != 2:
-                return False
-            data = parts[0]
-            padded = data + "=" * (-len(data) % 4)
-            payload = json.loads(base64.urlsafe_b64decode(padded))
-            jti = payload.get("jti")
-            exp = payload.get("exp", 0)
-            if not jti:
-                return False  # Legacy token without jti
             with self._revoked_lock:
                 conn = sqlite3.connect(str(AUTH_DB))
                 conn.execute(
@@ -235,15 +238,26 @@ class TokenManager:
                 conn.commit()
                 conn.close()
             return True
-        except Exception as e:  # noqa: broad-except
+        except Exception as _e:  # noqa: broad-except
+            log.debug("[TOKEN] revoke DB write failed: %s", _e)
             return False
 
     def revoke_all_for_user(self, user_id: int) -> None:
-        """Rotate the secret to invalidate ALL tokens. Nuclear option."""
-        # For per-user revocation without rotating global secret,
-        # we'd need to store all active jtis. For now, this is a
-        # placeholder — the per-token revoke() covers logout.
-        pass
+        """Revoke ALL active tokens for *user_id*.
+
+        Not implemented: requires enumerating all active JTIs for the user,
+        which in turn requires persisting issued tokens at creation time.
+        Current approach: rotate the signing key (revokes ALL users' tokens),
+        or rely on delete_user() + verify_token existence check for the
+        "user deleted" case.
+
+        Raises NotImplementedError so callers are not silently deceived.
+        """
+        raise NotImplementedError(
+            "Per-user bulk token revocation is not yet implemented. "
+            "Call rotate() to invalidate all tokens globally, or "
+            "delete the user account to prevent future authentication."
+        )
 
     def _is_revoked(self, jti: str) -> bool:
         """Check if a jti has been revoked."""
@@ -611,10 +625,9 @@ class DailyQuotaManager:
         # Make an instance-level copy so env-var overrides don't bleed into the class
         self._ROLE_LIMITS = dict(self.__class__._ROLE_LIMITS)
         self._init_db()
-        # Allow env-var override
-        import os as _os
-        _u = int(_os.environ.get("SALMALM_DAILY_QUOTA_USER", 0))
-        _a = int(_os.environ.get("SALMALM_DAILY_QUOTA_ANON", 0))
+        # Allow env-var override (os imported at module level)
+        _u = int(os.environ.get("SALMALM_DAILY_QUOTA_USER", 0))
+        _a = int(os.environ.get("SALMALM_DAILY_QUOTA_ANON", 0))
         if _u > 0:
             self._ROLE_LIMITS["user"] = _u
         if _a > 0:
@@ -744,64 +757,72 @@ class AuthManager:
         self._initialized = False
 
     def _ensure_db(self):
-        """Ensure db."""
+        """Ensure DB schema exists. Thread-safe via double-checked locking.
+
+        The outer `if self._initialized` is a fast-path read without a lock.
+        The inner re-check inside `with self._lock` prevents two threads from
+        both seeing `False` and both running the initialization body.
+        """
         if self._initialized:
             return
-        conn = sqlite3.connect(str(AUTH_DB))
-        conn.execute("""CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash BLOB NOT NULL,
-            password_salt BLOB NOT NULL,
-            role TEXT NOT NULL DEFAULT 'user',
-            api_key TEXT UNIQUE,
-            created_at TEXT NOT NULL,
-            last_login TEXT,
-            enabled INTEGER NOT NULL DEFAULT 1
-        )""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS sessions (
-            token_hash TEXT PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            created_at TEXT NOT NULL,
-            expires_at TEXT NOT NULL,
-            ip_address TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )""")
-        conn.execute("""CREATE TABLE IF NOT EXISTS login_attempts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            attempted_at REAL NOT NULL,
-            ip_address TEXT
-        )""")
-        conn.execute("""CREATE INDEX IF NOT EXISTS idx_login_attempts_user
-            ON login_attempts (username, attempted_at)""")
-        conn.commit()
+        with self._lock:
+            if self._initialized:  # Re-check: another thread may have won the race
+                return
+            conn = sqlite3.connect(str(AUTH_DB))
+            conn.execute("""CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash BLOB NOT NULL,
+                password_salt BLOB NOT NULL,
+                role TEXT NOT NULL DEFAULT 'user',
+                api_key TEXT UNIQUE,
+                created_at TEXT NOT NULL,
+                last_login TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1
+            )""")
+            conn.execute("""CREATE TABLE IF NOT EXISTS sessions (
+                token_hash TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                ip_address TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )""")
+            conn.execute("""CREATE TABLE IF NOT EXISTS login_attempts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                attempted_at REAL NOT NULL,
+                ip_address TEXT
+            )""")
+            conn.execute("""CREATE INDEX IF NOT EXISTS idx_login_attempts_user
+                ON login_attempts (username, attempted_at)""")
+            conn.commit()
 
-        # Create default admin if no users exist (random password)
-        count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-        if count == 0:
-            default_pw = base64.urlsafe_b64encode(os.urandom(18)).decode().rstrip("=")
-            _, raw_api_key = self._create_user_db(conn, "admin", default_pw, "admin")
-            # SECURITY: Never log passwords to file — console only via stderr
-            import sys
-            import logging as _logging
+            # Create default admin if no users exist (random password)
+            count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            if count == 0:
+                default_pw = base64.urlsafe_b64encode(os.urandom(18)).decode().rstrip("=")
+                _, raw_api_key = self._create_user_db(conn, "admin", default_pw, "admin")
+                # SECURITY: Never log passwords to file — console only via stderr
+                import sys
+                import logging as _logging
 
-            _stderr_handler = _logging.StreamHandler(sys.stderr)
-            _stderr_handler.setFormatter(_logging.Formatter("%(message)s"))
-            _sec_logger = _logging.getLogger("salmalm.auth.setup")
-            _sec_logger.addHandler(_stderr_handler)
-            _sec_logger.propagate = False
-            _sec_logger.warning(
-                f"\n{'=' * 50}\n"
-                f"[USER] Default admin created\n"
-                f"   Username: admin\n"
-                f"   Password: {default_pw}\n"
-                f"[WARN]  Save this password! It won't be shown again.\n"
-                f"{'=' * 50}"
-            )
-            log.info("[USER] Default admin user created (password shown in console only)")
-        conn.close()
-        self._initialized = True
+                _stderr_handler = _logging.StreamHandler(sys.stderr)
+                _stderr_handler.setFormatter(_logging.Formatter("%(message)s"))
+                _sec_logger = _logging.getLogger("salmalm.auth.setup")
+                _sec_logger.addHandler(_stderr_handler)
+                _sec_logger.propagate = False
+                _sec_logger.warning(
+                    f"\n{'=' * 50}\n"
+                    f"[USER] Default admin created\n"
+                    f"   Username: admin\n"
+                    f"   Password: {default_pw}\n"
+                    f"[WARN]  Save this password! It won't be shown again.\n"
+                    f"{'=' * 50}"
+                )
+                log.info("[USER] Default admin user created (password shown in console only)")
+            conn.close()
+            self._initialized = True
 
     @staticmethod
     def _hash_api_key(api_key: str) -> str:
@@ -871,28 +892,23 @@ class AuthManager:
             return None
 
         if not _verify_password(password, row[2], row[3]):
+            conn.close()
             self._record_attempt(username)
             return None
 
-        # Success — clear attempts from DB
+        # Success — clear attempts + update last_login in one transaction
+        from datetime import datetime
         try:
-            conn2 = sqlite3.connect(str(AUTH_DB))
-            conn2.execute("DELETE FROM login_attempts WHERE username=?", (username,))
-            conn2.commit()
-            conn2.close()
+            conn.execute("DELETE FROM login_attempts WHERE username=?", (username,))
+            conn.execute(
+                "UPDATE users SET last_login=? WHERE id=?",
+                (datetime.now(KST).isoformat(), row[0]),
+            )
+            conn.commit()
         except Exception as e:  # noqa: broad-except
             log.debug(f"Suppressed: {e}")
-
-        # Update last login
-        conn = sqlite3.connect(str(AUTH_DB))
-        from datetime import datetime
-
-        conn.execute(
-            "UPDATE users SET last_login=? WHERE id=?",
-            (datetime.now(KST).isoformat(), row[0]),
-        )
-        conn.commit()
-        conn.close()
+        finally:
+            conn.close()
 
         return {"id": row[0], "username": row[1], "role": row[4]}
 
@@ -952,8 +968,31 @@ class AuthManager:
         )
 
     def verify_token(self, token: str) -> Optional[dict]:
-        """Verify auth token. Returns user info or None."""
-        return self._token_mgr.verify(token)
+        """Verify auth token. Returns user info or None.
+
+        Also confirms the user still exists and is enabled in the DB.
+        This prevents a deleted user's JWT from remaining valid until expiry.
+        The extra DB lookup is a single indexed read — acceptable cost for a
+        personal-scale gateway.
+        """
+        payload = self._token_mgr.verify(token)
+        if not payload:
+            return None
+        uid = payload.get("uid")
+        if not uid:
+            return payload  # Legacy token without uid — pass through
+        try:
+            conn = sqlite3.connect(str(AUTH_DB))
+            row = conn.execute(
+                "SELECT enabled FROM users WHERE id=?", (uid,)
+            ).fetchone()
+            conn.close()
+            if row is None or not row[0]:
+                return None  # User deleted or disabled since token was issued
+        except Exception as _e:
+            log.debug("[TOKEN] verify_token user-existence check failed: %s", _e)
+            # DB unavailable — allow the JWT to pass (fail open for availability)
+        return payload
 
     def revoke_token(self, token: str) -> bool:
         """Revoke a token (logout). Returns True on success."""
@@ -1020,11 +1059,13 @@ class AuthManager:
 
 
 def extract_auth(headers: dict) -> Optional[dict]:
-    """Extract user from headers. Accepts dict (case-sensitive) or HTTPMessage (case-insensitive)."""
-    # Normalize dict to lowercase keys for reliable lookup
+    """Extract user from request headers (Bearer token or API key).
+
+    Accepts dict (case-sensitive) or HTTPMessage (case-insensitive).
+    Normalises dict keys to lowercase before lookup.
+    """
     if isinstance(headers, dict):
         headers = {k.lower(): v for k, v in headers.items()}
-    """Extract user from request headers (Bearer token or API key)."""
     auth_header = headers.get("authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]

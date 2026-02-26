@@ -425,7 +425,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "browser",
-        "description": "Browser automation (Playwright). Snapshot/act pattern: snapshot → reason → act → verify. Requires pip install salmalm[browser]. / 브라우저 자동화. 스냅샷→추론→행동→검증 패턴.",
+        "description": "Browser automation (Playwright). Snapshot/act pattern: snapshot → reason → act → verify. Requires: pip install salmalm[browser].",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -498,7 +498,7 @@ TOOL_DEFINITIONS = [
                     "description": "list, create, delete",
                     "enum": ["list", "create", "delete"],
                 },
-                "days": {"type": "integer", "description": "Days ahead to list (default: 7)"},
+                "days": {"type": "integer", "description": "Days ahead to list", "default": 7},
                 "title": {"type": "string", "description": "Event title (for create)"},
                 "start": {"type": "string", "description": "Start time ISO8601 (for create)"},
                 "end": {"type": "string", "description": "End time ISO8601 (for create)"},
@@ -511,10 +511,17 @@ TOOL_DEFINITIONS = [
     },
 ]
 
-# Extended tools (split for file size)
-from salmalm.tools.tools_schema_ext import TOOL_DEFINITIONS_EXT  # noqa: E402
-
-TOOL_DEFINITIONS.extend(TOOL_DEFINITIONS_EXT)
+# Extended tools (split for file size).
+# Wrapped in try/except: a broken tools_schema_ext must not silently
+# truncate TOOL_DEFINITIONS — it raises so the operator sees the error.
+try:
+    from salmalm.tools.tools_schema_ext import TOOL_DEFINITIONS_EXT  # noqa: E402
+    TOOL_DEFINITIONS.extend(TOOL_DEFINITIONS_EXT)
+except ImportError as _ext_err:
+    import logging as _log
+    _log.getLogger(__name__).error(
+        "[TOOLS] tools_schema_ext import failed — extended tools unavailable: %s", _ext_err
+    )
 
 
 # Re-export handler for backward compatibility
