@@ -136,8 +136,8 @@ _EXEC_TIER_DATABASE = {
 }
 
 
-def _build_exec_allowlist() -> set:
-    """Build effective allowlist from tiers + env vars."""
+def _build_exec_allowlist() -> frozenset:
+    """Build effective allowlist from tiers + env vars. Returns frozenset (immutable)."""
     allowed = set(_EXEC_TIER_BASIC)
     # Tier 2/3 default OFF (opt-in): set env var to "1" to enable.
     # Security: network/database tools should not be available unless explicitly requested.
@@ -145,10 +145,10 @@ def _build_exec_allowlist() -> set:
         allowed |= _EXEC_TIER_NETWORK
     if _os.environ.get("SALMALM_EXEC_DATABASE", "0") == "1":
         allowed |= _EXEC_TIER_DATABASE
-    return allowed
+    return frozenset(allowed)  # Immutable — built once at import time
 
 
-EXEC_ALLOWLIST = _build_exec_allowlist()
+EXEC_ALLOWLIST: frozenset = _build_exec_allowlist()
 # Per-command dangerous argument/flag blocklist — blocks code execution vectors
 EXEC_ARG_BLOCKLIST: dict = {
     "awk": {"-f", "--file"},

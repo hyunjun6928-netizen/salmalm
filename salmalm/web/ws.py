@@ -49,7 +49,8 @@ class WSClient:
         self.last_ping = time.time()
         self._id = id(self)
         self._send_lock = asyncio.Lock()  # Serialize concurrent sends
-        self._buffer: list = []  # Buffer messages during disconnect
+        self._buffer: list = []  # Buffer messages during disconnect (max 50, TTL 120s)
+        self._buffer_ts: float = 0.0  # Timestamp when buffering started
 
     async def send_json(self, data: dict) -> None:
         """Send a JSON message as a WebSocket text frame.
@@ -59,6 +60,15 @@ class WSClient:
         """
         if not self.connected:
             # Buffer for potential reconnection (max 50)
+            import time as _time_ws
+            now = _time_ws.monotonic()
+            # Start TTL clock on first buffered message
+            if not self._buffer:
+                self._buffer_ts = now
+            # Discard buffer if TTL (120s) exceeded — client won't reconnect in time
+            if now - self._buffer_ts > 120.0:
+                self._buffer.clear()
+                self._buffer_ts = now
             if len(self._buffer) < 50:
                 self._buffer.append(data)
             return

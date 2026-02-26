@@ -173,8 +173,14 @@ def execute_tool(name: str, args: dict) -> str:
         ("google_calendar", "create"): "create calendar event",
     }
     _tool_action = args.get("action", "")
-    _is_irreversible = (name, _tool_action) in _IRREVERSIBLE_ACTIONS or (name, None) in _IRREVERSIBLE_ACTIONS
-    _action_desc = _IRREVERSIBLE_ACTIONS.get((name, _tool_action)) or _IRREVERSIBLE_ACTIONS.get((name, None), "")
+    # Lookup order: exact (name, action) match first, then (name, None) wildcard.
+    # This allows per-action granularity while providing a catch-all via None.
+    def _lookup_irreversible(n: str, a: str):
+        """Lookup irreversible."""
+        return _IRREVERSIBLE_ACTIONS.get((n, a)) or _IRREVERSIBLE_ACTIONS.get((n, None))
+    _action_desc = _lookup_irreversible(name, _tool_action)
+    _is_irreversible = _action_desc is not None
+    _action_desc = _action_desc or ""
     if _is_irreversible and not args.pop("_confirmed", False):
         action_desc = _action_desc
         preview = _audit_args[:150]

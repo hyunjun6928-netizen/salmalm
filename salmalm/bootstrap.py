@@ -37,8 +37,22 @@ from salmalm.stability import health_monitor
 import salmalm.core as _core
 
 
+_UPDATE_CHECK_INTERVAL = 86400  # 24h — avoid blocking startup on every run
+_update_cache: dict = {}  # {"ts": float, "msg": str}
+
+
 def _check_for_updates() -> str:
-    """Check PyPI for newer version. Returns update message or empty string."""
+    """Check PyPI for newer version. Returns update message or empty string.
+
+    Result is cached for 24h so offline environments don't pay the 5s timeout
+    on every restart.
+    """
+    import time as _t
+    now = _t.time()
+    if _update_cache and now - _update_cache.get("ts", 0) < _UPDATE_CHECK_INTERVAL:
+        return _update_cache.get("msg", "")
+
+    msg = ""
     try:
         from salmalm.utils.http import request_json as _rj
 
@@ -55,14 +69,18 @@ def _check_for_updates() -> str:
 
         if latest and _ver_tuple(latest) > _ver_tuple(VERSION):
             if getattr(sys, "frozen", False):
-                return (
+                msg = (
                     f"⬆️  New version {latest} available!\n"
                     f"   Download: https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
                 )
-            return f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
+            else:
+                msg = f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
     except (OSError, ValueError, KeyError, ImportError):
         pass  # network/parse errors — silently skip
-    return ""
+
+    _update_cache["ts"] = now
+    _update_cache["msg"] = msg
+    return msg
 
 
 async def _start_telegram_bot() -> None:

@@ -10,6 +10,10 @@ import asyncio
 import json as _json
 import os as _os
 from concurrent.futures import ThreadPoolExecutor
+
+# Module-level singleton executor — prevents thread pool leak when IntelligenceEngine
+# is instantiated multiple times (e.g. during tests or hot-reload).
+_MODULE_TOOL_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tool")
 from typing import Any, Dict, Optional
 
 from salmalm.constants import (  # noqa: F401
@@ -186,7 +190,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
     def __init__(self) -> None:
         """Init  ."""
-        self._tool_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="tool")
+        self._tool_executor = _MODULE_TOOL_EXECUTOR  # Shared singleton — no thread leak
 
     def _get_tools_for_provider(self, provider: str, intent: str = None, user_message: str = "") -> list:
         """Get tools for provider."""

@@ -94,7 +94,7 @@ class TaskClassifier:
                 "search",
                 "검색",
                 "find",
-                "찾",
+                "찾기",  # "찾" alone over-matches (찾은, 값을찾 etc.) — use 2+ char form
                 "news",
                 "뉴스",
                 "latest",
