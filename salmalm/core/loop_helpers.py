@@ -51,7 +51,8 @@ def prune_session_context(session, model: str):
 
     if _should_prune_for_cache():
         _ctx_win = estimate_context_window(model)
-        pruned, stats = prune_context(session.messages, context_window_tokens=_ctx_win)
+        _sid = getattr(session, "id", "__global__")
+        pruned, stats = prune_context(session.messages, context_window_tokens=_ctx_win, session_id=_sid)
         if stats["soft_trimmed"] or stats["hard_cleared"]:
             log.info(f"[PRUNE] soft={stats['soft_trimmed']} hard={stats['hard_cleared']}")
         return pruned

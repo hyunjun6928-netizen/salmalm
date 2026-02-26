@@ -50,14 +50,18 @@ class TestBuildGeminiContents(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(len(result[0]['parts']), 2)
 
-    def test_multimodal_text_extraction(self):
+    def test_multimodal_text_and_image(self):
+        """Images must be forwarded as Gemini inline_data (not silently dropped)."""
         from salmalm.core.llm import _build_gemini_contents
         msgs = [{'role': 'user', 'content': [
             {'type': 'text', 'text': 'Describe this'},
-            {'type': 'image', 'source': {'type': 'base64', 'data': 'abc'}},
+            {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/png', 'data': 'abc123'}},
         ]}]
         result = _build_gemini_contents(msgs)
-        self.assertEqual(result[0]['parts'], [{'text': 'Describe this'}])
+        parts = result[0]['parts']
+        self.assertEqual(len(parts), 2, "Both text and image parts must be present")
+        self.assertEqual(parts[0], {'text': 'Describe this'})
+        self.assertEqual(parts[1], {'inline_data': {'mime_type': 'image/png', 'data': 'abc123'}})
 
     def test_alternating_roles_not_merged(self):
         from salmalm.core.llm import _build_gemini_contents

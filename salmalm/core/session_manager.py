@@ -180,25 +180,28 @@ def _estimate_total_tool_chars(messages: list) -> int:
     return total
 
 
-def prune_context(messages: list, context_window_tokens: Optional[int] = None) -> tuple:
+def prune_context(messages: list, context_window_tokens: Optional[int] = None,
+                  session_id: str = "__global__") -> tuple:
     """Prune old tool_result messages before LLM call.
 
     Args:
         messages: session message list
         context_window_tokens: model's context window in tokens (optional).
             Used for proportional hard-clear thresholds.
+        session_id: used to scope prune-cooldown tracking per session.
 
     Returns (pruned_messages, stats_dict).
-    Does NOT modify the original list — returns a deep copy.
+    Does NOT modify the original list — returns a copy.
     """
-    _record_prune_time()
+    _record_prune_time(session_id)
     stats = {"soft_trimmed": 0, "hard_cleared": 0, "unchanged": 0, "skipped_min_chars": False}
 
     # Skip if total tool output is small (OpenClaw: minPrunableToolChars)
     total_tool_chars = _estimate_total_tool_chars(messages)
     if total_tool_chars < _MIN_PRUNABLE_TOOL_CHARS:
         stats["skipped_min_chars"] = True
-        return messages, stats  # No copy needed — nothing changed
+        # Return a shallow copy so callers never alias session.messages directly.
+        return list(messages), stats
 
     pruned = copy.deepcopy(messages)
     ctx_chars = (context_window_tokens * 4) if context_window_tokens else None

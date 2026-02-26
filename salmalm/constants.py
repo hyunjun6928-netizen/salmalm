@@ -500,3 +500,11 @@ MODEL_NAME_FIXES: dict = {
     "grok-4": "grok-4-0709",
     "xai/grok-4": "xai/grok-4-0709",
 }
+
+# Extended thinking token budgets — keyed by level name
+THINKING_BUDGET_MAP: dict = {
+    "low":   4_000,
+    "medium": 10_000,
+    "high":  16_000,
+    "xhigh": 32_000,
+}

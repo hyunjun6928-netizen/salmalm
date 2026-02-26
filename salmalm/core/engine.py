@@ -7,6 +7,8 @@ directly from the original modules (e.g. salmalm.core.model_selection) instead.
 from __future__ import annotations
 
 import asyncio
+import json as _json
+import os as _os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 
@@ -18,6 +20,7 @@ from salmalm.constants import (  # noqa: F401
     REFLECT_SNIPPET_LEN,
     MODEL_ALIASES as _CONST_ALIASES,
     COMMAND_MODEL,
+    THINKING_BUDGET_MAP as _THINKING_BUDGET_MAP_CONST,
 )  # noqa: F401
 import re as _re
 import time as _time
@@ -155,13 +158,13 @@ from salmalm.core.classifier import (  # noqa: F401
 
 
 class IntelligenceEngine:
-    """Core AI reasoning engine — surpasses OpenClaw's capabilities.
+    """Core AI reasoning engine.
 
     Architecture:
     1. CLASSIFY — Determine task type, complexity, required resources
-    2. PLAN — For complex tasks, generate execution plan before acting
-    3. EXECUTE — Run tool loop with parallel execution
-    4. REFLECT — Self-evaluate response quality, retry if insufficient
+    2. PLAN — For complex tasks, generate execution plan before acting (opt-in)
+    3. EXECUTE — Tool loop with parallel execution and circuit-breaker
+    4. REFLECT — Self-evaluate response quality, retry if insufficient (opt-in)
     """
 
     # Planning prompt — injected before complex tasks
@@ -244,10 +247,15 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
     def _truncate_tool_result(self, result: str, tool_name: str = "") -> str:
         """Truncate tool result based on tool type to prevent context explosion."""
-        import os as _os
 
         result = self._redact_secrets(result)
-        # File pre-summarization: summarize large file reads with Haiku
+        # File pre-summarization: summarize large file reads with a fast model.
+        # NOTE: call_llm is synchronous — this blocks the ThreadPoolExecutor worker
+        # while waiting for the API response.  With max_workers=4 and multiple
+        # concurrent tools, all workers can be blocked simultaneously.  This path
+        # is only active when SALMALM_FILE_PRESUMMARY=1 (default OFF), so the
+        # real-world impact is minimal.  A proper fix would use asyncio.to_thread()
+        # at the caller and pass an async call; deferred to a future refactor.
         if (
             _os.environ.get("SALMALM_FILE_PRESUMMARY", "0") == "1"
             and tool_name in ("read_file", "web_fetch")
@@ -257,7 +265,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 from salmalm.core.llm import call_llm
 
                 summary = call_llm(
-                    model="anthropic/claude-haiku-3.5-20241022",
+                    model=COMMAND_MODEL,   # fast, low-cost — was hardcoded haiku
                     messages=[
                         {
                             "role": "user",
@@ -268,7 +276,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     tools=None,
                 )
                 if summary.get("content"):
-                    return f"[Pre-summarized by Haiku — original {len(result)} chars]\n\n{summary['content']}"
+                    return f"[Pre-summarized — original {len(result)} chars]\n\n{summary['content']}"
             except Exception as _exc:
                 log.debug(f"Suppressed: {_exc}")
                 pass  # Fall through to normal truncation
@@ -305,10 +313,14 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             tc = tool_calls[0]
             _metrics["tool_calls"] += 1
             t0 = _time.time()
+            # Copy args: never mutate tc["arguments"] — it is referenced later by
+            # _append_tool_results and serialised into LLM context (tool_use input).
+            # _session_id / _authenticated must NOT appear in the LLM's view of args.
+            exec_args = {**tc["arguments"],
+                         "_session_id": getattr(session, "id", ""),
+                         "_authenticated": getattr(session, "authenticated", False)}
             try:
-                tc["arguments"]["_session_id"] = getattr(session, "id", "")
-                tc["arguments"]["_authenticated"] = getattr(session, "authenticated", False)
-                result = self._truncate_tool_result(execute_tool(tc["name"], tc["arguments"]), tool_name=tc["name"])
+                result = self._truncate_tool_result(execute_tool(tc["name"], exec_args), tool_name=tc["name"])
                 elapsed = _time.time() - t0
                 audit_log(
                     "tool_call",
@@ -342,9 +354,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         for tc in tool_calls:
             _metrics["tool_calls"] += 1
             start_times[tc["id"]] = _time.time()
-            tc["arguments"]["_session_id"] = getattr(session, "id", "")
-            tc["arguments"]["_authenticated"] = getattr(session, "authenticated", False)
-            f = self._tool_executor.submit(execute_tool, tc["name"], tc["arguments"])
+            exec_args = {**tc["arguments"],
+                         "_session_id": getattr(session, "id", ""),
+                         "_authenticated": getattr(session, "authenticated", False)}
+            f = self._tool_executor.submit(execute_tool, tc["name"], exec_args)
             futures[tc["id"]] = (f, tc)
         outputs = {}
         for tc_id, (f, tc) in futures.items():
@@ -395,7 +408,6 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 [{"tool_use_id": tc["id"], "content": tool_outputs[tc["id"]]} for tc in tool_calls]
             )
         else:
-            import json as _json
             # Store assistant message WITH tool_calls in OpenAI format
             # so _sanitize_messages_for_provider can convert to tool_use for Anthropic fallback
             asst_tool_calls = [
@@ -414,7 +426,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 "content": result.get("content", "") or "",
                 "tool_calls": asst_tool_calls,
             })
-            session.last_active = __import__("time").time()
+            session.last_active = _time.time()
             for tc in tool_calls:
                 session.messages.append(
                     {"role": "tool", "tool_call_id": tc["id"], "name": tc["name"], "content": tool_outputs[tc["id"]]}
@@ -424,13 +436,12 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         """Determine if response needs self-reflection pass.
         Disabled by default for token optimization — reflection doubles LLM cost.
         Enable with SALMALM_REFLECT=1 env var."""
-        import os as _os
 
         if _os.environ.get("SALMALM_REFLECT", "0") != "1":
             return False
         if classification["intent"] not in ("code", "analysis"):
             return False
-        if iteration > 20:
+        if iteration >= self.MAX_TOOL_ITERATIONS - 5:
             return False
         if len(response) < 100:
             return False
@@ -482,7 +493,6 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         )
 
         # PHASE 1: PLANNING — opt-in via SALMALM_PLANNING=1 or settings toggle
-        import os as _os
 
         if _os.environ.get("SALMALM_PLANNING", "0") == "1":
             if classification["intent"] in ("code", "analysis") and classification.get("score", 0) >= 2:
@@ -693,7 +703,6 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         consecutive_errors = 0
         _recent_tool_calls = []
         _session_id = getattr(session, "id", "")
-        import os as _os
         result: dict = {}   # guard against NameError if _max_iter=0 or loop exits early
 
         _max_iter = int(_os.environ.get("SALMALM_MAX_TOOL_ITER", str(self.MAX_TOOL_ITERATIONS)))
@@ -841,4 +850,6 @@ from salmalm.core.slash_commands import (  # noqa: F401, E402
 )
 
 
-_THINKING_BUDGET_MAP = {"low": 4000, "medium": 10000, "high": 16000, "xhigh": 32000}
+# Sourced from constants.py — single source of truth for thinking budgets.
+# Re-exported here for backward compatibility (other modules import from engine).
+_THINKING_BUDGET_MAP = _THINKING_BUDGET_MAP_CONST

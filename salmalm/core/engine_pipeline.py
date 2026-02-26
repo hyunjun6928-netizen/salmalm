@@ -110,7 +110,18 @@ async def process_message(
         try:
             sess_lock.release()
         except RuntimeError:
-            pass  # Already released
+            pass  # Already released (timeout path)
+        # Evict lock entry if session no longer exists — prevents unbounded growth.
+        # Check lazily here: most sessions are long-lived so eviction is rare.
+        try:
+            from salmalm.core.session_store import _sessions as _ss
+            if session_id not in _ss:
+                with _session_locks_lock:
+                    # Double-check inside the lock (another coroutine may have just added it)
+                    if session_id not in _ss:
+                        _session_locks.pop(session_id, None)
+        except Exception:
+            pass  # Non-critical cleanup — never block on this
 
 
 def _classify_task(session, user_message: str) -> dict:

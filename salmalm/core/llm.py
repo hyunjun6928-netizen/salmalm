@@ -452,9 +452,13 @@ def _call_anthropic(
     thinking: bool = False,
     timeout: int = 0,
 ) -> Dict[str, Any]:
-    """Call anthropic."""
-    # Defensive: ensure tool-role messages are converted regardless of call path
-    messages = _sanitize_messages_for_provider(messages, "anthropic")
+    """Call anthropic.
+
+    Callers are responsible for sanitizing messages via
+    _sanitize_messages_for_provider(messages, 'anthropic') before calling
+    this function.  call_llm() and _try_fallback() both do this.
+    Do NOT re-sanitize here — it causes double orphaned-tool-result detection.
+    """
     system_msgs = [m["content"] for m in messages if m["role"] == "system"]
     chat_msgs = [m for m in messages if m["role"] != "system"]
 
@@ -813,10 +817,40 @@ def _build_gemini_contents(messages: List[Dict[str, Any]]) -> list:
         else:
             # user / unknown
             if isinstance(content, list):
-                text = " ".join(b.get("text", "") for b in content
-                               if isinstance(b, dict) and b.get("type") == "text")
-                content = text
-            parts.append({"role": "user", "parts": [{"text": str(content)}]})
+                gemini_parts: list = []
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    btype = block.get("type", "")
+                    if btype == "text":
+                        gemini_parts.append({"text": block.get("text", "")})
+                    elif btype == "image" and block.get("source", {}).get("type") == "base64":
+                        # Anthropic-style base64 → Gemini inline_data
+                        src = block["source"]
+                        gemini_parts.append({
+                            "inline_data": {
+                                "mime_type": src.get("media_type", "image/jpeg"),
+                                "data": src.get("data", ""),
+                            }
+                        })
+                    elif btype == "image_url":
+                        # OpenAI-style image_url → Gemini inline_data (best-effort; no URL fetch)
+                        url = block.get("image_url", {}).get("url", "")
+                        if url.startswith("data:"):
+                            # data URI: data:<mime>;base64,<data>
+                            try:
+                                header, b64data = url.split(",", 1)
+                                mime = header.split(";")[0].split(":")[1]
+                                gemini_parts.append({
+                                    "inline_data": {"mime_type": mime, "data": b64data}
+                                })
+                            except Exception:
+                                pass  # malformed data URI — skip
+                        # Remote URLs: Gemini can't fetch them; drop silently
+                if gemini_parts:
+                    parts.append({"role": "user", "parts": gemini_parts})
+            else:
+                parts.append({"role": "user", "parts": [{"text": str(content)}]})
 
     # Merge consecutive same-role turns (Gemini requires alternating user/model)
     merged: list = []

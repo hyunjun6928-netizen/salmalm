@@ -691,6 +691,8 @@ class LLMRouter:
         try:
             result = self._do_call(provider, bare_model, messages, max_tokens, tools, timeout)
             self._call_history.append({"model": target_model, "provider": provider, "ok": True, "ts": time.time()})
+            if len(self._call_history) > 200:
+                self._call_history = self._call_history[-100:]  # keep latest 100
             return result
         except Exception as e:
             errors.append(f"{provider}/{bare_model}: {e}")
@@ -718,6 +720,8 @@ class LLMRouter:
                         "fallback": True,
                     }
                 )
+                if len(self._call_history) > 200:
+                    self._call_history = self._call_history[-100:]
                 return result
             except Exception as e2:
                 errors.append(f"{fb_prov}/{fb_model}: {e2}")
