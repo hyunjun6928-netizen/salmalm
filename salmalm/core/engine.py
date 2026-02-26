@@ -7,8 +7,14 @@ directly from the original modules (e.g. salmalm.core.model_selection) instead.
 from __future__ import annotations
 
 import asyncio
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
+
+# ── Module-level main-loop reference for cross-thread callback dispatch ──
+_MAIN_LOOP: Optional[asyncio.AbstractEventLoop] = None
+# ── Lock protecting the shared _metrics dict from concurrent increments ──
+_METRICS_LOCK = threading.Lock()
 
 from salmalm.constants import (  # noqa: F401
     VERSION,
@@ -112,35 +118,32 @@ _select_model = _select_model_impl
 from salmalm.core.error_messages import friendly_error as _friendly_error
 
 
-def _get_event_loop() -> asyncio.AbstractEventLoop:
-    """Get the running event loop safely (no stale global reference)."""
-    try:
-        loop = asyncio.get_running_loop()
-        return loop if loop.is_running() else None
-    except RuntimeError:
-        return None
-
-
 def _safe_callback(cb, *args) -> None:
-    """Call a callback that may be sync or async. Fire-and-forget for async.
+    """Call a callback safely — sync or async, from any thread.
 
-    Works from both async context and sync threads (e.g. ThreadPoolExecutor).
-    Uses run_coroutine_threadsafe when no running loop in current thread.
+    - Async callbacks scheduled via create_task (async context) or
+      run_coroutine_threadsafe against the captured _MAIN_LOOP (sync thread).
+    - Exceptions in cb are swallowed so a bad callback never kills the engine.
     """
     if cb is None:
         return
-    result = cb(*args)
+    try:
+        result = cb(*args)
+    except Exception as _cb_exc:
+        log.debug(f"[ENGINE] callback raised: {_cb_exc}")
+        return
     if asyncio.iscoroutine(result):
         try:
+            # We're already inside an async context — fast path
             loop = asyncio.get_running_loop()
             loop.create_task(result)
         except RuntimeError:
-            # We're in a sync thread — schedule on the main loop
-            _loop = _get_event_loop()
-            if _loop:
+            # Sync thread (e.g. ThreadPoolExecutor worker) — schedule on main loop
+            _loop = _MAIN_LOOP
+            if _loop is not None and _loop.is_running():
                 asyncio.run_coroutine_threadsafe(result, _loop)
             else:
-                log.debug("[ENGINE] Dropping coroutine callback — no event loop available")
+                log.debug("[ENGINE] Dropping coroutine callback — _MAIN_LOOP not captured yet")
                 result.close()
 
 
@@ -301,35 +304,51 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         except Exception as _exc:
             log.debug(f"Suppressed: {_exc}")
 
+        def _run_one(tc):
+            """Submit a single tool to executor with timeout. Returns (tc_id, result_str)."""
+            # ── Separate execution args from the model's original args ──
+            # tc["arguments"] stays clean (for history/audit); _exec_args carries
+            # the injected fields (_session_id, _authenticated) that tools need.
+            _exec_args = dict(tc["arguments"])
+            _exec_args["_session_id"] = getattr(session, "id", "")
+            _exec_args["_authenticated"] = getattr(session, "authenticated", False)
+            _tool_timeout = self._get_tool_timeout(tc["name"])
+            f = self._tool_executor.submit(execute_tool, tc["name"], _exec_args)
+            return f.result(timeout=_tool_timeout)
+
+        def _redacted_summary(args: dict) -> str:
+            """Redact secrets from args before writing to audit log."""
+            return self._redact_secrets(str(args)[:200])
+
         if len(tool_calls) == 1:
             tc = tool_calls[0]
-            _metrics["tool_calls"] += 1
+            with _METRICS_LOCK:
+                _metrics["tool_calls"] += 1
             t0 = _time.time()
             try:
-                tc["arguments"]["_session_id"] = getattr(session, "id", "")
-                tc["arguments"]["_authenticated"] = getattr(session, "authenticated", False)
-                result = self._truncate_tool_result(execute_tool(tc["name"], tc["arguments"]), tool_name=tc["name"])
+                result = self._truncate_tool_result(_run_one(tc), tool_name=tc["name"])
                 elapsed = _time.time() - t0
                 audit_log(
                     "tool_call",
                     f"{tc['name']}: ok ({elapsed:.2f}s)",
                     detail_dict={
                         "tool": tc["name"],
-                        "args_summary": str(tc["arguments"])[:200],
+                        "args_summary": _redacted_summary(tc["arguments"]),
                         "elapsed_s": round(elapsed, 3),
                         "success": True,
                     },
                 )
             except Exception as e:
                 elapsed = _time.time() - t0
-                _metrics["tool_errors"] += 1
+                with _METRICS_LOCK:
+                    _metrics["tool_errors"] += 1
                 result = f"❌ Tool execution error: {e}"
                 audit_log(
                     "tool_call",
                     f"{tc['name']}: error ({e})",
                     detail_dict={
                         "tool": tc["name"],
-                        "args_summary": str(tc["arguments"])[:200],
+                        "args_summary": _redacted_summary(tc["arguments"]),
                         "elapsed_s": round(elapsed, 3),
                         "success": False,
                         "error": str(e)[:200],
@@ -340,11 +359,13 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         futures = {}
         start_times = {}
         for tc in tool_calls:
-            _metrics["tool_calls"] += 1
+            with _METRICS_LOCK:
+                _metrics["tool_calls"] += 1
             start_times[tc["id"]] = _time.time()
-            tc["arguments"]["_session_id"] = getattr(session, "id", "")
-            tc["arguments"]["_authenticated"] = getattr(session, "authenticated", False)
-            f = self._tool_executor.submit(execute_tool, tc["name"], tc["arguments"])
+            _exec_args = dict(tc["arguments"])
+            _exec_args["_session_id"] = getattr(session, "id", "")
+            _exec_args["_authenticated"] = getattr(session, "authenticated", False)
+            f = self._tool_executor.submit(execute_tool, tc["name"], _exec_args)
             futures[tc["id"]] = (f, tc)
         outputs = {}
         for tc_id, (f, tc) in futures.items():
@@ -357,21 +378,22 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     f"{tc['name']}: ok ({elapsed:.2f}s)",
                     detail_dict={
                         "tool": tc["name"],
-                        "args_summary": str(tc["arguments"])[:200],
+                        "args_summary": _redacted_summary(tc["arguments"]),
                         "elapsed_s": round(elapsed, 3),
                         "success": True,
                     },
                 )
             except Exception as e:
                 elapsed = _time.time() - start_times[tc_id]
-                _metrics["tool_errors"] += 1
+                with _METRICS_LOCK:
+                    _metrics["tool_errors"] += 1
                 outputs[tc_id] = f"❌ Tool execution error: {e}"
                 audit_log(
                     "tool_call",
                     f"{tc['name']}: error",
                     detail_dict={
                         "tool": tc["name"],
-                        "args_summary": str(tc["arguments"])[:200],
+                        "args_summary": _redacted_summary(tc["arguments"]),
                         "elapsed_s": round(elapsed, 3),
                         "success": False,
                         "error": str(e)[:200],
@@ -468,16 +490,23 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         on_status: Optional[object] = None,
     ) -> str:
         """Main execution loop — Plan → Execute → Reflect."""
+        # Capture the main event loop once per call so cross-thread callbacks
+        # (_safe_callback from ThreadPoolExecutor workers) can always find it.
+        global _MAIN_LOOP
+        _MAIN_LOOP = asyncio.get_running_loop()
 
         if not classification:
             classification = TaskClassifier.classify(user_message, len(session.messages))
 
         tier = classification["tier"]
-        use_thinking = classification["thinking"]
+        # Session setting wins; classification can only promote (not demote) thinking.
+        _cls_thinking = classification["thinking"]
         thinking_budget = classification["thinking_budget"]
+        # use_thinking is decided in _execute_loop via session.thinking_enabled;
+        # we surface classification result in logs only — no dead dual-source confusion.
         log.info(
             f"[AI] Intent: {classification['intent']} (tier={tier}, "
-            f"think={use_thinking}, budget={thinking_budget}, "
+            f"cls_think={_cls_thinking}, budget={thinking_budget}, "
             f"score={classification.get('score', 0)})"
         )
 
@@ -603,6 +632,15 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             return loop_msg, consecutive_errors
 
         self._append_tool_results(session, provider, result, result["tool_calls"], tool_outputs)
+
+        # Update loop-detection history AFTER successful execution.
+        # Without this, check_loop_detection always received an empty list → dead code.
+        recent_tool_calls.append(
+            [(tc["name"], str(tc.get("arguments", ""))[:200]) for tc in result["tool_calls"]]
+        )
+        # Keep only the last 20 rounds to bound memory
+        del recent_tool_calls[:-20]
+
         return None, consecutive_errors
 
     async def _finalize_loop_response(
@@ -707,7 +745,22 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             # Model & provider selection
             model = select_model(model_override, user_message, tier, iteration, router)
-            provider = model.split("/")[0] if "/" in model else "anthropic"
+            if "/" in model:
+                provider = model.split("/")[0]
+            else:
+                # Infer provider from well-known model-name prefixes.
+                # Default to "openai" (not "anthropic") so tool/message format
+                # doesn't silently mangle GPT-family models missing a prefix.
+                _pfx = model.split("-")[0].lower()
+                provider = {
+                    "claude": "anthropic",
+                    "gemini": "google",
+                    "llama": "groq",
+                    "mixtral": "groq",
+                    "whisper": "groq",
+                    "grok": "xai",
+                    "o1": "openai", "o3": "openai", "o4": "openai",
+                }.get(_pfx, "openai")
 
             # Tools
             tools = self._get_tools_for_provider(
