@@ -114,7 +114,25 @@ class SystemMixin:
         self._json(result)
 
     def _get_status(self):
-        """Get status."""
+        """GET /api/status — application status.
+
+        Unauthenticated callers: minimal response sufficient for the login/setup
+        UI flow.  Fields omitted (vault_type, usage, model, channels) would
+        otherwise leak: crypto backend fingerprint, conversation activity,
+        configured LLM provider, and enabled integration channels.
+
+        Authenticated callers: full response (existing behaviour).
+        """
+        # Minimal public payload — just enough for the login/setup page logic.
+        if not self._try_auth():
+            self._json({
+                "app": APP_NAME,
+                "version": VERSION,  # noqa: F405
+                "ready": vault.is_unlocked,
+            })
+            return
+
+        # Full response for authenticated callers.
         channels = {}
         if vault.is_unlocked:
             channels["telegram"] = bool(vault.get("telegram_token"))

@@ -348,9 +348,9 @@ class TestWebHandlerRoutes(unittest.TestCase):
         self.assertEqual(status, 200)
 
     def test_docs_page(self):
+        # /docs requires auth by default (SALMALM_DOCS_PUBLIC=1 to open for dev).
         status, body = self._get('/docs')
-        self.assertEqual(status, 200)
-        self.assertIn(b'html', body.lower())
+        self.assertIn(status, (200, 401, 403))
 
     def test_dashboard_page(self):
         status, _ = self._get('/dashboard')
@@ -360,7 +360,10 @@ class TestWebHandlerRoutes(unittest.TestCase):
         status, body = self._get('/api/status')
         self.assertEqual(status, 200)
         data = json.loads(body)
-        self.assertIn('usage', data)
+        # Unauthenticated: minimal payload (app + version + ready).
+        # Full payload requires authentication.
+        self.assertIn('app', data)
+        self.assertIn('version', data)
 
     def test_api_check_update(self):
         status, body = self._get('/api/check-update')

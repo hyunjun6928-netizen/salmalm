@@ -1,8 +1,11 @@
 """OAuth subscription authentication for Anthropic and OpenAI.
 
-stdlib-only. Token storage uses simple XOR obfuscation (AES-256 would require
-a third-party library; we stay stdlib-only and note that real deployments should
-use OS keyring or proper encryption).
+Token storage priority:
+  1. Vault (AES-256-GCM, preferred): persisted securely when vault is unlocked.
+  2. Memory-only fallback: when vault is locked, tokens are kept in process
+     memory and are discarded on server restart.  No XOR/obfuscated files are
+     written to disk — those are trivially reversible and give a false sense of
+     security.  Unlock the vault to persist tokens across restarts.
 """
 
 from __future__ import annotations
@@ -24,26 +27,27 @@ log = logging.getLogger(__name__)
 
 _CONFIG_DIR = DATA_DIR
 _TOKENS_PATH = _CONFIG_DIR / "oauth_tokens.json"
-_secret = os.environ.get("SALMALM_SECRET", "")
-if not _secret:
-    import logging as _log
-
-    _log.getLogger(__name__).warning(
-        "SALMALM_SECRET not set — OAuth tokens use weak obfuscation. "
-        "Set SALMALM_SECRET or use /vault for AES-GCM encryption."
-    )
-    _secret = "salmalm-default-key"
-_OBFUSCATION_KEY = hashlib.sha256(_secret.encode()).digest()
-
-
 def _xor_bytes(data: bytes, key: bytes) -> bytes:
-    """Simple XOR obfuscation (NOT real encryption — stdlib constraint)."""
+    """Simple XOR — kept for legacy token migration ONLY (reading old oauth_tokens.json).
+    Not used for new token storage; new tokens go to vault or memory.
+    """
     return bytes(d ^ key[i % len(key)] for i, d in enumerate(data))
 
 
+# In-memory fallback store — populated when vault is locked.
+# Tokens survive for the life of the process only; not persisted to disk.
+# Key is a hash of the raw token data (deterministic so we can overwrite).
+_MEMORY_STORE: dict = {}
+
+
 def _encrypt_tokens(data: dict) -> str:
-    # Prefer vault (AES-GCM) — ONLY secure storage path
-    """Encrypt tokens."""
+    """Persist tokens securely.
+
+    If vault is unlocked: store via AES-256-GCM (secure, survives restart).
+    Otherwise: keep in process memory ONLY — no XOR / no obfuscated files.
+    XOR is trivially reversible; writing it to disk creates a false sense of
+    security.  Return a stable key so callers can retrieve later.
+    """
     try:
         from salmalm.security.crypto import vault
 
@@ -51,19 +55,20 @@ def _encrypt_tokens(data: dict) -> str:
             vault.set("oauth_tokens", json.dumps(data))
             return "__VAULT__"
     except Exception as e:  # noqa: broad-except
-        log.debug(f"Suppressed: {e}")
-    # XOR fallback — warn loudly, this is NOT secure storage
+        log.debug(f"[OAUTH] vault unavailable: {e}")
+    # Memory-only fallback — token valid for this process lifetime only.
     log.warning(
-        "[OAUTH] ⚠️ Storing tokens with XOR obfuscation (NOT encryption). "
-        "Install cryptography package and unlock vault for secure storage: "
-        "pip install salmalm[crypto]"
+        "[OAUTH] ⚠️ Vault is locked — OAuth tokens are kept in memory only "
+        "and will be lost on server restart.  Unlock the vault to persist them: "
+        "salmalm vault unlock  (or set SALMALM_VAULT_PW for automation)"
     )
-    raw = json.dumps(data).encode()
-    return base64.b64encode(_xor_bytes(raw, _OBFUSCATION_KEY)).decode()
+    mem_key = "__MEM__"
+    _MEMORY_STORE[mem_key] = data
+    return mem_key
 
 
 def _decrypt_tokens(encoded: str) -> dict:
-    """Decrypt tokens."""
+    """Retrieve tokens from vault or memory store."""
     if encoded == "__VAULT__":
         try:
             from salmalm.security.crypto import vault
@@ -73,10 +78,38 @@ def _decrypt_tokens(encoded: str) -> dict:
                 if stored:
                     return json.loads(stored)
         except Exception as e:  # noqa: broad-except
-            log.debug(f"Suppressed: {e}")
+            log.debug(f"[OAUTH] vault read failed: {e}")
         return {}
-    raw = _xor_bytes(base64.b64decode(encoded), _OBFUSCATION_KEY)
-    return json.loads(raw)
+    if encoded == "__MEM__":
+        return _MEMORY_STORE.get("__MEM__", {})
+    # Legacy XOR tokens in existing oauth_tokens.json: attempt transparent
+    # migration to vault on first read so users aren't locked out.
+    log.warning(
+        "[OAUTH] Legacy XOR token detected in oauth_tokens.json — "
+        "attempting transparent migration to vault."
+    )
+    try:
+        _secret = os.environ.get("SALMALM_SECRET", "salmalm-default-key")
+        _key = hashlib.sha256(_secret.encode()).digest()
+        raw = bytes(d ^ _key[i % len(_key)] for i, d in enumerate(base64.b64decode(encoded)))
+        data = json.loads(raw)
+        # Migrate: re-encrypt via _encrypt_tokens (vault or memory)
+        new_key = _encrypt_tokens(data)
+        # Rewrite the file with the new storage key so XOR is never read again.
+        try:
+            if _TOKENS_PATH.exists():
+                old = json.loads(_TOKENS_PATH.read_text(encoding="utf-8"))
+                for provider, tok in old.items():
+                    if isinstance(tok, dict) and tok.get("_enc") == encoded:
+                        old[provider]["_enc"] = new_key
+                _TOKENS_PATH.write_text(json.dumps(old), encoding="utf-8")
+                log.info("[OAUTH] XOR token migrated to secure storage.")
+        except Exception as _mig_e:
+            log.debug(f"[OAUTH] Migration file-write failed: {_mig_e}")
+        return data
+    except Exception as e:
+        log.warning(f"[OAUTH] Failed to decode legacy XOR token: {e}")
+        return {}
 
 
 class AnthropicOAuth:

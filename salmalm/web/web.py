@@ -163,13 +163,33 @@ class WebHandler(
         "/api/onboarding",
         "/api/onboarding/preferences",
         "/api/setup",
-        "/docs",
+        # NOTE: /docs is intentionally NOT public — see _get_docs() for details.
+        # Set SALMALM_DOCS_PUBLIC=1 to restore public access for local dev.
         "/api/google/callback",
         "/api/google/auth",
         "/webhook/telegram",
         "/webhook/slack",
         "/api/check-update",
     }
+
+    def _try_auth(self) -> Optional[dict]:
+        """Silently attempt authentication without sending any error response.
+
+        Returns the authenticated user dict on success, or None if the request
+        is unauthenticated.  Use this for endpoints that serve a *reduced*
+        payload to unauthenticated callers instead of rejecting them outright
+        (e.g. /api/health, /api/status, /docs).
+        """
+        user = extract_auth(dict(self.headers))
+        if user:
+            return user
+        # Loopback single-user local mode (mirrors _require_auth logic)
+        ip = self._get_client_ip()
+        bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+        if bind in ("127.0.0.1", "localhost", "::1"):
+            if ip in ("127.0.0.1", "::1", "localhost") and vault.is_unlocked:
+                return {"username": "local", "role": "admin", "id": 0}
+        return None
 
     def _require_auth(self, min_role: str = "user") -> Optional[dict]:
         """Check auth for protected endpoints. Returns user dict or sends 401 and returns None.
@@ -608,12 +628,25 @@ class WebHandler(
 
     def _get_api_health(self):
         # K8s readiness/liveness probe compatible: 200=healthy, 503=unhealthy
-        """Get api health."""
+        """Get api health.
+
+        Unauthenticated callers receive a minimal probe-compatible response:
+            {"status": "healthy"}  or  {"status": "unhealthy"}
+        This preserves K8s liveness/readiness probe behaviour without leaking
+        component details (memory, disk, llm, vault, uptime, version) to
+        unauthenticated external observers.
+        Full report is returned when the request carries a valid auth token.
+        """
         from salmalm.core.health import get_health_report
 
         report = get_health_report()
         status_code = 200 if report.get("status") == "healthy" else 503
-        self._json(report, status=status_code)
+        # Authenticated callers get the full diagnostic report.
+        if self._try_auth():
+            self._json(report, status=status_code)
+            return
+        # Unauthenticated: K8s probe-compatible minimal response only.
+        self._json({"status": report.get("status", "unknown")}, status=status_code)
 
     # PyPI version cache: avoid blocking on every request.
     # TTL = 10 minutes. Background refresh on cache miss.
@@ -690,10 +723,22 @@ self.addEventListener('fetch',e=>{{
         self._html(_tmpl.DASHBOARD_HTML)
 
     def _get_docs(self):
-        """Get docs."""
+        """Get API documentation.
+
+        Protected by default: exposes the full endpoint inventory (names, params,
+        auth roles) which would hand an attacker a ready-made attack surface map.
+
+        Access rules:
+          1. Authenticated users always have access.
+          2. SALMALM_DOCS_PUBLIC=1 env var re-opens to unauthenticated callers
+             (convenience for local development only — never set in production).
+        """
         from salmalm.features.docs import generate_api_docs_html
 
-        self._html(generate_api_docs_html())
+        if os.environ.get("SALMALM_DOCS_PUBLIC", "0") == "1" or self._try_auth():
+            self._html(generate_api_docs_html())
+            return
+        self._json({"error": "Authentication required"}, 401)
 
     def _do_get_inner(self):
         # Route table dispatch for simple API endpoints

@@ -88,8 +88,10 @@ try:
     log.info("[OK] cryptography available -- AES-256-GCM enabled")
 except ImportError:
     log.warning(
-        "[WARN] cryptography not installed -- HMAC-CTR fallback enabled automatically. "
-        "Install 'pip install salmalm[crypto]' for AES-256-GCM encryption."
+        "[WARN] cryptography not installed. "
+        "Vault is DISABLED (create/unlock will raise RuntimeError) "
+        "unless you set SALMALM_VAULT_FALLBACK=1 to enable the stdlib HMAC-CTR fallback. "
+        "For secure AES-256-GCM encryption: pip install 'salmalm[crypto]'"
     )
 
 
