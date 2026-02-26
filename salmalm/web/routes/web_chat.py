@@ -80,6 +80,32 @@ def _cache_response(req_id: str, session_id: str, response: str, model: str, com
 class WebChatMixin:
     """Mixin providing chat route handlers."""
 
+    # ── Session isolation helpers ─────────────────────────────────────────────
+
+    def _resolve_session_id(self, raw_sid: str) -> tuple:
+        """Resolve a client-supplied session ID to a per-user namespaced ID.
+
+        Multi-user isolation: if two authenticated users both omit a session ID
+        (defaulting to ``"web"``), they must NOT share the same Session object.
+        We transparently suffix the default ``"web"`` id with the authenticated
+        user's numeric ID so each user gets ``"web:1"``, ``"web:2"``, etc.
+
+        Rules:
+          - ``raw_sid == "web"``  → ``"web:{uid}"`` when authenticated; else "web:0"
+          - Any other explicit session ID is left as-is (user intentionally named it).
+          - Returns ``(resolved_id: str, user_id: int | None)`` so callers can pass
+            ``user_id`` through to ``get_session()`` for the secondary ownership check.
+        """
+        user = self._try_auth()
+        uid = user["id"] if user else None
+        if raw_sid == "web":
+            # Always namespace default "web" session to avoid cross-user bleed.
+            # Unauthenticated loopback gets uid=0 (local single-user mode).
+            resolved = f"web:{uid if uid is not None else 0}"
+        else:
+            resolved = raw_sid
+        return resolved, uid
+
     def _post_api_chat(self):
         """Handle /api/chat and /api/chat/stream — main conversation endpoint."""
         from salmalm.core.engine_pipeline import process_message
@@ -90,7 +116,7 @@ class WebChatMixin:
             self._json({"error": "Vault locked"}, 403)
             return
         message = body.get("message", "")
-        session_id = body.get("session", "web")
+        session_id, _uid = self._resolve_session_id(body.get("session", "web"))
         image_b64 = body.get("image_base64")
         image_mime = body.get("image_mime", "image/png")
         ui_lang = body.get("lang", "")
@@ -208,7 +234,7 @@ class WebChatMixin:
             try:
                 from salmalm.core import get_session as _gs_pre
 
-                _sess_pre = _gs_pre(session_id)
+                _sess_pre = _gs_pre(session_id, user_id=_uid)
                 _model_ov = getattr(_sess_pre, "model_override", None)
                 if _model_ov == "auto":
                     _model_ov = None
@@ -237,7 +263,7 @@ class WebChatMixin:
 
             from salmalm.core import get_session as _gs2
 
-            _sess2 = _gs2(session_id)
+            _sess2 = _gs2(session_id, user_id=_uid)
             try:
                 from salmalm.tools.tools_ui import pop_pending_commands
 
@@ -280,7 +306,7 @@ class WebChatMixin:
             try:
                 from salmalm.core import get_session as _gs_pre2
 
-                _sess_pre2 = _gs_pre2(session_id)
+                _sess_pre2 = _gs_pre2(session_id, user_id=_uid)
                 _model_ov2 = getattr(_sess_pre2, "model_override", None)
                 if _model_ov2 == "auto":
                     _model_ov2 = None
@@ -300,7 +326,7 @@ class WebChatMixin:
                 loop.close()
             from salmalm.core import get_session as _gs
 
-            _sess = _gs(session_id)
+            _sess = _gs(session_id, user_id=_uid)
             self._json(
                 {
                     "response": response,
@@ -315,7 +341,7 @@ class WebChatMixin:
         # Abort generation — LibreChat style (생성 중지)
         if not self._require_auth("user"):
             return
-        session_id = body.get("session", body.get("session_id", "web"))
+        session_id, _uid = self._resolve_session_id(body.get("session", body.get("session_id", "web")))
         from salmalm.features.edge_cases import abort_controller
 
         abort_controller.set_abort(session_id)
@@ -328,7 +354,7 @@ class WebChatMixin:
         # Regenerate response — LibreChat style (응답 재생성)
         if not self._require_auth("user"):
             return
-        session_id = body.get("session_id", "web")
+        session_id, _uid = self._resolve_session_id(body.get("session_id", "web"))
         message_index = body.get("message_index")
         if message_index is None:
             self._json({"error": "Missing message_index"}, 400)
@@ -356,7 +382,7 @@ class WebChatMixin:
             return
         message = body.get("message", "")
         models = body.get("models", [])
-        session_id = body.get("session_id", "web")
+        session_id, _uid = self._resolve_session_id(body.get("session_id", "web"))
         if not message:
             self._json({"error": "Missing message"}, 400)
             return
@@ -378,7 +404,8 @@ class WebChatMixin:
         # Switch alternative — LibreChat style (대안 전환)
         if not self._require_auth("user"):
             return
-        session_id = body.get("session_id", "")
+        _raw_sid = body.get("session_id", "")
+        session_id, _uid = self._resolve_session_id(_raw_sid) if _raw_sid else ("", None)
         message_index = body.get("message_index")
         alt_id = body.get("alt_id")
         if not all([session_id, message_index is not None, alt_id]):
@@ -391,7 +418,7 @@ class WebChatMixin:
             # Update session messages
             from salmalm.core import get_session
 
-            session = get_session(session_id)
+            session = get_session(session_id, user_id=_uid)
             ua = [(i, m) for i, m in enumerate(session.messages) if m.get("role") in ("user", "assistant")]
             if int(message_index) < len(ua):
                 real_idx = ua[int(message_index)][0]

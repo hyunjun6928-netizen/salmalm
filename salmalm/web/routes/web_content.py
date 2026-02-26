@@ -155,7 +155,7 @@ class ContentMixin:
         """Get personas."""
         from salmalm.core.prompt import list_personas, get_active_persona
 
-        session_id = self.headers.get("X-Session-Id", "web")
+        session_id, _ = self._resolve_session_id(self.headers.get("X-Session-Id", "web"))
         personas = list_personas()
         active = get_active_persona(session_id)
         self._json({"personas": personas, "active": active})

@@ -307,7 +307,7 @@ class ManageMixin:
         body = self._body
         if not self._require_auth("user"):
             return
-        session_id = body.get("session_id", self.headers.get("X-Session-Id", "web"))
+        session_id, _ = self._resolve_session_id(body.get("session_id", self.headers.get("X-Session-Id", "web")))
         name = body.get("name", "")
         if not name:
             self._json({"error": "name required"}, 400)
@@ -415,7 +415,7 @@ class ManageMixin:
         from salmalm.features.queue import set_queue_mode
 
         mode = body.get("mode", "collect")
-        session_id = body.get("session_id", "web")
+        session_id, _ = self._resolve_session_id(body.get("session_id", "web"))
         try:
             result = set_queue_mode(session_id, mode)
             self._json({"ok": True, "message": result})

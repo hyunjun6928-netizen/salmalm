@@ -52,8 +52,9 @@ class SystemMixin:
             _ensure_modules()
         except Exception as e:
             log.debug(f"Suppressed: {e}")
-        # Session info
-        sess = get_session("web")
+        # Session info — use per-user resolved ID to avoid cross-user data
+        _dbg_sid, _dbg_uid = self._resolve_session_id("web")
+        sess = get_session(_dbg_sid, user_id=_dbg_uid)
         sess_msgs = len(sess.messages) if sess else 0
         sess_ctx = sum(len(str(m.get("content", ""))) for m in (sess.messages if sess else []))
         # Provider keys
@@ -140,12 +141,13 @@ class SystemMixin:
         # Include session-level model override if available
         from urllib.parse import parse_qs, urlparse
         qs = parse_qs(urlparse(self.path).query)
-        _sid = qs.get("session", ["web"])[0]
+        _raw_sid = qs.get("session", ["web"])[0]
+        _sid, _uid = self._resolve_session_id(_raw_sid)
         # Session-level override takes absolute precedence (including "auto")
         _effective_model = "auto"
         try:
             from salmalm.core import get_session
-            _sess = get_session(_sid)
+            _sess = get_session(_sid, user_id=_uid)
             _ov = getattr(_sess, "model_override", None)
             if _ov and _ov != "auto":
                 _effective_model = _ov  # specific model override on session

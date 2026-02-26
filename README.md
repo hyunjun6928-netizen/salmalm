@@ -8,8 +8,8 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.14-blue)](https://pypi.org/project/salmalm/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![CI](https://github.com/hyunjun6928-netizen/salmalm/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunjun6928-netizen/salmalm/actions)
-[![Tests](https://img.shields.io/badge/tests-1%2C908%20passed-brightgreen)]()
-[![Tools](https://img.shields.io/badge/tools-66-blueviolet)]()
+[![Tests](https://img.shields.io/badge/tests-1%2C920%20passed-brightgreen)]()
+[![Tools](https://img.shields.io/badge/tools-62-blueviolet)]()
 
 **[한국어 README](README_KR.md)** · **[Documentation](https://hyunjun6928-netizen.github.io/salmalm/)**
 
@@ -19,7 +19,7 @@
 
 ## What is SalmAlm?
 
-SalmAlm is a **self-hosted personal AI gateway** — one Python package that gives you a full-featured AI assistant with web UI, Telegram/Discord bots, 66 tools, memory system, sub-agents, and multi-provider model routing.
+SalmAlm is a **self-hosted personal AI gateway** — one Python package that gives you a full-featured AI assistant with web UI, Telegram/Discord bots, 62 tools, memory system, sub-agents, and multi-provider model routing.
 
 No Docker. No Node.js. No config files. Just:
 
@@ -178,12 +178,12 @@ Also supports LM Studio (`localhost:1234/v1`) and vLLM (`localhost:8000/v1`).
 
 | Metric | Value |
 |---|---|
-| Python files | 192 |
-| Lines of code | ~52,760 |
+| Python files | 196 |
+| Lines of code | ~57,500 |
 | Tools | 62 |
-| Tests | 1,908 passing |
+| Tests | 1,920 passing |
 | Max cyclomatic complexity | ≤20 (all but 1 function) |
-| Files > 800 lines | 0 |
+| Files > 800 lines | 4 (classifier, auth, web, commands) |
 
 ---
 
