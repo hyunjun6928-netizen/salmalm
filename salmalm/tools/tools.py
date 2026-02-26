@@ -525,4 +525,5 @@ except ImportError as _ext_err:
 
 
 # Re-export handler for backward compatibility
-from salmalm.tools.tool_handlers import execute_tool, _resolve_path, _is_safe_command, _is_subpath  # noqa: F401
+# execute_tool and path helpers live in tool_handlers / tools_common.
+# Import them directly: from salmalm.tools.tool_handlers import execute_tool

@@ -46,17 +46,42 @@ def trim_history(session, classification) -> None:
 
 
 def prune_session_context(session, model: str):
-    """Prune context if cache TTL expired."""
-    from salmalm.core.engine import _should_prune_for_cache, estimate_context_window, prune_context
+    """Prune context. Runs three stages when needed:
 
+    A (tool-result pruning) — always run when cache TTL has expired.
+    B (role-aware pair dropping) — run when Stage A is insufficient.
+    C (critical truncation) — last resort, keeps minimum pairs.
+    """
+    from salmalm.core.engine import _should_prune_for_cache, estimate_context_window, prune_context
+    from salmalm.core.session_manager import recover_overflow, _estimate_total_tokens
+
+    _ctx_win = estimate_context_window(model)
+    _sid = getattr(session, "id", "__global__")
+
+    # ── Stage A: tool-result pruning (cache-TTL aware) ──
     if _should_prune_for_cache():
-        _ctx_win = estimate_context_window(model)
-        _sid = getattr(session, "id", "__global__")
-        pruned, stats = prune_context(session.messages, context_window_tokens=_ctx_win, session_id=_sid)
-        if stats["soft_trimmed"] or stats["hard_cleared"]:
-            log.info(f"[PRUNE] soft={stats['soft_trimmed']} hard={stats['hard_cleared']}")
-        return pruned
-    return session.messages
+        pruned, a_stats = prune_context(session.messages, context_window_tokens=_ctx_win, session_id=_sid)
+        if a_stats["soft_trimmed"] or a_stats["hard_cleared"]:
+            log.info("[PRUNE-A] soft=%d hard=%d", a_stats["soft_trimmed"], a_stats["hard_cleared"])
+    else:
+        pruned = list(session.messages)
+
+    # ── Stage B/C: role-aware overflow recovery ──
+    # Run whenever estimated tokens exceed 90% of the context window,
+    # regardless of cache TTL (overflow must be handled proactively).
+    _overflow_threshold = int(_ctx_win * 0.90)
+    if _estimate_total_tokens(pruned) > _overflow_threshold:
+        pruned, bc_stats = recover_overflow(pruned, _ctx_win)
+        if bc_stats["stage"] != "A":
+            log.warning(
+                "[PRUNE-%s] dropped %d pair(s), ~%d → ~%d tokens",
+                bc_stats["stage"],
+                bc_stats["pairs_dropped"],
+                bc_stats["estimated_tokens_before"],
+                bc_stats["estimated_tokens_after"],
+            )
+
+    return pruned
 
 
 def record_usage(session_id: str, model: str, result, classification, iteration) -> None:

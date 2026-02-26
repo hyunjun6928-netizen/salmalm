@@ -1,7 +1,9 @@
 """Misc tools: reminder, workflow, file_index, notification, weather, rss_reader."""
 
 import json
+import os
 import re
+import tempfile
 import time
 import secrets
 import threading
@@ -19,7 +21,7 @@ from salmalm.security.crypto import vault, log
 # ── Reminder System ──────────────────────────────────────────
 
 _reminders: list = []
-_reminder_lock = threading.Lock()
+_reminder_lock = threading.RLock()  # RLock: reentrant — _ensure_reminder_thread holds it while calling _load_reminders
 _reminder_thread_started = False
 
 
@@ -146,20 +148,44 @@ def _reminders_file() -> Path:
 
 
 def _load_reminders():
-    """Load reminders."""
-    global _reminders
+    """Load reminders from disk into _reminders in-place.
+
+    Mutates the list (clear + extend) instead of rebinding the global.
+    This preserves all external references to _reminders obtained via
+    ``from salmalm.tools.tools_misc import _reminders`` (e.g. from
+    tool_handlers re-export or tests).  Rebinding with ``global _reminders
+    = ...`` would silently leave all importers pointing at the old empty list.
+    """
     fp = _reminders_file()
-    if fp.exists():
-        try:
-            _reminders = json.loads(fp.read_text(encoding="utf-8"))
-        except Exception as e:  # noqa: broad-except
-            _reminders = []
+    with _reminder_lock:
+        _reminders.clear()
+        if fp.exists():
+            try:
+                loaded = json.loads(fp.read_text(encoding="utf-8"))
+                if isinstance(loaded, list):
+                    _reminders.extend(loaded)
+            except Exception as e:  # noqa: broad-except
+                pass  # Leave _reminders empty on corrupt file
 
 
 def _save_reminders():
-    """Save reminders."""
+    """Save reminders atomically (tempfile + fsync + rename)."""
     fp = _reminders_file()
-    fp.write_text(json.dumps(_reminders, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    data = json.dumps(_reminders, ensure_ascii=False, indent=2, default=str).encode("utf-8")
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=fp.parent, suffix=".tmp")
+    try:
+        with os.fdopen(tmp_fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, fp)
+    except Exception as _e:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        log.warning("[REMINDER] Failed to save reminders: %s", _e)
 
 
 def _send_notification_impl(
@@ -280,9 +306,13 @@ def _reminder_check_loop():
 
 
 def _ensure_reminder_thread():
-    """Ensure reminder thread."""
+    """Ensure reminder thread starts exactly once (thread-safe double-check)."""
     global _reminder_thread_started
-    if not _reminder_thread_started:
+    if _reminder_thread_started:
+        return
+    with _reminder_lock:
+        if _reminder_thread_started:
+            return
         _reminder_thread_started = True
         _load_reminders()
         t = threading.Thread(target=_reminder_check_loop, daemon=True)

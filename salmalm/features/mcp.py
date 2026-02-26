@@ -36,13 +36,15 @@ from salmalm.security.crypto import log
 # ── JSON-RPC helpers ──────────────────────────────────────────
 
 _rpc_id = 0
+_rpc_id_lock = threading.Lock()
 
 
 def _next_id() -> int:
-    """Next id."""
+    """Thread-safe monotonic RPC ID generator."""
     global _rpc_id
-    _rpc_id += 1
-    return _rpc_id
+    with _rpc_id_lock:
+        _rpc_id += 1
+        return _rpc_id
 
 
 def _rpc_request(method: str, params: Optional[dict] = None, id: Optional[int] = None) -> dict:

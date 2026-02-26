@@ -23,7 +23,6 @@ from salmalm.core import (  # noqa: F401
     _init_audit_db,
     _restore_usage,
     audit_log,
-    _sessions,
     cron,
     LLMCronManager,
     PluginLoader,

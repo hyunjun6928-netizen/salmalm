@@ -254,3 +254,180 @@ def prune_context(messages: list, context_window_tokens: Optional[int] = None,
                 stats["unchanged"] += 1
 
     return pruned, stats
+
+
+# ============================================================
+# Stage B/C: Token overflow recovery (role-aware selection)
+# ============================================================
+
+# Minimum recent pairs always preserved (system + last N user/assistant pairs).
+_OVERFLOW_KEEP_LAST_PAIRS = 8    # Always keep last 8 user+assistant pairs
+_OVERFLOW_STAGE_C_PAIRS   = 3    # Stage C (critical): keep only last 3 pairs
+_CHARS_PER_TOKEN = 4             # Rough estimate; good enough for selection logic
+
+
+def _count_message_chars(msg: dict) -> int:
+    """Rough character count for a single message (all content blocks summed)."""
+    c = msg.get("content", "")
+    if isinstance(c, str):
+        return len(c)
+    if isinstance(c, list):
+        total = 0
+        for block in c:
+            if isinstance(block, dict):
+                for field in ("text", "content"):
+                    v = block.get(field, "")
+                    if isinstance(v, str):
+                        total += len(v)
+        return total
+    return 0
+
+
+def _estimate_total_tokens(messages: list) -> int:
+    """Rough token estimate across all messages."""
+    return sum(_count_message_chars(m) for m in messages) // _CHARS_PER_TOKEN
+
+
+def _strip_orphan_tool_results(msgs: list) -> list:
+    """Remove tool_result blocks whose tool_use_id has no preceding tool_use.
+
+    Prevents 'tool_result without preceding tool_use' API errors when pairs
+    are dropped and some tool results lose their parent assistant message.
+    """
+    active_ids: set = set()
+    for m in msgs:
+        if m.get("role") == "assistant":
+            c = m.get("content", "")
+            if isinstance(c, list):
+                for block in c:
+                    if isinstance(block, dict) and block.get("type") == "tool_use":
+                        active_ids.add(block.get("id", ""))
+            for tc in m.get("tool_calls", []):
+                if isinstance(tc, dict):
+                    active_ids.add(tc.get("id", ""))
+
+    cleaned = []
+    for m in msgs:
+        if m.get("role") == "user" and isinstance(m.get("content"), list):
+            blocks = [
+                b for b in m["content"]
+                if not (
+                    isinstance(b, dict)
+                    and b.get("type") == "tool_result"
+                    and b.get("tool_use_id", "") not in active_ids
+                )
+            ]
+            if not blocks:
+                continue   # Entire user message was only orphan tool results
+            cleaned.append({**m, "content": blocks})
+        elif m.get("role") == "tool":
+            if m.get("tool_call_id", "") in active_ids:
+                cleaned.append(m)
+            # else: orphan tool message, drop
+        else:
+            cleaned.append(m)
+    return cleaned
+
+
+def recover_overflow(
+    messages: list,
+    context_window_tokens: int,
+    *,
+    headroom: float = 0.15,
+) -> tuple:
+    """Role-aware context recovery for when tool-result pruning isn't enough.
+
+    Runs AFTER prune_context() (Stage A). Stages:
+      B: Drop oldest user+assistant pairs (oldest first), keep system +
+         last N pairs + tool results paired with kept assistants.
+         Orphaned tool_result blocks are stripped to avoid API errors.
+      C: Critical — only last _OVERFLOW_STAGE_C_PAIRS pairs kept.
+
+    Always preserves system messages regardless of token count.
+
+    Args:
+        messages:               Full message list (after Stage A pruning).
+        context_window_tokens:  Model's context window in tokens.
+        headroom:               Fraction of context window to leave free
+                                (default 15% — space for the LLM response).
+
+    Returns (recovered_messages, stats_dict).
+    Does NOT modify the original list.
+    """
+    import logging as _log
+    _logger = _log.getLogger(__name__)
+
+    target_tokens = int(context_window_tokens * (1.0 - headroom))
+    stats: dict = {
+        "stage": "A",
+        "pairs_dropped": 0,
+        "estimated_tokens_before": 0,
+        "estimated_tokens_after": 0,
+    }
+
+    estimated = _estimate_total_tokens(messages)
+    stats["estimated_tokens_before"] = estimated
+
+    if estimated <= target_tokens:
+        stats["estimated_tokens_after"] = estimated
+        return list(messages), stats   # Already fits — shallow copy, no changes
+
+    # Separate system messages (always kept) from the conversation body
+    system_msgs = [m for m in messages if m.get("role") == "system"]
+    conv_msgs   = [m for m in messages if m.get("role") != "system"]
+
+    # Build ordered list of pair-index-tuples in conv_msgs
+    pairs: list = []
+    i = 0
+    while i < len(conv_msgs):
+        m = conv_msgs[i]
+        if m.get("role") == "user":
+            if i + 1 < len(conv_msgs) and conv_msgs[i + 1].get("role") == "assistant":
+                pairs.append((i, i + 1))
+                i += 2
+            else:
+                pairs.append((i,))   # Dangling user message
+                i += 1
+        else:
+            i += 1
+
+    def _reconstruct(keep_pair_count: int) -> list:
+        if keep_pair_count >= len(pairs):
+            return system_msgs + conv_msgs
+        keep_pairs = pairs[-keep_pair_count:]
+        keep_indices: set = set()
+        for pair in keep_pairs:
+            keep_indices.update(pair)
+        # Pull in trailing tool messages that belong to kept assistant messages
+        for idx in list(keep_indices):
+            j = idx + 1
+            while j < len(conv_msgs) and conv_msgs[j].get("role") in ("tool",):
+                keep_indices.add(j)
+                j += 1
+        kept = [conv_msgs[k] for k in sorted(keep_indices)]
+        return _strip_orphan_tool_results(system_msgs + kept)
+
+    # Stage B: binary-search-style drop from oldest pairs
+    for keep in range(len(pairs) - 1, _OVERFLOW_STAGE_C_PAIRS - 1, -1):
+        candidate = _reconstruct(keep)
+        est = _estimate_total_tokens(candidate)
+        if est <= target_tokens:
+            dropped = len(pairs) - keep
+            stats.update(stage="B", pairs_dropped=dropped, estimated_tokens_after=est)
+            _logger.warning(
+                "[CTX] Stage B recovery: dropped %d old pair(s) → ~%d tokens (target %d)",
+                dropped, est, target_tokens,
+            )
+            return candidate, stats
+
+    # Stage C: critical — keep only absolute minimum
+    candidate = _reconstruct(_OVERFLOW_STAGE_C_PAIRS)
+    est = _estimate_total_tokens(candidate)
+    dropped = max(0, len(pairs) - _OVERFLOW_STAGE_C_PAIRS)
+    stats.update(stage="C", pairs_dropped=dropped, estimated_tokens_after=est)
+    _logger.warning(
+        "[CTX] Stage C (critical) recovery: kept only last %d pair(s) → ~%d tokens "
+        "(target %d, window %d). History severely truncated.",
+        _OVERFLOW_STAGE_C_PAIRS, est, target_tokens, context_window_tokens,
+    )
+    return candidate, stats
