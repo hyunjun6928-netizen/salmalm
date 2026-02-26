@@ -141,7 +141,16 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     def _redact_secrets(self, text: str) -> str:
         return self._SECRET_OUTPUT_RE.sub("[REDACTED]", text) if text else text
 
-    def _truncate_tool_result(self, result: str, tool_name: str = "") -> str:
+    # Paths that must never be pre-summarized — even if PRESUMMARY=1
+    _PRESUMMARY_PATH_BLOCKLIST = _re.compile(
+        r"(?i)(vault|auth\.db|audit\.db|\.env|secret|credential|token|password|keyring|\.ssh|\.gnupg)",
+    )
+    # Content patterns indicating the file is sensitive — skip summarization
+    _PRESUMMARY_CONTENT_BLOCKLIST = _re.compile(
+        r"(?i)(api[_-]?key|secret[_\s]*=|token[_\s]*=|password[_\s]*=|BEGIN (RSA|EC|PRIVATE|CERTIFICATE)|SK-|sk-|AKIA[0-9A-Z]{16})",
+    )
+
+    def _truncate_tool_result(self, result: str, tool_name: str = "", tool_args: dict | None = None) -> str:
         import os as _os
         result = self._redact_secrets(result)
         if (
@@ -149,17 +158,27 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             and tool_name in ("read_file", "web_fetch")
             and len(result) > 5000
         ):
-            try:
-                from salmalm.core.llm import call_llm
-                summary = call_llm(
-                    model="anthropic/claude-haiku-3.5-20241022",
-                    messages=[{"role": "user", "content": f"Summarize concisely:\n\n{result[:15000]}"}],
-                    max_tokens=1024, tools=None,
-                )
-                if summary.get("content"):
-                    return f"[Pre-summarized — original {len(result)} chars]\n\n{summary['content']}"
-            except Exception as _exc:
-                log.debug(f"Suppressed: {_exc}")
+            # #7 Privacy gate: skip sensitive paths and content
+            _path = str((tool_args or {}).get("path", (tool_args or {}).get("url", "")))
+            _path_blocked = self._PRESUMMARY_PATH_BLOCKLIST.search(_path)
+            _content_blocked = self._PRESUMMARY_CONTENT_BLOCKLIST.search(result[:2000])
+            if _path_blocked:
+                log.debug(f"[PRESUMMARY] Blocked path: {_path!r}")
+            elif _content_blocked:
+                log.debug(f"[PRESUMMARY] Blocked: sensitive content pattern detected")
+            else:
+                try:
+                    from salmalm.core.llm import call_llm
+                    # Privacy: NO session context, NO system messages — isolated call
+                    summary = call_llm(
+                        model="anthropic/claude-haiku-3.5-20241022",
+                        messages=[{"role": "user", "content": f"Summarize concisely (no added commentary):\n\n{result[:15000]}"}],
+                        max_tokens=1024, tools=None,
+                    )
+                    if summary.get("content"):
+                        return f"[Pre-summarized — original {len(result)} chars]\n\n{summary['content']}"
+                except Exception as _exc:
+                    log.debug(f"Suppressed: {_exc}")
         limit = self._TOOL_TRUNCATE_LIMITS.get(tool_name, self.MAX_TOOL_RESULT_CHARS)
         if len(result) > limit:
             return result[:limit] + f"\n\n... [truncated: {len(result)} chars, limit {limit}]"
@@ -256,7 +275,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 content_blocks.append({"type": "text", "text": result["content"]})
             for tc in tool_calls:
                 content_blocks.append({"type": "tool_use", "id": tc["id"], "name": tc["name"], "input": tc["arguments"]})
-            session.messages.append({"role": "assistant", "content": content_blocks})
+            with session._messages_lock:
+                session.messages.append({"role": "assistant", "content": content_blocks})
             session.add_tool_results(
                 [{"tool_use_id": tc["id"], "content": tool_outputs[tc["id"]]} for tc in tool_calls]
             )
@@ -269,17 +289,18 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     "arguments": _json.dumps(tc["arguments"]) if isinstance(tc["arguments"], dict) else str(tc["arguments"]),
                 },
             } for tc in tool_calls]
-            session.messages.append({
-                "role": "assistant",
-                "content": result.get("content", "") or "",
-                "tool_calls": asst_tool_calls,
-            })
-            session.last_active = _time.time()
-            for tc in tool_calls:
+            with session._messages_lock:
                 session.messages.append({
-                    "role": "tool", "tool_call_id": tc["id"],
-                    "name": tc["name"], "content": tool_outputs[tc["id"]],
+                    "role": "assistant",
+                    "content": result.get("content", "") or "",
+                    "tool_calls": asst_tool_calls,
                 })
+                session.last_active = _time.time()
+                for tc in tool_calls:
+                    session.messages.append({
+                        "role": "tool", "tool_call_id": tc["id"],
+                        "name": tc["name"], "content": tool_outputs[tc["id"]],
+                    })
 
     def _should_reflect(self, classification: dict, response: str, iteration: int) -> bool:
         import os as _os
@@ -355,7 +376,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         log.warning(f"[CUT] Token overflow — compacting {len(session.messages)} messages")
 
         # Stage A: Semantic compaction (summarise middle turns)
-        session.messages = compact_messages(session.messages, session=session, on_status=on_status)
+        with session._messages_lock:
+            session.messages = compact_messages(session.messages, session=session, on_status=on_status)
         result, _ = await self._call_with_failover(
             session.messages, model=model, tools=tools, max_tokens=max_tokens, thinking=thinking
         )
@@ -364,7 +386,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         # Stage B: Role-aware trim — keep last 5 complete exchanges
         if len(session.messages) > 12:
-            session.messages = self._role_aware_trim(session.messages, keep_last_exchanges=5)
+            with session._messages_lock:
+                session.messages = self._role_aware_trim(session.messages, keep_last_exchanges=5)
             log.warning(f"[CUT] Stage B (role-aware trim, 5 exchanges) → {len(session.messages)} msgs")
             result, _ = await self._call_with_failover(
                 session.messages, model=model, tools=tools, max_tokens=max_tokens, thinking=False
@@ -374,7 +397,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         # Stage C: Nuclear — keep last 2 complete exchanges only
         if len(session.messages) > 4:
-            session.messages = self._role_aware_trim(session.messages, keep_last_exchanges=2)
+            with session._messages_lock:
+                session.messages = self._role_aware_trim(session.messages, keep_last_exchanges=2)
             log.warning(f"[CUT][CUT] Stage C (nuclear, 2 exchanges) → {len(session.messages)} msgs")
             result, _ = await self._call_with_failover(
                 session.messages, model=model, tools=tools, max_tokens=max_tokens
@@ -435,7 +459,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         session.add_assistant(response)
         log.info(f"[CHAT] Response ({result.get('model','?')}): {len(response)} chars, iter={iteration+1}, intent={classification['intent']}")
         auto_log_conversation(user_message, response, classification)
-        session.messages = [m for m in session.messages if not m.get("_plan_injected")]
+        with session._messages_lock:
+                session.messages = [m for m in session.messages if not m.get("_plan_injected")]
         return response
 
     async def _run_reflection(self, user_message: str, response: str) -> str:
@@ -457,7 +482,13 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         from salmalm.core.loop_helpers import check_abort, select_model, trim_history, prune_session_context, record_usage
         import os as _os
 
-        use_thinking = getattr(session, "thinking_enabled", False)
+        # #6: Wire classification thinking — if classifier recommends thinking AND
+        # tier >= 2 (moderate complexity), enable it even if session toggle is off.
+        # Session toggle always wins if explicitly ON; classifier supplements it.
+        _cls_thinks = classification.get("thinking", False) and classification.get("tier", 1) >= 2
+        use_thinking = getattr(session, "thinking_enabled", False) or _cls_thinks
+        if _cls_thinks and not getattr(session, "thinking_enabled", False):
+            log.info(f"[AI] Classifier activated thinking (tier={classification.get('tier')}, budget={classification.get('thinking_budget')})")
         iteration = 0
         consecutive_errors = 0
         _recent_tool_calls: list = []
@@ -484,11 +515,13 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 }.get(_pfx, "openai")
 
             tools = self._get_tools_for_provider(provider, intent=classification["intent"], user_message=user_message or "")
-            _think_level = getattr(session, "thinking_level", "medium") if use_thinking else None
-            think_this_call = (
-                _think_level if (use_thinking and iteration == 0 and any(x in model for x in ("opus", "sonnet", "o3", "o4")))
-                else False
-            )
+            # thinking_level: user-set wins; fallback to classifier budget hint
+            _sess_think_level = getattr(session, "thinking_level", "medium")
+            _cls_budget = classification.get("thinking_budget", 4000)
+            _cls_level = "low" if _cls_budget <= 4000 else "medium" if _cls_budget <= 10000 else "high"
+            _think_level = _sess_think_level if getattr(session, "thinking_enabled", False) else _cls_level
+            _think_eligible = use_thinking and iteration == 0 and any(x in model for x in ("opus", "sonnet", "o3", "o4"))
+            think_this_call = _think_level if _think_eligible else False
             trim_history(session, classification)
             pruned_messages = prune_session_context(session, model)
             if on_status:
@@ -526,7 +559,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 if break_msg:
                     return break_msg
                 if len(session.messages) > 40:
-                    session.messages = compact_messages(session.messages, session=session, on_status=on_status)
+                    with session._messages_lock:
+                        session.messages = compact_messages(session.messages, session=session, on_status=on_status)
                     log.info(f"[CUT] Mid-loop compaction → {len(session.messages)} msgs")
                 iteration += 1
                 continue
@@ -539,7 +573,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         log.warning(f"[BREAK] Max iterations ({_max_iter}) reached")
         response = result.get("content") or "Reached maximum tool iterations. Please try a simpler request."
         session.add_assistant(response)
-        session.messages = [m for m in session.messages if not m.get("_plan_injected")]
+        with session._messages_lock:
+                session.messages = [m for m in session.messages if not m.get("_plan_injected")]
         return response
 
     async def run(
@@ -593,7 +628,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 log.debug(f"Suppressed: {_exc}")
             return friendly
         finally:
-            session.messages = [m for m in session.messages if not m.get("_plan_injected")]
+            with session._messages_lock:
+                session.messages = [m for m in session.messages if not m.get("_plan_injected")]
 
 
 # ── Lazy singleton ──────────────────────────────────────────────────────────

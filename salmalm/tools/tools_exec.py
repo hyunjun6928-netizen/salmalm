@@ -46,8 +46,24 @@ def _sanitized_env(extra_env: dict | None = None) -> dict:
         else:
             clean[k] = v
     if extra_env:
-        # User-supplied env vars are NOT filtered — they are explicit
-        clean.update(extra_env)
+        # Block dynamic loader / Python interpreter hijack vectors.
+        # Even though extra_env is user-supplied, an LLM could generate these.
+        _DANGEROUS_ENV_KEYS = frozenset({
+            "PYTHONPATH",       # import path injection → load attacker .py
+            "PYTHONSTARTUP",    # auto-exec arbitrary file on interpreter start
+            "PYTHONHOME",       # redirect stdlib → hijack all imports
+            "PYTHONINSPECT",    # force interactive mode
+            "LD_PRELOAD",       # shared library injection (Linux)
+            "LD_LIBRARY_PATH",  # library search path hijack (Linux)
+            "DYLD_INSERT_LIBRARIES",  # shared library injection (macOS)
+            "DYLD_LIBRARY_PATH",      # library search path hijack (macOS)
+            "PATH",             # command resolution hijack
+        })
+        for k, v in extra_env.items():
+            if k.upper() in _DANGEROUS_ENV_KEYS:
+                log.warning(f"[EXEC] Blocked dangerous env override: {k!r}")
+                continue
+            clean[k] = v
     return clean
 
 
@@ -291,6 +307,28 @@ def _ast_validate(code: str) -> str | None:
             "code",
             "codeop",
             "compileall",
+            # AST bypass vectors — absent from original list (reported in code review)
+            "pickle",       # arbitrary code exec via __reduce__
+            "marshal",      # bytecode deserialization
+            "builtins",     # __import__, exec, eval re-access
+            "gc",           # gc.get_objects() → traverse all live objects
+            "types",        # types.CodeType → construct arbitrary code objects
+            "dis",          # bytecode inspection / manipulation
+            "inspect",      # inspect.currentframe() → escape sandbox via frames
+            "ast",          # metaprogramming / AST manipulation
+            "tokenize",     # source-level analysis bypass
+            "linecache",    # arbitrary file read via frame trickery
+            "traceback",    # frame inspection
+            "copyreg",      # pickle extension bypass
+            "_io",          # raw I/O bypass
+            "io",           # file I/O
+            "tempfile",     # write to temp files
+            "glob",         # filesystem enumeration
+            "fnmatch",      # filesystem enumeration
+            "zipfile",      # archive read/write
+            "tarfile",      # archive read/write
+            "zipimport",    # import from zip → code exec
+            "pkg_resources",# arbitrary package import
         }
     )
     try:
@@ -399,9 +437,36 @@ def handle_python_eval(args: dict) -> str:
         "__subclasses__",
         "__bases__",
         "__mro__",
+        "__reduce__",
+        "__reduce_ex__",
+        "__code__",
+        "__globals__",
+        "__builtins__",
         "importlib",
         "ctypes",
         "signal",
+        # AST bypass vectors (added in code review)
+        "import pickle",
+        "import marshal",
+        "import gc",
+        "import types",
+        "import dis",
+        "import inspect",
+        "import ast",
+        "import io",
+        "import tempfile",
+        "gc.get_objects",
+        "gc.get_referrers",
+        "types.CodeType",
+        "types.FunctionType",
+        "marshal.loads",
+        "marshal.dumps",
+        "pickle.loads",
+        "pickle.dumps",
+        "inspect.currentframe",
+        "inspect.stack",
+        "dis.dis",
+        "dis.get_instructions",
         # Secret exfiltration prevention
         "salmalm.security",
         "from salmalm",

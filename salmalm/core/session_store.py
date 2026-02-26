@@ -54,9 +54,11 @@ class Session:
 
     def __init__(self, session_id: str, user_id: Optional[int] = None) -> None:
         """Create a new session with isolated context, message history, and model preferences."""
+        import threading as _threading
         self.id = session_id
         self.user_id = user_id  # Multi-tenant: owning user (None = legacy/local)
         self.messages: list = []
+        self._messages_lock = _threading.RLock()  # Protects messages list from concurrent tool threads
         self.created = time.time()
         self.last_active = time.time()
         self.metadata: dict = {}  # Arbitrary session metadata
@@ -71,10 +73,10 @@ class Session:
         self.last_complexity = "auto"  # Last complexity level
 
     def add_system(self, content: str) -> None:
-        # Replace existing system message
-        """Add a system message to the session."""
-        self.messages = [m for m in self.messages if m["role"] != "system"]
-        self.messages.insert(0, {"role": "system", "content": content})
+        """Add (or replace) the system message. Thread-safe."""
+        with self._messages_lock:
+            self.messages = [m for m in self.messages if m["role"] != "system"]
+            self.messages.insert(0, {"role": "system", "content": content})
 
     def _persist(self):
         """Save session to SQLite (only text messages, skip image data).
@@ -125,32 +127,29 @@ class Session:
             log.warning(f"Session persist error: {e}")
 
     def add_user(self, content: str) -> None:
-        """Add a user message to the session.
-
-        Auto-compaction: if session exceeds 1000 messages, trim old ones.
-        """
-        self.messages.append({"role": "user", "content": content})
-        self.last_active = time.time()
-        # Session size explosion prevention
-        if len(self.messages) > 1000:
-            system_msgs = [m for m in self.messages if m["role"] == "system"][:1]
-            recent = [m for m in self.messages if m["role"] != "system"][-50:]
-            self.messages = system_msgs + recent
-            log.warning(f"[SESSION] Auto-trimmed session {self.id}: >1000 msgs → {len(self.messages)}")
+        """Add a user message. Thread-safe. Auto-compacts on explosion (>1000 msgs)."""
+        with self._messages_lock:
+            self.messages.append({"role": "user", "content": content})
+            self.last_active = time.time()
+            if len(self.messages) > 1000:
+                system_msgs = [m for m in self.messages if m["role"] == "system"][:1]
+                recent = [m for m in self.messages if m["role"] != "system"][-50:]
+                self.messages = system_msgs + recent
+                log.warning(f"[SESSION] Auto-trimmed session {self.id}: >1000 msgs → {len(self.messages)}")
 
     def add_assistant(self, content: str) -> None:
-        """Add an assistant response to the session."""
-        self.messages.append({"role": "assistant", "content": content})
-        self.last_active = time.time()
+        """Add an assistant response. Thread-safe."""
+        with self._messages_lock:
+            self.messages.append({"role": "assistant", "content": content})
+            self.last_active = time.time()
         self._persist()
-        # Auto-save to disk after final response (debounced — not on tool calls)
         try:
             save_session_to_disk(self.id)
         except Exception as e:
             log.debug(f"Suppressed: {e}")
 
     def add_tool_results(self, results: list) -> None:
-        """Add tool results as a single user message with all results.
+        """Add tool results as a single user message. Thread-safe.
         results: list of {'tool_use_id': str, 'content': str}
         """
         content = [
@@ -161,7 +160,8 @@ class Session:
             }
             for r in results
         ]
-        self.messages.append({"role": "user", "content": content})
+        with self._messages_lock:
+            self.messages.append({"role": "user", "content": content})
 
 
 _tg_bot = None  # Set during startup by telegram module
