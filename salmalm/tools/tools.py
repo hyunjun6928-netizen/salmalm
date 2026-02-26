@@ -1,20 +1,30 @@
-"""SalmAlm tool definitions — schema for all built-in tools."""
+"""SalmAlm tool definitions — schema for all built-in tools.
+
+Design contract:
+- Every input_schema has additionalProperties: false (typo guard)
+- Numeric fields carry minimum/maximum (timeout/limit/count)
+- Action-based tools use allOf[if/then] for conditional required
+- anyOf used where exactly one of N inputs is required (stt)
+- Risk metadata lives in TOOL_RISK_METADATA (separate from API schema)
+"""
 
 TOOL_DEFINITIONS = [
     {
         "name": "exec",
-        "description": "Execute shell commands. Supports background=true for async, yieldMs for auto-background. Dangerous commands require approval.",
+        "description": "Execute shell commands. Dangerous commands require approval.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "Shell command to execute"},
-                "timeout": {"type": "integer", "description": "Timeout in seconds (default 30, max 1800 fg / 7200 bg)"},
-                "background": {"type": "boolean", "description": "Run in background, return immediately"},
-                "yieldMs": {"type": "integer", "description": "Wait N ms then auto-background if not finished"},
-                "notifyOnExit": {"type": "boolean", "description": "Notify on completion (background only)"},
-                "env": {"type": "object", "description": "Environment variables (PATH/LD_*/DYLD_* blocked)"},
+                "command": {"type": "string"},
+                "timeout": {"type": "integer", "minimum": 1, "maximum": 1800, "default": 30},
+                "background": {"type": "boolean", "default": False},
+                "yieldMs": {"type": "integer", "minimum": 0, "maximum": 600000},
+                "notifyOnExit": {"type": "boolean", "default": False},
+                "env": {"type": "object", "additionalProperties": {"type": "string"}},
             },
             "required": ["command"],
+            "additionalProperties": False,
+            # notifyOnExit only valid with background=true — enforced at runtime
         },
     },
     {
@@ -23,10 +33,17 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "description": "list | poll | kill", "enum": ["list", "poll", "kill"]},
-                "session_id": {"type": "string", "description": "Background session ID (for poll/kill)"},
+                "action": {"type": "string", "enum": ["list", "poll", "kill"]},
+                "session_id": {"type": "string"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"enum": ["poll", "kill"]}}},
+                    "then": {"required": ["session_id"]},
+                }
+            ],
         },
     },
     {
@@ -35,11 +52,12 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "File path"},
-                "offset": {"type": "integer", "description": "Start line number (1-based)"},
-                "limit": {"type": "integer", "description": "Number of lines to read"},
+                "path": {"type": "string"},
+                "offset": {"type": "integer", "minimum": 1},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 10000},
             },
             "required": ["path"],
+            "additionalProperties": False,
         },
     },
     {
@@ -48,10 +66,11 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "File path"},
-                "content": {"type": "string", "description": "File content"},
+                "path": {"type": "string"},
+                "content": {"type": "string"},
             },
             "required": ["path", "content"],
+            "additionalProperties": False,
         },
     },
     {
@@ -60,11 +79,12 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "File path"},
-                "old_text": {"type": "string", "description": "Text to find"},
-                "new_text": {"type": "string", "description": "Replacement text"},
+                "path": {"type": "string"},
+                "old_text": {"type": "string"},
+                "new_text": {"type": "string"},
             },
             "required": ["path", "old_text", "new_text"],
+            "additionalProperties": False,
         },
     },
     {
@@ -73,10 +93,11 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search query"},
-                "count": {"type": "integer", "description": "Number of results", "default": 5},
+                "query": {"type": "string"},
+                "count": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
             },
             "required": ["query"],
+            "additionalProperties": False,
         },
     },
     {
@@ -85,10 +106,11 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "url": {"type": "string", "description": "URL"},
-                "max_chars": {"type": "integer", "description": "Max characters", "default": 10000},
+                "url": {"type": "string"},
+                "max_chars": {"type": "integer", "minimum": 100, "maximum": 200000, "default": 10000},
             },
             "required": ["url"],
+            "additionalProperties": False,
         },
     },
     {
@@ -96,8 +118,9 @@ TOOL_DEFINITIONS = [
         "description": "Read MEMORY.md or memory/ files.",
         "input_schema": {
             "type": "object",
-            "properties": {"file": {"type": "string", "description": "Filename (e.g., MEMORY.md, 2026-02-18.md)"}},
+            "properties": {"file": {"type": "string"}},
             "required": ["file"],
+            "additionalProperties": False,
         },
     },
     {
@@ -106,16 +129,17 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "file": {"type": "string", "description": "Filename"},
-                "content": {"type": "string", "description": "Content"},
+                "file": {"type": "string"},
+                "content": {"type": "string"},
             },
             "required": ["file", "content"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "usage_report",
         "description": "Show token usage and cost for current session.",
-        "input_schema": {"type": "object", "properties": {}},
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
         "name": "memory_search",
@@ -123,10 +147,11 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Keyword or phrase to search"},
-                "max_results": {"type": "integer", "description": "Max results", "default": 5},
+                "query": {"type": "string"},
+                "max_results": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
             },
             "required": ["query"],
+            "additionalProperties": False,
         },
     },
     {
@@ -135,27 +160,25 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "prompt": {"type": "string", "description": "Image generation prompt (English recommended)"},
-                "provider": {"type": "string", "description": "xai or openai", "default": "xai"},
-                "size": {"type": "string", "description": "Image size", "default": "1024x1024"},
+                "prompt": {"type": "string"},
+                "provider": {"type": "string", "enum": ["xai", "openai"], "default": "xai"},
+                "size": {"type": "string", "default": "1024x1024"},
             },
             "required": ["prompt"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "image_analyze",
-        "description": "Analyze an image using vision AI (GPT-4o/Claude). Describe, OCR, or answer questions about images.",
+        "description": "Analyze an image using vision AI (GPT-4o/Claude). Describe, OCR, or answer questions.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "image_path": {"type": "string", "description": "Path to local image file or URL"},
-                "question": {
-                    "type": "string",
-                    "description": 'What to analyze (e.g., "describe this image", "read the text", "what color is the car")',
-                    "default": "Describe this image in detail.",
-                },
+                "image_path": {"type": "string"},
+                "question": {"type": "string", "default": "Describe this image in detail."},
             },
             "required": ["image_path"],
+            "additionalProperties": False,
         },
     },
     {
@@ -164,39 +187,41 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "text": {"type": "string", "description": "Text to convert"},
-                "voice": {
-                    "type": "string",
-                    "description": "alloy, echo, fable, onyx, nova, shimmer",
-                    "default": "nova",
-                },
+                "text": {"type": "string"},
+                "voice": {"type": "string", "enum": ["alloy", "echo", "fable", "onyx", "nova", "shimmer"], "default": "nova"},
             },
             "required": ["text"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "stt",
-        "description": "Transcribe audio to text (OpenAI Whisper). Accepts file path or base64 audio. You MUST provide either audio_path OR audio_base64.",
+        "description": "Transcribe audio to text (OpenAI Whisper). Provide audio_path OR audio_base64.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "audio_path": {"type": "string", "description": "Path to audio file (provide this OR audio_base64)"},
-                "audio_base64": {"type": "string", "description": "Base64-encoded audio data (provide this OR audio_path)"},
-                "language": {"type": "string", "description": "Language code (e.g. ko, en, ja)", "default": "ko"},
+                "audio_path": {"type": "string"},
+                "audio_base64": {"type": "string"},
+                "language": {"type": "string", "default": "ko"},
             },
-            "required": [],  # At least one of audio_path / audio_base64 is required (enforced at runtime)
+            "anyOf": [
+                {"required": ["audio_path"]},
+                {"required": ["audio_base64"]},
+            ],
+            "additionalProperties": False,
         },
     },
     {
         "name": "python_eval",
-        "description": "Execute Python code. Useful for math, data processing, analysis. Set _result to return output.",
+        "description": "Execute Python code (disabled by default; set SALMALM_PYTHON_EVAL=1). Assign result to _result.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "code": {"type": "string", "description": "Python code to execute. Assign result to _result variable."},
-                "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 15},
+                "code": {"type": "string"},
+                "timeout": {"type": "integer", "minimum": 1, "maximum": 300, "default": 15},
             },
             "required": ["code"],
+            "additionalProperties": False,
         },
     },
     {
@@ -207,26 +232,27 @@ TOOL_DEFINITIONS = [
             "properties": {
                 "detail": {
                     "type": "string",
-                    "description": "overview, cpu, memory, disk, processes, or network",
+                    "enum": ["overview", "cpu", "memory", "disk", "processes", "network"],
                     "default": "overview",
                 }
             },
-            "required": [],
+            "additionalProperties": False,
         },
     },
     {
         "name": "http_request",
-        "description": "Send HTTP requests (GET/POST/PUT/DELETE). Useful for API calls.",
+        "description": "Send HTTP requests (GET/POST/PUT/DELETE). For API calls.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "method": {"type": "string", "description": "GET, POST, PUT, DELETE", "default": "GET"},
-                "url": {"type": "string", "description": "Request URL"},
-                "headers": {"type": "object", "description": "Request headers (JSON)"},
-                "body": {"type": "string", "description": "Request body (for POST/PUT)"},
-                "timeout": {"type": "integer", "description": "Timeout in seconds", "default": 15},
+                "method": {"type": "string", "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"], "default": "GET"},
+                "url": {"type": "string"},
+                "headers": {"type": "object", "additionalProperties": {"type": "string"}},
+                "body": {"type": "string"},
+                "timeout": {"type": "integer", "minimum": 1, "maximum": 120, "default": 15},
             },
             "required": ["url"],
+            "additionalProperties": False,
         },
     },
     {
@@ -235,13 +261,9 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "region": {
-                    "type": "string",
-                    "description": "full (entire screen) or WxH+X+Y (region)",
-                    "default": "full",
-                }
+                "region": {"type": "string", "default": "full"},
             },
-            "required": [],
+            "additionalProperties": False,
         },
     },
     {
@@ -250,11 +272,12 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "data": {"type": "string", "description": "JSON string or file path"},
-                "query": {"type": "string", "description": "jq filter expression (e.g., .items[].name)"},
-                "from_file": {"type": "boolean", "description": "true if data is a file path", "default": False},
+                "data": {"type": "string"},
+                "query": {"type": "string"},
+                "from_file": {"type": "boolean", "default": False},
             },
             "required": ["data", "query"],
+            "additionalProperties": False,
         },
     },
     {
@@ -263,30 +286,42 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "file1": {"type": "string", "description": "First file path or text"},
-                "file2": {"type": "string", "description": "Second file path or text"},
-                "context_lines": {"type": "integer", "description": "Context lines", "default": 3},
+                "file1": {"type": "string"},
+                "file2": {"type": "string"},
+                "context_lines": {"type": "integer", "minimum": 0, "maximum": 20, "default": 3},
             },
             "required": ["file1", "file2"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "sub_agent",
-        "description": "Run long tasks in background. Returns immediately, notifies on completion.",
+        "description": "Run long tasks in background sub-agent. Returns immediately, notifies on completion.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "spawn, list, result, send, stop, log, info, or steer",
-                    "enum": ["spawn", "list", "result", "send", "stop", "log", "info", "steer"],
-                },
-                "task": {"type": "string", "description": "Task description (for spawn)"},
-                "model": {"type": "string", "description": "Model to use (optional)"},
-                "agent_id": {"type": "string", "description": "Agent ID (for result/send)"},
-                "message": {"type": "string", "description": "Message to send to agent (for send)"},
+                "action": {"type": "string", "enum": ["spawn", "list", "result", "send", "stop", "log", "info", "steer"]},
+                "task": {"type": "string"},
+                "model": {"type": "string"},
+                "agent_id": {"type": "string"},
+                "message": {"type": "string"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "spawn"}}},
+                    "then": {"required": ["task"]},
+                },
+                {
+                    "if": {"properties": {"action": {"enum": ["result", "send", "stop", "log", "steer"]}}},
+                    "then": {"required": ["agent_id"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "send"}}},
+                    "then": {"required": ["message"]},
+                },
+            ],
         },
     },
     {
@@ -295,16 +330,27 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "list, load, match, install, or uninstall",
-                    "enum": ["list", "load", "match", "install", "uninstall"],
-                },
-                "skill_name": {"type": "string", "description": "Skill directory name (for load/uninstall)"},
-                "query": {"type": "string", "description": "Query to match (for match)"},
-                "url": {"type": "string", "description": "Git URL or GitHub shorthand user/repo (for install)"},
+                "action": {"type": "string", "enum": ["list", "load", "match", "install", "uninstall"]},
+                "skill_name": {"type": "string"},
+                "query": {"type": "string"},
+                "url": {"type": "string"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"enum": ["load", "uninstall"]}}},
+                    "then": {"required": ["skill_name"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "match"}}},
+                    "then": {"required": ["query"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "install"}}},
+                    "then": {"required": ["url"]},
+                },
+            ],
         },
     },
     {
@@ -313,15 +359,18 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "copy, paste, list, or clear",
-                    "enum": ["copy", "paste", "list", "clear"],
-                },
-                "slot": {"type": "string", "description": "Slot name (default: default)"},
-                "content": {"type": "string", "description": "Text to save (for copy)"},
+                "action": {"type": "string", "enum": ["copy", "paste", "list", "clear"]},
+                "slot": {"type": "string", "default": "default"},
+                "content": {"type": "string"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "copy"}}},
+                    "then": {"required": ["content"]},
+                }
+            ],
         },
     },
     {
@@ -330,16 +379,19 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "hash, password, uuid, or token",
-                    "enum": ["hash", "password", "uuid", "token"],
-                },
-                "text": {"type": "string", "description": "Text to hash (for hash)"},
-                "algorithm": {"type": "string", "description": "sha256, md5, sha1, sha512, sha384 (default: sha256)"},
-                "length": {"type": "integer", "description": "Password/token length (default: 16)"},
+                "action": {"type": "string", "enum": ["hash", "password", "uuid", "token"]},
+                "text": {"type": "string"},
+                "algorithm": {"type": "string", "enum": ["sha256", "md5", "sha1", "sha512", "sha384"], "default": "sha256"},
+                "length": {"type": "integer", "minimum": 8, "maximum": 256, "default": 16},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "hash"}}},
+                    "then": {"required": ["text"]},
+                }
+            ],
         },
     },
     {
@@ -348,17 +400,20 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "Regex pattern"},
-                "text": {"type": "string", "description": "Target text"},
-                "action": {
-                    "type": "string",
-                    "description": "match, find, replace, or split",
-                    "enum": ["match", "find", "replace", "split"],
-                },
-                "replacement": {"type": "string", "description": "Replacement text (for replace)"},
-                "flags": {"type": "string", "description": "Flags: i(case-insensitive), m(multiline), s(dotall)"},
+                "pattern": {"type": "string"},
+                "text": {"type": "string"},
+                "action": {"type": "string", "enum": ["match", "find", "replace", "split"], "default": "find"},
+                "replacement": {"type": "string"},
+                "flags": {"type": "string"},
             },
             "required": ["pattern", "text"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "replace"}}},
+                    "then": {"required": ["replacement"]},
+                }
+            ],
         },
     },
     {
@@ -367,21 +422,28 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "list, add, remove, or toggle",
-                    "enum": ["list", "add", "remove", "toggle"],
-                },
-                "name": {"type": "string", "description": "Job name (for add)"},
-                "prompt": {"type": "string", "description": "LLM prompt (for add)"},
+                "action": {"type": "string", "enum": ["list", "add", "remove", "toggle"]},
+                "name": {"type": "string"},
+                "prompt": {"type": "string"},
                 "schedule": {
                     "type": "object",
-                    "description": 'Schedule: {"kind":"cron","expr":"0 6 * * *"} or {"kind":"every","seconds":3600} or {"kind":"at","time":"ISO8601"}',
+                    "description": '{"kind":"cron","expr":"0 6 * * *"} or {"kind":"every","seconds":3600} or {"kind":"at","time":"ISO8601"}',
                 },
-                "model": {"type": "string", "description": "Model to use (optional, default: current)"},
-                "job_id": {"type": "string", "description": "Job ID (for remove/toggle)"},
+                "model": {"type": "string"},
+                "job_id": {"type": "string"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "add"}}},
+                    "then": {"required": ["name", "prompt", "schedule"]},
+                },
+                {
+                    "if": {"properties": {"action": {"enum": ["remove", "toggle"]}}},
+                    "then": {"required": ["job_id"]},
+                },
+            ],
         },
     },
     {
@@ -389,8 +451,11 @@ TOOL_DEFINITIONS = [
         "description": "Manage plugins. Auto-load .py files from plugins/ to extend tools.",
         "input_schema": {
             "type": "object",
-            "properties": {"action": {"type": "string", "description": "list or reload", "enum": ["list", "reload"]}},
+            "properties": {
+                "action": {"type": "string", "enum": ["list", "reload"]},
+            },
             "required": ["action"],
+            "additionalProperties": False,
         },
     },
     {
@@ -399,16 +464,23 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "list, add, remove, or tools",
-                    "enum": ["list", "add", "remove", "tools"],
-                },
-                "name": {"type": "string", "description": "Server name (for add/remove)"},
-                "command": {"type": "string", "description": "Server command (for add, space-separated)"},
-                "env": {"type": "object", "description": "Environment variables (for add, optional)"},
+                "action": {"type": "string", "enum": ["list", "add", "remove", "tools"]},
+                "name": {"type": "string"},
+                "command": {"type": "string"},
+                "env": {"type": "object", "additionalProperties": {"type": "string"}},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "add"}}},
+                    "then": {"required": ["name", "command"]},
+                },
+                {
+                    "if": {"properties": {"action": {"enum": ["remove", "tools"]}}},
+                    "then": {"required": ["name"]},
+                },
+            ],
         },
     },
     {
@@ -417,34 +489,41 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search query"},
-                "max_results": {"type": "integer", "description": "Max results (default 5)", "default": 5},
+                "query": {"type": "string"},
+                "max_results": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5},
             },
             "required": ["query"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "browser",
-        "description": "Browser automation (Playwright). Snapshot/act pattern: snapshot → reason → act → verify. Requires pip install salmalm[browser]. / 브라우저 자동화. 스냅샷→추론→행동→검증 패턴.",
+        "description": "Browser automation (Playwright). snapshot→act→verify pattern. Requires: pip install salmalm[browser].",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "status/snapshot/act/screenshot",
-                    "enum": ["status", "snapshot", "act", "screenshot"],
-                },
-                "url": {"type": "string", "description": "URL to navigate to"},
+                "action": {"type": "string", "enum": ["status", "snapshot", "act", "screenshot", "navigate"]},
+                "url": {"type": "string"},
                 "kind": {
                     "type": "string",
-                    "description": "Action kind for act: click/type/press/navigate/evaluate/screenshot",
                     "enum": ["click", "type", "press", "navigate", "evaluate", "screenshot"],
                 },
-                "selector": {"type": "string", "description": "CSS selector (for click/type)"},
-                "text": {"type": "string", "description": "Input text (for type/press/evaluate/navigate)"},
-                "timeout": {"type": "integer", "description": "Timeout in ms (default 30000)"},
+                "selector": {"type": "string"},
+                "text": {"type": "string"},
+                "timeout": {"type": "integer", "minimum": 1000, "maximum": 120000, "default": 30000},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "act"}}},
+                    "then": {"required": ["kind"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "navigate"}}},
+                    "then": {"required": ["url"]},
+                },
+            ],
         },
     },
     {
@@ -453,22 +532,33 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "list/add/remove/run/status/upload/wake",
-                    "enum": ["list", "add", "remove", "run", "status", "upload", "wake"],
-                },
-                "name": {"type": "string", "description": "Node name"},
-                "command": {"type": "string", "description": "Command to run (for run)"},
-                "host": {"type": "string", "description": "Host address (for add)"},
-                "user": {"type": "string", "description": "SSH user (default: root)"},
-                "port": {"type": "integer", "description": "SSH port (default: 22)"},
-                "key": {"type": "string", "description": "SSH key path"},
-                "type": {"type": "string", "description": "Node type: ssh/http"},
-                "url": {"type": "string", "description": "HTTP agent URL (for add type=http)"},
-                "mac": {"type": "string", "description": "MAC address (for wake)"},
+                "action": {"type": "string", "enum": ["list", "add", "remove", "run", "status", "upload", "wake"]},
+                "name": {"type": "string"},
+                "command": {"type": "string"},
+                "host": {"type": "string"},
+                "user": {"type": "string", "default": "root"},
+                "port": {"type": "integer", "minimum": 1, "maximum": 65535, "default": 22},
+                "key": {"type": "string"},
+                "type": {"type": "string", "enum": ["ssh", "http"]},
+                "url": {"type": "string"},
+                "mac": {"type": "string"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "add"}}},
+                    "then": {"required": ["name", "host"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "run"}}},
+                    "then": {"required": ["name", "command"]},
+                },
+                {
+                    "if": {"properties": {"action": {"enum": ["remove", "status", "wake"]}}},
+                    "then": {"required": ["name"]},
+                },
+            ],
         },
     },
     {
@@ -477,44 +567,88 @@ TOOL_DEFINITIONS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "check, selftest, or recover",
-                    "enum": ["check", "selftest", "recover"],
-                    "default": "check",
-                },
+                "action": {"type": "string", "enum": ["check", "selftest", "recover"], "default": "check"},
             },
+            "additionalProperties": False,
         },
     },
-    # ── v0.12 New Tools ──────────────────────────────────────────
     {
         "name": "google_calendar",
-        "description": "Google Calendar: list upcoming events, create/delete events. Requires Google API credentials in vault.",
+        "description": "Google Calendar: list, create, delete events. Requires Google OAuth in vault.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "list, create, delete",
-                    "enum": ["list", "create", "delete"],
-                },
-                "days": {"type": "integer", "description": "Days ahead to list (default: 7)"},
-                "title": {"type": "string", "description": "Event title (for create)"},
-                "start": {"type": "string", "description": "Start time ISO8601 (for create)"},
-                "end": {"type": "string", "description": "End time ISO8601 (for create)"},
-                "description": {"type": "string", "description": "Event description"},
-                "event_id": {"type": "string", "description": "Event ID (for delete)"},
-                "calendar_id": {"type": "string", "description": "Calendar ID (default: primary)"},
+                "action": {"type": "string", "enum": ["list", "create", "delete"]},
+                "days": {"type": "integer", "minimum": 1, "maximum": 365, "default": 7},
+                "title": {"type": "string"},
+                "start": {"type": "string", "description": "ISO8601 datetime"},
+                "end": {"type": "string", "description": "ISO8601 datetime"},
+                "description": {"type": "string"},
+                "event_id": {"type": "string"},
+                "calendar_id": {"type": "string", "default": "primary"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "create"}}},
+                    "then": {"required": ["title", "start", "end"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "delete"}}},
+                    "then": {"required": ["event_id"]},
+                },
+            ],
         },
     },
 ]
+
+# ── Risk metadata (separate from API schema — not sent to LLM) ────────────
+# Used by tool_selector and validate_tool_calls for approval gating.
+TOOL_RISK_METADATA: dict[str, dict] = {
+    "exec":           {"risk": "high",   "approval_required": True},
+    "sandbox_exec":   {"risk": "medium", "approval_required": False},
+    "write_file":     {"risk": "medium", "approval_required": False},
+    "edit_file":      {"risk": "medium", "approval_required": False},
+    "http_request":   {"risk": "medium", "approval_required": False},
+    "node_manage":    {"risk": "high",   "approval_required": True},
+    "plugin_manage":  {"risk": "high",   "approval_required": True},
+    "mcp_manage":     {"risk": "high",   "approval_required": True},
+    "cron_manage":    {"risk": "medium", "approval_required": False},
+    "google_calendar":{"risk": "medium", "approval_required": False},
+    "gmail":          {"risk": "medium", "approval_required": False},
+}
 
 # Extended tools (split for file size)
 from salmalm.tools.tools_schema_ext import TOOL_DEFINITIONS_EXT  # noqa: E402
 
 TOOL_DEFINITIONS.extend(TOOL_DEFINITIONS_EXT)
+
+
+def _validate_tool_definitions(defns: list) -> None:
+    """Startup sanity check: no name duplicates, schema basics OK."""
+    seen: dict[str, int] = {}
+    errors: list[str] = []
+    for i, tool in enumerate(defns):
+        name = tool.get("name", f"<unnamed@{i}>")
+        if name in seen:
+            errors.append(f"Duplicate tool name '{name}' (indices {seen[name]} and {i})")
+        seen[name] = i
+        schema = tool.get("input_schema", {})
+        if schema.get("type") == "object":
+            if "additionalProperties" not in schema:
+                errors.append(f"Tool '{name}': missing additionalProperties")
+            for req in schema.get("required", []):
+                if req not in schema.get("properties", {}):
+                    errors.append(f"Tool '{name}': required field '{req}' not in properties")
+    if errors:
+        import logging
+        log = logging.getLogger(__name__)
+        for e in errors:
+            log.warning(f"[TOOLS] Schema issue: {e}")
+
+
+_validate_tool_definitions(TOOL_DEFINITIONS)
 
 
 # Re-export handler for backward compatibility

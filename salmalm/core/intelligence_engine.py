@@ -104,9 +104,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     _TOOL_TRUNCATE_LIMITS = {
         "exec": 8_000, "exec_session": 4_000, "sandbox_exec": 8_000,
         "python_eval": 6_000, "browser": 5_000, "http_request": 6_000,
-        "web_fetch": 6_000, "read": 10_000, "rag_search": 4_000,
-        "system_info": 2_000, "canvas": 2_000, "web_search": 4_000,
+        "web_fetch": 6_000, "read_file": 10_000, "rag_search": 4_000,
+        "system_monitor": 2_000, "canvas": 2_000, "web_search": 4_000,
         "weather": 2_000, "google_calendar": 3_000, "gmail": 4_000,
+        "email_inbox": 4_000, "email_read": 4_000, "email_search": 4_000,
+        "calendar_list": 3_000, "node_manage": 4_000, "file_index": 4_000,
     }
     _TOOL_TIMEOUTS = {
         "exec": 120, "exec_session": 10, "sandbox_exec": 60,

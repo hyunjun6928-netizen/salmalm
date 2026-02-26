@@ -1,41 +1,55 @@
-"""Extended tool definitions (tools 32-62)."""
+"""Extended tool definitions (tools 32+).
+
+Same design contract as tools.py:
+- additionalProperties: false on all input_schemas
+- Numeric limits (minimum/maximum) on all int/number fields
+- Conditional required via allOf[if/then] for action-based tools
+"""
 
 TOOL_DEFINITIONS_EXT = [
     {
         "name": "gmail",
-        "description": "Gmail: list recent emails, read specific email, send email. Requires Google API credentials in vault.",
+        "description": "Gmail: list, read, send, search emails. Requires Google OAuth in vault.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "list, read, send, search",
-                    "enum": ["list", "read", "send", "search"],
-                },
-                "count": {"type": "integer", "description": "Number of emails to list (default: 10)"},
-                "message_id": {"type": "string", "description": "Message ID (for read)"},
-                "to": {"type": "string", "description": "Recipient email (for send)"},
-                "subject": {"type": "string", "description": "Email subject (for send)"},
-                "body": {"type": "string", "description": "Email body (for send)"},
-                "query": {"type": "string", "description": "Search query (Gmail search syntax)"},
-                "label": {"type": "string", "description": "Label filter (default: INBOX)"},
+                "action": {"type": "string", "enum": ["list", "read", "send", "search"]},
+                "count": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
+                "message_id": {"type": "string"},
+                "to": {"type": "string"},
+                "subject": {"type": "string"},
+                "body": {"type": "string"},
+                "query": {"type": "string"},
+                "label": {"type": "string", "default": "INBOX"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "read"}}},
+                    "then": {"required": ["message_id"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "send"}}},
+                    "then": {"required": ["to", "subject", "body"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "search"}}},
+                    "then": {"required": ["query"]},
+                },
+            ],
         },
     },
     {
         "name": "calendar_list",
-        "description": 'List upcoming Google Calendar events. Use period="today" for today, "week" for this week, "month" for this month.',
+        "description": "List upcoming Google Calendar events.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "period": {
-                    "type": "string",
-                    "description": "today, week, month (default: week)",
-                    "enum": ["today", "week", "month"],
-                },
-                "calendar_id": {"type": "string", "description": "Calendar ID (default: primary)"},
+                "period": {"type": "string", "enum": ["today", "week", "month"], "default": "week"},
+                "calendar_id": {"type": "string", "default": "primary"},
             },
+            "additionalProperties": False,
         },
     },
     {
@@ -44,26 +58,28 @@ TOOL_DEFINITIONS_EXT = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "title": {"type": "string", "description": "Event title"},
-                "date": {"type": "string", "description": "Date in YYYY-MM-DD format"},
-                "time": {"type": "string", "description": "Start time HH:MM (omit for all-day)"},
-                "duration_minutes": {"type": "integer", "description": "Duration in minutes (default: 60)"},
-                "description": {"type": "string", "description": "Event description"},
-                "calendar_id": {"type": "string", "description": "Calendar ID (default: primary)"},
+                "title": {"type": "string"},
+                "date": {"type": "string", "description": "YYYY-MM-DD"},
+                "time": {"type": "string", "description": "HH:MM (omit for all-day)"},
+                "duration_minutes": {"type": "integer", "minimum": 1, "maximum": 1440, "default": 60},
+                "description": {"type": "string"},
+                "calendar_id": {"type": "string", "default": "primary"},
             },
             "required": ["title", "date"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "calendar_delete",
-        "description": "Delete an event from Google Calendar by event_id.",
+        "description": "Delete a Google Calendar event by event_id.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "event_id": {"type": "string", "description": "Event ID to delete"},
-                "calendar_id": {"type": "string", "description": "Calendar ID (default: primary)"},
+                "event_id": {"type": "string"},
+                "calendar_id": {"type": "string", "default": "primary"},
             },
             "required": ["event_id"],
+            "additionalProperties": False,
         },
     },
     {
@@ -72,8 +88,9 @@ TOOL_DEFINITIONS_EXT = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "count": {"type": "integer", "description": "Number of messages (default: 10, max: 30)"},
+                "count": {"type": "integer", "minimum": 1, "maximum": 30, "default": 10},
             },
+            "additionalProperties": False,
         },
     },
     {
@@ -82,9 +99,10 @@ TOOL_DEFINITIONS_EXT = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "message_id": {"type": "string", "description": "Gmail message ID"},
+                "message_id": {"type": "string"},
             },
             "required": ["message_id"],
+            "additionalProperties": False,
         },
     },
     {
@@ -93,107 +111,114 @@ TOOL_DEFINITIONS_EXT = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "to": {"type": "string", "description": "Recipient email address"},
-                "subject": {"type": "string", "description": "Email subject"},
-                "body": {"type": "string", "description": "Email body text"},
+                "to": {"type": "string"},
+                "subject": {"type": "string"},
+                "body": {"type": "string"},
             },
-            "required": ["to", "subject"],
+            "required": ["to", "subject", "body"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "email_search",
-        "description": 'Search emails using Gmail search syntax (e.g. "from:user@example.com", "is:unread", "subject:keyword").',
+        "description": 'Search emails using Gmail search syntax (e.g. "from:user@example.com is:unread").',
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Gmail search query"},
-                "count": {"type": "integer", "description": "Max results (default: 10)"},
+                "query": {"type": "string"},
+                "count": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
             },
             "required": ["query"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "reminder",
-        "description": "Set a reminder. Triggers notification via configured channel (Telegram/desktop) at specified time.",
+        "description": "Set a reminder. Triggers notification via Telegram/desktop at specified time.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "description": "set, list, delete", "enum": ["set", "list", "delete"]},
-                "message": {"type": "string", "description": "Reminder message"},
-                "time": {
-                    "type": "string",
-                    "description": 'When to remind: ISO8601, relative (e.g. "30m", "2h", "1d"), or natural language',
-                },
-                "reminder_id": {"type": "string", "description": "Reminder ID (for delete)"},
-                "repeat": {
-                    "type": "string",
-                    "description": "Repeat interval: daily, weekly, monthly, or cron expression",
-                },
+                "action": {"type": "string", "enum": ["set", "list", "delete"]},
+                "message": {"type": "string"},
+                "time": {"type": "string", "description": 'ISO8601, relative ("30m", "2h"), or natural language'},
+                "reminder_id": {"type": "string"},
+                "repeat": {"type": "string", "description": "daily, weekly, monthly, or cron expression"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "set"}}},
+                    "then": {"required": ["message", "time"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "delete"}}},
+                    "then": {"required": ["reminder_id"]},
+                },
+            ],
         },
     },
     {
         "name": "tts_generate",
-        "description": "Text-to-Speech: generate audio from text. Returns audio file path. Supports Google TTS (free) and OpenAI TTS.",
+        "description": "Generate audio from text. Supports Google TTS (free) and OpenAI TTS.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "text": {"type": "string", "description": "Text to convert to speech"},
-                "provider": {
-                    "type": "string",
-                    "description": "TTS provider: google, openai (default: google)",
-                    "enum": ["google", "openai"],
-                },
-                "language": {"type": "string", "description": "Language code (default: ko-KR)"},
-                "voice": {"type": "string", "description": "Voice name (provider-specific)"},
-                "output": {"type": "string", "description": "Output file path (default: auto-generated)"},
+                "text": {"type": "string"},
+                "provider": {"type": "string", "enum": ["google", "openai"], "default": "google"},
+                "language": {"type": "string", "default": "ko-KR"},
+                "voice": {"type": "string"},
+                "output": {"type": "string"},
             },
             "required": ["text"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "workflow",
-        "description": "Execute a predefined workflow (tool chain). Define workflows with steps that pipe outputs.",
+        "description": "Execute a predefined workflow (tool chain). Pipe outputs between steps.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "run, list, save, delete",
-                    "enum": ["run", "list", "save", "delete"],
-                },
-                "name": {"type": "string", "description": "Workflow name"},
-                "steps": {
-                    "type": "array",
-                    "description": "Workflow steps: [{tool, args, output_var}]",
-                    "items": {"type": "object"},
-                },
-                "variables": {"type": "object", "description": "Input variables for the workflow"},
+                "action": {"type": "string", "enum": ["run", "list", "save", "delete"]},
+                "name": {"type": "string"},
+                "steps": {"type": "array", "items": {"type": "object"}},
+                "variables": {"type": "object"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "save"}}},
+                    "then": {"required": ["name", "steps"]},
+                },
+                {
+                    "if": {"properties": {"action": {"enum": ["run", "delete"]}}},
+                    "then": {"required": ["name"]},
+                },
+            ],
         },
     },
     {
         "name": "file_index",
-        "description": "Index and search local files. Builds searchable index of workspace files for fast retrieval.",
+        "description": "Index and search local files. Builds searchable index of workspace files.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "search, index, status",
-                    "enum": ["search", "index", "status"],
-                },
-                "query": {"type": "string", "description": "Search query"},
-                "path": {"type": "string", "description": "Directory to index (default: workspace)"},
-                "extensions": {
-                    "type": "string",
-                    "description": 'File extensions to include (comma-separated, e.g. "py,md,txt")',
-                },
-                "limit": {"type": "integer", "description": "Max results (default: 10)"},
+                "action": {"type": "string", "enum": ["search", "index", "status"]},
+                "query": {"type": "string"},
+                "path": {"type": "string"},
+                "extensions": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 10},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "search"}}},
+                    "then": {"required": ["query"]},
+                },
+            ],
         },
     },
     {
@@ -202,61 +227,59 @@ TOOL_DEFINITIONS_EXT = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "message": {"type": "string", "description": "Notification message"},
-                "title": {"type": "string", "description": "Notification title"},
-                "channel": {
-                    "type": "string",
-                    "description": "Channel: telegram, desktop, webhook, all",
-                    "enum": ["telegram", "desktop", "webhook", "all"],
-                },
+                "message": {"type": "string"},
+                "title": {"type": "string"},
+                "channel": {"type": "string", "enum": ["telegram", "desktop", "webhook", "all"], "default": "all"},
                 "url": {"type": "string", "description": "Webhook URL (for webhook channel)"},
-                "priority": {
-                    "type": "string",
-                    "description": "Priority: low, normal, high",
-                    "enum": ["low", "normal", "high"],
-                },
+                "priority": {"type": "string", "enum": ["low", "normal", "high"], "default": "normal"},
             },
             "required": ["message"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"channel": {"const": "webhook"}}},
+                    "then": {"required": ["url"]},
+                },
+            ],
         },
     },
-    # ── v0.12.1 Additional Tools ─────────────────────────────────
     {
         "name": "weather",
-        "description": "Get current weather and forecast for a location. No API key needed.",
+        "description": "Get current weather and forecast. No API key needed.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "location": {
-                    "type": "string",
-                    "description": 'City name or coordinates (e.g. "Seoul", "Tokyo", "37.5,127.0")',
-                },
-                "format": {
-                    "type": "string",
-                    "description": "Output format: short, full, forecast",
-                    "enum": ["short", "full", "forecast"],
-                    "default": "full",
-                },
-                "lang": {"type": "string", "description": "Language code (default: ko)", "default": "ko"},
+                "location": {"type": "string"},
+                "format": {"type": "string", "enum": ["short", "full", "forecast"], "default": "full"},
+                "lang": {"type": "string", "default": "ko"},
             },
             "required": ["location"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "rss_reader",
-        "description": "Read RSS/Atom feeds. Subscribe, list, and fetch latest articles from news sources.",
+        "description": "Read RSS/Atom feeds. Subscribe, list, and fetch latest articles.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "fetch, subscribe, unsubscribe, list",
-                    "enum": ["fetch", "subscribe", "unsubscribe", "list"],
-                },
-                "url": {"type": "string", "description": "RSS feed URL (for fetch/subscribe)"},
-                "name": {"type": "string", "description": "Feed name (for subscribe)"},
-                "count": {"type": "integer", "description": "Number of articles to fetch (default: 5)"},
+                "action": {"type": "string", "enum": ["fetch", "subscribe", "unsubscribe", "list"]},
+                "url": {"type": "string"},
+                "name": {"type": "string"},
+                "count": {"type": "integer", "minimum": 1, "maximum": 50, "default": 5},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"enum": ["fetch", "subscribe"]}}},
+                    "then": {"required": ["url"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "subscribe"}}},
+                    "then": {"required": ["name"]},
+                },
+            ],
         },
     },
     {
@@ -265,243 +288,281 @@ TOOL_DEFINITIONS_EXT = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "text": {"type": "string", "description": "Text to translate"},
-                "target": {
-                    "type": "string",
-                    "description": 'Target language code (e.g. "en", "ko", "ja", "zh", "es", "fr")',
-                },
-                "source": {"type": "string", "description": "Source language code (default: auto-detect)"},
+                "text": {"type": "string"},
+                "target": {"type": "string"},
+                "source": {"type": "string"},
             },
             "required": ["text", "target"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "qr_code",
-        "description": "Generate QR code as SVG or text art. Pure stdlib, no dependencies.",
+        "description": "Generate QR code as SVG or text art.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "data": {"type": "string", "description": "Data to encode in QR code (URL, text, etc.)"},
-                "output": {"type": "string", "description": "Output file path (default: auto-generated SVG)"},
-                "format": {
-                    "type": "string",
-                    "description": "Output format: svg, text",
-                    "enum": ["svg", "text"],
-                    "default": "svg",
-                },
-                "size": {"type": "integer", "description": "Module size in pixels (SVG, default: 10)"},
+                "data": {"type": "string"},
+                "output": {"type": "string"},
+                "format": {"type": "string", "enum": ["svg", "text"], "default": "svg"},
+                "size": {"type": "integer", "minimum": 1, "maximum": 20, "default": 10},
             },
             "required": ["data"],
+            "additionalProperties": False,
         },
     },
-    # ── Personal Assistant Tools ──────────────────────────────
     {
         "name": "note",
-        "description": "Personal knowledge base — save, search, list, delete notes. 개인 메모/지식 베이스.",
+        "description": "Personal knowledge base — save, search, list, delete notes.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "Action: save, search, list, delete",
-                    "enum": ["save", "search", "list", "delete"],
-                },
-                "content": {"type": "string", "description": "Note content (for save)"},
-                "tags": {"type": "string", "description": "Comma-separated tags (for save)"},
-                "query": {"type": "string", "description": "Search query (for search)"},
-                "note_id": {"type": "string", "description": "Note ID (for delete)"},
-                "count": {"type": "integer", "description": "Number of results (for list)", "default": 10},
+                "action": {"type": "string", "enum": ["save", "search", "list", "delete"]},
+                "content": {"type": "string"},
+                "tags": {"type": "string"},
+                "query": {"type": "string"},
+                "note_id": {"type": "string"},
+                "count": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "save"}}},
+                    "then": {"required": ["content"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "search"}}},
+                    "then": {"required": ["query"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "delete"}}},
+                    "then": {"required": ["note_id"]},
+                },
+            ],
         },
     },
     {
         "name": "expense",
-        "description": "Expense tracker — add, view today/month, delete expenses. 가계부/지출 추적.",
+        "description": "Expense tracker — add, view today/month, delete expenses.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "Action: add, today, month, delete",
-                    "enum": ["add", "today", "month", "delete"],
-                },
-                "amount": {"type": "number", "description": "Amount in KRW (for add)"},
-                "category": {
-                    "type": "string",
-                    "description": "Category: 식비,교통,쇼핑,구독,의료,생활,기타 (auto-detected if empty)",
-                },
-                "description": {"type": "string", "description": "Description (for add)"},
-                "date": {"type": "string", "description": "Date YYYY-MM-DD (default: today)"},
-                "month": {"type": "string", "description": "Month YYYY-MM (for month summary)"},
-                "expense_id": {"type": "string", "description": "Expense ID (for delete)"},
+                "action": {"type": "string", "enum": ["add", "today", "month", "delete"]},
+                "amount": {"type": "number", "minimum": 0},
+                "category": {"type": "string"},
+                "description": {"type": "string"},
+                "date": {"type": "string"},
+                "month": {"type": "string"},
+                "expense_id": {"type": "string"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "add"}}},
+                    "then": {"required": ["amount", "description"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "delete"}}},
+                    "then": {"required": ["expense_id"]},
+                },
+            ],
         },
     },
     {
         "name": "save_link",
-        "description": "Save links/articles for later reading. Auto-fetches title and content. 링크/아티클 저장.",
+        "description": "Save links/articles for later reading. Auto-fetches title and content.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "Action: save, list, search, delete",
-                    "enum": ["save", "list", "search", "delete"],
-                },
-                "url": {"type": "string", "description": "URL to save"},
-                "title": {"type": "string", "description": "Title (auto-detected if empty)"},
-                "summary": {"type": "string", "description": "3-line summary"},
-                "tags": {"type": "string", "description": "Comma-separated tags"},
-                "query": {"type": "string", "description": "Search query"},
-                "link_id": {"type": "string", "description": "Link ID (for delete)"},
-                "count": {"type": "integer", "description": "Number of results", "default": 10},
+                "action": {"type": "string", "enum": ["save", "list", "search", "delete"]},
+                "url": {"type": "string"},
+                "title": {"type": "string"},
+                "summary": {"type": "string"},
+                "tags": {"type": "string"},
+                "query": {"type": "string"},
+                "link_id": {"type": "string"},
+                "count": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "save"}}},
+                    "then": {"required": ["url"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "search"}}},
+                    "then": {"required": ["query"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "delete"}}},
+                    "then": {"required": ["link_id"]},
+                },
+            ],
         },
     },
     {
         "name": "pomodoro",
-        "description": "Pomodoro timer — start focus session, break, stop, view stats. 포모도로 타이머.",
+        "description": "Pomodoro timer — start focus session, break, stop, view stats.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "Action: start, break, stop, status",
-                    "enum": ["start", "break", "stop", "status"],
-                },
-                "duration": {
-                    "type": "integer",
-                    "description": "Duration in minutes (default: 25 for focus, 5 for break)",
-                },
+                "action": {"type": "string", "enum": ["start", "break", "stop", "status"]},
+                "duration": {"type": "integer", "minimum": 1, "maximum": 120},
             },
             "required": ["action"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "routine",
-        "description": "Morning/evening routine automation. 아침/저녁 루틴 자동화.",
+        "description": "Morning/evening routine automation.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "description": "Routine name: morning, evening, list"},
+                "action": {"type": "string", "enum": ["morning", "evening", "list"]},
             },
             "required": ["action"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "briefing",
-        "description": "Generate daily briefing — weather, calendar, email, tasks summary. 데일리 브리핑.",
+        "description": "Generate daily briefing — weather, calendar, email, tasks summary.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "sections": {
-                    "type": "string",
-                    "description": "Comma-separated sections: weather,calendar,email,tasks,notes,expenses",
-                },
+                "sections": {"type": "string"},
             },
+            "additionalProperties": False,
         },
     },
     {
         "name": "apply_patch",
-        "description": "Apply a multi-file patch (Add/Update/Delete files). 멀티 파일 패치 적용.",
+        "description": "Apply a multi-file patch (Add/Update/Delete files).",
         "input_schema": {
             "type": "object",
             "properties": {
-                "patch_text": {"type": "string", "description": "Patch text in *** Begin Patch / *** End Patch format"},
-                "base_dir": {"type": "string", "description": "Base directory for patch operations (default: cwd)"},
+                "patch_text": {"type": "string"},
+                "base_dir": {"type": "string"},
             },
             "required": ["patch_text"],
+            "additionalProperties": False,
         },
     },
     {
         "name": "ui_control",
-        "description": "Control the web UI settings. Change language, theme, model, navigate panels, or create cron jobs. "
-        "UI 설정 제어: 언어, 테마, 모델 변경, 패널 이동, 크론 작업 생성.",
+        "description": "Control web UI settings: language, theme, model, panels, cron jobs.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": [
-                        "set_lang",
-                        "set_theme",
-                        "set_model",
-                        "new_session",
-                        "show_panel",
-                        "add_cron",
-                        "toggle_debug",
-                    ],
-                    "description": "Action to perform",
+                    "enum": ["set_lang", "set_theme", "set_model", "new_session", "show_panel", "add_cron", "toggle_debug"],
                 },
-                "value": {
-                    "type": "string",
-                    "description": "Value for the action. set_lang: en/ko, set_theme: light/dark, set_model: model name, show_panel: chat/settings/dashboard/sessions/cron/memory/docs",
-                },
-                "name": {"type": "string", "description": "For add_cron: job name"},
-                "interval": {"type": "integer", "description": "For add_cron: interval in seconds"},
-                "prompt": {"type": "string", "description": "For add_cron: AI prompt to execute"},
+                "value": {"type": "string"},
+                "name": {"type": "string"},
+                "interval": {"type": "integer", "minimum": 60, "maximum": 86400},
+                "prompt": {"type": "string"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "add_cron"}}},
+                    "then": {"required": ["name", "interval", "prompt"]},
+                },
+                {
+                    "if": {"properties": {"action": {"enum": ["set_lang", "set_theme", "set_model", "show_panel"]}}},
+                    "then": {"required": ["value"]},
+                },
+            ],
         },
     },
     {
         "name": "mesh",
-        "description": "SalmAlm Mesh — P2P networking between instances. Delegate tasks, share clipboard, discover LAN peers. / 인스턴스 간 P2P 네트워킹. 작업 위임, 클립보드 공유, LAN 피어 탐색.",
+        "description": "SalmAlm Mesh — P2P networking between instances. Delegate tasks, share clipboard, discover peers.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "status/add/remove/ping/task/broadcast/clipboard/discover",
-                    "enum": ["status", "add", "remove", "ping", "task", "broadcast", "clipboard", "discover"],
-                },
-                "url": {"type": "string", "description": "Peer URL (for add)"},
-                "name": {"type": "string", "description": "Peer display name"},
-                "peer_id": {"type": "string", "description": "Peer ID (for remove/task)"},
-                "task": {"type": "string", "description": "Task to delegate (for task/broadcast)"},
-                "text": {"type": "string", "description": "Clipboard text (for clipboard)"},
-                "secret": {"type": "string", "description": "Shared secret for auth"},
-                "model": {"type": "string", "description": "Model override for delegated task"},
+                "action": {"type": "string", "enum": ["status", "add", "remove", "ping", "task", "broadcast", "clipboard", "discover"]},
+                "url": {"type": "string"},
+                "name": {"type": "string"},
+                "peer_id": {"type": "string"},
+                "task": {"type": "string"},
+                "text": {"type": "string"},
+                "secret": {"type": "string"},
+                "model": {"type": "string"},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "add"}}},
+                    "then": {"required": ["url", "name"]},
+                },
+                {
+                    "if": {"properties": {"action": {"enum": ["task", "remove", "ping"]}}},
+                    "then": {"required": ["peer_id"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "task"}}},
+                    "then": {"required": ["task"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "clipboard"}}},
+                    "then": {"required": ["text"]},
+                },
+            ],
         },
     },
     {
         "name": "canvas",
-        "description": "Canvas — render HTML, markdown, code, or charts on a local preview server (:18803). / 로컬 프리뷰 서버에서 HTML, 마크다운, 코드, 차트 렌더링.",
+        "description": "Render HTML, markdown, code, or charts on local preview (:18803).",
         "input_schema": {
             "type": "object",
             "properties": {
-                "action": {
-                    "type": "string",
-                    "description": "status/present/markdown/code/list",
-                    "enum": ["status", "present", "markdown", "code", "list"],
-                },
-                "html": {"type": "string", "description": "HTML content (for present)"},
-                "text": {"type": "string", "description": "Markdown text (for markdown)"},
-                "code": {"type": "string", "description": "Source code (for code)"},
-                "language": {"type": "string", "description": "Programming language (for code)"},
-                "title": {"type": "string", "description": "Page title"},
-                "open": {"type": "boolean", "description": "Open in browser (default false)"},
+                "action": {"type": "string", "enum": ["status", "present", "markdown", "code", "list"]},
+                "html": {"type": "string"},
+                "text": {"type": "string"},
+                "code": {"type": "string"},
+                "language": {"type": "string"},
+                "title": {"type": "string"},
+                "open": {"type": "boolean", "default": False},
             },
             "required": ["action"],
+            "additionalProperties": False,
+            "allOf": [
+                {
+                    "if": {"properties": {"action": {"const": "present"}}},
+                    "then": {"required": ["html"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "markdown"}}},
+                    "then": {"required": ["text"]},
+                },
+                {
+                    "if": {"properties": {"action": {"const": "code"}}},
+                    "then": {"required": ["code"]},
+                },
+            ],
         },
     },
     {
         "name": "sandbox_exec",
-        "description": "Execute in OS-native sandbox (bubblewrap/sandbox-exec/rlimit). Safer than exec. / OS 기본 샌드박스에서 실행. exec보다 안전.",
+        "description": "Execute in OS-native sandbox (bubblewrap/sandbox-exec/rlimit). Safer than exec.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "Shell command to execute in sandbox"},
-                "timeout": {"type": "integer", "description": "Timeout in seconds (default 30)"},
-                "allow_network": {"type": "boolean", "description": "Allow network access (default false)"},
-                "memory_mb": {"type": "integer", "description": "Memory limit in MB (default 512)"},
+                "command": {"type": "string"},
+                "timeout": {"type": "integer", "minimum": 1, "maximum": 300, "default": 30},
+                "allow_network": {"type": "boolean", "default": False},
+                "memory_mb": {"type": "integer", "minimum": 64, "maximum": 4096, "default": 512},
             },
             "required": ["command"],
+            "additionalProperties": False,
         },
     },
 ]
