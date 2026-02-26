@@ -11,7 +11,10 @@ Direct imports from this module are also supported.
 from __future__ import annotations
 
 import asyncio
+import json as _json
+import os as _os
 import threading
+import traceback as _traceback
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 import re as _re
@@ -151,38 +154,61 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
     )
 
     def _truncate_tool_result(self, result: str, tool_name: str = "", tool_args: dict | None = None) -> str:
-        import os as _os
+        """Pure truncation — no LLM calls. Safe to call from any thread or async context.
+        Presummary (LLM-based) is handled separately in _presummary_if_needed() from
+        the async context to avoid blocking thread-pool workers.
+        """
         result = self._redact_secrets(result)
-        if (
-            _os.environ.get("SALMALM_FILE_PRESUMMARY", "0") == "1"
-            and tool_name in ("read_file", "web_fetch")
-            and len(result) > 5000
-        ):
-            # #7 Privacy gate: skip sensitive paths and content
-            _path = str((tool_args or {}).get("path", (tool_args or {}).get("url", "")))
-            _path_blocked = self._PRESUMMARY_PATH_BLOCKLIST.search(_path)
-            _content_blocked = self._PRESUMMARY_CONTENT_BLOCKLIST.search(result[:2000])
-            if _path_blocked:
-                log.debug(f"[PRESUMMARY] Blocked path: {_path!r}")
-            elif _content_blocked:
-                log.debug(f"[PRESUMMARY] Blocked: sensitive content pattern detected")
-            else:
-                try:
-                    from salmalm.core.llm import call_llm
-                    # Privacy: NO session context, NO system messages — isolated call
-                    summary = call_llm(
-                        model="anthropic/claude-haiku-3.5-20241022",
-                        messages=[{"role": "user", "content": f"Summarize concisely (no added commentary):\n\n{result[:15000]}"}],
-                        max_tokens=1024, tools=None,
-                    )
-                    if summary.get("content"):
-                        return f"[Pre-summarized — original {len(result)} chars]\n\n{summary['content']}"
-                except Exception as _exc:
-                    log.debug(f"Suppressed: {_exc}")
         limit = self._TOOL_TRUNCATE_LIMITS.get(tool_name, self.MAX_TOOL_RESULT_CHARS)
         if len(result) > limit:
             return result[:limit] + f"\n\n... [truncated: {len(result)} chars, limit {limit}]"
         return result
+
+    def _should_presummary(self, result: str, tool_name: str, tool_args: dict | None = None) -> bool:
+        """Check presummary eligibility without performing any I/O."""
+        if _os.environ.get("SALMALM_FILE_PRESUMMARY", "0") != "1":
+            return False
+        if tool_name not in ("read_file", "web_fetch") or len(result) <= 5000:
+            return False
+        _path = str((tool_args or {}).get("path", (tool_args or {}).get("url", "")))
+        if self._PRESUMMARY_PATH_BLOCKLIST.search(_path):
+            log.debug(f"[PRESUMMARY] Blocked path: {_path!r}")
+            return False
+        if self._PRESUMMARY_CONTENT_BLOCKLIST.search(result[:2000]):
+            log.debug("[PRESUMMARY] Blocked: sensitive content pattern detected")
+            return False
+        return True
+
+    async def _presummary_tool_outputs(self, tool_outputs: dict, valid_tools: list) -> dict:
+        """Apply LLM presummary to eligible tool outputs from the async context.
+        Runs call_llm in asyncio.to_thread to avoid blocking the event loop.
+        """
+        if _os.environ.get("SALMALM_FILE_PRESUMMARY", "0") != "1":
+            return tool_outputs
+
+        tc_map = {tc["id"]: tc for tc in valid_tools}
+        for tc_id, raw in list(tool_outputs.items()):
+            tc = tc_map.get(tc_id)
+            if not tc or not isinstance(raw, str):
+                continue
+            if not self._should_presummary(raw, tc["name"], tc.get("arguments")):
+                continue
+            try:
+                from salmalm.core.llm import call_llm
+
+                def _do_summary():
+                    return call_llm(
+                        model="anthropic/claude-haiku-3.5-20241022",
+                        messages=[{"role": "user", "content": f"Summarize concisely (no added commentary):\n\n{raw[:15000]}"}],
+                        max_tokens=1024, tools=None,
+                    )
+
+                summary = await asyncio.to_thread(_do_summary)
+                if summary.get("content"):
+                    tool_outputs[tc_id] = f"[Pre-summarized — original {len(raw)} chars]\n\n{summary['content']}"
+            except Exception as _exc:
+                log.debug(f"[PRESUMMARY] Suppressed: {_exc}")
+        return tool_outputs
 
     def _get_tool_timeout(self, tool_name: str) -> int:
         return self._TOOL_TIMEOUTS.get(tool_name, self._DEFAULT_TOOL_TIMEOUT)
@@ -281,7 +307,6 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 [{"tool_use_id": tc["id"], "content": tool_outputs[tc["id"]]} for tc in tool_calls]
             )
         else:
-            import json as _json
             asst_tool_calls = [{
                 "id": tc["id"], "type": "function",
                 "function": {
@@ -303,12 +328,13 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     })
 
     def _should_reflect(self, classification: dict, response: str, iteration: int) -> bool:
-        import os as _os
         if _os.environ.get("SALMALM_REFLECT", "0") != "1":
             return False
+        # Guard: reflection is meaningless at high iteration counts — something is
+        # already wrong. Use MAX_TOOL_ITERATIONS - 5 as cutoff (not a hardcoded 20).
         return (
             classification["intent"] in ("code", "analysis")
-            and iteration <= 20
+            and iteration < self.MAX_TOOL_ITERATIONS - 5
             and len(response) >= 100
             and classification.get("score", 0) >= 3
         )
@@ -417,6 +443,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         valid_tools, tool_outputs = validate_tool_calls(result["tool_calls"])
         if valid_tools:
             exec_outputs = await asyncio.to_thread(self._execute_tools_parallel, valid_tools, on_tool, session)
+            # Presummary runs here (async context, not in thread pool) to avoid blocking workers
+            exec_outputs = await self._presummary_tool_outputs(exec_outputs, valid_tools)
             tool_outputs.update(exec_outputs)
         consecutive_errors, break_msg = check_circuit_breaker(tool_outputs, consecutive_errors, self.MAX_CONSECUTIVE_ERRORS)
         if break_msg:
@@ -480,7 +508,6 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
     async def _execute_loop(self, session, user_message, model_override, on_tool, classification, tier, on_token=None, on_status=None):
         from salmalm.core.loop_helpers import check_abort, select_model, trim_history, prune_session_context, record_usage
-        import os as _os
 
         # #6: Wire classification thinking — if classifier recommends thinking AND
         # tier >= 2 (moderate complexity), enable it even if session toggle is off.
@@ -552,7 +579,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             if result.get("thinking"):
                 log.info(f"[AI] Thinking: {len(result['thinking'])} chars")
 
-            if result.get("tool_calls"):
+            _tool_calls = result.get("tool_calls")
+            _has_tools = isinstance(_tool_calls, list) and len(_tool_calls) > 0
+
+            if _has_tools:
                 break_msg, consecutive_errors = await self._handle_tool_calls(
                     result, session, provider, on_tool, on_status, consecutive_errors, _recent_tool_calls,
                 )
@@ -564,6 +594,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                     log.info(f"[CUT] Mid-loop compaction → {len(session.messages)} msgs")
                 iteration += 1
                 continue
+
+            # tool_calls = [] (empty list, not None) AND content empty → don't re-call LLM
+            if isinstance(_tool_calls, list) and not _tool_calls and not result.get("content", "").strip():
+                log.warning("[AI] Empty tool_calls + empty content — aborting loop to prevent extra LLM call")
+                result["content"] = "(No response from model.)"
 
             return await self._finalize_loop_response(
                 result, session, pruned_messages, model, tools,
@@ -601,7 +636,6 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             f"score={classification.get('score', 0)})"
         )
 
-        import os as _os
         if _os.environ.get("SALMALM_PLANNING", "0") == "1":
             if classification["intent"] in ("code", "analysis") and classification.get("score", 0) >= 2:
                 plan_msg = {"role": "system", "content": self.PLAN_PROMPT, "_plan_injected": True}
@@ -616,9 +650,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 on_token=on_token, on_status=on_status,
             )
         except Exception as e:
-            import traceback
             log.error(f"Engine.run error: {e}")
-            traceback.print_exc()
+            _traceback.print_exc()
             friendly = _friendly_error(e)
             session.add_assistant(friendly)
             try:
