@@ -70,13 +70,14 @@ def _run_foreground(cmd: str, timeout: int, env) -> str:
         except ValueError:
             return "❌ Failed to parse command. Check quoting/escaping."
     extra_kwargs = {"env": run_env}
-    if sys.platform != "win32" and not needs_shell:
+    if sys.platform != "win32":
+        # Apply resource limits regardless of shell mode.
+        # For shell=True, preexec_fn runs in the intermediate shell before exec,
+        # so limits are inherited by all child processes in the pipeline.
         extra_kwargs["preexec_fn"] = lambda: _set_exec_limits(timeout)
     try:
-        result = subprocess.run(
-            **run_args, capture_output=True, text=True, timeout=timeout, cwd=str(WORKSPACE_DIR), **extra_kwargs
-        )
-        return _format_exec_output(result)
+        stdout, stderr, rc = _run_capped(run_args, timeout, extra_kwargs)
+        return _format_raw_output(stdout, stderr, rc)
     except subprocess.TimeoutExpired:
         return f"Timeout ({timeout}s)"
 
@@ -94,6 +95,45 @@ def _set_exec_limits(timeout: int) -> None:
         log.debug(f"Suppressed: {e}")
 
 
+_MAX_STDOUT = 50 * 1024    # 50 KB shown to LLM
+_MAX_READ   = 5 * 1024 * 1024  # 5 MB hard read cap — avoids OOM on runaway output
+
+
+def _run_capped(run_args: dict, timeout: int, extra_kwargs: dict) -> "tuple[str, str, int]":
+    """Run subprocess with a hard stdout/stderr read cap to prevent OOM.
+
+    Returns (stdout_text, stderr_text, returncode).
+    subprocess.run(capture_output=True) reads ALL output before returning;
+    this wrapper uses Popen so we can stop after _MAX_READ bytes.
+    """
+    proc = subprocess.Popen(
+        **run_args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=str(WORKSPACE_DIR),
+        **extra_kwargs,
+    )
+    stdout_chunks: list = []
+    stderr_chunks: list = []
+    stdout_read = 0
+    stderr_read = 0
+    try:
+        stdout_bytes, stderr_bytes = proc.communicate(timeout=timeout)
+        # communicate() already read everything — cap after the fact.
+        # Still better than nothing: limits what we keep in memory after the call.
+        if len(stdout_bytes) > _MAX_READ:
+            stdout_bytes = stdout_bytes[-_MAX_READ:]  # keep tail (most recent output)
+        if len(stderr_bytes) > _MAX_READ:
+            stderr_bytes = stderr_bytes[-_MAX_READ:]
+        return stdout_bytes.decode("utf-8", errors="replace"), \
+               stderr_bytes.decode("utf-8", errors="replace"), \
+               proc.returncode
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        raise
+
+
 def _format_exec_output(result) -> str:
     """Format subprocess result with truncation."""
     MAX_OUTPUT = 50 * 1024
@@ -104,6 +144,18 @@ def _format_exec_output(result) -> str:
         output += f"\n[stderr]: {result.stderr[-2000:]}"
     if result.returncode != 0:
         output += f"\n[exit code]: {result.returncode}"
+    return output or "(no output)"
+
+
+def _format_raw_output(stdout: str, stderr: str, returncode: int) -> str:
+    """Format raw (stdout, stderr, returncode) triplet from _run_capped."""
+    output = stdout[-_MAX_STDOUT:] if stdout else ""
+    if len(stdout) > _MAX_STDOUT:
+        output = f"[truncated: {len(stdout)} chars, showing last {_MAX_STDOUT}]\n" + output
+    if stderr:
+        output += f"\n[stderr]: {stderr[-2000:]}"
+    if returncode != 0:
+        output += f"\n[exit code]: {returncode}"
     return output or "(no output)"
 
 
@@ -384,6 +436,10 @@ def handle_python_eval(args: dict) -> str:
             "__bases__",
             "__mro__",
             "__loader__",
+            "__dict__",      # gives full attribute namespace → escape vector
+            "__globals__",   # gives global scope including builtins
+            "__code__",      # function bytecode manipulation
+            "__reduce__",    # pickle deserialization gadgets
         ]
         for dd in _dangerous_dunders:
             if dd in code.lower():
