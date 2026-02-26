@@ -176,14 +176,15 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "stt",
-        "description": "Transcribe audio to text (OpenAI Whisper). Accepts file path or base64 audio.",
+        "description": "Transcribe audio to text (OpenAI Whisper). Accepts file path or base64 audio. You MUST provide either audio_path OR audio_base64.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "audio_path": {"type": "string", "description": "Path to audio file"},
-                "audio_base64": {"type": "string", "description": "Base64-encoded audio data"},
+                "audio_path": {"type": "string", "description": "Path to audio file (provide this OR audio_base64)"},
+                "audio_base64": {"type": "string", "description": "Base64-encoded audio data (provide this OR audio_path)"},
                 "language": {"type": "string", "description": "Language code (e.g. ko, en, ja)", "default": "ko"},
             },
+            "required": [],  # At least one of audio_path / audio_base64 is required (enforced at runtime)
         },
     },
     {

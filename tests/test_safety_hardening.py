@@ -187,9 +187,9 @@ class TestMaxToolIterations(unittest.TestCase):
                 'usage': {'input': 10, 'output': 10},
             }, None
 
-        # _handle_tool_calls returns None to continue loop
+        # _handle_tool_calls returns (break_msg, consecutive_errors) — None means continue
         async def mock_handle_tool_calls(*args, **kwargs):
-            return None
+            return None, 0  # (no break, no new errors)
 
         classification = {'intent': 'code', 'tier': 2, 'thinking': False,
                          'thinking_budget': 0, 'score': 3}

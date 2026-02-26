@@ -524,6 +524,10 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             except Exception as _exc:
                 log.debug(f"Suppressed: {_exc}")
             return error_msg
+        finally:
+            # Guarantee plan message cleanup regardless of exit path.
+            # _finalize_loop_response also does this on normal exit — filtering twice is harmless.
+            session.messages = [m for m in session.messages if not m.get("_plan_injected")]
 
     # ── OpenClaw-style limits ──
     MAX_TOOL_ITERATIONS = 25
@@ -566,8 +570,13 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
     async def _handle_tool_calls(
         self, result, session, provider, on_tool, on_status, consecutive_errors: int, recent_tool_calls: list
-    ) -> Optional[str]:
-        """Execute tool calls, check circuit breaker and loop detection. Returns break message or None."""
+    ) -> "tuple[Optional[str], int]":
+        """Execute tool calls, check circuit breaker and loop detection.
+
+        Returns:
+            (break_message, updated_consecutive_errors)
+            break_message is non-None when the loop should stop.
+        """
         from salmalm.core.loop_helpers import validate_tool_calls, check_circuit_breaker, check_loop_detection
 
         if on_status:
@@ -579,20 +588,22 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
             exec_outputs = await asyncio.to_thread(self._execute_tools_parallel, valid_tools, on_tool, session)
             tool_outputs.update(exec_outputs)
 
+        # consecutive_errors is an int (value type) — must be returned to caller
+        # so the circuit breaker accumulates across iterations, not just within one.
         consecutive_errors, break_msg = check_circuit_breaker(
             tool_outputs, consecutive_errors, self.MAX_CONSECUTIVE_ERRORS
         )
         if break_msg:
             session.add_assistant(break_msg)
-            return break_msg
+            return break_msg, consecutive_errors
 
         loop_msg = check_loop_detection(result.get("tool_calls", []), recent_tool_calls)
         if loop_msg:
             session.add_assistant(loop_msg)
-            return loop_msg
+            return loop_msg, consecutive_errors
 
         self._append_tool_results(session, provider, result, result["tool_calls"], tool_outputs)
-        return None
+        return None, consecutive_errors
 
     async def _finalize_loop_response(
         self,
@@ -683,6 +694,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         _recent_tool_calls = []
         _session_id = getattr(session, "id", "")
         import os as _os
+        result: dict = {}   # guard against NameError if _max_iter=0 or loop exits early
 
         _max_iter = int(_os.environ.get("SALMALM_MAX_TOOL_ITER", str(self.MAX_TOOL_ITERATIONS)))
         while iteration < _max_iter:
@@ -764,7 +776,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
             # ── Tool execution branch ──
             if result.get("tool_calls"):
-                break_msg = await self._handle_tool_calls(
+                break_msg, consecutive_errors = await self._handle_tool_calls(
                     result,
                     session,
                     provider,
@@ -795,9 +807,9 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 _failover_warn,
             )
 
-        # Loop exhausted
+        # Loop exhausted (result is initialized to {} above so this is always safe)
         log.warning(f"[BREAK] Max iterations ({_max_iter}) reached")
-        response = result.get("content", "Reached maximum tool iterations. Please try a simpler request.")  # noqa: F821
+        response = result.get("content", "Reached maximum tool iterations. Please try a simpler request.")
         if not response:
             response = "Reached maximum tool iterations. Please try a simpler request."
         session.add_assistant(response)
