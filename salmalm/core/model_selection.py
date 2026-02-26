@@ -127,7 +127,6 @@ _TIER_CANDIDATES = {
         ("openai/gpt-4.1-mini", "openai_api_key"),  # $0.4/$1.6
         ("openai/o4-mini", "openai_api_key"),  # $1.1/$4.4 (reasoning)
         ("google/gemini-2.5-pro", "google_api_key"),  # $1.25/$10
-        ("google/gemini-3.1-pro", "google_api_key"),  # $1.25/$10
         ("openai/gpt-4.1", "openai_api_key"),  # $2/$8
         ("xai/grok-3", "xai_api_key"),  # $3/$15
         ("anthropic/claude-sonnet-4-6", "anthropic_api_key"),  # $3/$15
@@ -135,12 +134,12 @@ _TIER_CANDIDATES = {
     ],
     "complex": [
         # Goal: strongest model per provider
+        # NOTE: gemini-3.1-pro removed — does not exist as of 2026-02
         ("openai/gpt-5.2", "openai_api_key"),  # $2/$8
         ("openai/gpt-5.2-codex", "openai_api_key"),  # $2/$8
-        ("google/gemini-3.1-pro", "google_api_key"),  # $1.25/$10
+        ("google/gemini-2.5-pro", "google_api_key"),  # $1.25/$10
         ("xai/grok-4", "xai_api_key"),  # $3/$15
         ("anthropic/claude-sonnet-4-6", "anthropic_api_key"),  # $3/$15
-        ("google/gemini-2.5-pro", "google_api_key"),  # $1.25/$10
     ],
 }
 
@@ -156,14 +155,16 @@ def auto_optimize_routing(available_keys: list[str]) -> dict:
     """
     key_set = set(available_keys)
     result = {}
+    used_models: set = set()  # Each tier must pick a DIFFERENT model
 
     for tier in ("simple", "moderate", "complex"):
         for model_id, required_key in _TIER_CANDIDATES[tier]:
-            if required_key in key_set:
+            if required_key in key_set and model_id not in used_models:
                 result[tier] = model_id
+                used_models.add(model_id)
                 break
         if tier not in result:
-            # Fallback: use whatever is available
+            # Fallback: use whatever is available (may overlap — acceptable for fallback)
             result[tier] = _MODELS.get("sonnet", "anthropic/claude-sonnet-4-6")
 
     return result

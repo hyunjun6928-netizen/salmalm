@@ -143,7 +143,7 @@ def _safe_callback(cb, *args) -> None:
             if _loop:
                 asyncio.run_coroutine_threadsafe(result, _loop)
             else:
-                log.debug("[ENGINE] Dropping coroutine callback — no event loop available")
+                log.warning("[ENGINE] Dropping coroutine callback — no event loop available (data loss possible)")
                 result.close()
 
 

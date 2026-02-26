@@ -102,6 +102,13 @@ def retry_with_backoff(
     """
 
     def decorator(func: Callable) -> Callable:
+        import asyncio as _asyncio
+        if _asyncio.iscoroutinefunction(func):
+            raise TypeError(
+                f"retry_with_backoff cannot decorate async function '{func.__name__}'. "
+                "Use async_retry_with_backoff() instead."
+            )
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             """Wrapper."""

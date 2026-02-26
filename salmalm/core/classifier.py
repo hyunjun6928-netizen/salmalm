@@ -36,7 +36,7 @@ class TaskClassifier:
                 "리팩",
                 "debug",
                 "디버그",
-                "API",
+                "api",
                 "server",
                 "서버",
                 "deploy",

@@ -17,7 +17,7 @@ def _register_services() -> None:
     """Register all service factories. Called once at import time."""
     if app is None:
         return
-    app.register("vault", lambda: __import__("salmalm.crypto", fromlist=["vault"]).vault)
+    app.register("vault", lambda: __import__("salmalm.security.crypto", fromlist=["vault"]).vault)
     app.register("router", lambda: __import__("salmalm.core", fromlist=["router"]).router)
     app.register("auth_manager", lambda: __import__("salmalm.auth", fromlist=["auth_manager"]).auth_manager)
     app.register("rate_limiter", lambda: __import__("salmalm.auth", fromlist=["rate_limiter"]).rate_limiter)

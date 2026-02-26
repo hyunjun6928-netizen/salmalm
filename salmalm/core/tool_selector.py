@@ -62,6 +62,15 @@ def get_tools_for_provider(provider: str, intent: str = None, user_message: str 
     all_tools = [t for t in all_tools if t["name"] in selected_names]
 
     # ── Schema compression: strip param descriptions, keep only required + type ──
+    import functools as _functools
+
+    @_functools.lru_cache(maxsize=256)
+    def _compress_schema_cached(schema_json: str) -> str:
+        """Cached version — tool schemas are immutable, so we cache by JSON key."""
+        import json as _json
+        schema = _json.loads(schema_json)
+        return _json.dumps(_compress_schema(schema))
+
     def _compress_schema(schema) -> dict:
         """Compress schema."""
         if not schema or not isinstance(schema, dict):

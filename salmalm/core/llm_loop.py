@@ -98,11 +98,19 @@ def _cooldown_provider(model: str, cooldown_seconds: int = 3600) -> None:
     provider = model.split("/")[0] if "/" in model else model
     with _cooldown_lock:
         cd = _load_cooldowns()
-        # Find all models from this provider in fallback config
+        # Find all models from this provider — both built-in fallbacks AND
+        # any user-added models from the live failover config.
         all_models = set()
         for m in _DEFAULT_FALLBACKS:
             if m.startswith(provider + "/"):
                 all_models.add(m)
+        try:
+            live_cfg = get_failover_config()
+            for m in live_cfg:
+                if isinstance(m, str) and m.startswith(provider + "/"):
+                    all_models.add(m)
+        except Exception:
+            pass  # Non-critical: built-in fallbacks already covered
         all_models.add(model)
         for m in all_models:
             cd[m] = {"until": _time.time() + cooldown_seconds, "failures": 99}
@@ -150,11 +158,12 @@ def _record_model_failure(model: str, cooldown_seconds: int = 0) -> None:
 
 
 def _clear_model_cooldown(model: str) -> None:
-    """Clear cooldown on successful call."""
+    """Clear cooldown on successful call. Also resets failure counter so next
+    failure starts from 0 rather than inheriting stale escalated backoff."""
     with _cooldown_lock:
         cd = _load_cooldowns()
         if model in cd:
-            del cd[model]
+            del cd[model]  # Full removal resets failures implicitly
             _save_cooldowns(cd)
 
 

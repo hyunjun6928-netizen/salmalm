@@ -14,6 +14,7 @@ OpenClaw-style cache-aware pruning (enhanced):
 from __future__ import annotations
 
 import copy
+import threading as _threading
 import time as _time
 from typing import Dict, Optional, Tuple
 
@@ -26,6 +27,7 @@ _last_api_call_time: Dict[str, float] = {}   # session_id → timestamp
 _CACHE_TTL_SECONDS = 300  # 5 minutes (Anthropic prompt cache TTL)
 _last_prune_time: Dict[str, float] = {}      # session_id → timestamp
 _PRUNE_COOLDOWN = 60  # Don't prune more than once per 60s
+_session_time_lock = _threading.Lock()       # Guards _last_api_call_time + _last_prune_time
 
 
 def _should_prune_for_cache(session_id: str = "__global__") -> bool:
@@ -38,8 +40,9 @@ def _should_prune_for_cache(session_id: str = "__global__") -> bool:
     Additionally, enforce a cooldown to prevent excessive pruning.
     """
     now = _time.time()
-    last_api = _last_api_call_time.get(session_id, 0.0)
-    last_prune = _last_prune_time.get(session_id, 0.0)
+    with _session_time_lock:
+        last_api = _last_api_call_time.get(session_id, 0.0)
+        last_prune = _last_prune_time.get(session_id, 0.0)
     if last_api == 0:
         return True
     if now - last_prune < _PRUNE_COOLDOWN:
@@ -49,12 +52,14 @@ def _should_prune_for_cache(session_id: str = "__global__") -> bool:
 
 def _record_api_call_time(session_id: str = "__global__"):
     """Record timestamp of API call for TTL tracking."""
-    _last_api_call_time[session_id] = _time.time()
+    with _session_time_lock:
+        _last_api_call_time[session_id] = _time.time()
 
 
 def _record_prune_time(session_id: str = "__global__"):
     """Record timestamp of pruning for cooldown tracking."""
-    _last_prune_time[session_id] = _time.time()
+    with _session_time_lock:
+        _last_prune_time[session_id] = _time.time()
 
 
 _PRUNE_KEEP_LAST_ASSISTANTS = 3
