@@ -94,7 +94,19 @@ def _get_db() -> sqlite3.Connection:
         conn.execute("""CREATE TABLE IF NOT EXISTS usage_stats (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts TEXT NOT NULL, model TEXT NOT NULL,
-            input_tokens INTEGER, output_tokens INTEGER, cost REAL
+            input_tokens INTEGER, output_tokens INTEGER, cost REAL,
+            user_id INTEGER
+        )""")
+        # Migration: add user_id column to existing databases
+        try:
+            conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER")
+        except Exception:
+            pass  # Column already exists — idempotent
+        conn.execute("""CREATE TABLE IF NOT EXISTS usage_detail (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT NOT NULL, session_id TEXT, model TEXT NOT NULL,
+            input_tokens INTEGER DEFAULT 0, output_tokens INTEGER DEFAULT 0,
+            cost REAL DEFAULT 0.0, intent TEXT DEFAULT ''
         )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS session_store (
             session_id TEXT PRIMARY KEY,
@@ -372,15 +384,9 @@ def track_usage(model: str, input_tokens: int, output_tokens: int, user_id: Opti
         except Exception as e:
             log.debug(f"Suppressed: {e}")
         # Also record to usage_detail for dashboard daily/monthly charts
+        # Table is created in _get_db() init — no CREATE TABLE needed here
         try:
             conn2 = _get_db()
-            conn2.execute(
-                "CREATE TABLE IF NOT EXISTS usage_detail ("
-                "id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, "
-                "session_id TEXT, model TEXT NOT NULL, "
-                "input_tokens INTEGER DEFAULT 0, output_tokens INTEGER DEFAULT 0, "
-                "cost REAL DEFAULT 0.0, intent TEXT DEFAULT '')"
-            )
             conn2.execute(
                 "INSERT INTO usage_detail (ts, session_id, model, input_tokens, output_tokens, cost) "
                 "VALUES (?,?,?,?,?,?)",
@@ -389,21 +395,23 @@ def track_usage(model: str, input_tokens: int, output_tokens: int, user_id: Opti
             conn2.commit()
         except Exception as e:
             log.debug(f"usage_detail write: {e}")
-        # Record cost against user quota
-        if user_id:
-            try:
-                from salmalm.features.users import user_manager
-
-                user_manager.record_cost(user_id, cost)
-            except Exception as e:
-                log.debug(f"Quota record error: {e}")
-        # Increment daily token quota counter
+    # ── Side effects OUTSIDE _usage_lock ─────────────────────────────────────
+    # record_cost() and add_usage() acquire their own locks.  Calling them
+    # inside _usage_lock creates a lock-ordering hazard (potential deadlock)
+    # and holds the global usage lock while doing DB I/O.
+    if user_id:
         try:
-            from salmalm.web.auth import daily_quota as _dq
-            _quota_uid = str(user_id) if user_id else "anonymous"
-            _dq.add_usage(_quota_uid, input_tokens + output_tokens)
-        except Exception as _e:
-            log.debug("daily_quota.add_usage failed: %s", _e)
+            from salmalm.features.users import user_manager
+
+            user_manager.record_cost(user_id, cost)
+        except Exception as e:
+            log.debug(f"Quota record error: {e}")
+    try:
+        from salmalm.web.auth import daily_quota as _dq
+        _quota_uid = str(user_id) if user_id else "anonymous"
+        _dq.add_usage(_quota_uid, input_tokens + output_tokens)
+    except Exception as _e:
+        log.debug("daily_quota.add_usage failed: %s", _e)
 
 
 def get_usage_report() -> dict:

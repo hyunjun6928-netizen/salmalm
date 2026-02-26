@@ -5,8 +5,12 @@
 """
 
 import json
+import logging
 import os
+import tempfile
 from salmalm.constants import DATA_DIR
+
+log = logging.getLogger(__name__)
 
 
 # Runtime CLI overrides (populated by __main__ / entry points)
@@ -42,17 +46,33 @@ class ConfigManager:
                     merged = {**defaults, **config}
                     return merged
                 return config
-            except (json.JSONDecodeError, OSError):
-                pass
+            except json.JSONDecodeError as e:
+                log.warning("[CONFIG] Corrupt JSON in %s.json: %s — falling back to defaults", name, e)
+            except OSError as e:
+                log.warning("[CONFIG] Cannot read %s.json: %s — falling back to defaults", name, e)
         return dict(defaults) if defaults else {}
 
     @classmethod
     def save(cls, name: str, config: dict) -> None:
-        """설정 파일 저장."""
+        """설정 파일 저장 (원자적 write — tempfile + fsync + rename).
+
+        Prevents config file corruption if the process is killed during write.
+        """
         cls.BASE_DIR.mkdir(parents=True, exist_ok=True)
         path = cls.BASE_DIR / f"{name}.json"
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=cls.BASE_DIR, suffix=".tmp")
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, path)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
     @classmethod
     def resolve(cls, name: str, key: str, default=None):

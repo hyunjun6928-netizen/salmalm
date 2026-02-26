@@ -174,9 +174,13 @@ class FastHandler:
     @property
     def _body(self) -> dict:
         if self._body_parsed is None:
-            try:
-                self._body_parsed = json.loads(self._body_bytes) if self._body_bytes else {}
-            except Exception:
+            if self._body_bytes:
+                try:
+                    self._body_parsed = json.loads(self._body_bytes)
+                except Exception as _e:
+                    log.debug("[ASGI] Request body is not valid JSON: %s", _e)
+                    self._body_parsed = {}
+            else:
                 self._body_parsed = {}
         return self._body_parsed
 

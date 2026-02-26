@@ -316,7 +316,10 @@ class UserManager:
                 log.debug(f"Suppressed: {e}")
 
         if updates:
+            _QUOTA_COLS = frozenset({"current_daily", "last_daily_reset", "current_monthly", "last_monthly_reset"})
             for col, val in updates:
+                # Column name comes from hardcoded strings above — assert to prevent future regressions
+                assert col in _QUOTA_COLS, f"Unexpected column name: {col}"
                 conn.execute(f"UPDATE user_quotas SET {col}=? WHERE user_id=?", (val, user_id))
             conn.commit()
             log.info(f"[QUOTA] Reset quotas for user {user_id}: {[u[0] for u in updates]}")
@@ -395,7 +398,9 @@ class UserManager:
                 key = "settings_json"
             elif key == "tts_enabled":
                 value = 1 if value else 0
-            if key in ("model_preference", "persona", "routing_config", "tts_enabled", "tts_voice", "settings_json"):
+            # Column name is validated against an explicit whitelist — not user-controlled
+            _SETTINGS_COLS = frozenset({"model_preference", "persona", "routing_config", "tts_enabled", "tts_voice", "settings_json"})
+            if key in _SETTINGS_COLS:
                 conn.execute(f"UPDATE user_settings SET {key}=? WHERE user_id=?", (value, user_id))
         conn.commit()
         conn.close()
