@@ -127,7 +127,9 @@ class Vault:
         """Whether the vault has been unlocked with a valid password."""
         return self._password is not None
 
-    def create(self, password: str, save_to_keychain: bool = True, force: bool = False) -> None:
+    def create(self, password: str, save_to_keychain: bool = False, force: bool = False) -> None:
+        # Default False for consistency with unlock(save_to_keychain=False).
+        # Keychain storage must be explicitly opted in — don't silently persist credentials.
         """Create a new vault with the given master password.
 
         Args:
@@ -169,13 +171,18 @@ class Vault:
             _tmp_salt: bytes = raw[1:17]   # local — NOT committed until success
             ciphertext: bytes = raw[17:]
             try:
-                key = _derive_key(password, _tmp_salt)
                 plaintext: bytes
                 if version == b"\x03" and HAS_CRYPTO:
+                    # AES-GCM: derive key once
+                    key = _derive_key(password, _tmp_salt)
                     nonce, ct = ciphertext[:12], ciphertext[12:]
                     plaintext = AESGCM(key).decrypt(nonce, ct, None)
+                elif version == b"\x04":
+                    # HMAC-CTR new format (IV embedded) — no base key needed, no double-try
+                    plaintext = self._unlock_hmac_ctr(password, ciphertext, _tmp_salt, strict=True)
                 elif version in (b"\x02", b"\x03"):
-                    plaintext = self._unlock_hmac_ctr(password, ciphertext, _tmp_salt)
+                    # HMAC-CTR legacy/transitional — double-try for backward compat
+                    plaintext = self._unlock_hmac_ctr(password, ciphertext, _tmp_salt, strict=False)
                 else:
                     return False
                 _tmp_data = json.loads(plaintext.decode("utf-8"))
@@ -197,20 +204,25 @@ class Vault:
                 return False
 
     def _unlock_hmac_ctr(self, password: str, ciphertext: bytes,
-                         salt: Optional[bytes] = None) -> bytes:
-        """Decrypt HMAC-CTR vault (new format with IV, legacy without).
+                         salt: Optional[bytes] = None, strict: bool = True) -> bytes:
+        """Decrypt HMAC-CTR vault.
 
-        Format discrimination:
-          new  : tag(32) | iv(16) | ct(N)  — HMAC covers (iv || ct)
-          legacy: tag(32) | ct(N)           — HMAC covers ct only; no IV
+        Format layout (both versions):
+          new  (v\x04) : tag(32) | iv(16) | ct(N)  — HMAC covers (iv || ct)
+          legacy(v\x02): tag(32) | ct(N)            — HMAC covers ct only; no IV
 
-        The two-attempt fallback is NOT an HMAC oracle: both attempts use the
-        same hmac_key derived from the caller-supplied password.  An adversary
-        without the password cannot make either HMAC comparison pass, so there
-        is no exploitable oracle.  The fallback exists only for backward-compat
-        with pre-IV vaults and is removed in the next major version.
+        strict=True  (v\x04 path): Only try new format. No fallback — eliminates
+                                   the "HMAC failure → legacy retry" path that could
+                                   theoretically be used as a format oracle.
+        strict=False (v\x02 path): Try new format first; fall back to legacy for
+                                   backward compat with pre-IV vaults. Uses the same
+                                   hmac_key for both attempts — an adversary without
+                                   the password cannot pass either check.
 
-        salt: explicit bytes (preferred); falls back to self._salt for compat.
+        PBKDF2 call count:
+          - hmac_key: 1 call (always)
+          - enc_key:  1 call (only on HMAC success — no wasted derivation on wrong pw)
+          Total: 2 PBKDF2 calls on success (vs. 3 in prior code that pre-derived base key)
         """
         _salt = salt if salt is not None else self._salt
         if _salt is None:
@@ -218,18 +230,23 @@ class Vault:
         tag, rest = ciphertext[:32], ciphertext[32:]
         if len(rest) < 1:
             raise ValueError("Ciphertext too short")
+
+        # Single hmac_key derivation (1 PBKDF2 call, not 3)
         hmac_key = _derive_key(password, _salt + b"hmac", 32)
 
-        # ── Attempt 1: new format (tag | iv | ct) ──────────────────────────
+        # ── New format: tag(32) | iv(16) | ct(N) ──────────────────────────
         if len(rest) >= 16:
             iv, ct = rest[:16], rest[16:]
             expected = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
             if hmac.compare_digest(tag, expected):
                 enc_key = _derive_key(password, _salt + b"enc" + iv, 32)
-                return self._ctr_decrypt(enc_key, ct)
+                return self._ctr_decrypt(enc_key, ct, iv=iv)
 
-        # ── Attempt 2: legacy format (tag | ct, no IV) — backward compat ───
-        # Only reached when new-format HMAC fails, indicating a pre-IV vault.
+        if strict:
+            raise ValueError("HMAC mismatch — wrong password or corrupted vault (strict mode)")
+
+        # ── Legacy format: tag(32) | ct(N), no IV — backward compat only ───
+        # Only reached for v\x02 vaults when new-format HMAC fails.
         log.debug("[VAULT] New-format HMAC mismatch — trying legacy (no-IV) format")
         ct = rest
         expected = hmac.new(hmac_key, ct, hashlib.sha256).digest()
@@ -279,14 +296,14 @@ class Vault:
             ct = AESGCM(key).encrypt(nonce, plaintext, None)
             new_bytes = VAULT_VERSION + self._salt + nonce + ct
         elif _ALLOW_FALLBACK:
-            # HMAC-CTR: two PBKDF2 calls (enc_key + hmac_key).
-            # Do NOT compute the base key — it is unused in this branch.
+            # HMAC-CTR: two PBKDF2 calls (enc_key + hmac_key). No base key.
+            # Write as v\x04 (new format, strict mode, no double-try on read).
             iv = secrets.token_bytes(16)
             enc_key = _derive_key(self._password, self._salt + b"enc" + iv, 32)
-            ct = self._ctr_encrypt(enc_key, plaintext)
+            ct = self._ctr_encrypt(enc_key, plaintext, iv=iv)
             hmac_key = _derive_key(self._password, self._salt + b"hmac", 32)
             tag = hmac.new(hmac_key, iv + ct, hashlib.sha256).digest()
-            new_bytes = b"\x02" + self._salt + tag + iv + ct
+            new_bytes = b"\x04" + self._salt + tag + iv + ct
         else:
             raise RuntimeError("Vault disabled: install 'cryptography' or set SALMALM_VAULT_FALLBACK=1")
 
@@ -299,18 +316,33 @@ class Vault:
                 pass
 
     @staticmethod
-    def _ctr_encrypt(key: bytes, data: bytes) -> bytes:
-        """CTR-mode encryption using HMAC as block cipher."""
+    def _ctr_encrypt(key: bytes, data: bytes, iv: Optional[bytes] = None) -> bytes:
+        """CTR-mode encryption using HMAC as block cipher.
+
+        The IV (nonce) is XOR'd into the block counter to ensure that two calls
+        with the same key but different IVs produce different keystreams.
+        Without IV-in-counter, calling _ctr_encrypt(key, x) twice with the
+        same key (but different IVs in the key derivation) would produce the
+        same keystream — a subtle implementation trap for callers.
+
+        iv: 16-byte nonce; if None, counter starts at 0 (legacy compat).
+        """
         out: bytearray = bytearray()
+        # Derive a deterministic 8-byte base from IV so counter is IV-dependent
+        iv_base: int = int.from_bytes((iv[:8] if iv else b"\x00" * 8), "big")
         ctr: int = 0
         for i in range(0, len(data), 32):
-            block = hmac.new(key, ctr.to_bytes(8, "big"), hashlib.sha256).digest()
+            block_ctr = (iv_base ^ ctr) & 0xFFFF_FFFF_FFFF_FFFF  # 64-bit
+            block = hmac.new(key, block_ctr.to_bytes(8, "big"), hashlib.sha256).digest()
             chunk = data[i : i + 32]
             out.extend(b ^ k for b, k in zip(chunk, block[: len(chunk)]))
             ctr += 1
         return bytes(out)
 
-    _ctr_decrypt = _ctr_encrypt  # CTR is symmetric
+    @classmethod
+    def _ctr_decrypt(cls, key: bytes, data: bytes, iv: Optional[bytes] = None) -> bytes:
+        """CTR-mode decryption (symmetric with encryption)."""
+        return cls._ctr_encrypt(key, data, iv=iv)
 
     # Map vault keys → env var names
     _ENV_MAP = {
