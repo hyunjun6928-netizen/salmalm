@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "salmalm"
-version = "0.27.58"
+version = "0.27.59"
 description = "Personal AI Gateway — Python AI assistant with multi-model routing, web UI, and 66 built-in tools. Core: uvicorn + fastapi + websockets."
 readme = "README.md"
 license = "MIT"
@@ -32,10 +32,11 @@ dependencies = [
     "uvicorn[standard]>=0.29.0",
     "fastapi>=0.111.0",
     "websockets>=12.0",
+    "cryptography>=41.0",
 ]
 
 [project.optional-dependencies]
-crypto = ["cryptography>=41.0"]
+crypto = ["cryptography>=41.0"]  # kept for backward compat, already in core deps
 browser = ["playwright>=1.40"]
 discord = []
 keychain = ["keyring>=24.0"]

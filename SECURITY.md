@@ -11,7 +11,7 @@ SalmAlm is a **local single-user personal AI tool**. Default bind is `127.0.0.1`
 | Network bind | `SALMALM_BIND=0.0.0.0` | `127.0.0.1` | Network exposure |
 | Shell operators (pipe, redirect, chain) | `SALMALM_ALLOW_SHELL=1` | OFF | Command injection |
 | Home directory file read | `SALMALM_ALLOW_HOME_READ=1` | OFF | Data exfiltration |
-| Vault fallback (HMAC-CTR) | `SALMALM_VAULT_FALLBACK=1` | OFF | Weaker encryption |
+| Vault fallback (HMAC-CTR) | `SALMALM_VAULT_FALLBACK=1` | OFF (AES-256-GCM is always available; fallback exists for emergency recovery only) | Weaker encryption |
 | Plugin system | `SALMALM_PLUGINS=1` | OFF | Arbitrary code execution |
 | CLI OAuth token reuse | `SALMALM_CLI_OAUTH=1` | OFF | Third-party token access |
 | Elevated exec on external bind | `SALMALM_ALLOW_ELEVATED=1` | OFF | Privilege escalation |
@@ -78,6 +78,14 @@ Destructive operations require explicit `_confirmed=true` parameter:
 - Tool dispatch payloads are HMAC-SHA256 signed with timestamp + nonce
 - Response size capped at 5MB, strict dict validation
 - JSON decode errors caught separately
+
+## OAuth Token Storage
+
+OAuth tokens (`web/oauth.py`) are stored with the following priority:
+1. **Vault (AES-256-GCM)** — when vault is unlocked (recommended, secure)
+2. **XOR obfuscation** — stdlib-only fallback when vault is locked (`NOT encryption`, just basic obfuscation to avoid plaintext on disk)
+
+The XOR fallback emits a loud `[OAUTH] ⚠️` warning to the log. If you use OAuth integrations, keep the vault unlocked. Future work: block OAuth storage unless vault is available.
 
 ## Vault Encryption
 

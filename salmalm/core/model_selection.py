@@ -198,11 +198,9 @@ def select_model(message: str, session) -> Tuple[str, str]:
     Returns (model_id, complexity_level) where complexity is 'simple'|'moderate'|'complex'|'manual'.
     Respects session-level model_override (from /model command).
     """
-    override = getattr(session, "model_override", None)
+    override = getattr(session, "model_override", None) or None  # normalize "" → None
     # Fallback to global force_model ONLY if session has no preference at all (None).
     # "auto" means user explicitly chose auto-routing — respect that.
-    if not override and override is not None:
-        pass  # empty string — treat as no preference
     if override is None:
         try:
             from salmalm.core.core import router

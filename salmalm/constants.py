@@ -404,8 +404,8 @@ MODEL_ALIASES = {
     "qwen3": "ollama/qwen3",
 }
 
-# Model for /commands processing (cheap + capable)
-COMMAND_MODEL = MODELS["opus"]
+# Model for /commands processing (fast + capable; sonnet is the right balance)
+COMMAND_MODEL = MODELS["sonnet"]
 
 # Model routing thresholds
 SIMPLE_QUERY_MAX_CHARS = 200  # short queries → cheap model

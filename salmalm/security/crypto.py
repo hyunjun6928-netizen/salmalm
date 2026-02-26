@@ -76,8 +76,8 @@ def _keychain_delete() -> bool:
 
 HAS_CRYPTO: bool = False
 _ALLOW_FALLBACK: bool = (
-    os.environ.get("SALMALM_VAULT_FALLBACK", "1") == "1"
-)  # Auto-fallback when cryptography is missing
+    os.environ.get("SALMALM_VAULT_FALLBACK", "0") == "1"
+)  # HMAC-CTR fallback when cryptography is missing (default OFF — matches SECURITY.md)
 try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.primitives import hashes as crypto_hashes
