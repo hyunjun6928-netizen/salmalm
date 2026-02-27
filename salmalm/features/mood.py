@@ -276,16 +276,16 @@ class MoodDetector:
         # Punctuation patterns
         excl_count = text.count("!")
         if excl_count >= 3:
-            scores["excited"] += excl_count / 3
+            scores["excited"] += float(excl_count) / 3
 
         ellipsis_count = text.count("...")
         if ellipsis_count >= 1:
-            scores["sad"] += ellipsis_count * 0.5
-            scores["anxious"] += ellipsis_count * 0.3
+            scores["sad"] += float(ellipsis_count) * 0.5
+            scores["anxious"] += float(ellipsis_count) * 0.3
 
         question_count = text.count("?")
         if question_count >= 3:
-            scores["anxious"] += question_count / 3
+            scores["anxious"] += float(question_count) / 3
 
         # Caps ratio (for English text)
         alpha_chars = [c for c in text if c.isalpha() and ord(c) < 128]

@@ -155,6 +155,10 @@ class TokenManager:
                 revoked_at REAL NOT NULL,
                 expires_at REAL NOT NULL
             )""")
+            conn.execute("""CREATE TABLE IF NOT EXISTS user_revocations (
+                user_id INTEGER PRIMARY KEY,
+                revoked_after TEXT NOT NULL
+            )""")
             conn.commit()
             conn.close()
         except Exception as e:  # noqa: broad-except
@@ -210,6 +214,11 @@ class TokenManager:
             jti = payload.get("jti")
             if jti and self._is_revoked(jti):
                 return None
+            # Check per-user bulk revocation
+            uid = payload.get("uid")
+            iat = payload.get("iat", 0)
+            if uid and self._is_user_revoked(uid, iat):
+                return None
             return payload  # type: ignore[no-any-return]
         except Exception as e:  # noqa: broad-except
             return None
@@ -246,19 +255,23 @@ class TokenManager:
     def revoke_all_for_user(self, user_id: int) -> None:
         """Revoke ALL active tokens for *user_id*.
 
-        Not implemented: requires enumerating all active JTIs for the user,
-        which in turn requires persisting issued tokens at creation time.
-        Current approach: rotate the signing key (revokes ALL users' tokens),
-        or rely on delete_user() + verify_token existence check for the
-        "user deleted" case.
-
-        Raises NotImplementedError so callers are not silently deceived.
+        Inserts a revocation timestamp into user_revocations. Any token with
+        iat <= revoked_after for this user_id will be rejected by verify().
         """
-        raise NotImplementedError(
-            "Per-user bulk token revocation is not yet implemented. "
-            "Call rotate() to invalidate all tokens globally, or "
-            "delete the user account to prevent future authentication."
-        )
+        try:
+            conn = get_connection(AUTH_DB)
+            try:
+                import datetime as _dt
+                revoked_after = _dt.datetime.utcnow().isoformat()
+                conn.execute(
+                    "INSERT OR REPLACE INTO user_revocations (user_id, revoked_after) VALUES (?, ?)",
+                    (user_id, revoked_after),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as e:
+            log.warning("[TOKEN] revoke_all_for_user failed: %s", e)
 
     def _is_revoked(self, jti: str) -> bool:
         """Check if a jti has been revoked."""
@@ -269,6 +282,23 @@ class TokenManager:
             return row is not None
         except Exception as e:  # noqa: broad-except
             return False
+
+    def _is_user_revoked(self, user_id: int, token_iat: int) -> bool:
+        """Check if all tokens for user_id issued at or before token_iat have been revoked."""
+        try:
+            conn = get_connection(AUTH_DB)
+            import datetime as _dt
+            row = conn.execute(
+                "SELECT revoked_after FROM user_revocations WHERE user_id=?", (user_id,)
+            ).fetchone()
+            conn.close()
+            if row:
+                revoked_ts = _dt.datetime.fromisoformat(row[0]).timestamp()
+                return token_iat <= revoked_ts
+        except Exception:
+            pass
+        return False
+
 
     def cleanup_expired(self) -> int:
         """Remove revocation entries for tokens that have expired anyway."""
@@ -770,7 +800,8 @@ class AuthManager:
             if self._initialized:  # Re-check: another thread may have won the race
                 return
             conn = get_connection(AUTH_DB)
-            conn.execute("""CREATE TABLE IF NOT EXISTS users (
+            try:
+                conn.execute("""CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password_hash BLOB NOT NULL,
@@ -781,7 +812,7 @@ class AuthManager:
                 last_login TEXT,
                 enabled INTEGER NOT NULL DEFAULT 1
             )""")
-            conn.execute("""CREATE TABLE IF NOT EXISTS sessions (
+                conn.execute("""CREATE TABLE IF NOT EXISTS sessions (
                 token_hash TEXT PRIMARY KEY,
                 user_id INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
@@ -789,40 +820,41 @@ class AuthManager:
                 ip_address TEXT,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )""")
-            conn.execute("""CREATE TABLE IF NOT EXISTS login_attempts (
+                conn.execute("""CREATE TABLE IF NOT EXISTS login_attempts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL,
                 attempted_at REAL NOT NULL,
                 ip_address TEXT
             )""")
-            conn.execute("""CREATE INDEX IF NOT EXISTS idx_login_attempts_user
+                conn.execute("""CREATE INDEX IF NOT EXISTS idx_login_attempts_user
                 ON login_attempts (username, attempted_at)""")
-            conn.commit()
+                conn.commit()
 
-            # Create default admin if no users exist (random password)
-            count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            if count == 0:
-                default_pw = base64.urlsafe_b64encode(os.urandom(18)).decode().rstrip("=")
-                _, raw_api_key = self._create_user_db(conn, "admin", default_pw, "admin")
-                # SECURITY: Never log passwords to file — console only via stderr
-                import sys
-                import logging as _logging
+                # Create default admin if no users exist (random password)
+                count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+                if count == 0:
+                    default_pw = base64.urlsafe_b64encode(os.urandom(18)).decode().rstrip("=")
+                    _, raw_api_key = self._create_user_db(conn, "admin", default_pw, "admin")
+                    # SECURITY: Never log passwords to file — console only via stderr
+                    import sys
+                    import logging as _logging
 
-                _stderr_handler = _logging.StreamHandler(sys.stderr)
-                _stderr_handler.setFormatter(_logging.Formatter("%(message)s"))
-                _sec_logger = _logging.getLogger("salmalm.auth.setup")
-                _sec_logger.addHandler(_stderr_handler)
-                _sec_logger.propagate = False
-                _sec_logger.warning(
-                    f"\n{'=' * 50}\n"
-                    f"[USER] Default admin created\n"
-                    f"   Username: admin\n"
-                    f"   Password: {default_pw}\n"
-                    f"[WARN]  Save this password! It won't be shown again.\n"
-                    f"{'=' * 50}"
-                )
-                log.info("[USER] Default admin user created (password shown in console only)")
-            conn.close()
+                    _stderr_handler = _logging.StreamHandler(sys.stderr)
+                    _stderr_handler.setFormatter(_logging.Formatter("%(message)s"))
+                    _sec_logger = _logging.getLogger("salmalm.auth.setup")
+                    _sec_logger.addHandler(_stderr_handler)
+                    _sec_logger.propagate = False
+                    _sec_logger.warning(
+                        f"\n{'=' * 50}\n"
+                        f"[USER] Default admin created\n"
+                        f"   Username: admin\n"
+                        f"   Password: {default_pw}\n"
+                        f"[WARN]  Save this password! It won't be shown again.\n"
+                        f"{'=' * 50}"
+                    )
+                    log.info("[USER] Default admin user created (password shown in console only)")
+            finally:
+                conn.close()
             self._initialized = True
 
     @staticmethod
@@ -882,32 +914,31 @@ class AuthManager:
             return None
 
         conn = get_connection(AUTH_DB)
-        row = conn.execute(
-            "SELECT id, username, password_hash, password_salt, role, api_key, enabled FROM users WHERE username=?",
-            (username,),
-        ).fetchone()
-        conn.close()
-
-        if not row or not row[6]:  # Not found or disabled
-            self._record_attempt(username)
-            return None
-
-        if not _verify_password(password, row[2], row[3]):
-            conn.close()
-            self._record_attempt(username)
-            return None
-
-        # Success — clear attempts + update last_login in one transaction
-        from datetime import datetime
         try:
-            conn.execute("DELETE FROM login_attempts WHERE username=?", (username,))
-            conn.execute(
-                "UPDATE users SET last_login=? WHERE id=?",
-                (datetime.now(KST).isoformat(), row[0]),
-            )
-            conn.commit()
-        except Exception as e:  # noqa: broad-except
-            log.debug(f"Suppressed: {e}")
+            row = conn.execute(
+                "SELECT id, username, password_hash, password_salt, role, api_key, enabled FROM users WHERE username=?",
+                (username,),
+            ).fetchone()
+
+            if not row or not row[6]:  # Not found or disabled
+                self._record_attempt(username)
+                return None
+
+            if not _verify_password(password, row[2], row[3]):
+                self._record_attempt(username)
+                return None
+
+            # Success — clear attempts + update last_login in one transaction
+            from datetime import datetime
+            try:
+                conn.execute("DELETE FROM login_attempts WHERE username=?", (username,))
+                conn.execute(
+                    "UPDATE users SET last_login=? WHERE id=?",
+                    (datetime.now(KST).isoformat(), row[0]),
+                )
+                conn.commit()
+            except Exception as e:  # noqa: broad-except
+                log.debug(f"Suppressed: {e}")
         finally:
             conn.close()
 

@@ -436,7 +436,7 @@ async def _handle_ws_msg(client, data: dict) -> None:
         await stream.send_error(str(e)[:200])
 
 
-async def _setup_services(host: str, port: int, httpd, server_thread, url: str) -> None:
+async def _setup_services(host: str, port: int, _httpd, server_thread, url: str) -> None:
     """Setup vault, channels, background services (phases 5-12)."""
     _auto_unlock_vault()
     # ── Phase 6: WebSocket Server ──

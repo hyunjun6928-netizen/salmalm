@@ -388,10 +388,15 @@ async def get_sessions(_u=_Depends(_auth)):
 async def get_session_messages(session_id: str, _u=_Depends(_auth)):
     import json as _json
     from salmalm.core import _get_db
+    from fastapi import HTTPException as _HTTPException
+    uid = _u.get("id") or _u.get("uid") or _u.get("username")
     conn = _get_db()
-    row = conn.execute("SELECT messages FROM session_store WHERE session_id=?", (session_id,)).fetchone()
+    row = conn.execute(
+        "SELECT messages FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+        (session_id, uid)
+    ).fetchone()
     if not row:
-        return _JSON(content={"messages": []})
+        raise _HTTPException(status_code=404, detail="Session not found or access denied")
     try:
         raw_msgs = _json.loads(row[0]) if row[0] else []
     except Exception:
@@ -412,7 +417,16 @@ async def get_session_messages(session_id: str, _u=_Depends(_auth)):
 
 @router.get("/api/sessions/{session_id}/last")
 async def get_session_last(session_id: str, _u=_Depends(_auth)):
-    from salmalm.core import get_session
+    from fastapi import HTTPException as _HTTPException
+    from salmalm.core import get_session, _get_db
+    uid = _u.get("id") or _u.get("uid") or _u.get("username")
+    _conn = _get_db()
+    _row = _conn.execute(
+        "SELECT 1 FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+        (session_id, uid)
+    ).fetchone()
+    if not _row:
+        raise _HTTPException(status_code=404, detail="Session not found or access denied")
     sess = get_session(session_id)
     last_msg = None
     for msg in reversed(sess.messages):
@@ -427,13 +441,33 @@ async def get_session_last(session_id: str, _u=_Depends(_auth)):
 
 @router.get("/api/sessions/{session_id}/summary")
 async def get_session_summary(session_id: str, _u=_Depends(_auth)):
+    from fastapi import HTTPException as _HTTPException
+    from salmalm.core import _get_db
     from salmalm.features.edge_cases import get_summary_card
+    uid = _u.get("id") or _u.get("uid") or _u.get("username")
+    _conn = _get_db()
+    _row = _conn.execute(
+        "SELECT 1 FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+        (session_id, uid)
+    ).fetchone()
+    if not _row:
+        raise _HTTPException(status_code=404, detail="Session not found or access denied")
     card = get_summary_card(session_id)
     return _JSON(content={"summary": card})
 
 @router.get("/api/sessions/{session_id}/alternatives")
 async def get_session_alternatives(session_id: str, msg_index: int = _Query(0), _u=_Depends(_auth)):
+    from fastapi import HTTPException as _HTTPException
+    from salmalm.core import _get_db
     from salmalm.features.edge_cases import conversation_fork
+    uid = _u.get("id") or _u.get("uid") or _u.get("username")
+    _conn = _get_db()
+    _row = _conn.execute(
+        "SELECT 1 FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+        (session_id, uid)
+    ).fetchone()
+    if not _row:
+        raise _HTTPException(status_code=404, detail="Session not found or access denied")
     alts = conversation_fork.get_alternatives(session_id, msg_index)
     return _JSON(content={"alternatives": alts})
 

@@ -277,6 +277,7 @@ _metrics = {
     "total_tokens_in": 0,
     "total_tokens_out": 0,
 }
+_metrics_lock = threading.Lock()
 
 # Hard cost cap — stop all LLM calls after this threshold (per session lifetime)
 # Override with SALMALM_COST_CAP env var (in USD)
@@ -764,6 +765,7 @@ __all__ = [
     "check_cost_cap",
     "CostCapExceeded",
     "_metrics",
+    "_metrics_lock",
     "compact_messages",
     "get_session",
     "write_daily_log",

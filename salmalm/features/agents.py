@@ -108,7 +108,11 @@ class SubAgent:
                 session = _core().get_session(session_id)
                 from salmalm.core.engine import process_message
 
-                result = asyncio.run(process_message(session_id, task, model_override=model))
+                _loop = asyncio.new_event_loop()
+                try:
+                    result = _loop.run_until_complete(process_message(session_id, task, model_override=model))
+                finally:
+                    _loop.close()
                 agent_info["result"] = result
                 agent_info["status"] = "completed"
                 now = datetime.now(KST)
@@ -361,7 +365,11 @@ class SubAgent:
         try:
             from salmalm.core.engine import process_message
 
-            result = asyncio.run(process_message(session_id, message))
+            _loop = asyncio.new_event_loop()
+            try:
+                result = _loop.run_until_complete(process_message(session_id, message))
+            finally:
+                _loop.close()
             agent["result"] = result  # Update with latest result
             return f"🤖 [{agent_id}] responded:\n\n{result[:3000]}"
         except Exception as e:
@@ -405,7 +413,11 @@ class SubAgent:
             # Completed — re-run with steering message
             from salmalm.core.engine import process_message
 
-            result = asyncio.run(process_message(session_id, message, model_override=agent.get("model")))
+            _loop = asyncio.new_event_loop()
+            try:
+                result = _loop.run_until_complete(process_message(session_id, message, model_override=agent.get("model")))
+            finally:
+                _loop.close()
             agent["result"] = result
             return {"ok": True, "agent_id": aid, "status": "steered", "result": result[:500]}
         except Exception as e:
@@ -432,7 +444,11 @@ class SubAgent:
             # If target is completed, re-process
             from salmalm.core.engine import process_message
 
-            result = asyncio.run(process_message(session_id, message, model_override=target.get("model")))
+            _loop = asyncio.new_event_loop()
+            try:
+                result = _loop.run_until_complete(process_message(session_id, message, model_override=target.get("model")))
+            finally:
+                _loop.close()
             target["result"] = result
             return {"ok": True, "from": from_id, "to": tid, "status": "delivered", "result": result[:500]}
         except Exception as e:

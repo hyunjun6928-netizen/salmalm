@@ -41,16 +41,30 @@ async def _get_cached_response_async(req_id: str, session_id: str, wait_if_proce
     If wait_if_processing=True and entry has status='processing', polls up to 12s
     for the SSE path to finish before returning. Prevents HTTP fallback double-processing
     when SSE stall fires but server hasn't aborted yet.
+    Uses asyncio.to_thread for blocking lock operations to avoid event loop blocking.
     """
     if not req_id:
         return None
-    key = f"{req_id}:{session_id}"
+
+    def _poll_once() -> dict | None:
+        with _RESP_CACHE_LOCK:
+            return _RESP_CACHE.get(f"{req_id}:{session_id}")
+
+    def _get_entry() -> dict | None:
+        key = f"{req_id}:{session_id}"
+        with _RESP_CACHE_LOCK:
+            entry = _RESP_CACHE.get(key)
+            if not entry:
+                return None
+            if _time.time() - entry["ts"] >= _RESP_CACHE_TTL:
+                del _RESP_CACHE[key]
+                return None
+        return entry
 
     # If processing: optionally wait for completion
     if wait_if_processing:
         for _ in range(24):  # 24 × 0.5s = 12s max wait
-            with _RESP_CACHE_LOCK:
-                entry = _RESP_CACHE.get(key)
+            entry = await asyncio.to_thread(_poll_once)
             if not entry:
                 break
             if entry.get("status") == "done":
@@ -60,13 +74,9 @@ async def _get_cached_response_async(req_id: str, session_id: str, wait_if_proce
                 break
             await asyncio.sleep(0.5)
 
-    with _RESP_CACHE_LOCK:
-        entry = _RESP_CACHE.get(key)
-        if not entry:
-            return None
-        if _time.time() - entry["ts"] >= _RESP_CACHE_TTL:
-            del _RESP_CACHE[key]
-            return None
+    entry = await asyncio.to_thread(_get_entry)
+    if not entry:
+        return None
     if entry.get("status") == "processing":
         return None  # Still running — fall through to HTTP POST path
     log.info(f"[IDEMPOTENCY] Cache hit for req_id={req_id[:12]}… — skipping re-process")
@@ -156,7 +166,7 @@ class WebChatMixin:
             # Fix #2: track client disconnect state
             _client_disconnected = [False]
             # Fix #3: keepalive thread control
-            _keepalive_stop = [False]
+            _keepalive_stop = threading.Event()
 
             def send_sse(event, data: dict) -> bool:
                 """Send SSE event. Returns False if client disconnected."""
@@ -184,11 +194,7 @@ class WebChatMixin:
 
             # Fix #3: keepalive ping thread — prevents proxy/nginx 60s idle timeout
             def _keepalive_worker():
-                import time
-                while not _keepalive_stop[0]:
-                    time.sleep(15)
-                    if _keepalive_stop[0]:
-                        break
+                while not _keepalive_stop.wait(timeout=15):
                     try:
                         self.wfile.write(b": keep-alive\n\n")
                         self.wfile.flush()
@@ -237,8 +243,7 @@ class WebChatMixin:
                 except Exception as e:
                     log.debug(f"[SSE] on_token error: {e}")
 
-            # Fix #1: always close loop via try/finally
-            loop = asyncio.new_event_loop()
+            # Fix #1: use existing event loop or asyncio.run for new env
             try:
                 from salmalm.core import get_session as _gs_pre
 
@@ -246,23 +251,26 @@ class WebChatMixin:
                 _model_ov = getattr(_sess_pre, "model_override", None)
                 if _model_ov == "auto":
                     _model_ov = None
-                response = loop.run_until_complete(
-                    process_message(
-                        session_id,
-                        message,
-                        model_override=_model_ov,
-                        image_data=(image_b64, image_mime) if image_b64 else None,
-                        on_tool=on_tool_sse,
-                        on_token=on_token_sse,
-                        lang=ui_lang,
-                    )
+                _coro = process_message(
+                    session_id,
+                    message,
+                    model_override=_model_ov,
+                    image_data=(image_b64, image_mime) if image_b64 else None,
+                    on_tool=on_tool_sse,
+                    on_token=on_token_sse,
+                    lang=ui_lang,
                 )
+                try:
+                    _running_loop = asyncio.get_running_loop()
+                    _fut = asyncio.run_coroutine_threadsafe(_coro, _running_loop)
+                    response = _fut.result(timeout=120)
+                except RuntimeError:
+                    response = asyncio.run(_coro)
             except Exception as e:
                 log.error(f"[SSE] process_message error: {e}")
                 response = f"❌ Internal error: {type(e).__name__}"
             finally:
-                loop.close()  # Fix #1: always close loop
-                _keepalive_stop[0] = True  # Fix #3: stop keepalive thread
+                _keepalive_stop.set()  # Fix #3: stop keepalive thread
 
             # If client disconnected mid-stream, nothing to send
             if _client_disconnected[0]:
@@ -309,8 +317,7 @@ class WebChatMixin:
                 })
                 return
 
-            # Fix #1: always close loop via try/finally (non-stream path)
-            loop = asyncio.new_event_loop()
+            # Fix #1: use existing event loop or asyncio.run for new env (non-stream path)
             try:
                 from salmalm.core import get_session as _gs_pre2
 
@@ -318,20 +325,21 @@ class WebChatMixin:
                 _model_ov2 = getattr(_sess_pre2, "model_override", None)
                 if _model_ov2 == "auto":
                     _model_ov2 = None
-                response = loop.run_until_complete(
-                    process_message(
-                        session_id,
-                        message,
-                        model_override=_model_ov2,
-                        image_data=(image_b64, image_mime) if image_b64 else None,
-                        lang=ui_lang,
-                    )
+                _coro2 = process_message(
+                    session_id,
+                    message,
+                    model_override=_model_ov2,
+                    image_data=(image_b64, image_mime) if image_b64 else None,
+                    lang=ui_lang,
                 )
+                try:
+                    _running_loop2 = asyncio.get_running_loop()
+                    response = asyncio.run_coroutine_threadsafe(_coro2, _running_loop2).result(timeout=120)
+                except RuntimeError:
+                    response = asyncio.run(_coro2)
             except Exception as e:
                 log.error(f"[Chat] process_message error: {e}")
                 response = f"❌ Internal error: {type(e).__name__}"
-            finally:
-                loop.close()
             from salmalm.core import get_session as _gs
 
             _sess = _gs(session_id)
@@ -369,17 +377,19 @@ class WebChatMixin:
             return
         from salmalm.features.edge_cases import conversation_fork
 
-        loop = asyncio.new_event_loop()
         try:
-            response = loop.run_until_complete(conversation_fork.regenerate(session_id, int(message_index)))
+            _coro_regen = conversation_fork.regenerate(session_id, int(message_index))
+            try:
+                _running_loop_regen = asyncio.get_running_loop()
+                response = asyncio.run_coroutine_threadsafe(_coro_regen, _running_loop_regen).result(timeout=120)
+            except RuntimeError:
+                response = asyncio.run(_coro_regen)
             if response:
                 self._json({"ok": True, "response": response})
             else:
                 self._json({"ok": False, "error": "Could not regenerate"}, 400)
         except Exception as e:
             self._json({"ok": False, "error": str(e)[:200]}, 500)
-        finally:
-            loop.close()
         return
 
     def _post_api_chat_compare(self):
@@ -396,14 +406,16 @@ class WebChatMixin:
             return
         from salmalm.features.edge_cases import compare_models
 
-        loop = asyncio.new_event_loop()
         try:
-            results = loop.run_until_complete(compare_models(session_id, message, models or None))
+            _coro_cmp = compare_models(session_id, message, models or None)
+            try:
+                _running_loop_cmp = asyncio.get_running_loop()
+                results = asyncio.run_coroutine_threadsafe(_coro_cmp, _running_loop_cmp).result(timeout=120)
+            except RuntimeError:
+                results = asyncio.run(_coro_cmp)
             self._json({"ok": True, "results": results})
         except Exception as e:
             self._json({"ok": False, "error": str(e)[:200]}, 500)
-        finally:
-            loop.close()
         return
 
     def _post_api_alternatives_switch(self):

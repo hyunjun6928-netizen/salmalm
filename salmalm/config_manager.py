@@ -148,7 +148,9 @@ class ConfigManager:
         migrated = False
         for migration in CONFIG_MIGRATIONS:
             if migration["version"] > current_version:
-                config = migration["migrate"](config)
+                _fn = migration.get("migrate")
+                if callable(_fn):
+                    config = _fn(config)
                 config["_version"] = migration["version"]
                 migrated = True
         if migrated:

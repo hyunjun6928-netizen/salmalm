@@ -146,7 +146,7 @@ def check_loop_detection(tool_calls: list, recent_calls: list) -> str | None:
     for tc in tool_calls:
         sig = (
             tc.get("name", ""),
-            hashlib.md5(json.dumps(tc.get("arguments", {}), sort_keys=True).encode()).hexdigest()[:8],
+            hashlib.sha256(json.dumps(tc.get("arguments", {}), sort_keys=True).encode()).hexdigest()[:12],
         )
         recent_calls.append(sig)
 

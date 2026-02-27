@@ -50,6 +50,7 @@ from salmalm.core import (  # noqa: F401
     get_session,
     _sessions,
     _metrics,
+    _metrics_lock,
     compact_session,
     auto_compact_if_needed,
     audit_log,
@@ -68,6 +69,7 @@ from salmalm.core.session_manager import (  # noqa: F401
     _PRUNE_SOFT_LIMIT,
     _PRUNE_HARD_LIMIT,
     _PRUNE_HEAD,
+    _PRUNE_TAIL,
 )
 from salmalm.core.llm_loop import (  # noqa: F401
     _call_llm_async,
@@ -87,8 +89,7 @@ from salmalm.core.llm_loop import (  # noqa: F401
     STATUS_TOOL_RUNNING,
 )
 
-# Keep _PRUNE_TAIL for backward compat
-_PRUNE_TAIL = 500
+# _PRUNE_TAIL is imported from session_manager (canonical definition)
 
 # ============================================================
 # Model aliases — sourced from constants.py (single source of truth)
@@ -316,7 +317,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         if len(tool_calls) == 1:
             tc = tool_calls[0]
-            _metrics["tool_calls"] += 1
+            with _metrics_lock:
+                _metrics["tool_calls"] += 1
             t0 = _time.time()
             # Copy args: never mutate tc["arguments"] — it is referenced later by
             # _append_tool_results and serialised into LLM context (tool_use input).
@@ -339,7 +341,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 )
             except Exception as e:
                 elapsed = _time.time() - t0
-                _metrics["tool_errors"] += 1
+                with _metrics_lock:
+                    _metrics["tool_errors"] += 1
                 result = f"❌ Tool execution error: {e}"
                 audit_log(
                     "tool_call",
@@ -357,7 +360,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         futures = {}
         start_times = {}
         for tc in tool_calls:
-            _metrics["tool_calls"] += 1
+            with _metrics_lock:
+                _metrics["tool_calls"] += 1
             start_times[tc["id"]] = _time.time()
             exec_args = {**tc["arguments"],
                          "_session_id": getattr(session, "id", ""),
@@ -382,7 +386,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 )
             except Exception as e:
                 elapsed = _time.time() - start_times[tc_id]
-                _metrics["tool_errors"] += 1
+                with _metrics_lock:
+                    _metrics["tool_errors"] += 1
                 outputs[tc_id] = f"❌ Tool execution error: {e}"
                 audit_log(
                     "tool_call",

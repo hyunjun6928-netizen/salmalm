@@ -46,7 +46,7 @@ from salmalm.core.llm_stream import (  # noqa: F401
     stream_google,
     stream_anthropic,
 )
-from salmalm.core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded, _metrics
+from salmalm.core import response_cache, router, track_usage, check_cost_cap, CostCapExceeded, _metrics, _metrics_lock
 
 
 _LLM_TIMEOUT = int(_os.environ.get("SALMALM_LLM_TIMEOUT", "120"))
@@ -354,8 +354,9 @@ def call_llm(
 
     log.info(f"[BOT] LLM call: {model} ({len(messages)} msgs, tools={len(tools or [])})")
 
-    _metrics["llm_calls"] += 1
-    _t0 = time.time()
+    with _metrics_lock:
+        _metrics["llm_calls"] += 1
+    _t0 = time.time()  # noqa: E303
     try:
         result = _call_provider(provider, api_key, model_id, messages, tools, max_tokens, thinking=thinking)
         result["model"] = model
@@ -365,8 +366,9 @@ def call_llm(
             inp_tok = usage.get("input", 0)
             out_tok = usage.get("output", 0)
             track_usage(model, inp_tok, out_tok)
-            _metrics["total_tokens_in"] += inp_tok
-            _metrics["total_tokens_out"] += out_tok
+            with _metrics_lock:
+                _metrics["total_tokens_in"] += inp_tok
+                _metrics["total_tokens_out"] += out_tok
             try:
                 from salmalm.monitoring.metrics import llm_calls_total, llm_call_duration, token_usage_total
                 _elapsed = time.time() - _t0
@@ -384,7 +386,8 @@ def call_llm(
             response_cache.put(model, messages, result["content"])
         return result
     except Exception as e:
-        _metrics["llm_errors"] += 1
+        with _metrics_lock:
+            _metrics["llm_errors"] += 1
         try:
             from salmalm.monitoring.metrics import llm_calls_total, llm_call_duration
             llm_calls_total.inc(provider=provider, model=model_id, status="error")
