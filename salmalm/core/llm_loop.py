@@ -10,7 +10,7 @@ import json
 import threading as _threading
 import time as _time
 from salmalm.constants import DATA_DIR as _DATA_DIR, MODEL_FALLBACKS as _DEFAULT_FALLBACKS
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from salmalm.security.crypto import log
 from salmalm.core.llm import (
@@ -357,8 +357,8 @@ async def call_with_failover(
     tools: Optional[list] = None,
     max_tokens: int = 4096,
     thinking: bool = False,
-    on_token: Optional[object] = None,
-    on_status: Optional[object] = None,
+    on_token: Optional[Callable] = None,
+    on_status: Optional[Callable] = None,
 ) -> Tuple[Dict[str, Any], Optional[str]]:
     """LLM call with automatic failover on failure.
 
@@ -449,7 +449,7 @@ async def call_with_failover(
 
 
 async def try_llm_call(
-    messages: list, model: str, tools: Optional[list], max_tokens: int, thinking: bool, on_token: Optional[object]
+    messages: list, model: str, tools: Optional[list], max_tokens: int, thinking: bool, on_token: Optional[Callable]
 ) -> Dict[str, Any]:
     """Single LLM call attempt with transient error retry.
 

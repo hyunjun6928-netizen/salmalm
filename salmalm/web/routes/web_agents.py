@@ -1,11 +1,10 @@
 """Agent task delegation — spawn autonomous sub-sessions to handle tasks."""
 from __future__ import annotations
 
-import json
 import threading
 import time
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from salmalm import log
 from salmalm.security.crypto import vault
@@ -209,7 +208,7 @@ class AgentsMixin:
             done = [t for t in all_tasks if t["status"] == "done"]
             failed = [t for t in all_tasks if t["status"] == "failed"]
             lines = [
-                f"**Agent Status**",
+                "**Agent Status**",
                 f"- 🔄 Running: {len(running)}",
                 f"- ✅ Done: {len(done)}",
                 f"- ❌ Failed: {len(failed)}",
@@ -286,10 +285,9 @@ class AgentsMixin:
 
 
 # ── FastAPI router ────────────────────────────────────────────────────────────
-import asyncio as _asyncio
-from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
-from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
-from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends
+from fastapi.responses import JSONResponse as _JSON
+from salmalm.web.fastapi_deps import require_auth as _auth
 
 router = _APIRouter()
 
@@ -374,7 +372,7 @@ async def post_directive(request: _Request, _u=_Depends(_auth)):
         running = [t for t in all_tasks if t["status"] == "running"]
         done = [t for t in all_tasks if t["status"] == "done"]
         failed = [t for t in all_tasks if t["status"] == "failed"]
-        lines = [f"**Agent Status**", f"- 🔄 Running: {len(running)}", f"- ✅ Done: {len(done)}", f"- ❌ Failed: {len(failed)}"]
+        lines = ["**Agent Status**", f"- 🔄 Running: {len(running)}", f"- ✅ Done: {len(done)}", f"- ❌ Failed: {len(failed)}"]
         if running:
             lines.append("\n**Active tasks:**")
             for t in running[:3]:

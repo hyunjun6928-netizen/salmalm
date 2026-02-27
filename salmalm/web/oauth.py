@@ -24,16 +24,16 @@ log = logging.getLogger(__name__)
 
 _CONFIG_DIR = DATA_DIR
 _TOKENS_PATH = _CONFIG_DIR / "oauth_tokens.json"
-_secret = os.environ.get("SALMALM_SECRET", "")
-if not _secret:
-    import logging as _log
-
-    _log.getLogger(__name__).warning(
-        "SALMALM_SECRET not set — OAuth tokens use weak obfuscation. "
-        "Set SALMALM_SECRET or use /vault for AES-GCM encryption."
+_raw_secret = os.environ.get("SALMALM_SECRET", "")
+if _raw_secret:
+    _OBFUSCATION_KEY = hashlib.sha256(_raw_secret.encode()).digest()
+else:
+    # Random key per process — tokens invalidated on restart, but secure (no hardcoded fallback)
+    _OBFUSCATION_KEY = secrets.token_bytes(32)
+    log.warning(
+        "[OAUTH] SALMALM_SECRET not set — OAuth tokens will be invalidated on restart. "
+        "Set SALMALM_SECRET for persistent tokens."
     )
-    _secret = "salmalm-default-key"
-_OBFUSCATION_KEY = hashlib.sha256(_secret.encode()).digest()
 
 
 def _xor_bytes(data: bytes, key: bytes) -> bytes:

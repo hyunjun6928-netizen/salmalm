@@ -67,11 +67,15 @@ class WSConnectionManager:
             log.debug(f"[WS] send_json failed: {e}")
 
     async def broadcast(self, data: dict, session_id: Optional[str] = None) -> None:
-        if session_id and session_id in self._connections:
-            await self.send_json(self._connections[session_id], data)
+        if session_id:
+            ws = self._connections.get(session_id)
+            if ws:
+                await self.send_json(ws, data)
             return
+        # Snapshot without lock to avoid holding lock during awaits
+        targets = list(self._all)
         dead: Set[WebSocket] = set()
-        for ws in list(self._all):
+        for ws in targets:
             try:
                 await self.send_json(ws, data)
             except Exception:
@@ -79,6 +83,10 @@ class WSConnectionManager:
         if dead:
             async with self._lock:
                 self._all -= dead
+                for ws in dead:
+                    sid = next((k for k, v in self._connections.items() if v is ws), None)
+                    if sid:
+                        self._connections.pop(sid, None)
 
 
 # ── Client adapter (presents old WSClient interface) ──────────────────────

@@ -663,7 +663,6 @@ self.addEventListener('fetch',e=>{{
 
             err_detail = traceback.format_exc()
             log.error(f"POST {self.path} error: {e}\n{err_detail}")
-            print(f"[ERROR] POST {self.path}: {e}", flush=True)
             try:
                 self._json({"error": f"Internal error: {str(e)[:200]}"}, 500)
             except (BrokenPipeError, ConnectionResetError, OSError):

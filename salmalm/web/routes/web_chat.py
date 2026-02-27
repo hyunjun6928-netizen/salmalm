@@ -13,11 +13,30 @@ from salmalm.core import router as _core_router
 # HTTP POST with the same req_id.
 # Format: { "req_id:session_id": {"response": str, "model": str, "complexity": str, "ts": float} }
 _RESP_CACHE: dict = {}
+_RESP_CACHE_LOCK = threading.Lock()
 _RESP_CACHE_TTL = 300  # 5 minutes — enough to cover any SSE→HTTP fallback window
 
 
 def _get_cached_response(req_id: str, session_id: str, wait_if_processing: bool = False) -> dict | None:
-    """Return cached response dict for req_id+session or None if not found / expired.
+    """Sync version: return cached response or None (no waiting). Used by legacy Mixin handlers."""
+    if not req_id:
+        return None
+    key = f"{req_id}:{session_id}"
+    with _RESP_CACHE_LOCK:
+        entry = _RESP_CACHE.get(key)
+        if not entry:
+            return None
+        if _time.time() - entry["ts"] >= _RESP_CACHE_TTL:
+            del _RESP_CACHE[key]
+            return None
+    if entry.get("status") == "processing":
+        return None
+    log.info(f"[IDEMPOTENCY] Cache hit for req_id={req_id[:12]}… — skipping re-process")
+    return entry
+
+
+async def _get_cached_response_async(req_id: str, session_id: str, wait_if_processing: bool = False) -> dict | None:
+    """Async version: return cached response dict for req_id+session or None if not found / expired.
 
     If wait_if_processing=True and entry has status='processing', polls up to 12s
     for the SSE path to finish before returning. Prevents HTTP fallback double-processing
@@ -30,7 +49,8 @@ def _get_cached_response(req_id: str, session_id: str, wait_if_processing: bool 
     # If processing: optionally wait for completion
     if wait_if_processing:
         for _ in range(24):  # 24 × 0.5s = 12s max wait
-            entry = _RESP_CACHE.get(key)
+            with _RESP_CACHE_LOCK:
+                entry = _RESP_CACHE.get(key)
             if not entry:
                 break
             if entry.get("status") == "done":
@@ -38,14 +58,15 @@ def _get_cached_response(req_id: str, session_id: str, wait_if_processing: bool 
                 return entry
             if _time.time() - entry["ts"] > _RESP_CACHE_TTL:
                 break
-            _time.sleep(0.5)
+            await asyncio.sleep(0.5)
 
-    entry = _RESP_CACHE.get(key)
-    if not entry:
-        return None
-    if _time.time() - entry["ts"] >= _RESP_CACHE_TTL:
-        del _RESP_CACHE[key]
-        return None
+    with _RESP_CACHE_LOCK:
+        entry = _RESP_CACHE.get(key)
+        if not entry:
+            return None
+        if _time.time() - entry["ts"] >= _RESP_CACHE_TTL:
+            del _RESP_CACHE[key]
+            return None
     if entry.get("status") == "processing":
         return None  # Still running — fall through to HTTP POST path
     log.info(f"[IDEMPOTENCY] Cache hit for req_id={req_id[:12]}… — skipping re-process")
@@ -58,7 +79,8 @@ def _mark_processing(req_id: str, session_id: str) -> None:
     """
     if not req_id:
         return
-    _RESP_CACHE[f"{req_id}:{session_id}"] = {"status": "processing", "ts": _time.time()}
+    with _RESP_CACHE_LOCK:
+        _RESP_CACHE[f"{req_id}:{session_id}"] = {"status": "processing", "ts": _time.time()}
 
 
 def _cache_response(req_id: str, session_id: str, response: str, model: str, complexity: str) -> None:
@@ -66,15 +88,16 @@ def _cache_response(req_id: str, session_id: str, response: str, model: str, com
     if not req_id:
         return
     key = f"{req_id}:{session_id}"
-    _RESP_CACHE[key] = {
-        "status": "done",
-        "response": response, "model": model, "complexity": complexity,
-        "ts": _time.time(),
-    }
     now = _time.time()
-    expired = [k for k, v in list(_RESP_CACHE.items()) if now - v["ts"] > _RESP_CACHE_TTL]
-    for k in expired:
-        _RESP_CACHE.pop(k, None)
+    with _RESP_CACHE_LOCK:
+        _RESP_CACHE[key] = {
+            "status": "done",
+            "response": response, "model": model, "complexity": complexity,
+            "ts": now,
+        }
+        expired = [k for k, v in list(_RESP_CACHE.items()) if now - v["ts"] > _RESP_CACHE_TTL]
+        for k in expired:
+            _RESP_CACHE.pop(k, None)
 
 
 class WebChatMixin:
@@ -94,6 +117,8 @@ class WebChatMixin:
         from salmalm.core.engine import process_message
 
         body = self._body
+        if not self._require_auth("user"):
+            return
         self._auto_unlock_localhost()
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
@@ -241,7 +266,7 @@ class WebChatMixin:
 
             # If client disconnected mid-stream, nothing to send
             if _client_disconnected[0]:
-                log.info(f"[SSE] Skipping done event — client already disconnected")
+                log.info("[SSE] Skipping done event — client already disconnected")
                 return
 
             from salmalm.core import get_session as _gs2
@@ -453,11 +478,9 @@ class WebChatMixin:
 
 
 # ── FastAPI router ────────────────────────────────────────────────────────────
-import asyncio as _asyncio
-from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
-from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
-from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
-from salmalm.web.schemas import ChatRequest, ChatResponse, SuccessResponse
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends
+from fastapi.responses import JSONResponse as _JSON, StreamingResponse as _SR
+from salmalm.web.fastapi_deps import require_auth as _auth
 from typing import Optional as _Optional
 from pydantic import BaseModel as _BaseModel, Field as _Field
 
@@ -477,7 +500,7 @@ async def post_chat(req: _ChatBody, _u=_Depends(_auth)):
     from salmalm.security.crypto import vault
     from salmalm.core.engine import process_message
     from salmalm.core import router as _core_router
-    from salmalm.web.routes.web_chat import _get_cached_response, _mark_processing, _cache_response
+    from salmalm.web.routes.web_chat import _get_cached_response_async
     if not vault.is_unlocked:
         return _JSON(content={"error": "Vault locked"}, status_code=403)
     message = req.message
@@ -489,7 +512,7 @@ async def post_chat(req: _ChatBody, _u=_Depends(_auth)):
     _MAX_MSG_CHARS = 50_000
     if len(message) > _MAX_MSG_CHARS:
         message = message[:_MAX_MSG_CHARS] + f"\n\n⚠️ **[Message truncated at {_MAX_MSG_CHARS:,} chars]**"
-    _cached = _get_cached_response(req_id, session_id, wait_if_processing=True)
+    _cached = await _get_cached_response_async(req_id, session_id, wait_if_processing=True)
     if _cached:
         return _JSON(content={"response": _cached["response"], "model": _cached["model"],
                               "complexity": _cached["complexity"], "from_cache": True})
@@ -510,7 +533,7 @@ async def post_chat(req: _ChatBody, _u=_Depends(_auth)):
 
 @router.post("/api/chat/stream")
 async def post_chat_stream(req: _ChatBody, _u=_Depends(_auth)):
-    import json as _json, threading, time as _time
+    import json as _json
     from salmalm.security.crypto import vault, log
     from salmalm.core.engine import process_message
     from salmalm.core import router as _core_router
@@ -528,43 +551,57 @@ async def post_chat_stream(req: _ChatBody, _u=_Depends(_auth)):
         message = message[:_MAX_MSG_CHARS] + f"\n\n⚠️ **[Message truncated at {_MAX_MSG_CHARS:,} chars]**"
     _mark_processing(req_id, session_id)
 
+    def _sse(event, data):
+        return f"event: {event}\ndata: {_json.dumps(data, ensure_ascii=False)}\n\n".encode()
+
+    _queue: asyncio.Queue = asyncio.Queue()
+
     async def generate():
-        import asyncio as _aio
-        tool_count = [0]
-        streamed_text = [""]
-        _disconnected = [False]
-
-        def _sse(event, data):
-            return f"event: {event}\ndata: {_json.dumps(data, ensure_ascii=False)}\n\n".encode()
-
         yield _sse("status", {"text": "🤔 Thinking..."})
 
-        def on_tool(name, args):
-            tool_count[0] += 1
-
         def on_token(event):
-            if _disconnected[0]:
-                raise RuntimeError("[SSE] Client disconnected")
             etype = event.get("type", "")
-            if etype == "text_delta":
-                text = event.get("text", "")
-                if text:
-                    streamed_text[0] += text
+            if etype == "text_delta" and event.get("text"):
+                try:
+                    _queue.put_nowait(_sse("chunk", {"text": event["text"], "streaming": True}))
+                except Exception:
+                    pass
             elif etype == "tool_use_start":
-                tool_count[0] += 1
+                try:
+                    _queue.put_nowait(_sse("status", {"text": f"🔧 Running {event.get('name', 'tool')}..."}))
+                except Exception:
+                    pass
+
+        from salmalm.core import get_session as _gs
+        _sess_pre = _gs(session_id)
+        _model_ov = getattr(_sess_pre, "model_override", None)
+        if _model_ov == "auto":
+            _model_ov = None
+
+        task = asyncio.create_task(
+            process_message(session_id, message, model_override=_model_ov,
+                            image_data=(image_b64, image_mime) if image_b64 else None,
+                            on_token=on_token, lang=ui_lang)
+        )
+
+        # Drain queue while task is running
+        while not task.done():
+            try:
+                chunk = await asyncio.wait_for(_queue.get(), timeout=0.1)
+                yield chunk
+            except asyncio.TimeoutError:
+                yield _sse("heartbeat", {})  # keep-alive
+
+        # Drain remaining queued chunks
+        while not _queue.empty():
+            yield _queue.get_nowait()
 
         try:
-            from salmalm.core import get_session as _gs
-            _sess_pre = _gs(session_id)
-            _model_ov = getattr(_sess_pre, "model_override", None)
-            if _model_ov == "auto":
-                _model_ov = None
-            response = await process_message(session_id, message, model_override=_model_ov,
-                                              image_data=(image_b64, image_mime) if image_b64 else None,
-                                              on_tool=on_tool, on_token=on_token, lang=ui_lang)
+            response = await task
         except Exception as e:
             log.error(f"[SSE] process_message error: {e}")
-            response = f"❌ Internal error: {type(e).__name__}"
+            yield _sse("error", {"text": str(e)})
+            return
 
         try:
             from salmalm.tools.tools_ui import pop_pending_commands
@@ -578,10 +615,6 @@ async def post_chat_stream(req: _ChatBody, _u=_Depends(_auth)):
         _done_model = getattr(_sess2, "last_model", _core_router.force_model or "auto")
         _done_complexity = getattr(_sess2, "last_complexity", "auto")
         _cache_response(req_id, session_id, response, _done_model, _done_complexity)
-
-        # Emit token chunks for the full response (clients rely on chunk events)
-        if response:
-            yield _sse("chunk", {"text": response, "streaming": False})
         yield _sse("done", {"response": response, "model": _done_model, "complexity": _done_complexity})
 
     return _SR(generate(), media_type="text/event-stream",
@@ -618,7 +651,6 @@ async def post_chat_abort(request: _Request, _u=_Depends(_auth)):
 
 @router.post("/api/chat/regenerate")
 async def post_chat_regenerate(request: _Request, _u=_Depends(_auth)):
-    import asyncio as _aio
     from salmalm.features.edge_cases import conversation_fork
     body = await request.json()
     session_id = body.get("session_id", "web")

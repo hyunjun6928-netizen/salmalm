@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import http.server
+import logging
 import os
 import signal
 import sys
 import threading
 import time
+
+log = logging.getLogger(__name__)
 
 from salmalm.constants import (  # noqa: F401
     VERSION,
@@ -589,7 +592,7 @@ def _start_tunnel(port: int) -> None:
             if m:
                 tunnel_url = m.group(1)
                 print(f"\n  🌐 Tunnel URL: {tunnel_url}")
-                print(f"  📱 폰에서 이 URL을 열거나, QR 코드를 스캔하세요:\n")
+                print("  📱 폰에서 이 URL을 열거나, QR 코드를 스캔하세요:\n")
                 try:
                     _print_qr(tunnel_url)
                 except Exception as e:
