@@ -334,6 +334,7 @@ import asyncio as _asyncio
 from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
 from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
 from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+from salmalm.web.schemas import EngineSettingsRequest, RoutingConfig
 
 router = _APIRouter()
 
@@ -422,9 +423,9 @@ async def post_sla_config(request: _Request, _u=_Depends(_auth)):
     return _JSON(content={"ok": True, "config": sla_config.get_all()})
 
 @router.post("/api/engine/settings")
-async def post_engine_settings(request: _Request, _u=_Depends(_auth)):
+async def post_engine_settings(req: EngineSettingsRequest, _u=_Depends(_auth)):
     from salmalm.web.routes.web_engine import _apply_engine_settings_to_runtime, _snapshot_current_settings, save_engine_settings
-    body = await request.json()
+    body = {k: v for k, v in req.model_dump().items() if v is not None}
     _apply_engine_settings_to_runtime(body)
     current = _snapshot_current_settings()
     save_engine_settings(current)

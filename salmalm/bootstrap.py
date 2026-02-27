@@ -140,7 +140,7 @@ async def _start_discord_bot() -> None:
             log.warning(f"[DISCORD] Failed to start: {e}")
 
 
-def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=18801):
+def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=None):
     """Print startup banner (deferred to run_server call)."""
     # RAG stats available but not displayed in banner (intentional)
     st = f"{selftest['passed']}/{selftest['total']}" if selftest else "skipped"
@@ -149,7 +149,7 @@ def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=1880
     _lines = [
         f"😈 {APP_NAME} v{VERSION}",
         f"Web UI:    http://{bind_addr}:{port}",
-        f"WebSocket: ws://{bind_addr}:{ws_port}",
+        f"WebSocket: ws://{bind_addr}:{port}/ws",
         f"Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}",
         f"Crypto:    {'AES-256-GCM' if HAS_CRYPTO else ('HMAC-CTR (fallback)' if os.environ.get('SALMALM_VAULT_FALLBACK') else 'Vault disabled')}",
         f"Self-test: {st}",
@@ -437,9 +437,12 @@ async def _setup_services(host: str, port: int, httpd, server_thread, url: str) 
     """Setup vault, channels, background services (phases 5-12)."""
     _auto_unlock_vault()
     # ── Phase 6: WebSocket Server ──
-    ws_port = int(os.environ.get("SALMALM_WS_PORT", 18801))
+    # SALMALM_WS_PORT is deprecated — WS is now served on the same port as HTTP.
+    _ws_port_legacy = os.environ.get("SALMALM_WS_PORT")
+    if _ws_port_legacy:
+        log.warning("[WS] SALMALM_WS_PORT is deprecated; WebSocket now shares the HTTP port via /ws")
     try:
-        ws_server.port = ws_port
+        ws_server.port = port
         await ws_server.start()
     except Exception as e:
         log.error(f"WebSocket server failed: {e}")
@@ -749,8 +752,7 @@ async def run_server():
 
     await _setup_services(bind_addr, port, server, web_thread, url)
 
-    _ws_port = int(os.environ.get("SALMALM_WS_PORT", 18801))
-    _print_banner(bind_addr=bind_addr, port=port, ws_port=_ws_port)
+    _print_banner(bind_addr=bind_addr, port=port)
 
     # ── Graceful Shutdown Setup ──
     _trigger_shutdown = asyncio.Event()

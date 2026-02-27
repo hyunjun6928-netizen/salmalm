@@ -333,6 +333,7 @@ import asyncio as _asyncio
 from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
 from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
 from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+from salmalm.web.schemas import CreateSessionRequest, SessionListResponse, SessionInfo
 
 router = _APIRouter()
 
@@ -437,10 +438,9 @@ async def get_session_alternatives(session_id: str, msg_index: int = _Query(0), 
     return _JSON(content={"alternatives": alts})
 
 @router.post("/api/sessions/create")
-async def post_sessions_create(request: _Request, _u=_Depends(_auth)):
+async def post_sessions_create(req: CreateSessionRequest, _u=_Depends(_auth)):
     from salmalm.core import _get_db
-    body = await request.json()
-    sid = body.get("session_id", "")
+    sid = req.session_id or ""
     if not sid:
         return _JSON(content={"ok": False, "error": "Missing session_id"}, status_code=400)
     conn = _get_db()

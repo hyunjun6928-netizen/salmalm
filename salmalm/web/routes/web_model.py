@@ -315,6 +315,7 @@ import asyncio as _asyncio
 from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
 from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
 from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+from salmalm.web.schemas import ModelsResponse, ModelInfo, SuccessResponse, ErrorResponse
 
 router = _APIRouter()
 

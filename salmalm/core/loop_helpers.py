@@ -23,7 +23,7 @@ def check_abort(session_id: str) -> str | None:
     return None
 
 
-def select_model(model_override, user_message, tier, iteration, router):
+def select_model(model_override: str | None, user_message: str, tier: int, iteration: int, router) -> str:
     """Select model based on override, tier, or router."""
     if model_override:
         return model_override
@@ -45,7 +45,7 @@ def trim_history(session, classification) -> None:
         session.messages = _sys + _recent
 
 
-def prune_session_context(session, model: str):
+def prune_session_context(session, model: str) -> list:
     """Prune context. Runs three stages when needed:
 
     A (tool-result pruning) — always run when cache TTL has expired.

@@ -390,6 +390,16 @@ async def _on_startup() -> None:  # noqa: D401
     _register_all_routes()
 
 
+# ── WebSocket endpoint (single-port, same as HTTP) ────────────────────────
+from fastapi import WebSocket as _WebSocket  # noqa: E402
+from salmalm.web.ws import ws_server as _ws_server  # noqa: E402
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: _WebSocket) -> None:
+    await _ws_server.handle_connection(websocket)
+
+
 # Also register synchronously for tests that import app without running uvicorn
 try:
     _register_all_routes()

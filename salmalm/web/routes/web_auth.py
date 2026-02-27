@@ -338,6 +338,8 @@ from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _De
 from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
 from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
 
+from salmalm.web.schemas import LoginRequest, UnlockRequest, UserCreate
+
 router = _APIRouter()
 
 @router.get("/api/auth/users")
@@ -371,29 +373,27 @@ async def get_google_auth(request: _Request, _u=_Depends(_auth)):
     return _RR(url=url, status_code=302)
 
 @router.post("/api/users/register")
-async def post_users_register(request: _Request):
+async def post_users_register(req: UserCreate, request: _Request):
     from salmalm.web.auth import extract_auth, auth_manager
     from salmalm.features.users import user_manager
-    body = await request.json()
     requester = extract_auth(dict(request.headers))
     reg_mode = user_manager.get_registration_mode()
     if reg_mode == "admin_only":
         if not requester or requester.get("role") != "admin":
             return _JSON(content={"error": "Admin access required for registration / 관리자만 등록 가능"}, status_code=403)
     try:
-        user = auth_manager.create_user(body.get("username", ""), body.get("password", ""), body.get("role", "user"))
+        user = auth_manager.create_user(req.username, req.password, req.role)
         user_manager.ensure_quota(user["id"])
         return _JSON(content={"ok": True, "user": user})
     except ValueError as e:
         return _JSON(content={"error": str(e)}, status_code=400)
 
 @router.post("/api/auth/login")
-async def post_auth_login(request: _Request):
+async def post_auth_login(req: LoginRequest, request: _Request):
     from salmalm.web.auth import auth_manager
     from salmalm.core import audit_log
-    body = await request.json()
-    username = body.get("username", "")
-    password = body.get("password", "")
+    username = req.username
+    password = req.password
     user = auth_manager.authenticate(username, password)
     ip = request.client.host if request.client else "unknown"
     if user:
@@ -405,26 +405,24 @@ async def post_auth_login(request: _Request):
         return _JSON(content={"error": "Invalid credentials"}, status_code=401)
 
 @router.post("/api/auth/register")
-async def post_auth_register(request: _Request):
+async def post_auth_register(req: UserCreate, request: _Request):
     from salmalm.web.auth import extract_auth, auth_manager
-    body = await request.json()
     requester = extract_auth(dict(request.headers))
     if not requester or requester.get("role") != "admin":
         return _JSON(content={"error": "Admin access required"}, status_code=403)
     try:
-        user = auth_manager.create_user(body.get("username", ""), body.get("password", ""), body.get("role", "user"))
+        user = auth_manager.create_user(req.username, req.password, req.role)
         return _JSON(content={"ok": True, "user": user})
     except ValueError as e:
         return _JSON(content={"error": str(e)}, status_code=400)
 
 @router.post("/api/unlock")
-async def post_unlock(request: _Request):
+async def post_unlock(req: UnlockRequest):
     from salmalm.security.crypto import vault
     from salmalm.constants import VAULT_FILE
     from salmalm.core import audit_log
     import secrets
-    body = await request.json()
-    password = body.get("password", "")
+    password = req.password
     if VAULT_FILE.exists():
         ok = vault.unlock(password, save_to_keychain=True)
     else:

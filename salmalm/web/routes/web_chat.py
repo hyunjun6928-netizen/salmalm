@@ -457,24 +457,35 @@ import asyncio as _asyncio
 from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
 from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
 from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+from salmalm.web.schemas import ChatRequest, ChatResponse, SuccessResponse
+from typing import Optional as _Optional
+from pydantic import BaseModel as _BaseModel, Field as _Field
+
+class _ChatBody(_BaseModel):
+    """Full chat request body (internal — includes all fields used by handler)."""
+    message: str = _Field("", description="User message")
+    session: str = _Field("web", description="Session ID")
+    image_base64: _Optional[str] = None
+    image_mime: str = "image/png"
+    lang: str = ""
+    req_id: str = ""
 
 router = _APIRouter()
 
 @router.post("/api/chat")
-async def post_chat(request: _Request, _u=_Depends(_auth)):
+async def post_chat(req: _ChatBody, _u=_Depends(_auth)):
     from salmalm.security.crypto import vault
     from salmalm.core.engine import process_message
     from salmalm.core import router as _core_router
     from salmalm.web.routes.web_chat import _get_cached_response, _mark_processing, _cache_response
-    body = await request.json()
     if not vault.is_unlocked:
         return _JSON(content={"error": "Vault locked"}, status_code=403)
-    message = body.get("message", "")
-    session_id = body.get("session", "web")
-    image_b64 = body.get("image_base64")
-    image_mime = body.get("image_mime", "image/png")
-    ui_lang = body.get("lang", "")
-    req_id = body.get("req_id", "")
+    message = req.message
+    session_id = req.session
+    image_b64 = req.image_base64
+    image_mime = req.image_mime
+    ui_lang = req.lang
+    req_id = req.req_id
     _MAX_MSG_CHARS = 50_000
     if len(message) > _MAX_MSG_CHARS:
         message = message[:_MAX_MSG_CHARS] + f"\n\n⚠️ **[Message truncated at {_MAX_MSG_CHARS:,} chars]**"
@@ -498,21 +509,20 @@ async def post_chat(request: _Request, _u=_Depends(_auth)):
                           "complexity": getattr(_sess, "last_complexity", "auto")})
 
 @router.post("/api/chat/stream")
-async def post_chat_stream(request: _Request, _u=_Depends(_auth)):
+async def post_chat_stream(req: _ChatBody, _u=_Depends(_auth)):
     import json as _json, threading, time as _time
     from salmalm.security.crypto import vault, log
     from salmalm.core.engine import process_message
     from salmalm.core import router as _core_router
     from salmalm.web.routes.web_chat import _mark_processing, _cache_response
-    body = await request.json()
     if not vault.is_unlocked:
         return _JSON(content={"error": "Vault locked"}, status_code=403)
-    message = body.get("message", "")
-    session_id = body.get("session", "web")
-    image_b64 = body.get("image_base64")
-    image_mime = body.get("image_mime", "image/png")
-    ui_lang = body.get("lang", "")
-    req_id = body.get("req_id", "")
+    message = req.message
+    session_id = req.session
+    image_b64 = req.image_base64
+    image_mime = req.image_mime
+    ui_lang = req.lang
+    req_id = req.req_id
     _MAX_MSG_CHARS = 50_000
     if len(message) > _MAX_MSG_CHARS:
         message = message[:_MAX_MSG_CHARS] + f"\n\n⚠️ **[Message truncated at {_MAX_MSG_CHARS:,} chars]**"
