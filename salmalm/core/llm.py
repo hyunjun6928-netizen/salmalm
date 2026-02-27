@@ -367,6 +367,17 @@ def call_llm(
             track_usage(model, inp_tok, out_tok)
             _metrics["total_tokens_in"] += inp_tok
             _metrics["total_tokens_out"] += out_tok
+            try:
+                from salmalm.monitoring.metrics import llm_calls_total, llm_call_duration, token_usage_total
+                _elapsed = time.time() - _t0
+                llm_calls_total.inc(provider=provider, model=model_id, status="ok")
+                llm_call_duration.observe(_elapsed)
+                if inp_tok:
+                    token_usage_total.inc(inp_tok, provider=provider, type="input")
+                if out_tok:
+                    token_usage_total.inc(out_tok, provider=provider, type="output")
+            except Exception:
+                pass
         except Exception as e:
             log.warning(f"[COST] Usage tracking failed (ignored): {e}")
         if not result.get("tool_calls") and result.get("content"):
@@ -374,6 +385,12 @@ def call_llm(
         return result
     except Exception as e:
         _metrics["llm_errors"] += 1
+        try:
+            from salmalm.monitoring.metrics import llm_calls_total, llm_call_duration
+            llm_calls_total.inc(provider=provider, model=model_id, status="error")
+            llm_call_duration.observe(time.time() - _t0)
+        except Exception:
+            pass
         _elapsed = time.time() - _t0
         err_str = str(e)
         log.error(

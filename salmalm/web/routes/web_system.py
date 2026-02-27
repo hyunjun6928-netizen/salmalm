@@ -173,13 +173,17 @@ class SystemMixin:
         )
 
     def _get_metrics(self):
-        """Get metrics."""
-        from salmalm.core import _metrics
+        """Get metrics — Prometheus text format 0.0.4."""
+        from salmalm.monitoring.metrics import metrics as prom_metrics
 
-        usage = get_usage_report()
-        _metrics["total_cost"] = usage.get("total_cost", 0.0)
-        merged = {**request_logger.get_metrics(), **_metrics}
-        self._json(merged)
+        body = prom_metrics.render_text().encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+        self._cors()
+        self._security_headers()
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _get_cert(self):
         """Get cert."""

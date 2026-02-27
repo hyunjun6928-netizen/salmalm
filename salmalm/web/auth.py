@@ -24,6 +24,7 @@ import json
 import os
 import secrets
 import sqlite3
+from salmalm.db import get_connection
 import threading
 import time
 from typing import Dict, List, Optional, Tuple
@@ -148,7 +149,7 @@ class TokenManager:
         """Create revoked_tokens table if it doesn't exist."""
         try:
             AUTH_DB.parent.mkdir(parents=True, exist_ok=True)
-            conn = sqlite3.connect(str(AUTH_DB))
+            conn = get_connection(AUTH_DB)
             conn.execute("""CREATE TABLE IF NOT EXISTS revoked_tokens (
                 jti TEXT PRIMARY KEY,
                 revoked_at REAL NOT NULL,
@@ -230,7 +231,7 @@ class TokenManager:
             return False  # Legacy token without jti
         try:
             with self._revoked_lock:
-                conn = sqlite3.connect(str(AUTH_DB))
+                conn = get_connection(AUTH_DB)
                 conn.execute(
                     "INSERT OR IGNORE INTO revoked_tokens (jti, revoked_at, expires_at) VALUES (?, ?, ?)",
                     (jti, time.time(), exp),
@@ -262,7 +263,7 @@ class TokenManager:
     def _is_revoked(self, jti: str) -> bool:
         """Check if a jti has been revoked."""
         try:
-            conn = sqlite3.connect(str(AUTH_DB))
+            conn = get_connection(AUTH_DB)
             row = conn.execute("SELECT 1 FROM revoked_tokens WHERE jti=?", (jti,)).fetchone()
             conn.close()
             return row is not None
@@ -272,7 +273,7 @@ class TokenManager:
     def cleanup_expired(self) -> int:
         """Remove revocation entries for tokens that have expired anyway."""
         try:
-            conn = sqlite3.connect(str(AUTH_DB))
+            conn = get_connection(AUTH_DB)
             cursor = conn.execute("DELETE FROM revoked_tokens WHERE expires_at < ?", (time.time(),))
             conn.commit()
             deleted = cursor.rowcount
@@ -433,7 +434,7 @@ class IPBanList:
     def _get_conn(self):
         """Return a SQLite connection to auth.db."""
         import sqlite3 as _sq
-        conn = _sq.connect(str(AUTH_DB))
+        conn = get_connection(AUTH_DB)
         conn.execute(self._DB_TABLE)
         conn.commit()
         return conn
@@ -636,7 +637,7 @@ class DailyQuotaManager:
     def _get_conn(self):
         """Return a SQLite connection to auth.db."""
         import sqlite3 as _sq
-        conn = _sq.connect(str(AUTH_DB))
+        conn = get_connection(AUTH_DB)
         conn.execute(self._DB_TABLE)
         conn.commit()
         return conn
@@ -768,7 +769,7 @@ class AuthManager:
         with self._lock:
             if self._initialized:  # Re-check: another thread may have won the race
                 return
-            conn = sqlite3.connect(str(AUTH_DB))
+            conn = get_connection(AUTH_DB)
             conn.execute("""CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
@@ -856,7 +857,7 @@ class AuthManager:
 
             raise AuthError("Password must be at least 8 characters")
 
-        conn = sqlite3.connect(str(AUTH_DB))
+        conn = get_connection(AUTH_DB)
         try:
             uid, raw_api_key = self._create_user_db(conn, username, password, role)
             conn.close()
@@ -880,7 +881,7 @@ class AuthManager:
             log.warning(f"[LOCK] Account locked: {username}")
             return None
 
-        conn = sqlite3.connect(str(AUTH_DB))
+        conn = get_connection(AUTH_DB)
         row = conn.execute(
             "SELECT id, username, password_hash, password_salt, role, api_key, enabled FROM users WHERE username=?",
             (username,),
@@ -916,7 +917,7 @@ class AuthManager:
         """Authenticate via API key (constant-time hash comparison)."""
         self._ensure_db()
         key_hash = self._hash_api_key(api_key)
-        conn = sqlite3.connect(str(AUTH_DB))
+        conn = get_connection(AUTH_DB)
         row = conn.execute(
             "SELECT id, username, role, enabled FROM users WHERE api_key=? AND enabled=1",
             (key_hash,),
@@ -929,7 +930,7 @@ class AuthManager:
     def _record_attempt(self, username: str, ip: str = ""):
         """Record a failed login attempt in DB (survives restart)."""
         try:
-            conn = sqlite3.connect(str(AUTH_DB))
+            conn = get_connection(AUTH_DB)
             conn.execute(
                 "INSERT INTO login_attempts (username, attempted_at, ip_address) VALUES (?, ?, ?)",
                 (username, time.time(), ip),
@@ -945,7 +946,7 @@ class AuthManager:
     def _is_locked_out(self, username: str) -> bool:
         """Check if username is locked out (DB-persisted, survives restart)."""
         try:
-            conn = sqlite3.connect(str(AUTH_DB))
+            conn = get_connection(AUTH_DB)
             cutoff = time.time() - self._lockout_duration
             row = conn.execute(
                 "SELECT COUNT(*) FROM login_attempts WHERE username=? AND attempted_at>?",
@@ -982,7 +983,7 @@ class AuthManager:
         if not uid:
             return payload  # Legacy token without uid — pass through
         try:
-            conn = sqlite3.connect(str(AUTH_DB))
+            conn = get_connection(AUTH_DB)
             row = conn.execute(
                 "SELECT enabled FROM users WHERE id=?", (uid,)
             ).fetchone()
@@ -1001,7 +1002,7 @@ class AuthManager:
     def list_users(self) -> List[dict]:
         """List all users (admin only)."""
         self._ensure_db()
-        conn = sqlite3.connect(str(AUTH_DB))
+        conn = get_connection(AUTH_DB)
         rows = conn.execute("SELECT id, username, role, created_at, last_login, enabled FROM users").fetchall()
         conn.close()
         return [
@@ -1019,7 +1020,7 @@ class AuthManager:
     def delete_user(self, username: str) -> bool:
         """Delete a user account by username."""
         self._ensure_db()
-        conn = sqlite3.connect(str(AUTH_DB))
+        conn = get_connection(AUTH_DB)
         cursor = conn.execute("DELETE FROM users WHERE username=? AND role != ?", (username, "admin"))
         conn.commit()
         deleted = cursor.rowcount > 0
@@ -1034,7 +1035,7 @@ class AuthManager:
             raise AuthError("Password must be at least 8 characters")
         self._ensure_db()
         pw_hash, salt = _hash_password(new_password)
-        conn = sqlite3.connect(str(AUTH_DB))
+        conn = get_connection(AUTH_DB)
         cursor = conn.execute(
             "UPDATE users SET password_hash=?, password_salt=? WHERE username=?",
             (pw_hash, salt, username),

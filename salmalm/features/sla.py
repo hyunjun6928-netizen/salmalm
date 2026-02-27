@@ -15,6 +15,7 @@ import json
 import math
 import os
 import sqlite3
+from salmalm.db import get_connection
 import threading
 import time
 from collections import deque
@@ -155,7 +156,7 @@ class UptimeMonitor:
 
     def _get_db(self) -> sqlite3.Connection:
         """Get db."""
-        conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=True)
+        conn = get_connection(AUDIT_DB)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
@@ -557,7 +558,7 @@ class Watchdog:
 
         # 1. DB check
         try:
-            conn = sqlite3.connect(str(AUDIT_DB), timeout=5)
+            conn = get_connection(AUDIT_DB)
             conn.execute("SELECT 1")
             conn.close()
             report["checks"]["database"] = {"status": "ok"}
@@ -673,7 +674,7 @@ class Watchdog:
                     log.debug(f"Suppressed: {e}")
                 del _thread_local.audit_conn
             # Test new connection
-            conn = sqlite3.connect(str(AUDIT_DB), timeout=5)
+            conn = get_connection(AUDIT_DB)
             conn.execute("SELECT 1")
             conn.close()
             log.info("[SLA] DB recovery successful")

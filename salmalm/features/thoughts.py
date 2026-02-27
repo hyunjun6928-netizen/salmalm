@@ -5,6 +5,7 @@ from salmalm.security.crypto import log
 
 import re
 import sqlite3
+from salmalm.db import get_connection
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -38,7 +39,7 @@ class ThoughtStream:
 
     def _ensure_db(self):
         """Ensure db."""
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS thoughts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,7 +63,7 @@ class ThoughtStream:
         tags = _extract_tags(content)
         now = datetime.now(KST).isoformat()
 
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             cur = conn.execute(
                 "INSERT INTO thoughts (content, tags, mood, created_at) VALUES (?, ?, ?, ?)", (content, tags, mood, now)
             )
@@ -85,7 +86,7 @@ class ThoughtStream:
 
     def list_recent(self, n: int = 10) -> List[Dict]:
         """List most recent N thoughts."""
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("SELECT * FROM thoughts ORDER BY created_at DESC LIMIT ?", (n,)).fetchall()
         return [dict(r) for r in rows]
@@ -107,7 +108,7 @@ class ThoughtStream:
                         pass
             if thought_ids:
                 placeholders = ",".join("?" * len(thought_ids))
-                with sqlite3.connect(str(self.db_path)) as conn:
+                with get_connection(self.db_path) as conn:
                     conn.row_factory = sqlite3.Row
                     rows = conn.execute(
                         f"SELECT * FROM thoughts WHERE id IN ({placeholders}) ORDER BY created_at DESC", thought_ids
@@ -117,7 +118,7 @@ class ThoughtStream:
             log.debug(f"Suppressed: {e}")
 
         # Fallback: simple LIKE search
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM thoughts WHERE content LIKE ? ORDER BY created_at DESC LIMIT 20", (f"%{query}%",)
@@ -126,7 +127,7 @@ class ThoughtStream:
 
     def by_tag(self, tag: str) -> List[Dict]:
         """Filter thoughts by tag."""
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM thoughts WHERE tags LIKE ? ORDER BY created_at DESC", (f"%{tag}%",)
@@ -138,7 +139,7 @@ class ThoughtStream:
         if date_str is None:
             date_str = datetime.now(KST).strftime("%Y-%m-%d")
 
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM thoughts WHERE created_at LIKE ? ORDER BY created_at ASC", (f"{date_str}%",)
@@ -147,7 +148,7 @@ class ThoughtStream:
 
     def stats(self) -> Dict[str, Any]:
         """Get thought statistics."""
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             total = conn.execute("SELECT COUNT(*) FROM thoughts").fetchone()[0]
 
             # Weekly count
@@ -176,7 +177,7 @@ class ThoughtStream:
 
     def export_markdown(self) -> str:
         """Export all thoughts as Markdown."""
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("SELECT * FROM thoughts ORDER BY created_at ASC").fetchall()
 
@@ -209,7 +210,7 @@ class ThoughtStream:
 
     def delete(self, thought_id: int) -> bool:
         """Delete a thought by ID."""
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             cur = conn.execute("DELETE FROM thoughts WHERE id = ?", (thought_id,))
             return cur.rowcount > 0
 

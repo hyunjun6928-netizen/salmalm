@@ -321,6 +321,11 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                 session_id=session_id,
                 detail_dict={"session_id": session_id},
             )
+        try:
+            from salmalm.monitoring.metrics import active_sessions
+            active_sessions.set(len(_sessions))
+        except Exception:
+            pass
         return _sessions[session_id]
 
 

@@ -18,6 +18,7 @@ Usage:
 
 import json
 import sqlite3
+from salmalm.db import get_connection
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -55,7 +56,7 @@ class UserManager:
         """Ensure db."""
         if self._initialized:
             return
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
 
@@ -122,7 +123,7 @@ class UserManager:
             return self._multi_tenant_enabled
         self._ensure_db()
         try:
-            conn = sqlite3.connect(str(USERS_DB))
+            conn = get_connection(USERS_DB)
             row = conn.execute("SELECT value FROM multi_tenant_config WHERE key='enabled'").fetchone()
             conn.close()
             self._multi_tenant_enabled = row and row[0] == "true"
@@ -133,7 +134,7 @@ class UserManager:
     def enable_multi_tenant(self, enabled: bool = True) -> None:
         """Enable or disable multi-tenant mode."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         conn.execute(
             "INSERT OR REPLACE INTO multi_tenant_config (key, value) VALUES ('enabled', ?)",
             ("true" if enabled else "false",),
@@ -147,7 +148,7 @@ class UserManager:
         """Get a multi-tenant config value."""
         self._ensure_db()
         try:
-            conn = sqlite3.connect(str(USERS_DB))
+            conn = get_connection(USERS_DB)
             row = conn.execute("SELECT value FROM multi_tenant_config WHERE key=?", (key,)).fetchone()
             conn.close()
             return row[0] if row else default
@@ -157,7 +158,7 @@ class UserManager:
     def set_config(self, key: str, value: str) -> None:
         """Set a multi-tenant config value."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         conn.execute("INSERT OR REPLACE INTO multi_tenant_config (key, value) VALUES (?, ?)", (key, value))
         conn.commit()
         conn.close()
@@ -167,7 +168,7 @@ class UserManager:
     def ensure_quota(self, user_id: int) -> None:
         """Create quota record for user if it doesn't exist."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         existing = conn.execute("SELECT user_id FROM user_quotas WHERE user_id=?", (user_id,)).fetchone()
         if not existing:
             now = datetime.now(KST).isoformat()
@@ -186,7 +187,7 @@ class UserManager:
 
         self._ensure_db()
         self._maybe_reset_quotas(user_id)
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         row = conn.execute(
             "SELECT daily_limit, monthly_limit, current_daily, current_monthly FROM user_quotas WHERE user_id=?",
             (user_id,),
@@ -232,7 +233,7 @@ class UserManager:
             return
         self._ensure_db()
         self.ensure_quota(user_id)
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         conn.execute(
             "UPDATE user_quotas SET current_daily = current_daily + ?, current_monthly = current_monthly + ? WHERE user_id=?",
             (cost, cost, user_id),
@@ -246,7 +247,7 @@ class UserManager:
         """Set quota limits for a user (admin only)."""
         self._ensure_db()
         self.ensure_quota(user_id)
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         if daily_limit is not None:
             conn.execute("UPDATE user_quotas SET daily_limit=? WHERE user_id=?", (daily_limit, user_id))
         if monthly_limit is not None:
@@ -258,7 +259,7 @@ class UserManager:
         """Get quota info for a user."""
         self._ensure_db()
         self._maybe_reset_quotas(user_id)
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         row = conn.execute(
             "SELECT daily_limit, monthly_limit, current_daily, current_monthly FROM user_quotas WHERE user_id=?",
             (user_id,),
@@ -282,7 +283,7 @@ class UserManager:
 
     def _maybe_reset_quotas(self, user_id: int):
         """Reset daily/monthly quotas if due."""
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         row = conn.execute(
             "SELECT last_daily_reset, last_monthly_reset FROM user_quotas WHERE user_id=?", (user_id,)
         ).fetchone()
@@ -329,7 +330,7 @@ class UserManager:
         """Reset all users' daily quotas. Called at midnight."""
         self._ensure_db()
         now = datetime.now(KST).isoformat()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         count = conn.execute("UPDATE user_quotas SET current_daily=0, last_daily_reset=?", (now,)).rowcount
         conn.commit()
         conn.close()
@@ -340,7 +341,7 @@ class UserManager:
         """Reset all users' monthly quotas. Called on 1st of month."""
         self._ensure_db()
         now = datetime.now(KST).isoformat()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         count = conn.execute("UPDATE user_quotas SET current_monthly=0, last_monthly_reset=?", (now,)).rowcount
         conn.commit()
         conn.close()
@@ -352,7 +353,7 @@ class UserManager:
     def get_user_settings(self, user_id: int) -> dict:
         """Get per-user settings."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         row = conn.execute(
             "SELECT model_preference, persona, routing_config, tts_enabled, tts_voice, settings_json FROM user_settings WHERE user_id=?",
             (user_id,),
@@ -387,7 +388,7 @@ class UserManager:
     def set_user_settings(self, user_id: int, **kwargs) -> None:
         """Update per-user settings."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         # Ensure row exists
         conn.execute("INSERT OR IGNORE INTO user_settings (user_id) VALUES (?)", (user_id,))
         for key, value in kwargs.items():
@@ -426,7 +427,7 @@ class UserManager:
     def get_user_by_telegram(self, chat_id: str) -> Optional[dict]:
         """Look up user by Telegram chat_id."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         row = conn.execute(
             """
             SELECT u.id, u.username, u.role, u.enabled, t.username as tg_username
@@ -445,7 +446,7 @@ class UserManager:
         """Link a Telegram chat_id to a user account."""
         self._ensure_db()
         now = datetime.now(KST).isoformat()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         conn.execute(
             "INSERT OR REPLACE INTO telegram_users (chat_id, user_id, username, registered_at) VALUES (?,?,?,?)",
             (str(chat_id), user_id, tg_username, now),
@@ -457,7 +458,7 @@ class UserManager:
     def unlink_telegram(self, chat_id: str) -> None:
         """Unlink a Telegram chat_id."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         conn.execute("DELETE FROM telegram_users WHERE chat_id=?", (str(chat_id),))
         conn.commit()
         conn.close()
@@ -488,7 +489,7 @@ class UserManager:
     def get_all_users_with_stats(self) -> List[dict]:
         """Get all users with usage stats for admin dashboard."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
 
         users = []
         rows = conn.execute("""
@@ -542,7 +543,7 @@ class UserManager:
     def toggle_user(self, user_id: int, enabled: bool) -> bool:
         """Enable or disable a user account."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         cursor = conn.execute(
             "UPDATE users SET enabled=? WHERE id=? AND role != ?", (1 if enabled else 0, user_id, "admin")
         )
@@ -554,7 +555,7 @@ class UserManager:
     def get_user_by_id(self, user_id: int) -> Optional[dict]:
         """Get user by ID."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         row = conn.execute("SELECT id, username, role, enabled FROM users WHERE id=?", (user_id,)).fetchone()
         conn.close()
         if not row:
@@ -564,7 +565,7 @@ class UserManager:
     def get_user_by_username(self, username: str) -> Optional[dict]:
         """Get user by username."""
         self._ensure_db()
-        conn = sqlite3.connect(str(USERS_DB))
+        conn = get_connection(USERS_DB)
         row = conn.execute("SELECT id, username, role, enabled FROM users WHERE username=?", (username,)).fetchone()
         conn.close()
         if not row:

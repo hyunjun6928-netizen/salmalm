@@ -137,9 +137,8 @@ def check_external_exposure_safety(bind_addr: str, handler) -> list:
     for db_candidate in (auth_db_path, DATA_DIR / "salmalm.db"):
         if db_candidate.exists():
             try:
-                import sqlite3
-
-                conn = sqlite3.connect(str(db_candidate))
+                from salmalm.db import get_connection
+                conn = get_connection(db_candidate)
                 cur = conn.execute("SELECT COUNT(*) FROM users WHERE password_hash IS NOT NULL")
                 count = cur.fetchone()[0]
                 conn.close()

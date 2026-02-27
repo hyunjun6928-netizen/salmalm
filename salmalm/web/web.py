@@ -72,6 +72,14 @@ class WebHandler(
         """Suppress default HTTP stderr logging — requests logged via salmalm logger in each handler."""
         pass
 
+    # Track last HTTP status code for metrics instrumentation
+    _last_status: int = 200
+
+    def send_response(self, code, message=None):
+        """Override to capture status code for metrics."""
+        self._last_status = code
+        super().send_response(code, message)
+
     # Allowed origins for CORS (same-host only, dynamic port)
     @staticmethod
     def _build_allowed_origins():
@@ -303,12 +311,19 @@ class WebHandler(
                 pass
         finally:
             duration = (time.time() - _start) * 1000
+            _clean = self.path.split("?")[0]
             request_logger.log_request(
                 "GET",
-                self.path.split("?")[0],
+                _clean,
                 ip=self._get_client_ip(),
                 duration_ms=duration,
             )
+            try:
+                from salmalm.monitoring.metrics import requests_total, request_duration
+                requests_total.inc(method="GET", path=_clean, status=str(self._last_status))
+                request_duration.observe(duration / 1000.0, method="GET")
+            except Exception:
+                pass
 
     # ── GET Route Table (exact path → method) ──
     _GET_ROUTES: dict = {}
@@ -655,7 +670,14 @@ self.addEventListener('fetch',e=>{{
                 pass  # Client already gone
         finally:
             duration = (time.time() - _start) * 1000
-            request_logger.log_request("POST", self.path, ip=self._get_client_ip(), duration_ms=duration)
+            _post_path = self.path.split("?")[0]
+            request_logger.log_request("POST", _post_path, ip=self._get_client_ip(), duration_ms=duration)
+            try:
+                from salmalm.monitoring.metrics import requests_total, request_duration
+                requests_total.inc(method="POST", path=_post_path, status=str(self._last_status))
+                request_duration.observe(duration / 1000.0, method="POST")
+            except Exception:
+                pass
 
     # Max POST body size: 10MB
     _MAX_POST_SIZE = 10 * 1024 * 1024

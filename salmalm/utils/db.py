@@ -28,10 +28,11 @@ def connect(
     """
     conn = sqlite3.connect(str(path), check_same_thread=check_same_thread)
     conn.execute("PRAGMA busy_timeout=5000")  # 5s wait on lock instead of immediate failure
-    if row_factory:
-        conn.row_factory = sqlite3.Row
     if wal:
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+    if row_factory:
+        conn.row_factory = sqlite3.Row
     return conn
 
 

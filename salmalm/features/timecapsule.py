@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from salmalm.db import get_connection
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -89,12 +90,12 @@ class TimeCapsule:
 
     def _init_db(self) -> None:
         """Init db."""
-        with sqlite3.connect(str(self.db_path)) as conn:
+        with get_connection(self.db_path) as conn:
             conn.execute(_SCHEMA)
 
     def _conn(self) -> sqlite3.Connection:
         """Conn."""
-        return sqlite3.connect(str(self.db_path))
+        return get_connection(self.db_path)
 
     # -- CRUD -----------------------------------------------------------------
 

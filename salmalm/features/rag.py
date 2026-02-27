@@ -28,6 +28,7 @@ import json
 import math
 import re
 import sqlite3
+from salmalm.db import get_connection
 import threading
 import time
 from pathlib import Path
@@ -194,7 +195,7 @@ class RAGEngine(RAGIndexerMixin):
         """Ensure db."""
         if self._conn:
             return
-        self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
+        self._conn = get_connection(self._db_path)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("""CREATE TABLE IF NOT EXISTS chunks (
