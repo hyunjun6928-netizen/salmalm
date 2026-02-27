@@ -63,9 +63,10 @@
       if(!r.ok||!r.body){throw new Error('stream unavailable')}
       var reader=r.body.getReader();var decoder=new TextDecoder();var buf='';var gotDone=false;
       var typingEl=document.getElementById('typing-row');
-      /* Per-chunk stall timeout: if server holds connection open but sends nothing for 60s,
-         abort and fall back to HTTP POST (prevents indefinite hang) */
-      var _STALL_MS=60000;
+      /* Per-chunk stall timeout: if server holds connection open but sends nothing for 120s,
+         abort and fall back to HTTP POST (prevents indefinite hang).
+         120s matches SALMALM_LLM_TIMEOUT default — heavy models (opus) need this headroom. */
+      var _STALL_MS=120000;
       var _stallTimer=null;
       function _readWithTimeout(){
         return Promise.race([
