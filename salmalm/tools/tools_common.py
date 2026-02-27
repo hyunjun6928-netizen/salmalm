@@ -13,6 +13,7 @@ from salmalm.constants import (
     EXEC_ELEVATED,
     EXEC_BLOCKED_INTERPRETERS,
     EXEC_ARG_BLOCKLIST,
+    EXEC_GIT_SAFE_OVERRIDES,
     EXEC_INLINE_CODE_PATTERNS,
     PROTECTED_FILES,
     WORKSPACE_DIR,
@@ -64,6 +65,36 @@ def _check_stage_allowlist(stage: str) -> tuple:
     elif first_word not in EXEC_ALLOWLIST:
         return False, f"Command not in allowlist: {first_word}"
     return _check_arg_blocklist(first_word, words)
+
+
+def apply_git_safe_overrides(cmd: str) -> str:
+    """Inject safety flags into git commands to prevent hook execution.
+
+    Examples:
+        git commit -m "msg"  →  git commit --no-verify -m "msg"
+        git clone <url>      →  git clone --config core.hooksPath=/dev/null <url>
+
+    Returns the modified command string (unchanged if not a git command).
+    """
+    try:
+        words = shlex.split(cmd)
+    except ValueError:
+        return cmd
+    if not words or words[0] != "git":
+        return cmd
+    # Find subcommand (first non-flag word after "git")
+    sub_idx = next((i for i, w in enumerate(words[1:], 1) if not w.startswith("-")), None)
+    if sub_idx is None:
+        return cmd
+    subcmd = words[sub_idx]
+    extra = EXEC_GIT_SAFE_OVERRIDES.get(subcmd)
+    if extra is None or not extra:
+        return cmd  # no override needed (or empty list = safe as-is)
+    # Inject flags right after the subcommand, avoiding duplicates
+    if any(f in words for f in extra):
+        return cmd  # already present
+    new_words = words[:sub_idx + 1] + extra + words[sub_idx + 1:]
+    return shlex.join(new_words)
 
 
 def _check_arg_blocklist(first_word: str, words: list) -> tuple:

@@ -8,7 +8,7 @@ import re
 import os
 import time
 from salmalm.tools.tool_registry import register
-from salmalm.tools.tools_common import _is_safe_command
+from salmalm.tools.tools_common import _is_safe_command, apply_git_safe_overrides
 from salmalm.constants import WORKSPACE_DIR
 from salmalm.security.exec_approvals import (  # noqa: F401
     check_approval,
@@ -179,6 +179,9 @@ def handle_exec(args: dict) -> str:
     yield_ms = args.get("yieldMs", 0)
     notify_on_exit = args.get("notifyOnExit", False)
     env = args.get("env", None)
+
+    # Git safe override: inject --no-verify / core.hooksPath=/dev/null before safety check
+    cmd = apply_git_safe_overrides(cmd)
 
     # Basic safety check
     safe, reason = _is_safe_command(cmd)

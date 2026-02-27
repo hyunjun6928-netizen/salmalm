@@ -155,11 +155,24 @@ EXEC_ARG_BLOCKLIST: dict = {
     "find": {"-exec", "-execdir", "-delete", "-ok", "-okdir"},
     "xargs": {"-I", "--replace", "-i"},
     "tar": {"--to-command", "--checkpoint-action", "--use-compress-program"},
-    # "hook"/"submodule" blocked: arbitrary code execution risk.
-    # commit/push/pull allowed for normal workflow — use --no-verify to skip hooks.
-    "git": {"clone", "fetch", "remote", "submodule", "hook", "am"},
+    # "hook"/"submodule" blocked: direct hook/submodule manipulation is too risky.
+    # commit/push/pull/clone are allowed via EXEC_GIT_SAFE_OVERRIDES (auto --no-verify injection).
+    "git": {"submodule", "hook", "am"},
     "sed": {"-i", "--in-place"},
 }
+# Git safe-override flags: automatically injected when these subcommands are used.
+# This allows normal git workflow while preventing hook execution (security boundary).
+EXEC_GIT_SAFE_OVERRIDES: dict = {
+    "commit": ["--no-verify"],           # skip pre-commit / commit-msg hooks
+    "push": ["--no-verify"],             # skip pre-push hooks
+    "pull": ["--no-verify"],             # skip post-merge hooks
+    "clone": ["--config", "core.hooksPath=/dev/null"],  # disable all hooks in clone
+    "rebase": ["--no-exec"],             # prevent --exec arbitrary command injection
+    "merge": ["--no-verify"],            # skip pre-merge hooks
+    "fetch": [],                         # safe as-is
+    "remote": [],                        # safe as-is
+}
+
 # Pattern blocklist for inline code execution in awk/sed
 EXEC_INLINE_CODE_PATTERNS = [
     r"\bawk\b[^|;]*\bsystem\s*\(",  # awk '{ system("...") }'
