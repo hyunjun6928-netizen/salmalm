@@ -179,12 +179,20 @@ def _record_model_failure(model: str, cooldown_seconds: int = 0) -> None:
 
 def _clear_model_cooldown(model: str) -> None:
     """Clear cooldown on successful call. Also resets failure counter so next
-    failure starts from 0 rather than inheriting stale escalated backoff."""
+    failure starts from 0 rather than inheriting stale escalated backoff.
+    Also notifies CircuitBreakerRegistry so the provider circuit resets."""
     with _cooldown_lock:
         cd = _load_cooldowns()
         if model in cd:
             del cd[model]  # Full removal resets failures implicitly
             _save_cooldowns(cd)
+    # Sync success to CircuitBreakerRegistry — provider circuit closes if it was open
+    try:
+        from salmalm.core.error_recovery import circuit_breakers
+        provider = model.split("/")[0] if "/" in model else model
+        circuit_breakers.record_success(provider)
+    except Exception:
+        pass  # Non-critical — cooldown file is the primary state
 
 
 def get_failover_config() -> dict:

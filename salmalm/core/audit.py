@@ -138,14 +138,14 @@ def audit_log(
     session_id: str = "",
     detail_dict: Optional[dict] = None,
 ) -> None:
-    """Write an audit event to the security log (v1 chain + v2 structured).
+    """Write an audit event to the security log (v2 structured only).
 
     Events are buffered and flushed in batches for performance.
     Flush triggers: batch size (20) or time interval (5s), whichever comes first.
 
     Args:
         event: event type string (tool_call, api_call, auth_success, etc.)
-        detail: plain text detail (for v1 compatibility)
+        detail: plain text detail (kept for call-site compatibility; stored in JSON detail)
         session_id: associated session ID
         detail_dict: structured detail as dict (serialized to JSON for v2)
     """
