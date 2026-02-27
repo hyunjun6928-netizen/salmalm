@@ -16,23 +16,28 @@ KST = timezone(timedelta(hours=9))
 # DATA_DIR = runtime data root (user data: DB, vault, memory, logs)
 #   Priority: $SALMALM_HOME > ~/SalmAlm
 import os as _os
+import importlib as _importlib
+from salmalm.config import limits as _limits
+from salmalm.config import models as _models
+from salmalm.config import paths as _paths
 
-from salmalm.config.paths import (
-    AGENTS_FILE,
-    AUDIT_DB,
-    BASE_DIR,
-    CACHE_DB,
-    DATA_DIR,
-    LOG_FILE,
-    MEMORY_DB,
-    MEMORY_DIR,
-    MEMORY_FILE,
-    SOUL_FILE,
-    TOOLS_FILE,
-    USER_FILE,
-    VAULT_FILE,
-    WORKSPACE_DIR,
-)
+_importlib.reload(_paths)
+_importlib.reload(_limits)
+
+AGENTS_FILE = _paths.AGENTS_FILE
+AUDIT_DB = _paths.AUDIT_DB
+BASE_DIR = _paths.BASE_DIR
+CACHE_DB = _paths.CACHE_DB
+DATA_DIR = _paths.DATA_DIR
+LOG_FILE = _paths.LOG_FILE
+MEMORY_DB = _paths.MEMORY_DB
+MEMORY_DIR = _paths.MEMORY_DIR
+MEMORY_FILE = _paths.MEMORY_FILE
+SOUL_FILE = _paths.SOUL_FILE
+TOOLS_FILE = _paths.TOOLS_FILE
+USER_FILE = _paths.USER_FILE
+VAULT_FILE = _paths.VAULT_FILE
+WORKSPACE_DIR = _paths.WORKSPACE_DIR
 
 # Security
 VAULT_VERSION = b"\x03"
@@ -270,15 +275,13 @@ EXEC_BLOCKLIST_PATTERNS = [
 PROTECTED_FILES = {".vault.enc", "audit.db", "auth.db", "server.py", ".clipboard.json"}
 
 # LLM
-from salmalm.config.limits import (
-    CACHE_TTL,
-    COMPACTION_THRESHOLD,
-    DEFAULT_MAX_TOKENS,
-    INTENT_COMPLEX_MSG,
-    INTENT_CONTEXT_DEPTH,
-    INTENT_SHORT_MSG,
-    REFLECT_SNIPPET_LEN,
-)
+CACHE_TTL = _limits.CACHE_TTL
+COMPACTION_THRESHOLD = _limits.COMPACTION_THRESHOLD
+DEFAULT_MAX_TOKENS = _limits.DEFAULT_MAX_TOKENS
+INTENT_COMPLEX_MSG = _limits.INTENT_COMPLEX_MSG
+INTENT_CONTEXT_DEPTH = _limits.INTENT_CONTEXT_DEPTH
+INTENT_SHORT_MSG = _limits.INTENT_SHORT_MSG
+REFLECT_SNIPPET_LEN = _limits.REFLECT_SNIPPET_LEN
 
 # Token cost estimates (per 1M tokens, USD)
 MODEL_COSTS = {
@@ -321,7 +324,10 @@ MODEL_COSTS = {
 # ============================================================
 # Model Registry — single source of truth for all model references
 # ============================================================
-from salmalm.config.models import FALLBACK_MODELS, MODEL_ALIASES, MODELS, THINKING_BUDGET_MAP
+FALLBACK_MODELS = _models.FALLBACK_MODELS
+MODEL_ALIASES = _models.MODEL_ALIASES
+MODELS = _models.MODELS
+THINKING_BUDGET_MAP = _models.THINKING_BUDGET_MAP
 
 # Tier-based model routing pools (cheapest → most capable)
 # Ollama models included for users running local LLMs
