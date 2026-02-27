@@ -327,3 +327,120 @@ class WebSetupMixin:
         audit_log("onboarding", f"preferences: model={model}, persona={persona}")
         self._json({"ok": True})
         return
+
+
+# ── FastAPI router ────────────────────────────────────────────────────────────
+import asyncio as _asyncio
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
+from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
+from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+
+router = _APIRouter()
+
+@router.get("/api/onboarding")
+async def get_onboarding():
+    from salmalm.security.crypto import vault
+    from salmalm.web.routes.web_setup import WebSetupMixin
+    _result = {}
+    class _H(WebSetupMixin):
+        def _json(self, data, status=200): _result["d"] = data
+    h = _H.__new__(_H)
+    import types
+    h._json = types.MethodType(_H._json, h)
+    h._get_api_onboarding()
+    return _JSON(content=_result.get("d", {}))
+
+@router.get("/setup")
+async def get_setup():
+    from salmalm.web import templates as _tmpl
+    return _HTML(content=_tmpl.ONBOARDING_HTML)
+
+@router.post("/api/setup")
+async def post_setup(request: _Request):
+    import os, base64
+    from salmalm.security.crypto import vault, log
+    from salmalm.constants import VAULT_FILE
+    from salmalm.core import audit_log
+    body = await request.json()
+    if VAULT_FILE.exists():
+        return _JSON(content={"error": "Already set up"}, status_code=400)
+    use_pw = body.get("use_password", False)
+    pw = body.get("password", "")
+    if use_pw and len(pw) < 4:
+        return _JSON(content={"error": "Password must be at least 4 characters"}, status_code=400)
+    try:
+        _vault_pw = pw if use_pw else ""
+        vault.create(_vault_pw)
+        vault.unlock(_vault_pw, save_to_keychain=True)
+        try:
+            _pw_hint_file = VAULT_FILE.parent / ".vault_auto"
+            if not use_pw:
+                _pw_hint_file.write_text("", encoding="utf-8")
+            else:
+                _pw_hint_file.write_text(base64.b64encode(_vault_pw.encode()).decode(), encoding="utf-8")
+            _pw_hint_file.chmod(0o600)
+        except Exception as e:
+            log.debug(f"Suppressed: {e}")
+        audit_log("setup", f"vault created {'with' if use_pw else 'without'} password")
+    except RuntimeError:
+        log.warning("[SETUP] Vault unavailable (no cryptography). Proceeding without encryption.")
+        audit_log("setup", "vault skipped — no cryptography package")
+        vault._data = {}
+        vault._password = ""
+        vault._salt = b"\x00" * 16
+        try:
+            VAULT_FILE.parent.mkdir(parents=True, exist_ok=True)
+            VAULT_FILE.write_bytes(b'{"no_crypto": true}')
+        except Exception:
+            pass
+    return _JSON(content={"ok": True})
+
+@router.post("/api/onboarding")
+async def post_onboarding(request: _Request):
+    from salmalm.web.routes.web_setup import WebSetupMixin, _ensure_vault_unlocked
+    from salmalm.security.crypto import vault, log
+    body = await request.json()
+    _result = {}
+    class _H(WebSetupMixin):
+        @property
+        def _body(self): return body
+        def _json(self, data, status=200): _result["d"] = (data, status)
+    h = _H.__new__(_H)
+    import types
+    h._json = types.MethodType(_H._json, h)
+    h._body = body
+    h._post_api_onboarding_inner()
+    data, status = _result.get("d", ({}, 200))
+    return _JSON(content=data, status_code=status)
+
+@router.post("/api/onboarding/preferences")
+async def post_onboarding_preferences(request: _Request):
+    import os
+    from salmalm.security.crypto import vault, log
+    from salmalm.constants import DATA_DIR
+    from salmalm.core import audit_log
+    body = await request.json()
+    model = body.get("model", "auto")
+    persona = body.get("persona", "expert")
+    if model and model != "auto":
+        vault.set("default_model", model)
+        try:
+            from salmalm.core.core import router as _router
+            _router.set_force_model(model)
+        except Exception as e:
+            log.warning(f"[SETUP] Failed to set router model: {e}")
+    persona_templates = {
+        "expert": "# SOUL.md\n\nYou are a professional AI expert. Be precise, detail-oriented, and thorough.",
+        "friend": "# SOUL.md\n\nYou are a friendly and warm conversational partner. Be casual and engaging.",
+        "assistant": "# SOUL.md\n\nYou are an efficient personal assistant. Be concise and task-focused.",
+    }
+    template = persona_templates.get(persona, persona_templates["expert"])
+    try:
+        soul_path = os.path.join(str(DATA_DIR), "SOUL.md")
+        os.makedirs(os.path.dirname(soul_path), exist_ok=True)
+        with open(soul_path, "w", encoding="utf-8") as f:
+            f.write(template)
+    except Exception as e:
+        log.debug(f"Suppressed: {e}")
+    audit_log("onboarding", f"preferences: model={model}, persona={persona}")
+    return _JSON(content={"ok": True})

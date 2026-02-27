@@ -491,3 +491,224 @@ class WebFilesMixin:
         self.send_header("Cache-Control", "public, max-age=86400")
         self.end_headers()
         self.wfile.write(fpath.read_bytes())
+
+
+# ── FastAPI router ────────────────────────────────────────────────────────────
+import asyncio as _asyncio
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
+from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
+from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+
+router = _APIRouter()
+
+@router.get("/api/sessions/{session_id}/export")
+async def get_session_export(request: _Request, session_id: str, format: str = _Query("json"), _u=_Depends(_auth)):
+    import json as _json
+    from salmalm.core import _get_db
+    conn = _get_db()
+    row = conn.execute("SELECT messages, updated_at FROM session_store WHERE session_id=?", (session_id,)).fetchone()
+    if not row:
+        return _JSON(content={"error": "Session not found"}, status_code=404)
+    msgs = _json.loads(row[0])
+    updated_at = row[1]
+    if format == "md":
+        lines = ["# SalmAlm Chat Export", f"Session: {session_id}", f"Date: {updated_at}", ""]
+        for msg in msgs:
+            role = msg.get("role", "")
+            if role == "system":
+                continue
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                content = " ".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+            icon = "## 👤 User" if role == "user" else "## 😈 Assistant"
+            lines.extend([icon, str(content), "", "---", ""])
+        body = "\n".join(lines).encode("utf-8")
+        fname = f"salmalm_{session_id}_{updated_at[:10]}.md"
+        return _Response(content=body, media_type="text/markdown; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{fname}"', "Content-Length": str(len(body))})
+    else:
+        export_data = {"session_id": session_id, "updated_at": updated_at, "messages": msgs}
+        body = _json.dumps(export_data, ensure_ascii=False, indent=2).encode("utf-8")
+        fname = f"salmalm_{session_id}_{updated_at[:10]}.json"
+        return _Response(content=body, media_type="application/json; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{fname}"', "Content-Length": str(len(body))})
+
+@router.get("/api/google/callback")
+async def get_google_callback(request: _Request):
+    import json as _json, time, urllib.request, urllib.error, urllib.parse as _urlparse, os as _os
+    from salmalm.security.crypto import vault, log
+    from salmalm.web.web import _google_oauth_pending_states
+    params = dict(request.query_params)
+    code = params.get("code", "")
+    state = params.get("state", "")
+    error = params.get("error", "")
+    if not state or state not in _google_oauth_pending_states:
+        return _HTML(content="<html><body><h2>Invalid OAuth State</h2><p><a href=\"/\">Back</a></p></body></html>")
+    issued_at = _google_oauth_pending_states.pop(state)
+    if time.time() - issued_at > 600:
+        return _HTML(content="<html><body><h2>OAuth State Expired</h2><p><a href=\"/\">Back</a></p></body></html>")
+    if error:
+        return _HTML(content=f"<html><body><h2>Google OAuth Error</h2><p>{error}</p><p><a href=\"/\">Back</a></p></body></html>")
+    if not code:
+        return _HTML(content="<html><body><h2>No code received</h2><p><a href=\"/\">Back</a></p></body></html>")
+    client_id = vault.get("google_client_id") or ""
+    client_secret = vault.get("google_client_secret") or ""
+    port = int(_os.environ.get("SALMALM_PORT", 18800))
+    redirect_uri = f"http://localhost:{port}/api/google/callback"
+    try:
+        data = _urlparse.urlencode({"code": code, "client_id": client_id, "client_secret": client_secret,
+                                    "redirect_uri": redirect_uri, "grant_type": "authorization_code"}).encode()
+        req = urllib.request.Request("https://oauth2.googleapis.com/token", data=data,
+                                    headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = _json.loads(resp.read())
+        access_token = result.get("access_token", "")
+        refresh_token = result.get("refresh_token", "")
+        if refresh_token:
+            vault.set("google_refresh_token", refresh_token)
+        if access_token:
+            vault.set("google_access_token", access_token)
+        scopes = result.get("scope", "")
+        return _HTML(content=f"""<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
+            <h2 style="color:#22c55e">✅ Google 연동 완료!</h2>
+            <p>Refresh token이 vault에 저장되었습니다.</p>
+            <p style="font-size:0.85em;color:#666">Scopes: {scopes}</p>
+            <p><a href="/" style="color:#6366f1">← SalmAlm으로 돌아가기</a></p>
+            </body></html>""")
+    except Exception as e:
+        return _HTML(content=f"""<html><body style="font-family:sans-serif;max-width:600px;margin:40px auto;text-align:center">
+            <h2 style="color:#ef4444">❌ 토큰 교환 실패</h2><p>{str(e)[:200]}</p>
+            <p><a href="/" style="color:#6366f1">← SalmAlm으로 돌아가기</a></p></body></html>""")
+
+@router.get("/api/agent/export")
+async def get_agent_export(request: _Request, vault_export: int = _Query(0, alias="vault"),
+                           sessions: int = _Query(1), data: int = _Query(1)):
+    import zipfile, io, json as _json, datetime
+    from salmalm.web.fastapi_deps import optional_auth as _oa
+    _u = await _oa(request)
+    if not _u:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    min_role = "admin" if vault_export else "user"
+    if min_role == "admin" and _u.get("role") != "admin":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Admin required")
+    from salmalm.web.routes.web_files import _populate_export_zip
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        _populate_export_zip(zf, bool(sessions), bool(data), bool(vault_export), _u, _json, datetime)
+    data_bytes = buf.getvalue()
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    return _Response(content=data_bytes, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="salmalm-export-{ts}.zip"',
+                             "Content-Length": str(len(data_bytes))})
+
+@router.get("/uploads/{file_path:path}")
+async def get_uploads(file_path: str):
+    from pathlib import Path
+    from salmalm.constants import WORKSPACE_DIR
+    fname = Path(file_path).name
+    if not fname:
+        return _Response(status_code=400)
+    upload_dir = (WORKSPACE_DIR / "uploads").resolve()
+    fpath = (upload_dir / fname).resolve()
+    if not fpath.is_relative_to(upload_dir) or not fpath.exists():
+        return _Response(status_code=404)
+    mime_map = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+                ".webp": "image/webp", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg"}
+    ext = fpath.suffix.lower()
+    mime = mime_map.get(ext, "application/octet-stream")
+    stat = fpath.stat()
+    etag = f'"{int(stat.st_mtime)}-{stat.st_size}"'
+    return _Response(content=fpath.read_bytes(), media_type=mime,
+                    headers={"ETag": etag, "Cache-Control": "public, max-age=86400", "Content-Length": str(stat.st_size)})
+
+@router.post("/api/agent/import/preview")
+async def post_agent_import_preview(request: _Request, _u=_Depends(_auth)):
+    import zipfile, io, json as _json
+    body_bytes = await request.body()
+    content_type = request.headers.get("content-type", "")
+    if "multipart" not in content_type:
+        return _JSON(content={"ok": False, "error": "Expected multipart upload"}, status_code=400)
+    boundary = content_type.split("boundary=")[1].encode() if "boundary=" in content_type else b""
+    parts = body_bytes.split(b"--" + boundary)
+    zip_data = None
+    for part in parts:
+        if b"filename=" in part:
+            body_start = part.find(b"\r\n\r\n")
+            if body_start > 0:
+                zip_data = part[body_start + 4:]
+                if zip_data.endswith(b"\r\n"):
+                    zip_data = zip_data[:-2]
+                break
+    if not zip_data:
+        return _JSON(content={"ok": False, "error": "No ZIP file found"}, status_code=400)
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_data))
+        manifest = _json.loads(zf.read("manifest.json")) if "manifest.json" in zf.namelist() else {}
+        preview = {"files": zf.namelist(), "manifest": manifest, "size": len(zip_data)}
+        return _JSON(content={"ok": True, "preview": preview})
+    except Exception as e:
+        return _JSON(content={"ok": False, "error": str(e)}, status_code=400)
+
+@router.post("/api/upload")
+async def post_upload(request: _Request):
+    import email.parser, email.policy
+    from pathlib import Path
+    from salmalm.constants import WORKSPACE_DIR
+    from salmalm.core import audit_log
+    from salmalm.security.crypto import vault, log
+    if not vault.is_unlocked:
+        return _JSON(content={"error": "Vault locked"}, status_code=403)
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" not in content_type:
+        return _JSON(content={"error": "multipart required"}, status_code=400)
+    try:
+        raw = await request.body()
+        header_bytes = f"Content-Type: {content_type}\r\n\r\n".encode()
+        msg = email.parser.BytesParser(policy=email.policy.compat32).parsebytes(header_bytes + raw)
+        for part in msg.walk():
+            fname_raw = part.get_filename()
+            if not fname_raw:
+                continue
+            fname = Path(fname_raw).name
+            if not fname or ".." in fname or "/" in fname or "\\" in fname or "\x00" in fname:
+                return _JSON(content={"error": "Invalid filename"}, status_code=400)
+            from salmalm.features.edge_cases import validate_upload
+            ok, err = validate_upload(fname, len(part.get_payload(decode=True) or b""))
+            if not ok:
+                return _JSON(content={"error": err}, status_code=400)
+            file_data = part.get_payload(decode=True)
+            if not file_data:
+                continue
+            if len(file_data) > 50 * 1024 * 1024:
+                return _JSON(content={"error": "File too large (max 50MB)"}, status_code=413)
+            save_dir = WORKSPACE_DIR / "uploads"
+            save_dir.mkdir(exist_ok=True)
+            (save_dir / fname).write_bytes(file_data)
+            size_kb = len(file_data) / 1024
+            is_image = any(fname.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"))
+            is_text = any(fname.lower().endswith(ext) for ext in (".txt", ".md", ".py", ".js", ".json", ".csv", ".log", ".html", ".css", ".sh", ".bat", ".yaml", ".yml", ".xml", ".sql"))
+            is_pdf = fname.lower().endswith(".pdf")
+            info = f"[{'🖼️ Image' if is_image else '📎 File'} uploaded: uploads/{fname} ({size_kb:.1f}KB)]"
+            if is_pdf or is_text:
+                try:
+                    from salmalm.features.edge_cases import process_uploaded_file
+                    info = process_uploaded_file(fname, file_data)
+                except Exception:
+                    if is_text:
+                        preview = file_data.decode("utf-8", errors="replace")[:3000]
+                        info += f"\n[File content]\n{preview}"
+            log.info(f"[SEND] Web upload: {fname} ({size_kb:.1f}KB)")
+            audit_log("web_upload", fname)
+            resp = {"ok": True, "filename": fname, "size": len(file_data), "info": info, "is_image": is_image}
+            if is_image:
+                import base64
+                ext = fname.rsplit(".", 1)[-1].lower()
+                mime = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp"}.get(f".{ext}", "image/png")
+                resp["image_base64"] = base64.b64encode(file_data).decode()
+                resp["image_mime"] = mime
+            return _JSON(content=resp)
+        return _JSON(content={"error": "No file found"}, status_code=400)
+    except Exception as e:
+        return _JSON(content={"error": str(e)[:200]}, status_code=500)

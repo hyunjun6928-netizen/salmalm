@@ -6,7 +6,7 @@ import time as _time
 
 from salmalm.security.crypto import vault, log
 import json
-from salmalm.core import router
+from salmalm.core import router as _core_router
 
 # ── SSE response idempotency cache ───────────────────────────────────────────
 # Prevents duplicate processing when SSE stream fails and client falls back to
@@ -254,7 +254,7 @@ class WebChatMixin:
                     send_sse("ui_cmd", cmd)
             except Exception as e:
                 log.debug(f"Suppressed: {e}")
-            _done_model = getattr(_sess2, "last_model", router.force_model or "auto")
+            _done_model = getattr(_sess2, "last_model", _core_router.force_model or "auto")
             _done_complexity = getattr(_sess2, "last_complexity", "auto")
             # Cache response for idempotency (SSE fallback → HTTP POST dedup)
             _cache_response(req_id, session_id, response, _done_model, _done_complexity)
@@ -313,7 +313,7 @@ class WebChatMixin:
             self._json(
                 {
                     "response": response,
-                    "model": getattr(_sess, "last_model", router.force_model or "auto"),
+                    "model": getattr(_sess, "last_model", _core_router.force_model or "auto"),
                     "complexity": getattr(_sess, "last_complexity", "auto"),
                 }
             )
@@ -450,3 +450,211 @@ class WebChatMixin:
 
         result = delete_message(sid, int(idx))
         self._json(result)
+
+
+# ── FastAPI router ────────────────────────────────────────────────────────────
+import asyncio as _asyncio
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
+from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
+from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+
+router = _APIRouter()
+
+@router.post("/api/chat")
+async def post_chat(request: _Request, _u=_Depends(_auth)):
+    from salmalm.security.crypto import vault
+    from salmalm.core.engine import process_message
+    from salmalm.core import router as _core_router
+    from salmalm.web.routes.web_chat import _get_cached_response, _mark_processing, _cache_response
+    body = await request.json()
+    if not vault.is_unlocked:
+        return _JSON(content={"error": "Vault locked"}, status_code=403)
+    message = body.get("message", "")
+    session_id = body.get("session", "web")
+    image_b64 = body.get("image_base64")
+    image_mime = body.get("image_mime", "image/png")
+    ui_lang = body.get("lang", "")
+    req_id = body.get("req_id", "")
+    _MAX_MSG_CHARS = 50_000
+    if len(message) > _MAX_MSG_CHARS:
+        message = message[:_MAX_MSG_CHARS] + f"\n\n⚠️ **[Message truncated at {_MAX_MSG_CHARS:,} chars]**"
+    _cached = _get_cached_response(req_id, session_id, wait_if_processing=True)
+    if _cached:
+        return _JSON(content={"response": _cached["response"], "model": _cached["model"],
+                              "complexity": _cached["complexity"], "from_cache": True})
+    from salmalm.core import get_session as _gs
+    _sess_pre = _gs(session_id)
+    _model_ov = getattr(_sess_pre, "model_override", None)
+    if _model_ov == "auto":
+        _model_ov = None
+    try:
+        response = await process_message(session_id, message, model_override=_model_ov,
+                                         image_data=(image_b64, image_mime) if image_b64 else None, lang=ui_lang)
+    except Exception as e:
+        response = f"❌ Internal error: {type(e).__name__}"
+    _sess = _gs(session_id)
+    return _JSON(content={"response": response,
+                          "model": getattr(_sess, "last_model", _core_router.force_model or "auto"),
+                          "complexity": getattr(_sess, "last_complexity", "auto")})
+
+@router.post("/api/chat/stream")
+async def post_chat_stream(request: _Request, _u=_Depends(_auth)):
+    import json as _json, threading, time as _time
+    from salmalm.security.crypto import vault, log
+    from salmalm.core.engine import process_message
+    from salmalm.core import router as _core_router
+    from salmalm.web.routes.web_chat import _mark_processing, _cache_response
+    body = await request.json()
+    if not vault.is_unlocked:
+        return _JSON(content={"error": "Vault locked"}, status_code=403)
+    message = body.get("message", "")
+    session_id = body.get("session", "web")
+    image_b64 = body.get("image_base64")
+    image_mime = body.get("image_mime", "image/png")
+    ui_lang = body.get("lang", "")
+    req_id = body.get("req_id", "")
+    _MAX_MSG_CHARS = 50_000
+    if len(message) > _MAX_MSG_CHARS:
+        message = message[:_MAX_MSG_CHARS] + f"\n\n⚠️ **[Message truncated at {_MAX_MSG_CHARS:,} chars]**"
+    _mark_processing(req_id, session_id)
+
+    async def generate():
+        import asyncio as _aio
+        tool_count = [0]
+        streamed_text = [""]
+        _disconnected = [False]
+
+        def _sse(event, data):
+            return f"event: {event}\ndata: {_json.dumps(data, ensure_ascii=False)}\n\n".encode()
+
+        yield _sse("status", {"text": "🤔 Thinking..."})
+
+        def on_tool(name, args):
+            tool_count[0] += 1
+
+        def on_token(event):
+            if _disconnected[0]:
+                raise RuntimeError("[SSE] Client disconnected")
+            etype = event.get("type", "")
+            if etype == "text_delta":
+                text = event.get("text", "")
+                if text:
+                    streamed_text[0] += text
+            elif etype == "tool_use_start":
+                tool_count[0] += 1
+
+        try:
+            from salmalm.core import get_session as _gs
+            _sess_pre = _gs(session_id)
+            _model_ov = getattr(_sess_pre, "model_override", None)
+            if _model_ov == "auto":
+                _model_ov = None
+            response = await process_message(session_id, message, model_override=_model_ov,
+                                              image_data=(image_b64, image_mime) if image_b64 else None,
+                                              on_tool=on_tool, on_token=on_token, lang=ui_lang)
+        except Exception as e:
+            log.error(f"[SSE] process_message error: {e}")
+            response = f"❌ Internal error: {type(e).__name__}"
+
+        try:
+            from salmalm.tools.tools_ui import pop_pending_commands
+            for cmd in pop_pending_commands():
+                yield _sse("ui_cmd", cmd)
+        except Exception:
+            pass
+
+        from salmalm.core import get_session as _gs2
+        _sess2 = _gs2(session_id)
+        _done_model = getattr(_sess2, "last_model", _core_router.force_model or "auto")
+        _done_complexity = getattr(_sess2, "last_complexity", "auto")
+        _cache_response(req_id, session_id, response, _done_model, _done_complexity)
+
+        # Emit token chunks for the full response (clients rely on chunk events)
+        if response:
+            yield _sse("chunk", {"text": response, "streaming": False})
+        yield _sse("done", {"response": response, "model": _done_model, "complexity": _done_complexity})
+
+    return _SR(generate(), media_type="text/event-stream",
+               headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"})
+
+@router.post("/api/messages/edit")
+async def post_messages_edit(request: _Request, _u=_Depends(_auth)):
+    from salmalm.core import edit_message
+    body = await request.json()
+    sid = body.get("session_id", "")
+    idx = body.get("message_index")
+    content = body.get("content", "")
+    if not sid or idx is None or not content:
+        return _JSON(content={"ok": False, "error": "Missing session_id, message_index, or content"}, status_code=400)
+    return _JSON(content=edit_message(sid, int(idx), content))
+
+@router.post("/api/messages/delete")
+async def post_messages_delete(request: _Request, _u=_Depends(_auth)):
+    from salmalm.core import delete_message
+    body = await request.json()
+    sid = body.get("session_id", "")
+    idx = body.get("message_index")
+    if not sid or idx is None:
+        return _JSON(content={"ok": False, "error": "Missing session_id or message_index"}, status_code=400)
+    return _JSON(content=delete_message(sid, int(idx)))
+
+@router.post("/api/chat/abort")
+async def post_chat_abort(request: _Request, _u=_Depends(_auth)):
+    body = await request.json()
+    session_id = body.get("session", body.get("session_id", "web"))
+    from salmalm.features.edge_cases import abort_controller
+    abort_controller.set_abort(session_id)
+    return _JSON(content={"ok": True, "message": "Abort signal sent / 중단 신호 전송됨"})
+
+@router.post("/api/chat/regenerate")
+async def post_chat_regenerate(request: _Request, _u=_Depends(_auth)):
+    import asyncio as _aio
+    from salmalm.features.edge_cases import conversation_fork
+    body = await request.json()
+    session_id = body.get("session_id", "web")
+    message_index = body.get("message_index")
+    if message_index is None:
+        return _JSON(content={"error": "Missing message_index"}, status_code=400)
+    try:
+        response = await conversation_fork.regenerate(session_id, int(message_index))
+        if response:
+            return _JSON(content={"ok": True, "response": response})
+        return _JSON(content={"ok": False, "error": "Could not regenerate"}, status_code=400)
+    except Exception as e:
+        return _JSON(content={"ok": False, "error": str(e)[:200]}, status_code=500)
+
+@router.post("/api/chat/compare")
+async def post_chat_compare(request: _Request, _u=_Depends(_auth)):
+    from salmalm.features.edge_cases import compare_models
+    body = await request.json()
+    message = body.get("message", "")
+    models = body.get("models", [])
+    session_id = body.get("session_id", "web")
+    if not message:
+        return _JSON(content={"error": "Missing message"}, status_code=400)
+    try:
+        results = await compare_models(session_id, message, models or None)
+        return _JSON(content={"ok": True, "results": results})
+    except Exception as e:
+        return _JSON(content={"ok": False, "error": str(e)[:200]}, status_code=500)
+
+@router.post("/api/alternatives/switch")
+async def post_alternatives_switch(request: _Request, _u=_Depends(_auth)):
+    from salmalm.features.edge_cases import conversation_fork
+    body = await request.json()
+    session_id = body.get("session_id", "")
+    message_index = body.get("message_index")
+    alt_id = body.get("alt_id")
+    if not all([session_id, message_index is not None, alt_id]):
+        return _JSON(content={"error": "Missing parameters"}, status_code=400)
+    content = conversation_fork.switch_alternative(session_id, int(message_index), int(alt_id))
+    if content:
+        from salmalm.core import get_session
+        session = get_session(session_id)
+        ua = [(i, m) for i, m in enumerate(session.messages) if m.get("role") in ("user", "assistant")]
+        if int(message_index) < len(ua):
+            real_idx = ua[int(message_index)][0]
+            session.messages[real_idx] = {"role": "assistant", "content": content}
+            session._persist()
+        return _JSON(content={"ok": True, "content": content})
+    return _JSON(content={"ok": False, "error": "Alternative not found"}, status_code=404)

@@ -326,3 +326,227 @@ class WebSessionsMixin:
             if text:
                 out.append({"role": role, "text": text, "model": model})
         self._json({"session_id": sid, "messages": out})
+
+
+# ── FastAPI router ────────────────────────────────────────────────────────────
+import asyncio as _asyncio
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
+from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
+from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+
+router = _APIRouter()
+
+@router.get("/api/sessions")
+async def get_sessions(_u=_Depends(_auth)):
+    import json as _json, re as _re
+    from salmalm.core import _get_db
+    conn = _get_db()
+    _uid = _u.get("id", 0)
+    if _uid and _uid > 0:
+        rows = conn.execute("SELECT session_id, updated_at, title, parent_session_id FROM session_store WHERE user_id=? OR user_id IS NULL ORDER BY updated_at DESC", (_uid,)).fetchall()
+    else:
+        rows = conn.execute("SELECT session_id, updated_at, title, parent_session_id FROM session_store ORDER BY updated_at DESC").fetchall()
+    _HIDDEN_PREFIXES = ("agent_", "subagent_", "cron-", "test_msg_", "e2e-", "save_test")
+    sessions = []
+    for r in rows:
+        sid = r[0]
+        if any(sid.startswith(p) for p in _HIDDEN_PREFIXES):
+            continue
+        stored_title = r[2] if len(r) > 2 else ""
+        parent_sid = r[3] if len(r) > 3 else None
+        if stored_title:
+            title = stored_title
+            msg_count = 0
+        else:
+            try:
+                msgs = _json.loads(conn.execute("SELECT messages FROM session_store WHERE session_id=?", (sid,)).fetchone()[0])
+                title = ""
+                for m in msgs:
+                    if m.get("role") == "user" and isinstance(m.get("content"), str):
+                        _raw = m["content"].strip()
+                        if _raw.startswith("[") and ("uploaded" in _raw or "📎" in _raw or "🖼" in _raw):
+                            continue
+                        _raw = _re.sub(r'\*\*([^*]+)\*\*', r'\1', _raw)
+                        _raw = _re.sub(r'\*([^*]+)\*', r'\1', _raw)
+                        _raw = _re.sub(r'`([^`]+)`', r'\1', _raw).replace("*", "").replace("`", "")
+                        title = _raw[:60]
+                        break
+                msg_count = len([m for m in msgs if m.get("role") in ("user", "assistant")])
+            except Exception:
+                title = sid
+                msg_count = 0
+        if not stored_title and msg_count == 0 and sid != "web":
+            continue
+        entry = {"id": sid, "title": title or sid, "updated_at": r[1], "messages": msg_count}
+        if parent_sid:
+            entry["parent_session_id"] = parent_sid
+        sessions.append(entry)
+    return _JSON(content={"sessions": sessions})
+
+@router.get("/api/sessions/{session_id}/messages")
+async def get_session_messages(session_id: str, _u=_Depends(_auth)):
+    import json as _json
+    from salmalm.core import _get_db
+    conn = _get_db()
+    row = conn.execute("SELECT messages FROM session_store WHERE session_id=?", (session_id,)).fetchone()
+    if not row:
+        return _JSON(content={"messages": []})
+    try:
+        raw_msgs = _json.loads(row[0]) if row[0] else []
+    except Exception:
+        return _JSON(content={"messages": []})
+    out = []
+    for msg in raw_msgs:
+        role = msg.get("role", "")
+        if role not in ("user", "assistant"):
+            continue
+        content = msg.get("content", "")
+        if isinstance(content, list):
+            text = " ".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text").strip()
+        else:
+            text = str(content)
+        if text:
+            out.append({"role": role, "text": text, "model": msg.get("model", "")})
+    return _JSON(content={"session_id": session_id, "messages": out})
+
+@router.get("/api/sessions/{session_id}/last")
+async def get_session_last(session_id: str, _u=_Depends(_auth)):
+    from salmalm.core import get_session
+    sess = get_session(session_id)
+    last_msg = None
+    for msg in reversed(sess.messages):
+        if msg.get("role") == "assistant":
+            last_msg = msg
+            break
+    msg_count = len(sess.messages)
+    last_active = getattr(sess, "last_active", 0)
+    if last_msg:
+        return _JSON(content={"ok": True, "message": last_msg.get("content", ""), "role": "assistant", "msg_count": msg_count, "last_active": last_active})
+    return _JSON(content={"ok": True, "message": None, "msg_count": msg_count, "last_active": last_active})
+
+@router.get("/api/sessions/{session_id}/summary")
+async def get_session_summary(session_id: str, _u=_Depends(_auth)):
+    from salmalm.features.edge_cases import get_summary_card
+    card = get_summary_card(session_id)
+    return _JSON(content={"summary": card})
+
+@router.get("/api/sessions/{session_id}/alternatives")
+async def get_session_alternatives(session_id: str, msg_index: int = _Query(0), _u=_Depends(_auth)):
+    from salmalm.features.edge_cases import conversation_fork
+    alts = conversation_fork.get_alternatives(session_id, msg_index)
+    return _JSON(content={"alternatives": alts})
+
+@router.post("/api/sessions/create")
+async def post_sessions_create(request: _Request, _u=_Depends(_auth)):
+    from salmalm.core import _get_db
+    body = await request.json()
+    sid = body.get("session_id", "")
+    if not sid:
+        return _JSON(content={"ok": False, "error": "Missing session_id"}, status_code=400)
+    conn = _get_db()
+    try:
+        conn.execute('INSERT OR IGNORE INTO session_store (session_id, messages, updated_at, title) VALUES (?, ?, datetime("now"), ?)', (sid, "[]", "New Chat"))
+        conn.commit()
+    except Exception:
+        pass
+    return _JSON(content={"ok": True, "session_id": sid})
+
+@router.post("/api/sessions/delete")
+async def post_sessions_delete(request: _Request, _u=_Depends(_auth)):
+    from salmalm.security.crypto import log
+    from salmalm.core import _sessions, _get_db
+    from salmalm.core.session_store import _SESSIONS_DIR
+    from salmalm.core import audit_log
+    body = await request.json()
+    sid = body.get("session_id", "")
+    if not sid:
+        return _JSON(content={"ok": False, "error": "Missing session_id"}, status_code=400)
+    if sid in _sessions:
+        del _sessions[sid]
+    conn = _get_db()
+    conn.execute("DELETE FROM session_store WHERE session_id=?", (sid,))
+    conn.commit()
+    _json_path = _SESSIONS_DIR / f"{sid}.json"
+    try:
+        if _json_path.exists():
+            _json_path.unlink()
+    except Exception as _e:
+        log.warning(f"[SESSION] Could not delete session file {_json_path}: {_e}")
+    audit_log("session_delete", sid, session_id=sid, detail_dict={"session_id": sid})
+    return _JSON(content={"ok": True})
+
+@router.post("/api/sessions/clear")
+async def post_sessions_clear(request: _Request, _u=_Depends(_auth)):
+    from salmalm.security.crypto import log
+    from salmalm.core import _sessions, _get_db, audit_log
+    from salmalm.core.session_store import _SESSIONS_DIR
+    body = await request.json()
+    keep = body.get("keep", "web")
+    conn = _get_db()
+    rows = conn.execute("SELECT session_id FROM session_store WHERE session_id != ?", (keep,)).fetchall()
+    deleted = 0
+    for r in rows:
+        sid = r[0]
+        if sid in _sessions:
+            del _sessions[sid]
+        _json_path = _SESSIONS_DIR / f"{sid}.json"
+        try:
+            if _json_path.exists():
+                _json_path.unlink()
+        except Exception:
+            pass
+        deleted += 1
+    conn.execute("DELETE FROM session_store WHERE session_id != ?", (keep,))
+    conn.commit()
+    audit_log("session_clear", keep, detail_dict={"deleted": deleted, "kept": keep})
+    return _JSON(content={"ok": True, "deleted": deleted})
+
+@router.post("/api/sessions/import")
+async def post_sessions_import(request: _Request, _u=_Depends(_auth)):
+    import json as _json, uuid
+    from salmalm.core import _get_db, audit_log
+    body = await request.json()
+    messages = body.get("messages", [])
+    title = body.get("title", "Imported Chat")
+    if not messages or not isinstance(messages, list):
+        return _JSON(content={"ok": False, "error": "messages array required"}, status_code=400)
+    sid = f"imported_{uuid.uuid4().hex[:8]}"
+    conn = _get_db()
+    conn.execute("INSERT OR REPLACE INTO session_store (session_id, messages, title, updated_at) VALUES (?, ?, ?, datetime('now'))",
+                 (sid, _json.dumps(messages, ensure_ascii=False), title))
+    conn.commit()
+    audit_log("session_import", sid, detail_dict={"title": title, "msg_count": len(messages)})
+    return _JSON(content={"ok": True, "session_id": sid})
+
+@router.post("/api/sessions/rename")
+async def post_sessions_rename(request: _Request, _u=_Depends(_auth)):
+    from salmalm.core import _get_db
+    body = await request.json()
+    sid = body.get("session_id", "")
+    title = body.get("title", "").strip()[:60]
+    if not sid or not title:
+        return _JSON(content={"ok": False, "error": "Missing session_id or title"}, status_code=400)
+    conn = _get_db()
+    conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
+    conn.commit()
+    return _JSON(content={"ok": True})
+
+@router.post("/api/sessions/rollback")
+async def post_sessions_rollback(request: _Request, _u=_Depends(_auth)):
+    from salmalm.core import rollback_session
+    body = await request.json()
+    sid = body.get("session_id", "")
+    count = int(body.get("count", 1))
+    if not sid:
+        return _JSON(content={"ok": False, "error": "Missing session_id"}, status_code=400)
+    return _JSON(content=rollback_session(sid, count))
+
+@router.post("/api/sessions/branch")
+async def post_sessions_branch(request: _Request, _u=_Depends(_auth)):
+    from salmalm.core import branch_session
+    body = await request.json()
+    sid = body.get("session_id", "")
+    message_index = body.get("message_index")
+    if not sid or message_index is None:
+        return _JSON(content={"ok": False, "error": "Missing session_id or message_index"}, status_code=400)
+    return _JSON(content=branch_session(sid, int(message_index)))

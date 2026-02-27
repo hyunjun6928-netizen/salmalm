@@ -283,3 +283,136 @@ class AgentsMixin:
                 "ok": False,
                 "result": f"❌ Unknown directive: `${cmd}`\nType `$help` for available commands.",
             })
+
+
+# ── FastAPI router ────────────────────────────────────────────────────────────
+import asyncio as _asyncio
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
+from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
+from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+
+router = _APIRouter()
+
+@router.get("/api/agent/tasks")
+async def get_agent_tasks(_u=_Depends(_auth)):
+    from salmalm.web.routes.web_agents import _tasks, _tasks_lock
+    with _tasks_lock:
+        tasks = list(_tasks.values())
+    tasks.sort(key=lambda t: (t["status"] != "running", -t["created_at"]))
+    return _JSON(content={"tasks": tasks})
+
+@router.post("/api/agent/task")
+async def post_agent_task(request: _Request, _u=_Depends(_auth)):
+    import threading, uuid
+    from salmalm.security.crypto import vault
+    from salmalm.web.routes.web_agents import _tasks, _tasks_lock, _task_record, _run_task
+    if not vault.is_unlocked:
+        return _JSON(content={"error": "Vault locked"}, status_code=403)
+    body = await request.json()
+    description = (body.get("description") or "").strip()
+    model = body.get("model", "auto") or "auto"
+    if not description:
+        return _JSON(content={"error": "description required"}, status_code=400)
+    if len(description) > 4000:
+        return _JSON(content={"error": "description too long (max 4000 chars)"}, status_code=400)
+    task_id = uuid.uuid4().hex[:12]
+    rec = _task_record(task_id, description, model)
+    with _tasks_lock:
+        _tasks[task_id] = rec
+    threading.Thread(target=_run_task, args=(task_id, description, model), daemon=True).start()
+    return _JSON(content={"ok": True, "task_id": task_id})
+
+@router.post("/api/agent/task/cancel")
+async def post_agent_task_cancel(request: _Request, _u=_Depends(_auth)):
+    from salmalm.web.routes.web_agents import _tasks, _tasks_lock
+    body = await request.json()
+    task_id = body.get("task_id", "")
+    if not task_id:
+        return _JSON(content={"error": "task_id required"}, status_code=400)
+    with _tasks_lock:
+        if task_id not in _tasks:
+            return _JSON(content={"error": "Task not found"}, status_code=404)
+        _tasks[task_id]["status"] = "cancelled"
+    return _JSON(content={"ok": True})
+
+@router.post("/api/agent/tasks/clear")
+async def post_agent_tasks_clear(_u=_Depends(_auth)):
+    from salmalm.web.routes.web_agents import _tasks, _tasks_lock
+    _DONE_STATUSES = {"done", "failed", "cancelled"}
+    with _tasks_lock:
+        to_remove = [tid for tid, t in _tasks.items() if t.get("status") in _DONE_STATUSES]
+        for tid in to_remove:
+            del _tasks[tid]
+    return _JSON(content={"ok": True, "removed": len(to_remove)})
+
+@router.post("/api/directive")
+async def post_directive(request: _Request, _u=_Depends(_auth)):
+    import threading, uuid
+    from salmalm.security.crypto import vault
+    from salmalm.web.routes.web_agents import _tasks, _tasks_lock, _task_record, _run_task
+    body = await request.json()
+    raw = (body.get("text") or "").strip()
+    if not raw.startswith("$"):
+        return _JSON(content={"error": "Not a directive"}, status_code=400)
+    text = raw[1:].strip()
+    parts = text.split(None, 1)
+    cmd = parts[0].lower() if parts else ""
+    args = parts[1] if len(parts) > 1 else ""
+    if cmd == "task":
+        if not args:
+            return _JSON(content={"ok": False, "result": "Usage: $task <description>"})
+        task_id = uuid.uuid4().hex[:12]
+        model = body.get("model", "auto") or "auto"
+        rec = _task_record(task_id, args, model)
+        with _tasks_lock:
+            _tasks[task_id] = rec
+        threading.Thread(target=_run_task, args=(task_id, args, model), daemon=True).start()
+        return _JSON(content={"ok": True, "type": "task", "result": f"✅ Agent task `{task_id}` spawned\n\n**Task:** {args[:80]}", "task_id": task_id})
+    elif cmd == "status":
+        with _tasks_lock:
+            all_tasks = list(_tasks.values())
+        running = [t for t in all_tasks if t["status"] == "running"]
+        done = [t for t in all_tasks if t["status"] == "done"]
+        failed = [t for t in all_tasks if t["status"] == "failed"]
+        lines = [f"**Agent Status**", f"- 🔄 Running: {len(running)}", f"- ✅ Done: {len(done)}", f"- ❌ Failed: {len(failed)}"]
+        if running:
+            lines.append("\n**Active tasks:**")
+            for t in running[:3]:
+                lines.append(f"- `{t['id']}` — {t['description'][:60]}")
+        return _JSON(content={"ok": True, "type": "status", "result": "\n".join(lines)})
+    elif cmd == "vault":
+        if not vault.is_unlocked:
+            return _JSON(content={"ok": False, "result": "❌ Vault is locked"})
+        sub_parts = args.split(None, 2)
+        sub = sub_parts[0].lower() if sub_parts else "list"
+        if sub == "list":
+            keys = vault.keys()
+            return _JSON(content={"ok": True, "type": "vault", "result": f"**Vault keys:** {', '.join(keys) or '(empty)'}"})
+        elif sub == "get" and len(sub_parts) >= 2:
+            val = vault.get(sub_parts[1])
+            masked = ("••••" + str(val)[-4:]) if val and len(str(val)) > 8 else ("(empty)" if not val else str(val))
+            return _JSON(content={"ok": True, "type": "vault", "result": f"**{sub_parts[1]}:** {masked}"})
+        elif sub == "set" and len(sub_parts) >= 3:
+            vault.set(sub_parts[1], sub_parts[2])
+            return _JSON(content={"ok": True, "type": "vault", "result": f"✅ `{sub_parts[1]}` saved to vault"})
+        elif sub == "delete" and len(sub_parts) >= 2:
+            vault.delete(sub_parts[1])
+            return _JSON(content={"ok": True, "type": "vault", "result": f"✅ `{sub_parts[1]}` deleted from vault"})
+        return _JSON(content={"ok": True, "type": "vault", "result": "Usage: $vault [list|get key|set key val|delete key]"})
+    elif cmd == "model":
+        if not args:
+            return _JSON(content={"ok": False, "result": "Usage: $model <auto|haiku|sonnet|opus|model-name>"})
+        try:
+            from salmalm.core.llm_router import llm_router
+            msg = llm_router.switch_model(args)
+            try:
+                from salmalm.core.core import router as _router
+                _router.set_force_model(None if args == "auto" else args)
+            except Exception:
+                pass
+            return _JSON(content={"ok": True, "type": "model", "result": f"✅ {msg}"})
+        except Exception as e:
+            return _JSON(content={"ok": False, "result": f"❌ {e}"})
+    elif cmd in ("help", "?", ""):
+        return _JSON(content={"ok": True, "type": "help", "result": "**Available directives:**\n- `$task <description>` — spawn an autonomous agent\n- `$status` — show running agent tasks\n- `$vault list` — list vault keys\n- `$model <name>` — switch active model\n- `$help` — show this help"})
+    return _JSON(content={"ok": False, "result": f"❌ Unknown directive: `${cmd}`\nType `$help` for available commands."})

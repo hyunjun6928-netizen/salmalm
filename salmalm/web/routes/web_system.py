@@ -7,7 +7,7 @@ from pathlib import Path
 from salmalm.constants import DATA_DIR, VERSION, WORKSPACE_DIR, BASE_DIR  # noqa: F401
 from salmalm.security.crypto import vault, log  # noqa: F401
 from salmalm.constants import APP_NAME  # noqa: F401
-from salmalm.core.core import get_usage_report, router  # noqa: F401
+from salmalm.core.core import get_usage_report, router as _core_router  # noqa: F401
 
 import logging
 
@@ -155,11 +155,11 @@ class SystemMixin:
                 _effective_model = _ov  # specific model override on session
             elif _ov == "auto":
                 _effective_model = "auto"  # user explicitly chose auto routing
-            elif _ov is None and router.force_model:
-                _effective_model = router.force_model  # no session pref → global fallback
+            elif _ov is None and _core_router.force_model:
+                _effective_model = _core_router.force_model  # no session pref → global fallback
         except Exception as e:
             log.debug(f"[STATUS] session model lookup failed: {e}")
-            _effective_model = router.force_model or "auto"
+            _effective_model = _core_router.force_model or "auto"
         self._json(
             {
                 "app": APP_NAME,
@@ -342,3 +342,201 @@ class SystemMixin:
                     return True
             # If header present, any value is fine (existence proves CORS preflight passed)
         return True
+
+
+# ── FastAPI router — true async handlers (no _dispatch) ──────────────────
+import asyncio as _asyncio
+import sys as _sys
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
+from fastapi.responses import JSONResponse as _JSON, Response as _Response
+from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+
+router = _APIRouter()
+
+
+@router.get("/api/uptime")
+async def get_api_uptime():
+    from salmalm.features.sla import uptime_monitor
+    return _JSON(uptime_monitor.get_stats())
+
+
+@router.get("/api/latency")
+async def get_api_latency():
+    from salmalm.features.sla import latency_tracker
+    return _JSON(latency_tracker.get_stats())
+
+
+@router.get("/api/nodes")
+async def get_api_nodes(_u=_Depends(_auth)):
+    from salmalm.features.nodes import node_manager
+    return _JSON({"nodes": node_manager.list_nodes()})
+
+
+@router.get("/api/status")
+async def get_api_status(request: _Request, session: str = _Query("web")):
+    from salmalm.core.core import get_usage_report, router as _cr
+    from salmalm.security.crypto import vault
+    channels = {}
+    if vault.is_unlocked:
+        channels["telegram"] = bool(vault.get("telegram_token"))
+        channels["discord"] = bool(vault.get("discord_token"))
+    _effective_model = "auto"
+    try:
+        from salmalm.core import get_session
+        _sess = get_session(session)
+        _ov = getattr(_sess, "model_override", None)
+        if _ov and _ov != "auto":
+            _effective_model = _ov
+        elif _ov is None and _cr.force_model:
+            _effective_model = _cr.force_model
+    except Exception:
+        pass
+    from salmalm.security.crypto import HAS_CRYPTO
+    vault_type = "AES-256-GCM" if HAS_CRYPTO else "HMAC-CTR (obfuscation only)"
+    return _JSON({
+        "app": APP_NAME, "version": VERSION,
+        "unlocked": vault.is_unlocked, "vault_type": vault_type,
+        "usage": get_usage_report(), "model": _effective_model,
+        "channels": channels,
+    })
+
+
+@router.get("/api/debug")
+async def get_api_debug(_u=_Depends(_auth)):
+    import gc, platform
+    from salmalm.core import _metrics, get_session
+    from salmalm.core.engine_pipeline import _active_requests, _shutting_down
+    from salmalm.tools.tool_registry import _HANDLERS, _ensure_modules, _DYNAMIC_TOOLS
+    from salmalm.core.llm_router import PROVIDERS, is_provider_available
+    from salmalm.security.crypto import vault
+    try:
+        _ensure_modules()
+    except Exception:
+        pass
+    sess = get_session("web")
+    sess_msgs = len(sess.messages) if sess else 0
+    sess_ctx = sum(len(str(m.get("content", ""))) for m in (sess.messages if sess else []))
+    providers = {n: is_provider_available(n) for n in PROVIDERS}
+    import resource
+    try:
+        mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    except Exception:
+        mem_mb = 0
+    gc_counts = gc.get_count()
+    return _JSON({
+        "python": _sys.version, "platform": platform.platform(),
+        "pid": os.getpid(), "memory_mb": round(mem_mb, 1),
+        "gc": {"gen0": gc_counts[0], "gen1": gc_counts[1], "gen2": gc_counts[2]},
+        "active_requests": _active_requests, "shutting_down": _shutting_down,
+        "metrics": {**_metrics},
+        "session": {"messages": sess_msgs, "context_chars": sess_ctx},
+        "tools": {"registered": len(_HANDLERS), "dynamic": len(_DYNAMIC_TOOLS)},
+        "providers": providers, "vault_unlocked": vault.is_unlocked,
+    })
+
+
+@router.get("/api/queue")
+async def get_api_queue(request: _Request, _u=_Depends(_auth)):
+    from salmalm.features.queue import queue_status
+    session_id = request.headers.get("x-session-id", "web")
+    return _JSON(queue_status(session_id))
+
+
+@router.get("/api/metrics")
+async def get_api_metrics():
+    from salmalm.monitoring.metrics import metrics as _pm
+    body = _pm.render_text().encode("utf-8")
+    return _Response(content=body, media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
+@router.get("/api/cert")
+async def get_api_cert(_u=_Depends(_auth)):
+    from salmalm.utils.tls import get_cert_info
+    return _JSON(get_cert_info())
+
+
+@router.get("/api/ws/status")
+async def get_api_ws_status(_u=_Depends(_auth)):
+    from salmalm.web.ws import ws_server
+    return _JSON({"running": ws_server._running, "clients": ws_server.client_count, "port": ws_server.port})
+
+
+@router.get("/api/usage/daily")
+async def get_api_usage_daily(_u=_Depends(_auth)):
+    from salmalm.features.edge_cases import usage_tracker
+    return _JSON({"report": usage_tracker.daily_report()})
+
+
+@router.get("/api/usage/monthly")
+async def get_api_usage_monthly(_u=_Depends(_auth)):
+    from salmalm.features.edge_cases import usage_tracker
+    return _JSON({"report": usage_tracker.monthly_report()})
+
+
+@router.get("/api/doctor")
+async def get_api_doctor(_u=_Depends(_auth)):
+    from salmalm.features.doctor import doctor
+    results = await _asyncio.to_thread(doctor.run_all)
+    ok = sum(1 for r in results if r["status"] == "ok")
+    return _JSON({"checks": results, "passed": ok, "total": len(results)})
+
+
+@router.get("/api/ollama/detect")
+async def get_api_ollama_detect():
+    from salmalm.core.llm_router import detect_ollama
+    result = await _asyncio.to_thread(detect_ollama)
+    return _JSON(result)
+
+
+@router.get("/api/update/check")
+async def get_api_update_check():
+    import urllib.request as _ur
+    try:
+        resp = await _asyncio.to_thread(lambda: _ur.urlopen("https://pypi.org/pypi/salmalm/json", timeout=10))
+        import json as _j
+        data = _j.loads(resp.read().decode())
+        latest = data.get("info", {}).get("version", VERSION)
+        result = {"current": VERSION, "latest": latest, "exe": getattr(_sys, "frozen", False),
+                  "update_available": latest != VERSION}
+    except Exception as e:
+        result = {"current": VERSION, "latest": None, "error": str(e)[:100]}
+    return _JSON(result)
+
+
+@router.get("/static/app.js")
+async def get_static_app_js(request: _Request):
+    import hashlib
+    js_path = Path(__file__).parent.parent.parent / "static" / "app.js"
+    if not js_path.exists():
+        return _Response(status_code=404)
+    content = js_path.read_bytes()
+    etag = f'"{hashlib.sha256(content).hexdigest()[:16]}"'
+    if request.headers.get("if-none-match") == etag:
+        return _Response(status_code=304)
+    return _Response(content=content, media_type="application/javascript; charset=utf-8",
+                     headers={"ETag": etag, "Cache-Control": "public, max-age=3600"})
+
+
+@router.get("/api/audit")
+async def get_api_audit(
+    limit: int = _Query(50), type: str = _Query(None), session_id: str = _Query(None),
+    _u=_Depends(_auth),
+):
+    from salmalm.core import query_audit_log
+    entries = query_audit_log(limit=limit, event_type=type, session_id=session_id)
+    return _JSON({"entries": entries, "count": len(entries)})
+
+
+@router.get("/api/logs")
+async def get_api_logs(lines: int = _Query(100), level: str = _Query(""), _u=_Depends(_auth)):
+    log_path = DATA_DIR / "salmalm.log"
+    entries = []
+    if log_path.exists():
+        all_lines = log_path.read_text(encoding="utf-8", errors="replace").strip().split("\n")
+        lvl = level.upper()
+        for ln in all_lines[-lines:]:
+            if lvl and f"[{lvl}]" not in ln:
+                continue
+            entries.append(ln)
+    return _JSON({"logs": entries, "total": len(entries)})
+

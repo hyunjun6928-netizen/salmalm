@@ -143,3 +143,99 @@ class WebGatewayMixin:
         except Exception as e:
             log.error(f"Webhook handler error: {e}")
             self._json({"ok": True})  # Always return 200 to Telegram
+
+
+# ── FastAPI router ────────────────────────────────────────────────────────────
+import asyncio as _asyncio
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
+from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
+from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+
+router = _APIRouter()
+
+@router.get("/api/gateway/nodes")
+async def get_gateway_nodes(_u=_Depends(_auth)):
+    from salmalm.features.nodes import gateway
+    return _JSON(content={"nodes": gateway.list_nodes()})
+
+@router.post("/api/config/telegram")
+async def post_config_telegram(request: _Request):
+    from salmalm.security.crypto import vault
+    body = await request.json()
+    if not vault.is_unlocked:
+        return _JSON(content={"error": "Vault locked"}, status_code=403)
+    vault.set("telegram_token", body.get("token", ""))
+    vault.set("telegram_owner_id", body.get("owner_id", ""))
+    return _JSON(content={"ok": True, "message": "Telegram config saved. Restart required."})
+
+@router.post("/api/gateway/register")
+async def post_gateway_register(request: _Request):
+    from salmalm.features.nodes import gateway
+    body = await request.json()
+    node_id = body.get("node_id", "")
+    url = body.get("url", "")
+    if not node_id or not url:
+        return _JSON(content={"error": "node_id and url required"}, status_code=400)
+    result = gateway.register(node_id, url, token=body.get("token", ""),
+                              capabilities=body.get("capabilities"), name=body.get("name", ""))
+    return _JSON(content=result)
+
+@router.post("/api/gateway/heartbeat")
+async def post_gateway_heartbeat(request: _Request):
+    from salmalm.features.nodes import gateway
+    body = await request.json()
+    return _JSON(content=gateway.heartbeat(body.get("node_id", "")))
+
+@router.post("/api/gateway/unregister")
+async def post_gateway_unregister(request: _Request):
+    from salmalm.features.nodes import gateway
+    body = await request.json()
+    return _JSON(content=gateway.unregister(body.get("node_id", "")))
+
+@router.post("/api/gateway/dispatch")
+async def post_gateway_dispatch(request: _Request):
+    from salmalm.features.nodes import gateway
+    body = await request.json()
+    node_id = body.get("node_id", "")
+    tool = body.get("tool", "")
+    args = body.get("args", {})
+    if node_id:
+        result = gateway.dispatch(node_id, tool, args)
+    else:
+        result = gateway.dispatch_auto(tool, args)
+        if result is None:
+            result = {"error": "No available node for this tool"}
+    return _JSON(content=result)
+
+@router.post("/webhook/slack")
+async def post_webhook_slack(request: _Request):
+    import json as _json
+    from salmalm.channels.slack_bot import slack_bot
+    body = await request.json()
+    if not slack_bot.bot_token:
+        return _JSON(content={"error": "Slack not configured"}, status_code=503)
+    ts = request.headers.get("x-slack-request-timestamp", "")
+    sig = request.headers.get("x-slack-signature", "")
+    raw_body = _json.dumps(body).encode() if isinstance(body, dict) else b""
+    if not slack_bot.verify_request(ts, sig, raw_body):
+        return _JSON(content={"error": "Invalid signature"}, status_code=403)
+    result = slack_bot.handle_event(body)
+    return _JSON(content=result if result else {"ok": True})
+
+@router.post("/webhook/telegram")
+async def post_webhook_telegram(request: _Request):
+    from salmalm.security.crypto import log
+    from salmalm.channels.telegram import telegram_bot
+    body = await request.json()
+    if not telegram_bot.token:
+        return _JSON(content={"error": "Telegram not configured"}, status_code=503)
+    secret = request.headers.get("x-telegram-bot-api-secret-token", "")
+    if telegram_bot._webhook_secret and not telegram_bot.verify_webhook_request(secret):
+        log.warning("[BLOCK] Telegram webhook: invalid secret token")
+        return _JSON(content={"error": "Forbidden"}, status_code=403)
+    try:
+        await telegram_bot.handle_webhook_update(body)
+        return _JSON(content={"ok": True})
+    except Exception as e:
+        log.error(f"Webhook handler error: {e}")
+        return _JSON(content={"ok": True})

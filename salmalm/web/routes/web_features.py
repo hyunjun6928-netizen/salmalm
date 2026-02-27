@@ -379,3 +379,28 @@ class WebFeaturesMixin:
             },
         ]
         self._json({"categories": cats})
+
+
+# ── FastAPI router ────────────────────────────────────────────────────────────
+import asyncio as _asyncio
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
+from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
+from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+
+router = _APIRouter()
+
+@router.get("/api/features")
+async def get_features():
+    from salmalm.web.routes.web_features import WebFeaturesMixin as _WFM
+    # Call the mixin logic by building the response from the known structure
+    # We reuse the existing Mixin data by monkey-patching _json
+    _result = {}
+    class _FakeHandler(_WFM):
+        def _json(self, data, status=200): _result["data"] = data
+    h = _FakeHandler.__new__(_FakeHandler)
+    _FakeHandler._json.__get__(h)
+    # Directly bind
+    import types
+    h._json = types.MethodType(_FakeHandler._json, h)
+    h._get_features()
+    return _JSON(content=_result.get("data", {}))

@@ -693,8 +693,7 @@ async def run_server():
 
     try:
         import uvicorn
-        from salmalm.web.asgi import create_asgi_app
-        asgi_app = create_asgi_app()
+        from salmalm.web.app import app as asgi_app
         uvicorn_config = uvicorn.Config(
             asgi_app,
             host=bind_addr,

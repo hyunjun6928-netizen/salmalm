@@ -327,3 +327,105 @@ class WebEngineMixin:
         current = _snapshot_current_settings()
         save_engine_settings(current)
         self._json({"ok": True})
+
+
+# ── FastAPI router ────────────────────────────────────────────────────────────
+import asyncio as _asyncio
+from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
+from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
+from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
+
+router = _APIRouter()
+
+@router.get("/api/sla")
+async def get_sla():
+    from salmalm.features.sla import uptime_monitor, latency_tracker, watchdog, sla_config
+    return _JSON(content={"uptime": uptime_monitor.get_stats(), "latency": latency_tracker.get_stats(),
+                           "health": watchdog.get_last_report(), "config": sla_config.get_all()})
+
+@router.get("/api/sla/config")
+async def get_sla_config():
+    from salmalm.features.sla import sla_config
+    return _JSON(content=sla_config.get_all())
+
+@router.get("/api/routing")
+async def get_routing(_u=_Depends(_auth)):
+    from salmalm.security.crypto import vault
+    from salmalm.core.engine import get_routing_config
+    from salmalm.constants import MODELS
+    config = get_routing_config()
+    _provider_key_map = {"anthropic": "anthropic_api_key", "openai": "openai_api_key",
+                         "xai": "xai_api_key", "google": "google_api_key", "openrouter": "openrouter_api_key"}
+    for tier in ("simple", "moderate", "complex"):
+        model = config.get(tier, "")
+        if not model or model == "auto":
+            continue
+        provider = model.split("/")[0] if "/" in model else ""
+        key_name = _provider_key_map.get(provider)
+        if key_name and not vault.get(key_name):
+            config[tier] = ""
+    return _JSON(content={"config": config, "available_models": MODELS})
+
+@router.get("/api/failover")
+async def get_failover(_u=_Depends(_auth)):
+    from salmalm.core.engine import get_failover_config
+    from salmalm.core.llm_loop import get_cooldown_status
+    return _JSON(content={"config": get_failover_config(), "cooldowns": get_cooldown_status()})
+
+@router.get("/api/engine/settings")
+async def get_engine_settings(_u=_Depends(_auth)):
+    from salmalm.web.routes.web_engine import _snapshot_current_settings
+    return _JSON(content=_snapshot_current_settings())
+
+@router.post("/api/routing")
+async def post_routing(request: _Request, _u=_Depends(_auth)):
+    from salmalm.core.engine import _save_routing_config, get_routing_config
+    body = await request.json()
+    cfg = get_routing_config()
+    for k in ("simple", "moderate", "complex"):
+        if k in body and body[k]:
+            cfg[k] = body[k]
+    _save_routing_config(cfg)
+    return _JSON(content={"ok": True, "config": cfg})
+
+@router.post("/api/routing/optimize")
+async def post_routing_optimize(_u=_Depends(_auth)):
+    from salmalm.security.crypto import vault
+    from salmalm.core.model_selection import auto_optimize_and_save
+    available_keys = [k for k in ("anthropic_api_key", "openai_api_key", "xai_api_key", "google_api_key") if vault.get(k)]
+    if not available_keys:
+        return _JSON(content={"ok": False, "error": "No API keys configured"}, status_code=400)
+    config = auto_optimize_and_save(available_keys)
+    from salmalm.core.model_selection import _MODEL_COSTS as MODEL_COSTS
+    summary = {}
+    for tier, model in config.items():
+        cost = MODEL_COSTS.get(model, (0, 0))
+        provider = model.split("/")[0] if "/" in model else "?"
+        name = model.split("/")[-1] if "/" in model else model
+        summary[tier] = {"model": model, "provider": provider, "name": name, "cost_input": cost[0], "cost_output": cost[1]}
+    return _JSON(content={"ok": True, "config": config, "summary": summary, "keys_used": available_keys})
+
+@router.post("/api/failover")
+async def post_failover(request: _Request, _u=_Depends(_auth)):
+    from salmalm.core.engine import save_failover_config, get_failover_config
+    body = await request.json()
+    save_failover_config(body)
+    return _JSON(content={"ok": True, "config": get_failover_config()})
+
+@router.post("/api/sla/config")
+async def post_sla_config(request: _Request, _u=_Depends(_auth)):
+    if _u.get("role") != "admin":
+        return _JSON(content={"error": "Admin access required"}, status_code=403)
+    from salmalm.features.sla import sla_config
+    body = await request.json()
+    sla_config.update(body)
+    return _JSON(content={"ok": True, "config": sla_config.get_all()})
+
+@router.post("/api/engine/settings")
+async def post_engine_settings(request: _Request, _u=_Depends(_auth)):
+    from salmalm.web.routes.web_engine import _apply_engine_settings_to_runtime, _snapshot_current_settings, save_engine_settings
+    body = await request.json()
+    _apply_engine_settings_to_runtime(body)
+    current = _snapshot_current_settings()
+    save_engine_settings(current)
+    return _JSON(content={"ok": True})
