@@ -63,16 +63,11 @@
       if(!r.ok||!r.body){throw new Error('stream unavailable')}
       var reader=r.body.getReader();var decoder=new TextDecoder();var buf='';var gotDone=false;
       var typingEl=document.getElementById('typing-row');
-      /* Per-chunk stall timeout: if server holds connection open but sends nothing for 120s,
-         abort and fall back to HTTP POST (prevents indefinite hang).
-         120s matches SALMALM_LLM_TIMEOUT default — heavy models (opus) need this headroom. */
-      var _STALL_MS=120000;
+      /* No stall timeout — wait indefinitely like OpenClaw.
+         Heavy models (opus) can take 3+ minutes for complex tasks. */
       var _stallTimer=null;
       function _readWithTimeout(){
-        return Promise.race([
-          reader.read(),
-          new Promise(function(_,reject){_stallTimer=setTimeout(function(){reject(new Error('SSE stall: no data for '+_STALL_MS+'ms'))},_STALL_MS)})
-        ]);
+        return reader.read();
       }
       while(true){
         var chunk=await _readWithTimeout();
