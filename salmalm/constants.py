@@ -270,7 +270,7 @@ PROTECTED_FILES = {".vault.enc", "audit.db", "auth.db", "server.py", ".clipboard
 
 # LLM
 DEFAULT_MAX_TOKENS = 4096
-COMPACTION_THRESHOLD = 30000
+COMPACTION_THRESHOLD = 20000
 CACHE_TTL = int(_os.environ.get("SALMALM_CACHE_TTL", "3600"))
 
 # Intent classification thresholds

@@ -790,7 +790,8 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           <div style="margin-bottom:8px">
             <select id="eng-compaction" style="width:auto;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
               <option value="15000">Aggressive (15K)</option>
-              <option value="30000" selected>Balanced (30K)</option>
+              <option value="20000" selected>Balanced (20K) ★</option>
+              <option value="30000">Standard (30K)</option>
               <option value="60000">Relaxed (60K)</option>
               <option value="120000">Maximum (120K)</option>
             </select>
@@ -798,12 +799,14 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           <div style="font-size:12px;color:var(--text2);line-height:1.8">
             <span class="eng-en">Controls when old messages are summarized to free up context space. Lower = more frequent compaction = lower cost per turn but may lose details.<br>
             <b>15K (Aggressive):</b> Compacts often. Best for cost savings. <span style="color:#4ade80">~$0.01/turn avg on Opus</span><br>
-            <b>30K (Balanced):</b> Good middle ground. <span style="color:#facc15">~$0.02/turn avg</span><br>
+            <b>20K (Balanced ★):</b> Recommended default. Earlier compaction, lower cost. <span style="color:#4ade80">~$0.015/turn avg</span><br>
+            <b>30K (Standard):</b> Previous default. Good middle ground. <span style="color:#facc15">~$0.02/turn avg</span><br>
             <b>60K (Relaxed):</b> Keeps more history. <span style="color:#f97316">~$0.04/turn avg</span><br>
             <b>120K (Maximum):</b> Full context retention. Best for long coding sessions. <span style="color:#f87171">~$0.08/turn avg</span></span>
             <span class="eng-kr">이전 메시지를 요약하여 컨텍스트 공간을 확보하는 시점을 제어합니다. 낮을수록 더 자주 압축 = 턴당 비용 절감, 세부사항 손실 가능.<br>
             <b>15K (적극적):</b> 자주 압축. 비용 절감 최적. <span style="color:#4ade80">Opus 기준 턴당 평균 ~$0.01</span><br>
-            <b>30K (균형):</b> 적절한 중간값. <span style="color:#facc15">턴당 평균 ~$0.02</span><br>
+            <b>20K (균형 ★):</b> 권장 기본값. 더 일찍 압축, 비용 절감. <span style="color:#4ade80">턴당 평균 ~$0.015</span><br>
+            <b>30K (표준):</b> 이전 기본값. <span style="color:#facc15">턴당 평균 ~$0.02</span><br>
             <b>60K (여유):</b> 더 많은 히스토리 유지. <span style="color:#f97316">턴당 평균 ~$0.04</span><br>
             <b>120K (최대):</b> 전체 컨텍스트 유지. 긴 코딩 세션에 적합. <span style="color:#f87171">턴당 평균 ~$0.08</span></span><br>
             <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Auto-compaction <b>ON</b>, threshold fixed internally (~<b>60-120K</b>). Not user-configurable.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 자동 압축 <b>ON</b>, 임계값은 내부 고정 (사용자 조절 불가). 대략 <b>60-120K</b> 수준.</span></span>
