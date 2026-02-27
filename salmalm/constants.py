@@ -1,7 +1,6 @@
 """SalmAlm constants — paths, costs, thresholds."""
 
 from datetime import timedelta, timezone
-from pathlib import Path
 
 try:
     from importlib.metadata import version as _pkg_version
@@ -18,20 +17,22 @@ KST = timezone(timedelta(hours=9))
 #   Priority: $SALMALM_HOME > ~/SalmAlm
 import os as _os
 
-BASE_DIR = Path(__file__).parent.resolve()  # salmalm/ package dir
-DATA_DIR = Path(_os.environ.get("SALMALM_HOME", "") or Path.home() / "SalmAlm")
-MEMORY_DIR = DATA_DIR / "memory"
-WORKSPACE_DIR = DATA_DIR
-SOUL_FILE = DATA_DIR / "soul.md"
-AGENTS_FILE = DATA_DIR / "agents.md"
-MEMORY_FILE = DATA_DIR / "memory.md"
-USER_FILE = DATA_DIR / "user.md"
-TOOLS_FILE = DATA_DIR / "tools.md"
-VAULT_FILE = DATA_DIR / ".vault.enc"
-AUDIT_DB = DATA_DIR / "audit.db"
-MEMORY_DB = DATA_DIR / "memory.db"
-CACHE_DB = DATA_DIR / "cache.db"
-LOG_FILE = DATA_DIR / "salmalm.log"
+from salmalm.config.paths import (
+    AGENTS_FILE,
+    AUDIT_DB,
+    BASE_DIR,
+    CACHE_DB,
+    DATA_DIR,
+    LOG_FILE,
+    MEMORY_DB,
+    MEMORY_DIR,
+    MEMORY_FILE,
+    SOUL_FILE,
+    TOOLS_FILE,
+    USER_FILE,
+    VAULT_FILE,
+    WORKSPACE_DIR,
+)
 
 # Security
 VAULT_VERSION = b"\x03"
@@ -269,15 +270,15 @@ EXEC_BLOCKLIST_PATTERNS = [
 PROTECTED_FILES = {".vault.enc", "audit.db", "auth.db", "server.py", ".clipboard.json"}
 
 # LLM
-DEFAULT_MAX_TOKENS = 4096
-COMPACTION_THRESHOLD = 20000
-CACHE_TTL = int(_os.environ.get("SALMALM_CACHE_TTL", "3600"))
-
-# Intent classification thresholds
-INTENT_SHORT_MSG = 500  # messages shorter than this → simpler model
-INTENT_COMPLEX_MSG = 1500  # messages longer than this → complex model
-INTENT_CONTEXT_DEPTH = 40  # conversation turns threshold for complexity bump
-REFLECT_SNIPPET_LEN = 500  # max chars of user message in reflection prompt
+from salmalm.config.limits import (
+    CACHE_TTL,
+    COMPACTION_THRESHOLD,
+    DEFAULT_MAX_TOKENS,
+    INTENT_COMPLEX_MSG,
+    INTENT_CONTEXT_DEPTH,
+    INTENT_SHORT_MSG,
+    REFLECT_SNIPPET_LEN,
+)
 
 # Token cost estimates (per 1M tokens, USD)
 MODEL_COSTS = {
@@ -320,35 +321,7 @@ MODEL_COSTS = {
 # ============================================================
 # Model Registry — single source of truth for all model references
 # ============================================================
-MODELS = {
-    # Anthropic
-    "opus": "anthropic/claude-opus-4-6",
-    "sonnet": "anthropic/claude-sonnet-4-6",
-    "haiku": "anthropic/claude-haiku-4-5-20251001",
-    # OpenAI
-    "gpt5.2": "openai/gpt-5.2-codex",
-    "gpt5.1": "openai/gpt-5.1-codex",
-    "gpt4.1": "openai/gpt-4.1",
-    "gpt4.1mini": "openai/gpt-4.1-mini",
-    "gpt4.1nano": "openai/gpt-4.1-nano",
-    "o3": "openai/o3",
-    "o4mini": "openai/o4-mini",
-    # xAI
-    "grok4": "xai/grok-4",
-    "grok3": "xai/grok-3",
-    "grok3mini": "xai/grok-3-mini",
-    # Google
-    "gemini3pro": "google/gemini-3-pro-preview",
-    "gemini3flash": "google/gemini-3-flash-preview",
-    "gemini2.5pro": "google/gemini-2.5-pro",
-    "gemini2.5flash": "google/gemini-2.5-flash",
-    # DeepSeek (via OpenRouter)
-    "deepseek-r1": "openrouter/deepseek/deepseek-r1",
-    "deepseek-chat": "openrouter/deepseek/deepseek-chat",
-    # Meta (via OpenRouter)
-    "maverick": "openrouter/meta-llama/llama-4-maverick",
-    "scout": "openrouter/meta-llama/llama-4-scout",
-}
+from salmalm.config.models import FALLBACK_MODELS, MODEL_ALIASES, MODELS, THINKING_BUDGET_MAP
 
 # Tier-based model routing pools (cheapest → most capable)
 # Ollama models included for users running local LLMs
@@ -374,49 +347,12 @@ MODEL_TIERS = {
     3: [MODELS["opus"], MODELS["o3"], MODELS["sonnet"], MODELS["gpt5.1"], MODELS["grok4"], "ollama/llama3.3"],
 }
 
-# Fallback models per provider (cheapest reliable model)
-FALLBACK_MODELS = {
-    "anthropic": "claude-sonnet-4-20250514",
-    "xai": "grok-4",
-    "google": "gemini-3-flash-preview",
-}
-
 # API validation test models (lightweight, for key testing)
 TEST_MODELS = {
     "anthropic": "claude-haiku-4-5-20251001",
     "openai": "gpt-4.1-nano",
     "xai": "grok-3-mini",
     "google": "gemini-2.0-flash",
-}
-
-# User-facing model aliases (for /model command)
-MODEL_ALIASES = {
-    "claude": MODELS["sonnet"],
-    "sonnet": MODELS["sonnet"],
-    "opus": MODELS["opus"],
-    "haiku": MODELS["haiku"],
-    "gpt": MODELS["gpt5.2"],
-    "gpt5": MODELS["gpt5.2"],
-    "gpt5.1": MODELS["gpt5.1"],
-    "gpt4.1": MODELS["gpt4.1"],
-    "4.1mini": MODELS["gpt4.1mini"],
-    "4.1nano": MODELS["gpt4.1nano"],
-    "o3": MODELS["o3"],
-    "o4mini": MODELS["o4mini"],
-    "grok": MODELS["grok4"],
-    "grok4": MODELS["grok4"],
-    "grok3": MODELS["grok3"],
-    "grok3mini": MODELS["grok3mini"],
-    "gemini": MODELS["gemini3pro"],
-    "flash": MODELS["gemini3flash"],
-    "deepseek": MODELS["deepseek-r1"],
-    "maverick": MODELS["maverick"],
-    "scout": MODELS["scout"],
-    "llama": "ollama/llama3.3",
-    "llama3.2": "ollama/llama3.2",
-    "llama3.3": "ollama/llama3.3",
-    "qwen": "ollama/qwen3",
-    "qwen3": "ollama/qwen3",
 }
 
 # Model for /commands processing (fast + capable; sonnet is the right balance)
@@ -514,12 +450,4 @@ MODEL_NAME_FIXES: dict = {
     "openai/gpt-5.3-codex": "openai/gpt-5.2-codex",
     "grok-4": "grok-4-0709",
     "xai/grok-4": "xai/grok-4-0709",
-}
-
-# Extended thinking token budgets — keyed by level name
-THINKING_BUDGET_MAP: dict = {
-    "low":   4_000,
-    "medium": 10_000,
-    "high":  16_000,
-    "xhigh": 32_000,
 }
