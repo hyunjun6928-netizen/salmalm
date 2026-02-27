@@ -50,7 +50,9 @@ def _install_shortcut():
         try:
             import subprocess as _sp
 
-            win_user = _sp.check_output(["cmd.exe", "/C", "echo", "%USERNAME%"], stderr=_sp.DEVNULL, text=True).strip()
+            win_user = _sp.check_output(["cmd.exe", "/C", "echo", "%USERNAME%"], stderr=_sp.DEVNULL, text=True, timeout=5).strip()
+            # Sanitize: Windows usernames can contain spaces/special chars
+            win_user = "".join(c for c in win_user if c.isalnum() or c in "-_.")
             win_desktop = f"/mnt/c/Users/{win_user}/Desktop"
             if not os.path.isdir(win_desktop):
                 # Fallback: try OneDrive Desktop

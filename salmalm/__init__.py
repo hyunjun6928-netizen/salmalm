@@ -14,21 +14,31 @@ app = None  # Will be set below if runtime (not during build)
 
 
 def _register_services() -> None:
-    """Register all service factories. Called once at import time."""
+    """Register all service factories. Each registration is isolated so one
+    failure does not prevent the others from loading."""
     if app is None:
         return
-    app.register("vault", lambda: __import__("salmalm.security.crypto", fromlist=["vault"]).vault)
-    app.register("router", lambda: __import__("salmalm.core", fromlist=["router"]).router)
-    app.register("auth_manager", lambda: __import__("salmalm.auth", fromlist=["auth_manager"]).auth_manager)
-    app.register("rate_limiter", lambda: __import__("salmalm.auth", fromlist=["rate_limiter"]).rate_limiter)
-    app.register("rag_engine", lambda: __import__("salmalm.rag", fromlist=["rag_engine"]).rag_engine)
-    app.register("mcp_manager", lambda: __import__("salmalm.mcp", fromlist=["mcp_manager"]).mcp_manager)
-    app.register("node_manager", lambda: __import__("salmalm.nodes", fromlist=["node_manager"]).node_manager)
-    app.register("health_monitor", lambda: __import__("salmalm.stability", fromlist=["health_monitor"]).health_monitor)
-    app.register("telegram_bot", lambda: __import__("salmalm.telegram", fromlist=["telegram_bot"]).telegram_bot)
-    app.register("user_manager", lambda: __import__("salmalm.users", fromlist=["user_manager"]).user_manager)
-    app.register("discord_bot", lambda: __import__("salmalm.discord_bot", fromlist=["discord_bot"]).discord_bot)
-    app.register("ws_server", lambda: __import__("salmalm.ws", fromlist=["ws_server"]).ws_server)
+    import logging as _log
+    _svc_log = _log.getLogger(__name__)
+    _services = [
+        ("vault", "salmalm.security.crypto", "vault"),
+        ("router", "salmalm.core", "router"),
+        ("auth_manager", "salmalm.auth", "auth_manager"),
+        ("rate_limiter", "salmalm.auth", "rate_limiter"),
+        ("rag_engine", "salmalm.rag", "rag_engine"),
+        ("mcp_manager", "salmalm.mcp", "mcp_manager"),
+        ("node_manager", "salmalm.nodes", "node_manager"),
+        ("health_monitor", "salmalm.stability", "health_monitor"),
+        ("telegram_bot", "salmalm.telegram", "telegram_bot"),
+        ("user_manager", "salmalm.users", "user_manager"),
+        ("discord_bot", "salmalm.discord_bot", "discord_bot"),
+        ("ws_server", "salmalm.ws", "ws_server"),
+    ]
+    for svc_name, module_path, attr in _services:
+        try:
+            app.register(svc_name, lambda m=module_path, a=attr: getattr(__import__(m, fromlist=[a]), a))
+        except Exception as _e:
+            _svc_log.warning(f"[INIT] Failed to register service '{svc_name}': {_e}")
 
 
 _logging_initialized = False

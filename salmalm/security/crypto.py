@@ -168,13 +168,19 @@ class Vault:
             version: bytes = raw[0:1]
             _tmp_salt: bytes = raw[1:17]   # local — NOT committed until success
             ciphertext: bytes = raw[17:]
+            # Validate version byte before attempting decryption.
+            # Unknown version → vault is corrupted or from a future release.
+            _KNOWN_VERSIONS = (b"\x02", b"\x03", b"\x04")
+            if version not in _KNOWN_VERSIONS:
+                log.error(f"[VAULT] Unknown version byte 0x{version.hex()} — vault corrupted or incompatible")
+                return False
             try:
                 key = _derive_key(password, _tmp_salt)
                 plaintext: bytes
                 if version == b"\x03" and HAS_CRYPTO:
                     nonce, ct = ciphertext[:12], ciphertext[12:]
                     plaintext = AESGCM(key).decrypt(nonce, ct, None)
-                elif version in (b"\x02", b"\x03"):
+                elif version in (b"\x02", b"\x03", b"\x04"):
                     plaintext = self._unlock_hmac_ctr(password, ciphertext, _tmp_salt)
                 else:
                     return False

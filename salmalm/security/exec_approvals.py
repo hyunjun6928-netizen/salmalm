@@ -39,6 +39,11 @@ DANGEROUS_PATTERNS = [
     r"\bwget\s.*\|\s*(ba)?sh",
     r"\bcurl\s.*\|\s*python",  # curl | python
     r"\bwget\s.*\|\s*python",
+    # Pipe-chain data exfiltration: cat sensitive_file | curl/nc/wget attacker
+    r"(cat|tail|head|grep)\s+.*(passwd|shadow|id_rsa|\.env|secret|token|key)\s*\|",
+    r"\|\s*(curl|wget|nc|ncat|socat)\s+[a-zA-Z0-9]",  # any pipe into network tool
+    r">\s*/proc/",   # write to /proc (kernel interface manipulation)
+    r"\|\s*base64\s*\|\s*(curl|wget)",  # encode + exfiltrate pattern
     r">\s*/dev/[sh]d[a-z]",  # write to raw block device
     r"\bmv\s+.*\s+/dev/null\b",  # mv to /dev/null (data destruction)
 ]

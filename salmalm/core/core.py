@@ -100,8 +100,11 @@ def _get_db() -> sqlite3.Connection:
         # Migration: add user_id column to existing databases
         try:
             conn.execute("ALTER TABLE usage_stats ADD COLUMN user_id INTEGER")
-        except Exception:
-            pass  # Column already exists — idempotent
+        except sqlite3.OperationalError:
+            pass  # Column already exists (idempotent migration)
+        except Exception as _e:
+            log.warning(f"[DB] Migration error (usage_stats.user_id): {_e}")
+            raise
         conn.execute("""CREATE TABLE IF NOT EXISTS usage_detail (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts TEXT NOT NULL, session_id TEXT, model TEXT NOT NULL,
@@ -115,24 +118,24 @@ def _get_db() -> sqlite3.Connection:
         )""")
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN parent_session_id TEXT DEFAULT NULL")
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists (idempotent)
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN branch_index INTEGER DEFAULT NULL")
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists (idempotent)
         try:
             conn.execute('ALTER TABLE session_store ADD COLUMN title TEXT DEFAULT ""')
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists (idempotent)
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN user_id INTEGER DEFAULT NULL")
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists (idempotent)
         try:
             conn.execute("ALTER TABLE session_store ADD COLUMN session_meta TEXT DEFAULT '{}'")
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists (idempotent)
         conn.execute("""CREATE TABLE IF NOT EXISTS session_message_backup (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT NOT NULL,
@@ -381,8 +384,8 @@ def track_usage(model: str, input_tokens: int, output_tokens: int, user_id: Opti
                 ),
             )  # noqa: F405
             conn.commit()
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists (idempotent)
         # Also record to usage_detail for dashboard daily/monthly charts
         # Table is created in _get_db() init — no CREATE TABLE needed here
         try:
@@ -447,8 +450,8 @@ class ModelRouter:
                 if vault_model and vault_model != "auto":
                     self.force_model = vault_model
                     log.info(f"[FIX] Restored model from vault: {vault_model}")
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
+        except sqlite3.OperationalError:
+            pass  # Column already exists (idempotent)
 
     def set_force_model(self, model: Optional[str]) -> None:
         """Set and persist model preference."""

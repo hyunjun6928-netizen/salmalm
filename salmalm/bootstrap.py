@@ -64,8 +64,9 @@ def _check_for_updates() -> str:
         latest = data.get("info", {}).get("version", "")
 
         def _ver_tuple(v) -> tuple:
-            """Ver tuple."""
-            return tuple(int(x) for x in v.split("."))
+            """Ver tuple — handles 1.2.3, 1.2.3.post1, 1.2.3a1 etc."""
+            import re as _re_ver
+            return tuple(int(x) for x in _re_ver.findall(r"\d+", v.split("+")[0]))
 
         if latest and _ver_tuple(latest) > _ver_tuple(VERSION):
             if getattr(sys, "frozen", False):

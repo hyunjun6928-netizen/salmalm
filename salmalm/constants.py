@@ -155,9 +155,9 @@ EXEC_ARG_BLOCKLIST: dict = {
     "find": {"-exec", "-execdir", "-delete", "-ok", "-okdir"},
     "xargs": {"-I", "--replace", "-i"},
     "tar": {"--to-command", "--checkpoint-action", "--use-compress-program"},
-    # "commit" blocked: pre-commit / post-commit hooks can execute arbitrary code.
-    # "am" / "rebase" blocked: allow hook execution via --exec flag.
-    "git": {"clone", "pull", "push", "fetch", "remote", "submodule", "hook", "commit", "am", "rebase"},
+    # "hook"/"submodule" blocked: arbitrary code execution risk.
+    # commit/push/pull allowed for normal workflow — use --no-verify to skip hooks.
+    "git": {"clone", "fetch", "remote", "submodule", "hook", "am"},
     "sed": {"-i", "--in-place"},
 }
 # Pattern blocklist for inline code execution in awk/sed

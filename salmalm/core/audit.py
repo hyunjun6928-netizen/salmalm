@@ -58,7 +58,7 @@ def _schedule_audit_flush() -> None:
         _audit_flush_timer.start()
 
 
-_audit_lock = threading.Lock()  # Audit log writes
+_audit_lock = threading.RLock()  # RLock: same thread can re-acquire (prevents deadlock in flush→schedule→flush paths)
 
 
 def _init_audit_db():

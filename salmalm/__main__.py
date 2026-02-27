@@ -38,12 +38,32 @@ def main() -> None:
         asyncio.run(run_server())
     except RuntimeError as e:
         if "running event loop" in str(e):
-            # An event loop is already running (e.g. Jupyter / nest_asyncio context).
-            # get_event_loop() is deprecated in 3.12+ when no current loop is set;
-            # use asyncio.get_running_loop() to grab the live loop safely.
-            import asyncio as _asyncio
-            loop = _asyncio.get_running_loop()
-            loop.run_until_complete(run_server())
+            # An event loop is already running (e.g. Jupyter / nest_asyncio).
+            # run_until_complete() on an already-running loop raises RuntimeError again.
+            # Use nest_asyncio if available, otherwise create a new thread with its own loop.
+            try:
+                import nest_asyncio as _nest
+                _nest.apply()
+                import asyncio as _asyncio
+                _asyncio.get_event_loop().run_until_complete(run_server())
+            except ImportError:
+                import threading as _threading
+                import asyncio as _asyncio
+                _exc_holder = []
+                def _run():
+                    loop = _asyncio.new_event_loop()
+                    _asyncio.set_event_loop(loop)
+                    try:
+                        loop.run_until_complete(run_server())
+                    except Exception as _e:
+                        _exc_holder.append(_e)
+                    finally:
+                        loop.close()
+                t = _threading.Thread(target=_run, daemon=True)
+                t.start()
+                t.join()
+                if _exc_holder:
+                    raise _exc_holder[0]
         else:
             raise
 

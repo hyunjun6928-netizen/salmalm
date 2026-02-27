@@ -89,11 +89,15 @@ class ConfigManager:
         env_key = f"SALMALM_{name.upper()}_{key.upper()}"
         env_val = os.environ.get(env_key)
         if env_val is not None:
-            # Attempt JSON parse for non-string types
-            try:
-                return json.loads(env_val)
-            except (json.JSONDecodeError, ValueError):
-                return env_val
+            # Only attempt JSON parse if value looks structured — avoids exception
+            # overhead on plain strings like SALMALM_FOO=hello (fired on every lookup).
+            _first = env_val[0] if env_val else ""
+            if _first in ('{', '[', '"') or _first.lstrip('-').isdigit() or env_val in ('true', 'false', 'null'):
+                try:
+                    return json.loads(env_val)
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            return env_val
 
         # 3. Config file
         config = cls.load(name)

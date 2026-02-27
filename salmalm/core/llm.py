@@ -74,7 +74,8 @@ def _http_post(url: str, headers: Dict[str, str], body: dict, timeout: int = 120
             err_body = e.read().decode("utf-8", errors="replace")
             # Mask potential API keys in error body
             import re as _re_mask
-            _safe_body = _re_mask.sub(r'(sk-[a-zA-Z0-9]{4})[a-zA-Z0-9-]+', r'\1***', err_body[:300])
+            # Mask all provider key formats: sk-*, sk-ant-*, AIza*, Bearer tokens, xAI keys, etc.
+            _safe_body = _re_mask.sub(r'[a-zA-Z0-9_\-]{20,}', '***', err_body[:300])
             log.error(f"HTTP {e.code}: {_safe_body}")
             if e.code == 401:
                 from salmalm.core.exceptions import AuthError

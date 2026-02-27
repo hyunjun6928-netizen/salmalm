@@ -75,12 +75,25 @@ def _load_cooldowns() -> dict:
 
 
 def _save_cooldowns(cd: dict) -> None:
-    """Save cooldowns."""
+    """Save cooldowns atomically (tempfile + rename — safe on process kill)."""
+    import os as _os, tempfile as _tf
     try:
         _COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _COOLDOWN_FILE.write_text(json.dumps(cd), encoding="utf-8")
+        fd, tmp = _tf.mkstemp(dir=_COOLDOWN_FILE.parent, suffix=".tmp")
+        try:
+            with _os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(json.dumps(cd))
+                f.flush()
+                _os.fsync(f.fileno())
+            _os.replace(tmp, _COOLDOWN_FILE)
+        except Exception:
+            try:
+                _os.unlink(tmp)
+            except OSError:
+                pass
+            raise
     except Exception as e:
-        log.debug(f"Suppressed: {e}")
+        log.debug(f"[COOLDOWN] Save failed: {e}")
 
 
 def _is_model_cooled_down(model: str) -> bool:
