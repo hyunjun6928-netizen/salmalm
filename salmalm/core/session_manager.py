@@ -62,6 +62,13 @@ def _record_prune_time(session_id: str = "__global__"):
         _last_prune_time[session_id] = _time.time()
 
 
+def evict_session_timing(session_id: str) -> None:
+    """Remove timing entries for a deleted/expired session to prevent unbounded dict growth."""
+    with _session_time_lock:
+        _last_api_call_time.pop(session_id, None)
+        _last_prune_time.pop(session_id, None)
+
+
 _PRUNE_KEEP_LAST_ASSISTANTS = 3
 _PRUNE_SOFT_LIMIT = 4000  # Default soft-trim threshold (chars)
 _PRUNE_HEAD = 1500

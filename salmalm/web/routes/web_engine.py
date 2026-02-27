@@ -297,10 +297,14 @@ class WebEngineMixin:
 
     def _get_api_engine_settings(self):
         """GET /api/engine/settings — return current engine optimization toggles."""
+        if not self._require_auth("user"):
+            return
         self._json(_snapshot_current_settings())
 
     def _post_api_engine_settings(self):
         """POST /api/engine/settings — apply + persist engine optimization settings."""
+        if not self._require_auth("user"):
+            return
         body = self._body
         # Apply to runtime (os.environ + module constants)
         _apply_engine_settings_to_runtime(body)

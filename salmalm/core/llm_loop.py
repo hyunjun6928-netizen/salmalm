@@ -377,8 +377,14 @@ async def call_with_failover(
                     _clear_model_cooldown(fb)
                     return result, warn
                 _record_model_failure(fb)
-        # All in cooldown — try primary anyway
-        pass
+        # All fallbacks in cooldown — reject immediately without hammering dead endpoints
+        log.warning(f"[FAILOVER] {model} + all fallbacks in cooldown — rejecting request")
+        return {
+            "content": "⚠️ 모든 AI 모델이 일시적으로 사용 불가합니다. 잠시 후 다시 시도해주세요.",
+            "tool_calls": [],
+            "_failed": True,
+            "usage": {"input": 0, "output": 0},
+        }, f"⚠️ {model.split('/')[-1]} and all fallbacks in cooldown"
 
     # Try primary model
     result = await try_llm_call(messages, model, tools, max_tokens, thinking, on_token)

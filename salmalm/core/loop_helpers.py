@@ -14,7 +14,7 @@ log = logging.getLogger("salmalm")
 
 def check_abort(session_id: str) -> str | None:
     """Check if generation was aborted. Returns partial response or None."""
-    from salmalm.features.edge_cases import abort_controller
+    from salmalm.features.abort import abort_controller
 
     if abort_controller.is_aborted(session_id):
         partial = abort_controller.get_partial(session_id) or ""
@@ -59,7 +59,7 @@ def prune_session_context(session, model: str):
     _sid = getattr(session, "id", "__global__")
 
     # ── Stage A: tool-result pruning (cache-TTL aware) ──
-    if _should_prune_for_cache():
+    if _should_prune_for_cache(session_id=_sid):
         pruned, a_stats = prune_context(session.messages, context_window_tokens=_ctx_win, session_id=_sid)
         if a_stats["soft_trimmed"] or a_stats["hard_cleared"]:
             log.info("[PRUNE-A] soft=%d hard=%d", a_stats["soft_trimmed"], a_stats["hard_cleared"])

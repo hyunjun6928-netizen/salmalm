@@ -190,7 +190,10 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
 
     if lang and lang in ("en", "ko"):
         lang_directive = "Respond in English." if lang == "en" else "한국어로 응답하세요."
-        session.messages.append({"role": "system", "content": f"[Language: {lang_directive}]"})
+        lang_content = f"[Language: {lang_directive}]"
+        # Dedup: strip previous lang directives before appending (same pattern as _recall)
+        session.messages = [m for m in session.messages if not m.get("_lang")]
+        session.messages.append({"role": "system", "content": lang_content, "_lang": True})
 
     session.messages = compact_messages(session.messages, session=session, on_status=on_status)
     if len(session.messages) % 20 == 0:
@@ -317,7 +320,8 @@ async def _safe(coro_or_fn, *args, fallback=None, label="stage", **kwargs):
         else:
             return coro_or_fn(*args, **kwargs)
     except Exception as _e:
-        log.warning(f"[PIPELINE] {label} failed (fallback): {type(_e).__name__}: {_e}")
+        import traceback as _tb
+        log.warning(f"[PIPELINE] {label} failed (fallback): {type(_e).__name__}: {_e}\n{_tb.format_exc()}")
         return fallback
 
 
@@ -495,7 +499,7 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
     # Web notification (if task came from telegram)
     if session_id == "telegram":
         # Store notification for web polling
-        from salmalm.core import _sessions  # noqa: F811
+        from salmalm.core.session_store import _sessions  # canonical source
 
         web_session = _sessions.get("web")
         if web_session:

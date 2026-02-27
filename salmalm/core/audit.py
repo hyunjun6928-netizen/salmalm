@@ -17,7 +17,7 @@ def _audit_get_db():
     return _get_db()
 
 
-from salmalm.constants import KST  # noqa: E402
+from salmalm.constants import KST, AUDIT_DB  # noqa: E402
 from datetime import datetime  # noqa: E402
 
 
@@ -25,22 +25,25 @@ _audit_v2_initialized = False  # Guard: CREATE TABLE called once per process lif
 
 
 def _ensure_audit_v2_table():
-    """Create the v2 audit_log_v2 table. No-op after first call (flag guard)."""
+    """Create the v2 audit_log_v2 table. No-op after first call (flag guard, lock-protected)."""
     global _audit_v2_initialized
-    if _audit_v2_initialized:
+    if _audit_v2_initialized:  # fast path — no lock needed after init
         return
-    conn = _audit_get_db()
-    conn.execute("""CREATE TABLE IF NOT EXISTS audit_log_v2 (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT NOT NULL,
-        event_type TEXT NOT NULL,
-        session_id TEXT DEFAULT '',
-        detail TEXT DEFAULT '{}'
-    )""")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_ts ON audit_log_v2(timestamp)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)")
-    conn.commit()
-    _audit_v2_initialized = True
+    with _audit_lock:  # serialize concurrent first-callers
+        if _audit_v2_initialized:  # double-checked locking
+            return
+        conn = _audit_get_db()
+        conn.execute("""CREATE TABLE IF NOT EXISTS audit_log_v2 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            session_id TEXT DEFAULT '',
+            detail TEXT DEFAULT '{}'
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_ts ON audit_log_v2(timestamp)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)")
+        conn.commit()
+        _audit_v2_initialized = True
 
 
 _AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush (moved above _schedule_audit_flush)
@@ -180,7 +183,7 @@ def audit_checkpoint() -> Optional[str]:
         if not row:
             return None
         head_hash, head_id = row[0], row[1]
-        checkpoint_file = AUDIT_DB.parent / "audit_checkpoint.log"  # noqa: F405
+        checkpoint_file = AUDIT_DB.parent / "audit_checkpoint.log"
         ts = datetime.now(KST).isoformat()  # noqa: F405
         with open(checkpoint_file, "a") as f:
             f.write(f"{ts} id={head_id} hash={head_hash}\n")

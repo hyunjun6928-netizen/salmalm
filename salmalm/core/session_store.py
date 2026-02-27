@@ -201,6 +201,11 @@ def _cleanup_sessions():
             except Exception as e:
                 log.debug(f"Suppressed: {e}")
             del _sessions[sid]
+            try:
+                from salmalm.core.session_manager import evict_session_timing
+                evict_session_timing(sid)
+            except Exception:
+                pass
         if stale:
             log.info(f"[CLEAN] Session cleanup: removed {len(stale)} inactive sessions")
         # Hard cap
@@ -208,6 +213,11 @@ def _cleanup_sessions():
             by_age = sorted(_sessions.items(), key=lambda x: x[1].last_active)
             for sid, _ in by_age[: len(_sessions) - _SESSION_MAX]:
                 del _sessions[sid]
+                try:
+                    from salmalm.core.session_manager import evict_session_timing
+                    evict_session_timing(sid)
+                except Exception:
+                    pass
 
 
 def get_session(session_id: str, user_id: Optional[int] = None) -> Session:

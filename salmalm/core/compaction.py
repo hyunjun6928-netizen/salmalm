@@ -172,7 +172,9 @@ def _stage5_llm_summarize(
         log.warning("[PKG] Stage 5 produced empty/short summary — using stage 4 result")
         return stage4
 
-    original_chars = sum(len(_msg_content_str(m)) for m in to_summarize)
+    # Compare against the slice actually fed to the LLM (last 30), not the full list
+    _summarised_slice = to_summarize[-30:]
+    original_chars = sum(len(_msg_content_str(m)) for m in _summarised_slice)
     if len(summary_content) > original_chars:
         log.warning(f"[PKG] Summary ({len(summary_content)}) > original ({original_chars}) — using stage 4")
         return stage4
@@ -317,14 +319,8 @@ def _estimate_tokens(messages: list) -> int:
     return total_chars // 4
 
 
-def estimate_tokens(text_or_messages) -> int:
-    """Estimate tokens — accepts string or message list."""
-    if isinstance(text_or_messages, str):
-        return max(1, len(text_or_messages) // 4)
-    return _estimate_tokens(text_or_messages)
-
-
 # ── Enhanced compaction helpers (from original compaction.py) ──
+# estimate_tokens: use salmalm.core.cost as single source of truth
 from salmalm.core.cost import estimate_tokens  # noqa: F401
 
 

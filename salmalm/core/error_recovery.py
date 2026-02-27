@@ -198,6 +198,11 @@ async def retry_with_recovery(
             # Check for soft failures (200 but error content)
             content = result.get("content", "") if isinstance(result, dict) else ""
             if isinstance(content, str) and content.startswith("❌"):
+                # Billing/auth errors embedded in content → treat as permanent, do not retry
+                _err_lower = content.lower()
+                if any(p in _err_lower for p in ("billing", "quota", "api key", "unauthorized", "credit")):
+                    circuit_breakers.record_failure(provider)
+                    return {**result, "_failed": True}, None
                 raise RuntimeError(content)
 
             circuit_breakers.record_success(provider)
@@ -234,8 +239,8 @@ async def retry_with_recovery(
                 if on_retry:
                     try:
                         on_retry(attempt, delay, e)
-                    except Exception as e:
-                        log.debug(f"Suppressed: {e}")
+                    except Exception as _cb_err:
+                        log.debug(f"Suppressed on_retry callback error: {_cb_err}")
                 await _async_sleep(delay)
             else:
                 log.error(f"[RETRY] {provider} all {max_retries} retries exhausted: {e}")

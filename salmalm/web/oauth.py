@@ -249,7 +249,7 @@ class OAuthManager:
         self.anthropic = AnthropicOAuth()
         self.openai = OpenAIOAuth()
         self._tokens: Dict[str, dict] = {}
-        self._pending_states: Dict[str, str] = {}  # state -> provider
+        self._pending_states: Dict[str, tuple] = {}  # state -> (provider, timestamp)
         self._load()
 
     def _load(self):
@@ -264,20 +264,39 @@ class OAuthManager:
             self._tokens = {}
 
     def _save(self):
-        """Save."""
+        """Save tokens atomically (tempfile + fsync + rename) to prevent corruption on crash."""
         import os as _os
+        import tempfile as _tempfile
 
         _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        _TOKENS_PATH.write_text(_encrypt_tokens(self._tokens))
+        data = _encrypt_tokens(self._tokens)
+        fd, tmp = _tempfile.mkstemp(dir=_CONFIG_DIR, suffix=".tmp")
         try:
-            _os.chmod(_TOKENS_PATH, 0o600)
-        except OSError as e:
-            log.warning(f"Could not set permissions on {_TOKENS_PATH}: {e}")
+            with _os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(data)
+                f.flush()
+                _os.fsync(f.fileno())
+            _os.chmod(tmp, 0o600)
+            _os.replace(tmp, _TOKENS_PATH)
+        except Exception:
+            try:
+                _os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+
+    def _evict_stale_states(self, ttl: float = 600.0) -> None:
+        """Evict OAuth state tokens older than ttl seconds (default 10 min)."""
+        import time as _time
+        now = _time.time()
+        self._pending_states = {k: v for k, v in self._pending_states.items() if now - v[1] < ttl}
 
     def setup(self, provider: str, redirect_uri: str = "http://localhost:8080/oauth/callback") -> str:
         """Setup."""
+        import time as _time
+        self._evict_stale_states()
         state = secrets.token_urlsafe(16)
-        self._pending_states[state] = provider
+        self._pending_states[state] = (provider, _time.time())
         if provider == "anthropic":
             url = self.anthropic.get_auth_url(redirect_uri, state)
         elif provider == "openai":
@@ -288,7 +307,8 @@ class OAuthManager:
 
     def handle_callback(self, code: str, state: str, redirect_uri: str = "http://localhost:8080/oauth/callback") -> str:
         """Handle callback."""
-        provider = self._pending_states.pop(state, None)
+        _entry = self._pending_states.pop(state, None)
+        provider = _entry[0] if _entry else None
         if not provider:
             return "❌ Invalid or expired OAuth state."
         try:

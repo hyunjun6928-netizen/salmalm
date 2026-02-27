@@ -125,14 +125,9 @@ def _run_capped(run_args: dict, timeout: int, extra_kwargs: dict) -> "tuple[str,
         cwd=str(WORKSPACE_DIR),
         **extra_kwargs,
     )
-    stdout_chunks: list = []
-    stderr_chunks: list = []
-    stdout_read = 0
-    stderr_read = 0
     try:
+        # communicate() buffers all output — cap after the fact to limit memory retention.
         stdout_bytes, stderr_bytes = proc.communicate(timeout=timeout)
-        # communicate() already read everything — cap after the fact.
-        # Still better than nothing: limits what we keep in memory after the call.
         if len(stdout_bytes) > _MAX_READ:
             stdout_bytes = stdout_bytes[-_MAX_READ:]  # keep tail (most recent output)
         if len(stderr_bytes) > _MAX_READ:
