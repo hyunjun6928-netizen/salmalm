@@ -208,7 +208,8 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         "python_eval": 6_000,
         "browser": 5_000,
         "http_request": 6_000,
-        "web_fetch": 6_000,
+        "web_fetch": 12_000,   # 페이지 콘텐츠는 10K+ 흔함
+        "read_file": 10_000,   # read alias 추가
         "read": 10_000,
         "rag_search": 4_000,
         "system_info": 2_000,
