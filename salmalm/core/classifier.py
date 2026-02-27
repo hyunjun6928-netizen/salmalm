@@ -1315,10 +1315,11 @@ def _get_dynamic_max_tokens(intent: str, user_message: str, model: str = "") -> 
         provider = model.split("/")[0] if "/" in model else "anthropic"
         base = _MODEL_DEFAULT_MAX.get(provider, 8192)
     msg_lower = user_message.lower()
-    # Scale up for detailed requests
+    # Scale up for detailed requests — cap at 4096 to avoid runaway spend
     if any(kw in msg_lower for kw in _DETAIL_KEYWORDS):
-        return max(base * 2, 8192)
+        return min(max(base * 2, 2048), 4096)
     # Scale up for long input (long question → likely long answer)
+    # Cap at 4096 — 8192 was too aggressive for most queries
     if len(user_message) > 500:
-        return max(base, 8192)
+        return min(max(base, 2048), 4096)
     return base

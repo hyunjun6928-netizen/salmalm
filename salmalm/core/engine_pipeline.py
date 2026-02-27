@@ -202,7 +202,7 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
         for i, m in enumerate(session.messages):
             if m.get("role") == "system":
                 session.messages[i] = dict(m)
-                session.messages[i]["content"] = inject_rag_context(session.messages, m["content"], max_chars=2500)
+                session.messages[i]["content"] = inject_rag_context(session.messages, m["content"], max_chars=1500)
                 break
     except Exception as e:
         log.warning(f"RAG injection skipped: {e}")

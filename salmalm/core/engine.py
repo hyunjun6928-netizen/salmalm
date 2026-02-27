@@ -199,7 +199,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         return get_tools_for_provider(provider, intent, user_message)
 
     # Max chars per tool result sent to LLM context (default + per-type overrides)
-    MAX_TOOL_RESULT_CHARS = 20_000
+    MAX_TOOL_RESULT_CHARS = 8_000  # 20K was excessive for unknown tools
     # Aggressive truncation — every char costs tokens
     _TOOL_TRUNCATE_LIMITS = {
         "exec": 8_000,

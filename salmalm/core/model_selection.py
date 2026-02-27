@@ -36,21 +36,32 @@ _MODERATE_KEYWORDS = [
     "debug",
     "디버그",
     "explain",
-    "설명",
+    "설명해",    # "설명해줘", "설명해봐" 커버 (단독 "설명"은 너무 광범위)
+    "설명 해",
     "번역",
     "translate",
+    "구현",
+    "implement",
+    "작성해",
+    "써줘",
+    "만들어줘",
+    "짜줘",
 ]
 _COMPLEX_KEYWORDS = [
     "설계",
     "아키텍처",
     "architecture",
-    "design",
     "system design",
     "from scratch",
     "처음부터",
-    "전체",
+    "전체 설계",    # "전체" 단독은 너무 광범위 — 복합어만 잡음
+    "전체 리팩",
+    "전체 마이그레이션",
     "migration",
     "마이그레이션",
+    "design document",
+    "전면 개편",
+    "리아키텍처",
 ]
 
 # ── Model name corrections (from constants — single source of truth) ──
@@ -246,7 +257,13 @@ def select_model(message: str, session) -> Tuple[str, str]:
     if getattr(session, "thinking_enabled", False):
         return rc["complex"], "complex"
 
-    if msg_len > 500:
+    # Complex: keyword match OR very long message
+    # chat/memory/creative는 긴 잡담이 많으므로 임계값을 높임 (800자)
+    # 코드/분석 intent는 300자만 넘어도 complex로
+    _intent_hint = getattr(session, "_last_intent", None)  # engine이 심어주면 참조
+    _is_chat_like = _intent_hint in {"chat", "memory", "creative"} if _intent_hint else False
+    _complex_len_threshold = 800 if _is_chat_like else 300  # 한국어 300자 ≈ 영어 150단어
+    if msg_len > _complex_len_threshold:
         return rc["complex"], "complex"
     for kw in _COMPLEX_KEYWORDS:
         if kw in msg_lower:
@@ -258,9 +275,8 @@ def select_model(message: str, session) -> Tuple[str, str]:
         if kw in msg_lower:
             return rc["moderate"], "moderate"
 
-    if msg_len < 50 and _SIMPLE_PATTERNS.match(message.strip()):
-        return rc["simple"], "simple"
-    if msg_len < 50:
+    # Simple: 80자 이하 (한국어 짧은 질문 커버)
+    if msg_len <= 80:
         return rc["simple"], "simple"
 
     return rc["moderate"], "moderate"

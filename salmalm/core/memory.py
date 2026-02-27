@@ -195,7 +195,7 @@ class MemoryManager:
                 source = r.get("source", "")
                 snippet = r.get("content", "")[:200]
                 score = r.get("score", 0)
-                if score < 0.1:  # Too low relevance
+                if score < 0.25:  # Too low relevance — 0.1 was too permissive
                     continue
                 parts.append(f"- {source}: {snippet}")
             if len(parts) <= 1:

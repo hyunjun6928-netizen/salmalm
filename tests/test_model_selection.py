@@ -51,8 +51,12 @@ class TestSelectModel:
            return_value={'simple': '', 'moderate': '', 'complex': ''})
     def test_long_message_routes_complex(self, _):
         from salmalm.core.model_selection import select_model
-        session = self._make_session('auto')
-        model, level = select_model('x' * 600, session)
+        from unittest.mock import MagicMock, patch as _patch
+        mock_router = MagicMock()
+        mock_router.force_model = None
+        with _patch('salmalm.core.core.router', mock_router):
+            session = self._make_session('auto')
+            model, level = select_model('x' * 350, session)  # 300자 초과 → complex
         assert level == 'complex'
 
     def test_manual_override_respected(self):

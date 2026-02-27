@@ -137,7 +137,7 @@ class TestToolResultTruncation(unittest.TestCase):
         eng = Engine()
         long_result = 'x' * 60000
         truncated = eng._truncate_tool_result(long_result)
-        self.assertLessEqual(len(truncated), 20000 + 200)  # +overhead for message
+        self.assertLessEqual(len(truncated), 8000 + 200)  # +overhead for message
         self.assertIn('truncated', truncated.lower())
 
     def test_no_truncation_under_50k(self):
@@ -149,9 +149,9 @@ class TestToolResultTruncation(unittest.TestCase):
         self.assertEqual(result, short_result)
 
     def test_max_tool_result_chars_value(self):
-        """MAX_TOOL_RESULT_CHARS should be 20_000 (optimized)."""
+        """MAX_TOOL_RESULT_CHARS should be 8_000 (token-optimized default)."""
         from salmalm.core.engine import IntelligenceEngine as Engine
-        self.assertEqual(Engine.MAX_TOOL_RESULT_CHARS, 20_000)
+        self.assertEqual(Engine.MAX_TOOL_RESULT_CHARS, 8_000)
 
 
 # ============================================================
