@@ -10,7 +10,14 @@ def main() -> None:
     """CLI entry point — always routes through bootstrap.run_server()."""
     from salmalm.cli import setup_workdir, dispatch_cli
 
-    setup_workdir()
+    try:
+        setup_workdir()
+    except PermissionError as _pe:
+        import sys as _sys
+        print(f"❌ 권한 오류: 작업 디렉터리를 생성할 수 없습니다.\n"
+              f"   {_pe}\n"
+              f"   HOME 또는 DATA 경로의 쓰기 권한을 확인하세요.", file=_sys.stderr)
+        _sys.exit(1)
 
     from salmalm import init_logging
 

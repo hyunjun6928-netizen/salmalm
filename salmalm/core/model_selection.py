@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 # ── Complexity keywords ──
 _SIMPLE_PATTERNS = re.compile(
     r"^(안녕|hi|hello|hey|ㅎㅇ|ㅎㅎ|ㄱㅅ|고마워|감사|ㅋㅋ|ㅎㅎ|ok|lol|yes|no|네|아니|응|ㅇㅇ|뭐해|잘자|굿|bye|잘가|좋아|ㅠㅠ|ㅜㅜ|오|와|대박|진짜|뭐|어|음|흠|뭐야|왜|어떻게|언제|어디|누구|얼마)[\?!？！.\s]*$",
-    re.IGNORECASE,
+    re.IGNORECASE | re.UNICODE,  # re.UNICODE: Korean char class matching on all platforms
 )
 _MODERATE_KEYWORDS = [
     "분석",

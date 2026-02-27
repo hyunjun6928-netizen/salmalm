@@ -21,8 +21,14 @@ from salmalm.constants import KST  # noqa: E402
 from datetime import datetime  # noqa: E402
 
 
+_audit_v2_initialized = False  # Guard: CREATE TABLE called once per process lifetime
+
+
 def _ensure_audit_v2_table():
-    """Create the v2 audit_log_v2 table with session_id and JSON detail."""
+    """Create the v2 audit_log_v2 table. No-op after first call (flag guard)."""
+    global _audit_v2_initialized
+    if _audit_v2_initialized:
+        return
     conn = _audit_get_db()
     conn.execute("""CREATE TABLE IF NOT EXISTS audit_log_v2 (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,6 +40,7 @@ def _ensure_audit_v2_table():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_ts ON audit_log_v2(timestamp)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)")
     conn.commit()
+    _audit_v2_initialized = True
 
 
 _AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush (moved above _schedule_audit_flush)
@@ -97,7 +104,10 @@ def _init_audit_db():
 
 
 def _flush_audit_buffer() -> None:
-    """Write buffered audit entries to SQLite in a single transaction."""
+    """Write buffered audit entries to SQLite in a single transaction.
+
+    Safe to call from atexit — checks DB availability before writing.
+    """
     global _audit_flush_timer
     with _audit_lock:
         if not _audit_buffer:
@@ -107,7 +117,11 @@ def _flush_audit_buffer() -> None:
         _audit_buffer.clear()
         _audit_flush_timer = None
 
-    conn = _audit_get_db()
+    try:
+        conn = _audit_get_db()
+    except Exception as _db_err:
+        log.warning(f"[AUDIT] DB unavailable during flush (atexit?): {_db_err}")
+        return
     # Get current chain head
     row = conn.execute("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
     prev = row[0] if row else "0" * 64

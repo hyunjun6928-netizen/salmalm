@@ -740,8 +740,17 @@ class LLMRouter:
         url, headers, body = self._build_request(provider, model, messages, max_tokens, tools)
         data = json.dumps(body).encode()
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            result = json.loads(resp.read().decode())
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                result = json.loads(resp.read().decode())
+        except Exception as _e:
+            # Mask API keys in exception context — tracebacks must not leak secrets
+            _safe_hdrs = {
+                k: ("***" if "key" in k.lower() or "auth" in k.lower() or "token" in k.lower() else v)
+                for k, v in headers.items()
+            }
+            log.error(f"[LLM_ROUTER] {provider} call failed: {type(_e).__name__}: {_e} | headers: {_safe_hdrs}")
+            raise
         return self._parse_response(provider, result)
 
 
