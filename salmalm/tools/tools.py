@@ -281,12 +281,14 @@ TOOL_DEFINITIONS = [
                     "description": "spawn, list, result, send, stop, log, info, or steer",
                     "enum": ["spawn", "list", "result", "send", "stop", "log", "info", "steer"],
                 },
-                "task": {"type": "string", "description": "Task description (for spawn)"},
-                "model": {"type": "string", "description": "Model to use (optional)"},
-                "agent_id": {"type": "string", "description": "Agent ID (for result/send)"},
-                "message": {"type": "string", "description": "Message to send to agent (for send)"},
+                "task": {"type": "string", "description": "Task description — REQUIRED when action=spawn"},
+                "model": {"type": "string", "description": "Model to use (optional, for spawn)"},
+                "agent_id": {"type": "string", "description": "Agent ID (required for result/send/stop/log/info/steer)"},
+                "message": {"type": "string", "description": "Message to send to agent (required for send/steer)"},
             },
             "required": ["action"],
+            # Note: 'task' is required when action=spawn, 'agent_id' when action=result/send/stop.
+            # Enforced at runtime in tools_agent.py.
         },
     },
     {

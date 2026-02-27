@@ -11,7 +11,7 @@ def _agent_spawn(args):
     return (
         f"🤖 Sub-agent spawned: [{SubAgent.spawn(args.get('task', ''), model=args.get('model'))}]\nTask: {args.get('task', '')[:100]}"
         if args.get("task")
-        else "❌ Task is required"
+        else "❌ Task is required — please provide a 'task' parameter describing what the sub-agent should do."
     )
 
 
