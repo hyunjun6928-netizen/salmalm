@@ -172,6 +172,21 @@ def _apply_int_setting(body: dict, key: str, min_val: int, max_val: int, env_key
 
 
 class WebEngineMixin:
+    GET_ROUTES = {
+        "/api/sla": "_get_sla",
+        "/api/sla/config": "_get_sla_config",
+        "/api/routing": "_get_routing",
+        "/api/failover": "_get_failover",
+        "/api/engine/settings": "_get_api_engine_settings",
+    }
+    POST_ROUTES = {
+        "/api/routing": "_post_api_routing",
+        "/api/routing/optimize": "_post_api_routing_optimize",
+        "/api/failover": "_post_api_failover",
+        "/api/sla/config": "_post_api_sla_config",
+        "/api/engine/settings": "_post_api_engine_settings",
+    }
+
     """Mixin providing engine route handlers."""
 
     def _get_sla(self):

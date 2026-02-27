@@ -5,6 +5,19 @@ import json
 
 
 class WebGatewayMixin:
+    GET_ROUTES = {
+        "/api/gateway/nodes": "_get_gateway_nodes",
+    }
+    POST_ROUTES = {
+        "/api/config/telegram": "_post_api_config_telegram",
+        "/api/gateway/register": "_post_api_gateway_register",
+        "/api/gateway/heartbeat": "_post_api_gateway_heartbeat",
+        "/api/gateway/unregister": "_post_api_gateway_unregister",
+        "/api/gateway/dispatch": "_post_api_gateway_dispatch",
+        "/webhook/slack": "_post_webhook_slack",
+        "/webhook/telegram": "_post_webhook_telegram",
+    }
+
     """Mixin providing gateway route handlers."""
 
     def _get_gateway_nodes(self):

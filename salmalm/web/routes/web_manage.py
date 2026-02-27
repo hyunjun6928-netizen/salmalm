@@ -44,6 +44,32 @@ def _systemd_restart_after_upgrade() -> None:
 
 
 class ManageMixin:
+    GET_ROUTES = {
+        "/api/backup": "_get_backup",
+    }
+    POST_ROUTES = {
+        "/api/do-update": "_post_api_do_update",
+        "/api/restart": "_post_api_restart",
+        "/api/update": "_post_api_update",
+        "/api/persona/switch": "_post_api_persona_switch",
+        "/api/persona/create": "_post_api_persona_create",
+        "/api/persona/delete": "_post_api_persona_delete",
+        "/api/stt": "_post_api_stt",
+        "/api/agent/sync": "_post_api_agent_sync",
+        "/api/queue/mode": "_post_api_queue_mode",
+        "/api/soul": "_post_api_soul",
+        "/api/agents": "_post_api_agents",
+        "/api/hooks": "_post_api_hooks",
+        "/api/plugins/manage": "_post_api_plugins_manage",
+        "/api/groups": "_post_api_groups",
+        "/api/paste/detect": "_post_api_paste_detect",
+        "/api/vault": "_post_api_vault",
+        "/api/cooldowns/reset": "_post_api_cooldowns_reset",
+        "/api/backup/restore": "_post_api_backup_restore",
+        "/api/presence": "_post_api_presence",
+        "/api/node/execute": "_post_api_node_execute",
+    }
+
     def _post_api_cooldowns_reset(self):
         """POST /api/cooldowns/reset — Clear all model cooldowns."""
         if not self._require_auth("user"):

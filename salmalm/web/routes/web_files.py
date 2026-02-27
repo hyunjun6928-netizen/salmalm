@@ -77,6 +77,17 @@ def _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, export_user, _js
 
 
 class WebFilesMixin:
+    POST_ROUTES = {
+        "/api/agent/import/preview": "_post_api_agent_import_preview",
+        "/api/upload": "_post_api_upload",
+    }
+    GET_PREFIX_ROUTES = [
+        ("/api/sessions/", "_get_api_sessions_export", "/export"),
+        ("/api/google/callback", "_get_api_google_callback", None),
+        ("/api/agent/export", "_get_api_agent_export", None),
+        ("/uploads/", "_get_uploads", None),
+    ]
+
     """Mixin for web_files routes."""
 
     def _post_api_agent_import_preview(self):

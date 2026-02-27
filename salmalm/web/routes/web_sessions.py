@@ -6,6 +6,23 @@ from salmalm.core import audit_log
 
 
 class WebSessionsMixin:
+    GET_ROUTES = {
+        "/api/sessions": "_get_api_sessions",
+    }
+    POST_ROUTES = {
+        "/api/sessions/create": "_post_api_sessions_create",
+        "/api/sessions/delete": "_post_api_sessions_delete",
+        "/api/sessions/clear": "_post_api_sessions_clear",
+        "/api/sessions/import": "_post_api_sessions_import",
+        "/api/sessions/rename": "_post_api_sessions_rename",
+        "/api/sessions/rollback": "_post_api_sessions_rollback",
+        "/api/sessions/branch": "_post_api_sessions_branch",
+    }
+    GET_PREFIX_ROUTES = [
+        ("/api/sessions/", "_get_api_sessions_messages", "/messages"),
+        ("/api/sessions/", "_get_api_sessions_last", "/last"),
+    ]
+
     """Mixin providing sessions route handlers."""
 
     def _get_api_sessions(self):

@@ -311,51 +311,15 @@ class WebHandler(
             )
 
     # ── GET Route Table (exact path → method) ──
-    _GET_ROUTES = {
-        "/api/uptime": "_get_uptime",
-        "/api/latency": "_get_latency",
-        "/api/sla": "_get_sla",
-        "/api/sla/config": "_get_sla_config",
-        "/api/nodes": "_get_nodes",
-        "/api/gateway/nodes": "_get_gateway_nodes",
-        "/api/status": "_get_status",
-        "/api/debug": "_get_debug",
-        "/api/queue": "_get_queue",
-        "/api/metrics": "_get_metrics",
-        "/api/cert": "_get_cert",
-        "/api/ws/status": "_get_ws_status",
-        "/api/usage/daily": "_get_usage_daily",
-        "/api/usage/monthly": "_get_usage_monthly",
-        "/api/usage/models": "_get_usage_models",
-        "/api/groups": "_get_groups",
-        "/api/models": "_get_models",
-        "/api/llm-router/providers": "_get_llm_router_providers",
-        "/api/llm-router/current": "_get_llm_router_current",
-        "/api/soul": "_get_soul",
-        "/api/onboarding": "_get_api_onboarding",
-        "/api/routing": "_get_routing",
-        "/api/failover": "_get_failover",
-        "/api/doctor": "_get_doctor",
-        "/api/backup": "_get_backup",
-        "/api/cron": "_get_cron",
-        "/api/memory/files": "_get_memory_files",
-        "/api/mcp": "_get_mcp",
-        "/api/rag": "_get_rag",
-        "/api/personas": "_get_personas",
-        "/api/thoughts": "_get_thoughts",
-        "/api/thoughts/stats": "_get_thoughts_stats",
-        "/api/features": "_get_features",
-        "/api/engine/settings": "_get_api_engine_settings",
-        "/api/tools/list": "_get_tools_list",
-        "/api/browser/status": "_get_api_browser_status",
-        "/api/ollama/detect": "_get_ollama_detect",
-        "/api/commands": "_get_commands",
-        "/setup": "_get_setup",
-        "/api/sessions": "_get_api_sessions",
+    _GET_ROUTES: dict = {}
+    for _mixin_cls in [
+        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin,
+    ]:
+        _GET_ROUTES.update(getattr(_mixin_cls, 'GET_ROUTES', {}))
+    _GET_ROUTES.update({
         "/api/notifications": "_get_api_notifications",
         "/api/presence": "_get_api_presence",
         "/api/channels": "_get_api_channels",
-        "/api/dashboard": "_get_api_dashboard",
         "/api/plugins": "_get_api_plugins",
         "/api/agents": "_get_api_agents",
         "/api/hooks": "_get_api_hooks",
@@ -363,25 +327,15 @@ class WebHandler(
         "/api/security/bans": "_get_api_security_bans",
         "/api/quota/usage": "_get_api_quota_usage",
         "/api/quota/my": "_get_api_quota_my",
-        "/api/health/providers": "_get_api_health_providers",
         "/api/bookmarks": "_get_api_bookmarks",
         "/api/paste/detect": "_get_api_paste_detect",
         "/api/health": "_get_api_health",
         "/api/check-update": "_get_api_check_update",
-        "/api/update/check": "_get_api_update_check",
-        "/api/auth/users": "_get_api_auth_users",
-        "/api/users": "_get_api_users",
-        "/api/users/quota": "_get_api_users_quota",
-        "/api/users/settings": "_get_api_users_settings",
-        "/api/tenant/config": "_get_api_tenant_config",
-        "/api/google/auth": "_get_api_google_auth",
-        "/manifest.json": "_get_manifest_json",
         "/sw.js": "_get_sw_js",
-        "/static/app.js": "_get_static_app_js",
         "/dashboard": "_get_dashboard",
         "/docs": "_get_docs",
-        "/api/agent/tasks": "_get_api_agent_tasks",
-    }
+    })
+
 
     def _get_api_notifications(self):
         """Get api notifications."""
@@ -706,81 +660,15 @@ self.addEventListener('fetch',e=>{{
     # Max POST body size: 10MB
     _MAX_POST_SIZE = 10 * 1024 * 1024
 
-    _POST_ROUTES = {
-        "/api/users/register": "_post_api_users_register",
-        "/api/users/delete": "_post_api_users_delete",
-        "/api/users/toggle": "_post_api_users_toggle",
-        "/api/users/quota/set": "_post_api_users_quota_set",
-        "/api/users/settings": "_post_api_users_settings",
-        "/api/tenant/config": "_post_api_tenant_config",
-        "/api/auth/login": "_post_api_auth_login",
-        "/api/auth/register": "_post_api_auth_register",
-        "/api/setup": "_post_api_setup",
+    _POST_ROUTES: dict = {}
+    for _mixin_cls in [
+        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin,
+    ]:
+        _POST_ROUTES.update(getattr(_mixin_cls, 'POST_ROUTES', {}))
+    _POST_ROUTES.update({
         "/api/security/unban": "_post_api_security_unban",
-        "/api/do-update": "_post_api_do_update",
-        "/api/restart": "_post_api_restart",
-        "/api/update": "_post_api_update",
-        "/api/persona/switch": "_post_api_persona_switch",
-        "/api/persona/create": "_post_api_persona_create",
-        "/api/persona/delete": "_post_api_persona_delete",
-        "/api/test-key": "_post_api_test_key",
-        "/api/models/refresh": "_post_api_models_refresh",
-        "/api/unlock": "_post_api_unlock",
-        "/api/auto-unlock": "_post_api_auto_unlock",
-        "/api/stt": "_post_api_stt",
-        "/api/agent/sync": "_post_api_agent_sync",
-        "/api/agent/import/preview": "_post_api_agent_import_preview",
-        "/api/queue/mode": "_post_api_queue_mode",
-        "/api/cron/add": "_post_api_cron_add",
-        "/api/cron/delete": "_post_api_cron_delete",
-        "/api/cron/toggle": "_post_api_cron_toggle",
-        "/api/cron/run": "_post_api_cron_run",
-        "/api/sessions/create": "_post_api_sessions_create",
-        "/api/sessions/delete": "_post_api_sessions_delete",
-        "/api/sessions/clear": "_post_api_sessions_clear",
-        "/api/sessions/import": "_post_api_sessions_import",
-        "/api/soul": "_post_api_soul",
-        "/api/routing": "_post_api_routing",
-        "/api/routing/optimize": "_post_api_routing_optimize",
-        "/api/failover": "_post_api_failover",
-        "/api/cooldowns/reset": "_post_api_cooldowns_reset",
-        "/api/backup/restore": "_post_api_backup_restore",
-        "/api/sessions/rename": "_post_api_sessions_rename",
-        "/api/sessions/rollback": "_post_api_sessions_rollback",
-        "/api/messages/edit": "_post_api_messages_edit",
-        "/api/messages/delete": "_post_api_messages_delete",
-        "/api/sessions/branch": "_post_api_sessions_branch",
-        "/api/agents": "_post_api_agents",
-        "/api/hooks": "_post_api_hooks",
-        "/api/plugins/manage": "_post_api_plugins_manage",
-        "/api/chat/abort": "_post_api_chat_abort",
-        "/api/chat/regenerate": "_post_api_chat_regenerate",
-        "/api/chat/compare": "_post_api_chat_compare",
-        "/api/alternatives/switch": "_post_api_alternatives_switch",
-        "/api/bookmarks": "_post_api_bookmarks",
-        "/api/groups": "_post_api_groups",
-        "/api/paste/detect": "_post_api_paste_detect",
-        "/api/vault": "_post_api_vault",
-        "/api/upload": "_post_api_upload",
-        "/api/onboarding": "_post_api_onboarding",
-        "/api/onboarding/preferences": "_post_api_onboarding_preferences",
-        "/api/config/telegram": "_post_api_config_telegram",
-        "/api/gateway/register": "_post_api_gateway_register",
-        "/api/gateway/heartbeat": "_post_api_gateway_heartbeat",
-        "/api/gateway/unregister": "_post_api_gateway_unregister",
-        "/api/gateway/dispatch": "_post_api_gateway_dispatch",
-        "/webhook/slack": "_post_webhook_slack",
-        "/api/presence": "_post_api_presence",
-        "/webhook/telegram": "_post_webhook_telegram",
-        "/api/sla/config": "_post_api_sla_config",
-        "/api/node/execute": "_post_api_node_execute",
-        "/api/thoughts": "_post_api_thoughts",
-        "/api/engine/settings": "_post_api_engine_settings",
-        "/api/agent/task": "_post_api_agent_task",
-        "/api/agent/task/cancel": "_delete_api_agent_task",
-        "/api/agent/tasks/clear": "_post_api_agent_tasks_clear",
-        "/api/directive": "_post_api_directive",
-    }
+    })
+
 
     def _do_post_inner(self):
         """Do post inner."""
@@ -839,18 +727,9 @@ self.addEventListener('fetch',e=>{{
         else:
             self._json({"error": "Not found"}, 404)
 
-    _GET_PREFIX_ROUTES = [
-        ("/api/search", "_get_api_search", None),
-        ("/api/sessions/", "_get_api_sessions_messages", "/messages"),
-        ("/api/sessions/", "_get_api_sessions_export", "/export"),
-        ("/api/rag/search", "_get_api_rag_search", None),
-        ("/api/audit", "_get_api_audit", None),
-        ("/api/sessions/", "_get_api_sessions_summary", "/summary"),
-        ("/api/sessions/", "_get_api_sessions_alternatives", "/alternatives"),
-        ("/api/sessions/", "_get_api_sessions_last", "/last"),
-        ("/api/logs", "_get_api_logs", None),
-        ("/api/memory/read?", "_get_api_memory_read", None),
-        ("/api/google/callback", "_get_api_google_callback", None),
-        ("/api/agent/export", "_get_api_agent_export", None),
-        ("/uploads/", "_get_uploads", None),
-    ]
+    _GET_PREFIX_ROUTES: list = []
+    for _mixin_cls in [
+        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin,
+    ]:
+        _GET_PREFIX_ROUTES.extend(getattr(_mixin_cls, 'GET_PREFIX_ROUTES', []))
+

@@ -22,6 +22,16 @@ def _ensure_vault_unlocked(vault) -> bool:
 
 
 class WebSetupMixin:
+    GET_ROUTES = {
+        "/api/onboarding": "_get_api_onboarding",
+        "/setup": "_get_setup",
+    }
+    POST_ROUTES = {
+        "/api/setup": "_post_api_setup",
+        "/api/onboarding": "_post_api_onboarding",
+        "/api/onboarding/preferences": "_post_api_onboarding_preferences",
+    }
+
     """Mixin providing setup route handlers."""
 
     def _needs_onboarding(self) -> bool:

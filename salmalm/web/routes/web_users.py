@@ -5,6 +5,20 @@ from salmalm.web.auth import auth_manager, extract_auth
 
 
 class WebUsersMixin:
+    GET_ROUTES = {
+        "/api/users": "_get_api_users",
+        "/api/users/quota": "_get_api_users_quota",
+        "/api/users/settings": "_get_api_users_settings",
+        "/api/tenant/config": "_get_api_tenant_config",
+    }
+    POST_ROUTES = {
+        "/api/users/delete": "_post_api_users_delete",
+        "/api/users/toggle": "_post_api_users_toggle",
+        "/api/users/quota/set": "_post_api_users_quota_set",
+        "/api/users/settings": "_post_api_users_settings",
+        "/api/tenant/config": "_post_api_tenant_config",
+    }
+
     """Mixin providing users route handlers."""
 
     def _get_api_users(self):

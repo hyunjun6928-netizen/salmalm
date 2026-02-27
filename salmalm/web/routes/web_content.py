@@ -12,6 +12,33 @@ log = logging.getLogger(__name__)
 
 
 class ContentMixin:
+    GET_ROUTES = {
+        "/api/groups": "_get_groups",
+        "/api/soul": "_get_soul",
+        "/api/memory/files": "_get_memory_files",
+        "/api/mcp": "_get_mcp",
+        "/api/rag": "_get_rag",
+        "/api/personas": "_get_personas",
+        "/api/thoughts": "_get_thoughts",
+        "/api/thoughts/stats": "_get_thoughts_stats",
+        "/api/tools/list": "_get_tools_list",
+        "/api/browser/status": "_get_api_browser_status",
+        "/api/commands": "_get_commands",
+        "/api/dashboard": "_get_api_dashboard",
+        "/manifest.json": "_get_manifest_json",
+    }
+    POST_ROUTES = {
+        "/api/bookmarks": "_post_api_bookmarks",
+        "/api/thoughts": "_post_api_thoughts",
+    }
+    GET_PREFIX_ROUTES = [
+        ("/api/search", "_get_api_search", None),
+        ("/api/rag/search", "_get_api_rag_search", None),
+        ("/api/sessions/", "_get_api_sessions_summary", "/summary"),
+        ("/api/sessions/", "_get_api_sessions_alternatives", "/alternatives"),
+        ("/api/memory/read?", "_get_api_memory_read", None),
+    ]
+
     def _get_thoughts(self):
         """Get thoughts."""
         from salmalm.features.thoughts import thought_stream

@@ -78,6 +78,15 @@ def _cache_response(req_id: str, session_id: str, response: str, model: str, com
 
 
 class WebChatMixin:
+    POST_ROUTES = {
+        "/api/messages/edit": "_post_api_messages_edit",
+        "/api/messages/delete": "_post_api_messages_delete",
+        "/api/chat/abort": "_post_api_chat_abort",
+        "/api/chat/regenerate": "_post_api_chat_regenerate",
+        "/api/chat/compare": "_post_api_chat_compare",
+        "/api/alternatives/switch": "_post_api_alternatives_switch",
+    }
+
     """Mixin providing chat route handlers."""
 
     def _post_api_chat(self):

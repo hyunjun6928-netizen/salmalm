@@ -13,6 +13,18 @@ from salmalm.web.auth import auth_manager, extract_auth
 
 
 class WebAuthMixin:
+    GET_ROUTES = {
+        "/api/auth/users": "_get_api_auth_users",
+        "/api/google/auth": "_get_api_google_auth",
+    }
+    POST_ROUTES = {
+        "/api/users/register": "_post_api_users_register",
+        "/api/auth/login": "_post_api_auth_login",
+        "/api/auth/register": "_post_api_auth_register",
+        "/api/unlock": "_post_api_unlock",
+        "/api/auto-unlock": "_post_api_auto_unlock",
+    }
+
     """Mixin providing auth route handlers."""
 
     def _auto_unlock_localhost(self) -> bool:

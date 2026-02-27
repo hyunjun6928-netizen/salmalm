@@ -15,6 +15,28 @@ log = logging.getLogger(__name__)
 
 
 class SystemMixin:
+    GET_ROUTES = {
+        "/api/uptime": "_get_uptime",
+        "/api/latency": "_get_latency",
+        "/api/nodes": "_get_nodes",
+        "/api/status": "_get_status",
+        "/api/debug": "_get_debug",
+        "/api/queue": "_get_queue",
+        "/api/metrics": "_get_metrics",
+        "/api/cert": "_get_cert",
+        "/api/ws/status": "_get_ws_status",
+        "/api/usage/daily": "_get_usage_daily",
+        "/api/usage/monthly": "_get_usage_monthly",
+        "/api/doctor": "_get_doctor",
+        "/api/ollama/detect": "_get_ollama_detect",
+        "/api/update/check": "_get_api_update_check",
+        "/static/app.js": "_get_static_app_js",
+    }
+    GET_PREFIX_ROUTES = [
+        ("/api/audit", "_get_api_audit", None),
+        ("/api/logs", "_get_api_logs", None),
+    ]
+
     def _get_uptime(self):
         """Get uptime."""
         from salmalm.features.sla import uptime_monitor

@@ -2,6 +2,16 @@
 
 
 class WebCronMixin:
+    GET_ROUTES = {
+        "/api/cron": "_get_cron",
+    }
+    POST_ROUTES = {
+        "/api/cron/add": "_post_api_cron_add",
+        "/api/cron/delete": "_post_api_cron_delete",
+        "/api/cron/toggle": "_post_api_cron_toggle",
+        "/api/cron/run": "_post_api_cron_run",
+    }
+
     """Mixin providing cron route handlers."""
 
     def _get_cron(self):

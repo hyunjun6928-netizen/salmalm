@@ -2,6 +2,10 @@
 
 
 class WebFeaturesMixin:
+    GET_ROUTES = {
+        "/api/features": "_get_features",
+    }
+
     """Mixin for web_features routes."""
 
     def _get_features(self):

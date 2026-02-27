@@ -7,6 +7,18 @@ from salmalm.constants import TEST_MODELS
 
 
 class WebModelMixin:
+    GET_ROUTES = {
+        "/api/usage/models": "_get_usage_models",
+        "/api/models": "_get_models",
+        "/api/llm-router/providers": "_get_llm_router_providers",
+        "/api/llm-router/current": "_get_llm_router_current",
+        "/api/health/providers": "_get_api_health_providers",
+    }
+    POST_ROUTES = {
+        "/api/test-key": "_post_api_test_key",
+        "/api/models/refresh": "_post_api_models_refresh",
+    }
+
     """Mixin providing model route handlers."""
 
     def _get_usage_models(self):

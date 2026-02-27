@@ -85,6 +85,16 @@ def _run_task(task_id: str, description: str, model: str) -> None:
 
 
 class AgentsMixin:
+    GET_ROUTES = {
+        "/api/agent/tasks": "_get_api_agent_tasks",
+    }
+    POST_ROUTES = {
+        "/api/agent/task": "_post_api_agent_task",
+        "/api/agent/task/cancel": "_delete_api_agent_task",
+        "/api/agent/tasks/clear": "_post_api_agent_tasks_clear",
+        "/api/directive": "_post_api_directive",
+    }
+
     """Route mixin for /api/agent/* endpoints."""
 
     def _post_api_agent_task(self) -> None:
