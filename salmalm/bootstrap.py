@@ -679,6 +679,13 @@ async def run_server():
         )
         raise SystemExit(1)
 
+    # ── Load persisted engine settings (compaction threshold, tokens, etc.) ──
+    try:
+        from salmalm.web.routes.web_engine import load_engine_settings
+        load_engine_settings()
+    except Exception as _se:
+        log.warning(f"[ENGINE-SETTINGS] Could not load persisted settings: {_se}")
+
     # ── Try uvicorn (ASGI) first; fall back to ThreadingHTTPServer ──────────
     _uvicorn_ok = False
     server = None
