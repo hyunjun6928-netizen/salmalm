@@ -170,13 +170,29 @@ def _resolve_api_key(provider: str) -> Optional[str]:
     return vault.get(f"{provider}_api_key")
 
 
+_INTERNAL_MSG_KEYS = frozenset({"_recall", "_plan_injected", "_rag_injected"})
+
+
+def _strip_internal_keys(messages: list) -> list:
+    """Remove internal marker keys from messages before sending to any provider.
+
+    Keys like _recall, _plan_injected are used internally for cleanup logic
+    but must not be forwarded — unknown fields may cause API rejection (400).
+    """
+    if not any(k in m for m in messages for k in _INTERNAL_MSG_KEYS):
+        return messages  # fast path — no markers present
+    return [{k: v for k, v in m.items() if k not in _INTERNAL_MSG_KEYS} for m in messages]
+
+
 def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
     """Convert messages between provider formats to avoid role errors.
 
     - Anthropic only accepts 'user', 'assistant', 'system' roles
     - OpenAI uses 'tool' role for tool results
     - Google uses 'model' instead of 'assistant'
+    - Internal marker keys (_recall, _plan_injected, etc.) are stripped here.
     """
+    messages = _strip_internal_keys(messages)
     if provider == "anthropic":
         import json as _json
 

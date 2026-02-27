@@ -208,12 +208,18 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
         log.warning(f"RAG injection skipped: {e}")
 
     # Auto-recall: inject relevant memory context (OpenClaw-style)
+    # Dedup: remove previous recall injections before appending new one.
+    # Prevents identical [Memory Recall] blocks accumulating on every turn.
     try:
         from salmalm.core.memory import memory_manager
 
         recall = memory_manager.auto_recall(user_message)
         if recall:
-            session.messages.append({"role": "system", "content": recall})
+            # Strip stale recall messages from previous turns
+            session.messages = [m for m in session.messages if not m.get("_recall")]
+            # Skip injection if recall content is identical to the one we just removed
+            # (i.e., same context window — no new information to add)
+            session.messages.append({"role": "system", "content": recall, "_recall": True})
     except Exception as _recall_err:
         log.debug(f"[PIPELINE] auto_recall skipped: {_recall_err}")
 
