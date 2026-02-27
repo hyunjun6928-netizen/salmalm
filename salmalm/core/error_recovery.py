@@ -319,28 +319,20 @@ class StreamBuffer:
 
 
 def friendly_error(error: str, provider: str = "") -> str:
-    """Convert technical errors to user-friendly messages."""
-    error_lower = error.lower()
+    """Convert technical errors to user-friendly messages.
 
-    if "api key" in error_lower or "authentication" in error_lower or "401" in error_lower:
-        return f"🔑 {provider} API key is missing or invalid. Check Settings → API Keys."
-
-    if "rate limit" in error_lower or "429" in error_lower:
-        return f"⏳ {provider} rate limit hit. Waiting a moment before retrying..."
-
-    if "overloaded" in error_lower or "529" in error_lower:
-        return f"🏋️ {provider} is overloaded right now. Trying again shortly..."
-
-    if "timeout" in error_lower:
-        return f"⏰ {provider} request timed out. This usually means the response was too complex."
-
-    if "connection" in error_lower or "network" in error_lower:
-        return f"🌐 Can't reach {provider}. Check your internet connection."
-
-    if "context" in error_lower and ("long" in error_lower or "length" in error_lower):
-        return "📏 Conversation too long. Try /compact to compress context."
-
-    return f"❌ {provider}: {error[:200]}"
+    Delegates to error_messages.friendly_error (canonical implementation).
+    Provider prefix prepended when available.
+    """
+    from salmalm.core.error_messages import friendly_error as _canonical
+    exc_like = Exception(error)
+    msg = _canonical(exc_like)
+    # Inject provider name if provided and not already present
+    if provider and provider not in msg:
+        msg = msg.replace(
+            "(Invalid API key", f"({provider} — Invalid API key", 1
+        ) if "Invalid API key" in msg else f"[{provider}] {msg}"
+    return msg
 
 
 # ── Global Service-Level Circuit Breaker ──

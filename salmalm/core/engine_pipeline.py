@@ -21,10 +21,9 @@ import re as _re
 
 
 def _get_thinking_budget_map():
-    """Lazy import to avoid circular dependency."""
-    from salmalm.core.engine import _THINKING_BUDGET_MAP
-
-    return _THINKING_BUDGET_MAP
+    """Get thinking budget map from constants (single source of truth)."""
+    from salmalm.constants import THINKING_BUDGET_MAP
+    return THINKING_BUDGET_MAP
 
 
 _MAX_MESSAGE_LENGTH = 100_000

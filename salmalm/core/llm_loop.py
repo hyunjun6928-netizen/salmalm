@@ -168,6 +168,13 @@ def _record_model_failure(model: str, cooldown_seconds: int = 0) -> None:
         }
         _save_cooldowns(cd)
         log.warning(f"[FAILOVER] {model} cooled down for {cooldown_secs}s (failure #{failures + 1})")
+    # Sync to CircuitBreakerRegistry so global_circuit_breaker sees provider state
+    try:
+        from salmalm.core.error_recovery import circuit_breakers
+        provider = model.split("/")[0] if "/" in model else model
+        circuit_breakers.record_failure(provider)
+    except Exception:
+        pass  # Non-critical — cooldown file is the primary state
 
 
 def _clear_model_cooldown(model: str) -> None:

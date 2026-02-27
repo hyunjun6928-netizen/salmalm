@@ -122,20 +122,9 @@ def _flush_audit_buffer() -> None:
     except Exception as _db_err:
         log.warning(f"[AUDIT] DB unavailable during flush (atexit?): {_db_err}")
         return
-    # Get current chain head
-    row = conn.execute("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
-    prev = row[0] if row else "0" * 64
-
+    # v2 only — v1 hash-chain table retained for schema compat but no longer written.
+    # Removing dual-write halves audit storage overhead.
     for ts, event, detail, session_id, json_detail in entries:
-        # v1: hash-chain
-        payload = f"{ts}|{event}|{detail}|{prev}"
-        h = hashlib.sha256(payload.encode()).hexdigest()
-        conn.execute(
-            "INSERT INTO audit_log (ts, event, detail, prev_hash, hash) VALUES (?,?,?,?,?)",
-            (ts, event, detail[:500], prev, h),
-        )
-        prev = h
-        # v2: structured
         conn.execute(
             "INSERT INTO audit_log_v2 (timestamp, event_type, session_id, detail) VALUES (?,?,?,?)",
             (ts, event, session_id, json_detail),
