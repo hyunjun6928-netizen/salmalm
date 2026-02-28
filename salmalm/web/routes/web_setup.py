@@ -396,7 +396,12 @@ async def post_setup(request: _Request):
     return _JSON(content={"ok": True})
 
 @router.post("/api/onboarding")
-async def post_onboarding(request: _Request):
+async def post_onboarding(request: _Request, _u=_Depends(_optauth)):
+    import os as _os_onb
+    # On external bind: reject unauthenticated onboarding API key writes
+    _bind_onb = _os_onb.environ.get("SALMALM_BIND", "127.0.0.1")
+    if _bind_onb not in ("127.0.0.1", "localhost", "::1") and not _u:
+        return _JSON(content={"error": "Authentication required"}, status_code=401)
     from salmalm.web.routes.web_setup import WebSetupMixin, _ensure_vault_unlocked
     from salmalm.security.crypto import vault, log
     body = await request.json()
@@ -414,11 +419,19 @@ async def post_onboarding(request: _Request):
     return _JSON(content=data, status_code=status)
 
 @router.post("/api/onboarding/preferences")
-async def post_onboarding_preferences(request: _Request):
+async def post_onboarding_preferences(request: _Request, _u=_Depends(_optauth)):
     import os
     from salmalm.security.crypto import vault, log
     from salmalm.constants import DATA_DIR
     from salmalm.core import audit_log
+    # Require vault to be unlocked (= local session or authenticated user)
+    if not vault.is_unlocked:
+        return _JSON(content={"error": "Vault locked — unlock vault first"}, status_code=403)
+    # On external bind: require authentication (no anonymous preference writes)
+    _bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+    _is_local_bind = _bind in ("127.0.0.1", "localhost", "::1")
+    if not _is_local_bind and not _u:
+        return _JSON(content={"error": "Authentication required"}, status_code=401)
     body = await request.json()
     model = body.get("model", "auto")
     persona = body.get("persona", "expert")
