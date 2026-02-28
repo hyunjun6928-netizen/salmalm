@@ -122,6 +122,7 @@ def _try_fallback(provider, model, messages, tools, max_tokens, t0) -> Optional[
         try:
             fb_tools = _adapt_tools_for_provider(tools, fb_provider)
             fb_messages = _sanitize_messages_for_provider(messages, fb_provider)
+            from salmalm.core.llm.dispatcher import _call_provider  # noqa: PLC0415 — avoids circular import
             result = _call_provider(
                 fb_provider, fb_key, fb_model_id, fb_messages, fb_tools, max_tokens, timeout=_LLM_TIMEOUT
             )
@@ -358,6 +359,7 @@ def call_llm(
         _metrics["llm_calls"] += 1
     _t0 = time.time()  # noqa: E303
     try:
+        from salmalm.core.llm.dispatcher import _call_provider  # noqa: PLC0415 — avoids circular import
         result = _call_provider(provider, api_key, model_id, messages, tools, max_tokens, thinking=thinking)
         result["model"] = model
         # Cost tracking — best-effort (never fail the request)
@@ -404,6 +406,7 @@ def call_llm(
         if isinstance(e, _ResponsesOnlyModel) and provider == "openai":
             log.info(f"[RESPONSES] {model} → retrying with v1/responses endpoint")
             try:
+                from salmalm.core.llm.openai import _call_openai_responses  # noqa: PLC0415 — avoids circular import
                 resp_result = _call_openai_responses(api_key, model_id, messages, tools or [], max_tokens)
                 resp_result["model"] = model
                 _RESPONSES_API_MODELS.add(model_id)  # cache for future calls
