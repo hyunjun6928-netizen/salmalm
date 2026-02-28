@@ -203,13 +203,17 @@ def _send_notification_impl(
                 owner = vault.get("telegram_owner_id") or ""
                 if owner:
                     text = f"🔔 {title}\n{message}" if title else f"🔔 {message}"
-                    tg_url = f"https://api.telegram.org/bot{vault.get('telegram_bot_token')}/sendMessage"
-                    body = json.dumps({"chat_id": owner, "text": text}).encode()
-                    req = urllib.request.Request(
-                        tg_url, data=body, headers={"Content-Type": "application/json"}, method="POST"
-                    )
-                    urllib.request.urlopen(req, timeout=10)
-                    results.append("telegram: ✅")
+                    _tg_bot_token = vault.get("telegram_bot_token")
+                    if not _tg_bot_token:
+                        results.append("telegram: ❌ bot token not configured")
+                    else:
+                        tg_url = f"https://api.telegram.org/bot{_tg_bot_token}/sendMessage"
+                        body = json.dumps({"chat_id": owner, "text": text}).encode()
+                        req = urllib.request.Request(
+                            tg_url, data=body, headers={"Content-Type": "application/json"}, method="POST"
+                        )
+                        urllib.request.urlopen(req, timeout=10)
+                        results.append("telegram: ✅")
                 else:
                     results.append("telegram: ⚠️ no owner_id")
             else:

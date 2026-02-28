@@ -130,13 +130,12 @@ class WebGatewayMixin:
             import asyncio
 
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    import concurrent.futures as _cf_gw
-                    asyncio.run_coroutine_threadsafe(telegram_bot.handle_webhook_update(update), loop)
-                else:
-                    loop.run_until_complete(telegram_bot.handle_webhook_update(update))
+                loop = asyncio.get_running_loop()
+                # Wait for result so webhook is fully processed before returning 200
+                fut = asyncio.run_coroutine_threadsafe(telegram_bot.handle_webhook_update(update), loop)
+                fut.result(timeout=10)
             except RuntimeError:
+                # No running loop — safe to use asyncio.run()
                 asyncio.run(telegram_bot.handle_webhook_update(update))
             self._json({"ok": True})
         except Exception as e:

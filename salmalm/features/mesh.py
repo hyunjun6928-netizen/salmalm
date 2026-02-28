@@ -285,7 +285,13 @@ class MeshManager:
             import asyncio
             from salmalm.core.engine import process_message
 
-            result = asyncio.run(process_message(f"mesh-{from_host}", task, model_override=model))
+            try:
+                _loop = asyncio.get_running_loop()
+                result = asyncio.run_coroutine_threadsafe(
+                    process_message(f"mesh-{from_host}", task, model_override=model), _loop
+                ).result(timeout=120)
+            except RuntimeError:
+                result = asyncio.run(process_message(f"mesh-{from_host}", task, model_override=model))
             return {"result": result[:5000], "status": "completed"}
         except Exception as e:
             return {"error": str(e), "status": "failed"}
