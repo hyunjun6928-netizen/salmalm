@@ -82,7 +82,7 @@ class TestEngineClassifierExtended(unittest.TestCase):
 class TestLLMModule(unittest.TestCase):
     """Test LLM call paths with mocks."""
 
-    @patch('salmalm.core.llm.urllib.request.urlopen')
+    @patch('salmalm.core.llm.common.urllib.request.urlopen')
     def test_call_openai_mock(self, mock_urlopen):
         from salmalm.core.llm import call_llm
         mock_resp = MagicMock()

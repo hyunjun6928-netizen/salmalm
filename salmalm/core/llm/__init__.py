@@ -12,6 +12,8 @@ Sub-modules:
 """
 from __future__ import annotations
 
+from salmalm.core import track_usage  # noqa: F401 — backward-compat re-export
+
 from salmalm.core.llm.common import (  # noqa: F401
     _ResponsesOnlyModel,
     _RESPONSES_API_MODELS,
@@ -64,4 +66,5 @@ __all__ = [
     "_resolve_api_key",
     "_strip_internal_keys",
     "_sanitize_messages_for_provider",
+    "track_usage",
 ]
