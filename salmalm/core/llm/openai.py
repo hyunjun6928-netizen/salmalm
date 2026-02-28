@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 import urllib.error
 import urllib.request
 
-from salmalm.core.llm.common import _http_post, _http_get, _ResponsesOnlyModel, _RESPONSES_API_MODELS, _RESPONSES_API_BLACKLIST
+from salmalm.core.llm.common import _http_post, _http_get, _get_temperature, _ResponsesOnlyModel, _RESPONSES_API_MODELS, _RESPONSES_API_BLACKLIST
 
 def _call_openai(
     api_key: str,
