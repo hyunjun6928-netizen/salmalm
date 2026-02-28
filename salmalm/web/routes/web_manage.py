@@ -608,6 +608,8 @@ class ManageMixin:
 
     def _post_api_node_execute(self):
         """Post api node execute."""
+        if not self._require_auth("admin"):
+            return
         body = self._body
         # Node endpoint: execute a tool locally (called by gateway)
         from salmalm.tools.tool_handlers import execute_tool

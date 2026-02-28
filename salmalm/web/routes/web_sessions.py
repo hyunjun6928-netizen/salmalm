@@ -183,7 +183,8 @@ class WebSessionsMixin:
     def _post_api_sessions_delete(self):
         """Post api sessions delete."""
         body = self._body
-        if not self._require_auth("user"):
+        _u = self._require_auth("user")
+        if not _u:
             return
         sid = body.get("session_id", "")
         if not sid:
@@ -192,10 +193,22 @@ class WebSessionsMixin:
         from salmalm.core import _sessions, _get_db
         from salmalm.core.session_store import _SESSIONS_DIR
 
+        conn = _get_db()
+        _uid = _u.get("id") if _u.get("role") != "admin" else None
+        if _uid is not None:
+            row = conn.execute(
+                "SELECT 1 FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+                (sid, _uid),
+            ).fetchone()
+            if not row:
+                self._json({"ok": False, "error": "Session not found or access denied"}, 403)
+                return
         if sid in _sessions:
             del _sessions[sid]
-        conn = _get_db()
-        conn.execute("DELETE FROM session_store WHERE session_id=?", (sid,))
+        conn.execute(
+            "DELETE FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+            (sid, _uid if _uid is not None else _u.get("id", 0)),
+        ) if _uid is not None else conn.execute("DELETE FROM session_store WHERE session_id=?", (sid,))
         conn.commit()
         # Also delete the on-disk JSON file — without this the session
         # resurrects on every server restart (dual-persistence bug)
@@ -211,7 +224,8 @@ class WebSessionsMixin:
     def _post_api_sessions_clear(self):
         """Delete all sessions except the specified one (or 'web')."""
         body = self._body
-        if not self._require_auth("user"):
+        _u = self._require_auth("user")
+        if not _u:
             return
         keep = body.get("keep", "web")
         from salmalm.core import _sessions, _get_db
@@ -219,10 +233,17 @@ class WebSessionsMixin:
         from salmalm.core.session_store import _SESSIONS_DIR
 
         conn = _get_db()
-        # Get all session ids except the one to keep
-        rows = conn.execute(
-            "SELECT session_id FROM session_store WHERE session_id != ?", (keep,)
-        ).fetchall()
+        _uid = _u.get("id") if _u.get("role") != "admin" else None
+        # Scope deletion to the requesting user's sessions only
+        if _uid is not None:
+            rows = conn.execute(
+                "SELECT session_id FROM session_store WHERE session_id != ? AND (user_id=? OR user_id IS NULL)",
+                (keep, _uid),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT session_id FROM session_store WHERE session_id != ?", (keep,)
+            ).fetchall()
         deleted = 0
         for r in rows:
             sid = r[0]
@@ -236,7 +257,13 @@ class WebSessionsMixin:
             except Exception as _e:
                 log.debug("[SESSIONS] JSON cleanup failed for %s: %s", sid, _e)
             deleted += 1
-        conn.execute("DELETE FROM session_store WHERE session_id != ?", (keep,))
+        if _uid is not None:
+            conn.execute(
+                "DELETE FROM session_store WHERE session_id != ? AND (user_id=? OR user_id IS NULL)",
+                (keep, _uid),
+            )
+        else:
+            conn.execute("DELETE FROM session_store WHERE session_id != ?", (keep,))
         conn.commit()
         audit_log("session_clear", keep, detail_dict={"deleted": deleted, "kept": keep})
         self._json({"ok": True, "deleted": deleted})
@@ -244,7 +271,8 @@ class WebSessionsMixin:
     def _post_api_sessions_rename(self):
         """Post api sessions rename."""
         body = self._body
-        if not self._require_auth("user"):
+        _u = self._require_auth("user")
+        if not _u:
             return
         sid = body.get("session_id", "")
         title = body.get("title", "").strip()[:60]
@@ -254,7 +282,21 @@ class WebSessionsMixin:
         from salmalm.core import _get_db
 
         conn = _get_db()
-        conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
+        _uid = _u.get("id") if _u.get("role") != "admin" else None
+        if _uid is not None:
+            row = conn.execute(
+                "SELECT 1 FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+                (sid, _uid),
+            ).fetchone()
+            if not row:
+                self._json({"ok": False, "error": "Session not found or access denied"}, 403)
+                return
+            conn.execute(
+                "UPDATE session_store SET title=? WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+                (title, sid, _uid),
+            )
+        else:
+            conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
         conn.commit()
         self._json({"ok": True})
 

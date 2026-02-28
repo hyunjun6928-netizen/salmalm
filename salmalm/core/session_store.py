@@ -147,6 +147,12 @@ class Session:
             recent = [m for m in self.messages if m["role"] != "system"][-50:]
             self.messages = system_msgs + recent
             log.warning(f"[SESSION] Auto-trimmed session {self.id}: >1000 msgs → {len(self.messages)}")
+        # Persist user message immediately — prevents message loss on crash
+        # before add_assistant() is called (e.g. long LLM round-trip with kill -9)
+        try:
+            self._persist()
+        except Exception as _e:
+            log.warning("[SESSION] add_user _persist failed for %s: %s", self.id, _e)
 
     def add_assistant(self, content: str) -> None:
         """Add an assistant response to the session."""
