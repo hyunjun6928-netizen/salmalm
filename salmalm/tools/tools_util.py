@@ -27,16 +27,10 @@ def handle_hash_text(args: dict) -> str:
         if not text:
             return "❌ text is required"
         algo = args.get("algorithm", "sha256")
-        algos = {
-            "sha256": hashlib.sha256,
-            "md5": hashlib.md5,
-            "sha1": hashlib.sha1,
-            "sha512": hashlib.sha512,
-            "sha384": hashlib.sha384,
-        }
-        if algo not in algos:
-            return f"❌ Supported algorithms: {', '.join(algos.keys())}"
-        h = algos[algo](text.encode("utf-8")).hexdigest()
+        _HASH_ALGOS = ("sha256", "md5", "sha1", "sha512", "sha384")
+        if algo not in _HASH_ALGOS:
+            return f"❌ Supported algorithms: {', '.join(_HASH_ALGOS)}"
+        h = hashlib.new(algo, text.encode("utf-8"), usedforsecurity=False).hexdigest()
         return f"🔐 {algo.upper()}: {h}"
     elif action == "password":
         length = max(8, min(args.get("length", 16), 128))

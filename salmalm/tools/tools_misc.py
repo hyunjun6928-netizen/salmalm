@@ -10,7 +10,7 @@ import threading
 import subprocess
 import sys
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from salmalm.tools.tool_registry import register
 from salmalm.constants import WORKSPACE_DIR
@@ -79,7 +79,7 @@ def _parse_en_time(m_en) -> tuple:
 
 def _parse_relative_time(s: str) -> datetime:
     """Parse time string into datetime."""
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     s_stripped = s.strip().lower()
 
     m = re.match(r"^(\d+)\s*(m|min|h|hr|hour|d|day|w|week)s?$", s_stripped)
@@ -254,7 +254,7 @@ def _send_notification_impl(
                     "title": title or "SalmAlm",
                     "message": message,
                     "priority": priority,
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
             ).encode()
             req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
@@ -270,7 +270,7 @@ def _reminder_check_loop():
     """Reminder check loop."""
     while True:
         time.sleep(30)
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         with _reminder_lock:
             due = []
             remaining = []
@@ -336,7 +336,7 @@ def handle_reminder(args: dict) -> str:
             "message": message,
             "time": trigger_time.isoformat(),
             "repeat": args.get("repeat"),
-            "created": datetime.now().isoformat(),
+            "created": datetime.now(timezone.utc).isoformat(),
         }
         with _reminder_lock:
             _reminders.append(reminder)
@@ -413,7 +413,7 @@ def handle_workflow(args: dict) -> str:
         if not name or not steps:
             return "❌ name and steps are required for save"
         wf = _load_workflows()
-        wf[name] = {"steps": steps, "created": datetime.now().isoformat()}
+        wf[name] = {"steps": steps, "created": datetime.now(timezone.utc).isoformat()}
         _save_workflows(wf)
         return f"🔄 Workflow saved: **{name}** ({len(steps)} steps)"
 
@@ -696,7 +696,7 @@ def _rss_subscribe(args: dict) -> str:
     if not name:
         name = url.split("/")[2] if "/" in url else url[:30]
     feeds = _load_feeds()
-    feeds[name] = {"url": url, "added": datetime.now().isoformat()}
+    feeds[name] = {"url": url, "added": datetime.now(timezone.utc).isoformat()}
     _save_feeds(feeds)
     return f"📰 Subscribed: **{name}** ({url})"
 

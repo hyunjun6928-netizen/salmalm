@@ -22,6 +22,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import sqlite3
 from salmalm.db import get_connection
@@ -262,7 +263,7 @@ class TokenManager:
             conn = get_connection(AUTH_DB)
             try:
                 import datetime as _dt
-                revoked_after = _dt.datetime.utcnow().isoformat()
+                revoked_after = _dt.datetime.now(_dt.timezone.utc).isoformat()
                 conn.execute(
                     "INSERT OR REPLACE INTO user_revocations (user_id, revoked_after) VALUES (?, ?)",
                     (user_id, revoked_after),
@@ -880,14 +881,16 @@ class AuthManager:
     def create_user(self, username: str, password: str, role: str = "user") -> dict:
         """Create a new user. Returns user info."""
         self._ensure_db()
+        from salmalm.core.exceptions import AuthError
+
         if role not in self.ROLES:
-            from salmalm.core.exceptions import AuthError
-
             raise AuthError(f"Invalid role: {role}. Must be one of {self.ROLES}")
-        if len(password) < 8:
-            from salmalm.core.exceptions import AuthError
-
-            raise AuthError("Password must be at least 8 characters")
+        if not username or len(username) > 64:
+            raise AuthError("Username must be 1-64 characters")
+        if not re.match(r'^[a-zA-Z0-9_\-\.]+$', username):
+            raise AuthError("Username contains invalid characters")
+        if len(password) < 8 or len(password) > 1024:
+            raise AuthError("Password must be 8-1024 characters")
 
         conn = get_connection(AUTH_DB)
         try:

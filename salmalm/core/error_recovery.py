@@ -73,7 +73,7 @@ def backoff_delay(attempt: int, base: float = 1.0, max_delay: float = 60.0, jitt
     """
     delay = min(base * (2**attempt), max_delay)
     if jitter:
-        delay = delay * (0.5 + random.random() * 0.5)  # 50-100% of calculated delay
+        delay = delay * (0.5 + random.random() * 0.5)  # not security-sensitive: backoff jitter
     return delay
 
 

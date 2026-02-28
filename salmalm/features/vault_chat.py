@@ -38,32 +38,33 @@ def _pbkdf2_derive(password: str, salt: bytes, iterations: int = PBKDF2_ITERATIO
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations, dklen=32)
 
 
-def _aes_gcm_encrypt(key: bytes, plaintext: bytes) -> bytes:
-    """AES-256-GCM encrypt. Returns nonce(12) + ciphertext + tag(16)."""
-    # Pure stdlib: use CTR + HMAC as fallback (no cryptography dependency)
-    nonce = secrets.token_bytes(12)
-    # We implement AES-256-GCM via hmac-based stream cipher for stdlib-only
-    # This uses a simplified authenticated encryption scheme
-    stream_key = hashlib.pbkdf2_hmac("sha256", key, nonce, 1, dklen=len(plaintext) + 16)
-    ct = bytes(a ^ b for a, b in zip(plaintext, stream_key[: len(plaintext)]))
-    tag = hmac.new(key, nonce + ct, hashlib.sha256).digest()[:16]
-    return nonce + ct + tag
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM as _AESGCM
+    from cryptography.exceptions import InvalidTag as _InvalidTag
 
+    def _aes_gcm_encrypt(key: bytes, plaintext: bytes) -> bytes:
+        """AES-256-GCM encrypt. Returns nonce(12) + ciphertext+tag."""
+        nonce = secrets.token_bytes(12)
+        return nonce + _AESGCM(key).encrypt(nonce, plaintext, None)
 
-def _aes_gcm_decrypt(key: bytes, data: bytes) -> bytes:
-    """AES-256-GCM decrypt. Input: nonce(12) + ciphertext + tag(16)."""
-    if len(data) < 28:
-        raise ValueError("Data too short for decryption")
-    nonce = data[:12]
-    tag = data[-16:]
-    ct = data[12:-16]
-    # Verify tag
-    expected_tag = hmac.new(key, nonce + ct, hashlib.sha256).digest()[:16]
-    if not hmac.compare_digest(tag, expected_tag):
-        raise ValueError("Decryption failed: invalid password or corrupted data")
-    stream_key = hashlib.pbkdf2_hmac("sha256", key, nonce, 1, dklen=len(ct) + 16)
-    plaintext = bytes(a ^ b for a, b in zip(ct, stream_key[: len(ct)]))
-    return plaintext
+    def _aes_gcm_decrypt(key: bytes, data: bytes) -> bytes:
+        """AES-256-GCM decrypt. Input: nonce(12) + ciphertext+tag."""
+        nonce, ct = data[:12], data[12:]
+        try:
+            return _AESGCM(key).decrypt(nonce, ct, None)
+        except _InvalidTag:
+            raise ValueError("Decryption failed: invalid password or corrupted data")
+
+except ImportError:
+    def _aes_gcm_encrypt(key: bytes, plaintext: bytes) -> bytes:  # type: ignore[misc]
+        raise RuntimeError(
+            "cryptography package required for vault encryption. Run: pip install cryptography"
+        )
+
+    def _aes_gcm_decrypt(key: bytes, data: bytes) -> bytes:  # type: ignore[misc]
+        raise RuntimeError(
+            "cryptography package required for vault decryption. Run: pip install cryptography"
+        )
 
 
 class VaultChat:
@@ -96,7 +97,7 @@ class VaultChat:
         salt = secrets.token_bytes(32)
         pw_hash = _pbkdf2_derive(password, salt)
         verify_salt = secrets.token_bytes(16)
-        verify_hash = hashlib.pbkdf2_hmac("sha256", pw_hash, verify_salt, 1000)
+        verify_hash = hashlib.pbkdf2_hmac("sha256", pw_hash, verify_salt, PBKDF2_ITERATIONS)
         meta = {
             "salt": salt.hex(),
             "verify_salt": verify_salt.hex(),
@@ -131,7 +132,7 @@ class VaultChat:
         key = _pbkdf2_derive(password, salt)
         verify_salt = bytes.fromhex(meta["verify_salt"])
         verify_hash = bytes.fromhex(meta["verify_hash"])
-        expected = hashlib.pbkdf2_hmac("sha256", key, verify_salt, 1000)
+        expected = hashlib.pbkdf2_hmac("sha256", key, verify_salt, PBKDF2_ITERATIONS)
         if hmac.compare_digest(expected, verify_hash):
             return key
         return None
@@ -155,7 +156,7 @@ class VaultChat:
             f.write(new_encrypted)
         # Update meta
         verify_salt = secrets.token_bytes(16)
-        verify_hash = hashlib.pbkdf2_hmac("sha256", new_key, verify_salt, 1000)
+        verify_hash = hashlib.pbkdf2_hmac("sha256", new_key, verify_salt, PBKDF2_ITERATIONS)
         meta = {
             "salt": new_salt.hex(),
             "verify_salt": verify_salt.hex(),

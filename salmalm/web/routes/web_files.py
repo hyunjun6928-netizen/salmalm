@@ -68,7 +68,7 @@ def _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, export_user, _js
         _json.dumps(
             {
                 "version": VERSION,
-                "exported_at": datetime.datetime.now().isoformat(),
+                "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "includes": {"sessions": inc_sessions, "data": inc_data, "vault": inc_vault},
             },
             indent=2,
@@ -444,7 +444,7 @@ class WebFilesMixin:
             _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, _export_user, _json, datetime)
         buf.seek(0)
         data = buf.getvalue()
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
         self.send_response(200)
         self._cors()
         self.send_header("Content-Type", "application/zip")
@@ -598,7 +598,7 @@ async def get_agent_export(request: _Request, vault_export: int = _Query(0, alia
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         _populate_export_zip(zf, bool(sessions), bool(data), bool(vault_export), _u, _json, datetime)
     data_bytes = buf.getvalue()
-    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
     return _Response(content=data_bytes, media_type="application/zip",
                     headers={"Content-Disposition": f'attachment; filename="salmalm-export-{ts}.zip"',
                              "Content-Length": str(len(data_bytes))})

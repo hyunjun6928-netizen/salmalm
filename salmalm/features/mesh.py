@@ -184,7 +184,7 @@ class MeshManager:
     def add_peer(self, url: str, name: str = "", secret: str = "") -> str:
         """Add a peer by URL. Returns status message."""
         url = url.rstrip("/")
-        peer_id = hashlib.md5(url.encode()).hexdigest()[:8]
+        peer_id = hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()[:8]
 
         with self._lock:
             if len(self._peers) >= self._MAX_PEERS:

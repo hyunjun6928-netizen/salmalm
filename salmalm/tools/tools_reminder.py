@@ -8,7 +8,7 @@ Strengthens the existing reminder system in tools_misc.py with:
 """
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 # Korean weekday names
@@ -94,7 +94,7 @@ def parse_natural_time(text: str) -> datetime:
     - "next friday at 3pm" → next Friday 15:00
     - "모레 저녁" → day after tomorrow 18:00
     """
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     s = text.strip()
     s_lower = s.lower()
 

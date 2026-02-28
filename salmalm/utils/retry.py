@@ -79,7 +79,7 @@ def _should_retry(error: Exception) -> tuple:
 def _add_jitter(delay: float) -> float:
     """Add ±10% jitter to delay."""
     jitter = delay * JITTER_FACTOR
-    return delay + random.uniform(-jitter, jitter)
+    return delay + random.uniform(-jitter, jitter)  # not security-sensitive: retry jitter
 
 
 def retry_with_backoff(

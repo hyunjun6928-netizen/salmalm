@@ -326,7 +326,7 @@ class EmbeddedBlockChunker:
 
         lo = self.config.humanDelayMin
         hi = self.config.humanDelayMax
-        return random.uniform(lo, hi)
+        return random.uniform(lo, hi)  # not security-sensitive: humanized delay jitter
 
     def split_for_channel(self, text: str) -> List[str]:
         """Split a complete text into channel-appropriate messages.

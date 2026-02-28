@@ -7,7 +7,7 @@ import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Ensure salmalm is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -29,7 +29,7 @@ class TestReminderTool(unittest.TestCase):
 
     def test_set_reminder_iso(self):
         from salmalm.tools.tool_handlers import execute_tool
-        future = (datetime.now() + timedelta(hours=1)).isoformat()
+        future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
         result = execute_tool('reminder', {'action': 'set', 'message': 'ISO test', 'time': future})
         self.assertIn('Reminder set', result)
 
@@ -59,17 +59,17 @@ class TestReminderTool(unittest.TestCase):
     def test_parse_relative_hours(self):
         from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('2h')
-        self.assertGreater(result, datetime.now())
+        self.assertGreater(result, datetime.now(timezone.utc))
 
     def test_parse_relative_days(self):
         from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('3d')
-        self.assertGreater(result, datetime.now() + timedelta(days=2))
+        self.assertGreater(result, datetime.now(timezone.utc) + timedelta(days=2))
 
     def test_parse_relative_weeks(self):
         from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('1w')
-        self.assertGreater(result, datetime.now() + timedelta(days=6))
+        self.assertGreater(result, datetime.now(timezone.utc) + timedelta(days=6))
 
     def test_parse_invalid_time(self):
         from salmalm.tools.tool_handlers import _parse_relative_time

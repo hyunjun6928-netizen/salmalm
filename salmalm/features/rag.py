@@ -310,7 +310,7 @@ class RAGEngine(RAGIndexerMixin):
             tokens = self._tokenize(chunk_text)
             if not tokens:
                 continue
-            h = hashlib.md5(chunk_text.encode()).hexdigest()[:12]
+            h = hashlib.md5(chunk_text.encode(), usedforsecurity=False).hexdigest()[:12]
             new_docs.append((label, i + 1, i + len(chunk_lines), chunk_text, json.dumps(tokens), len(tokens), mtime, h))
             vectors.append(compute_tf(tokens))
             for t in set(tokens):

@@ -199,6 +199,8 @@ class LLMCronManager:
         if not hasattr(web_session, "_notifications"):
             web_session._notifications = []
         web_session._notifications.append({"time": time.time(), "text": f"⏰ Cron [{job_name}]: {response[:200]}"})
+        if len(web_session._notifications) > 200:
+            web_session._notifications = web_session._notifications[-200:]
 
     def _handle_cron_failure(self, job: dict, error) -> None:
         """Handle cron job failure: notify owner, auto-disable after 5 failures."""

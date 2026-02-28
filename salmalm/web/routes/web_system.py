@@ -296,7 +296,7 @@ class SystemMixin:
         # ETag for caching
         import hashlib
 
-        etag = f'"{hashlib.md5(content).hexdigest()}"'
+        etag = f'"{hashlib.md5(content, usedforsecurity=False).hexdigest()}"'
         if self.headers.get("If-None-Match") == etag:
             self.send_response(304)
             self.end_headers()

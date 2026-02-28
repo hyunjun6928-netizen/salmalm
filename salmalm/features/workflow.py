@@ -254,7 +254,7 @@ class WorkflowEngine:
             result_map[s.get("id", "unknown")] = sr.to_dict()
 
         for s in steps:
-            t = threading.Thread(target=_run, args=(s,))
+            t = threading.Thread(target=_run, args=(s,), daemon=True)
             threads.append(t)
             t.start()
         for t in threads:

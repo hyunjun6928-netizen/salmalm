@@ -2,7 +2,13 @@
 
 from salmalm.security.crypto import log
 import json
+import re as _re
 from salmalm.core import audit_log
+
+# Precompiled regex for title extraction (used in hot session-list loops)
+_RE_BOLD = _re.compile(r'\*\*([^*]+)\*\*')
+_RE_ITALIC = _re.compile(r'\*([^*]+)\*')
+_RE_CODE = _re.compile(r'`([^`]+)`')
 
 
 class WebSessionsMixin:
@@ -61,24 +67,26 @@ class WebSessionsMixin:
                 msg_count = 0
             else:
                 try:
-                    msgs = json.loads(
-                        conn.execute(
-                            "SELECT messages FROM session_store WHERE session_id=?",
-                            (sid,),
-                        ).fetchone()[0]
-                    )
+                    _row = conn.execute(
+                        "SELECT messages FROM session_store WHERE session_id=?",
+                        (sid,),
+                    ).fetchone()
+                    if _row is None:
+                        title = stored_title or ""
+                        msg_count = 0
+                        continue
+                    msgs = json.loads(_row[0])
                     title = ""
-                    import re as _re_title
                     for m in msgs:
                         if m.get("role") == "user" and isinstance(m.get("content"), str):
                             _raw = m["content"].strip()
                             # Skip file upload info lines as title
                             if _raw.startswith("[") and ("uploaded" in _raw or "📎" in _raw or "🖼" in _raw):
                                 continue
-                            # Strip markdown formatting
-                            _raw = _re_title.sub(r'\*\*([^*]+)\*\*', r'\1', _raw)
-                            _raw = _re_title.sub(r'\*([^*]+)\*', r'\1', _raw)
-                            _raw = _re_title.sub(r'`([^`]+)`', r'\1', _raw)
+                            # Strip markdown formatting (precompiled at module level)
+                            _raw = _RE_BOLD.sub(r'\1', _raw)
+                            _raw = _RE_ITALIC.sub(r'\1', _raw)
+                            _raw = _RE_CODE.sub(r'\1', _raw)
                             _raw = _raw.replace("*", "").replace("`", "")
                             title = _raw[:60]
                             break
@@ -104,7 +112,6 @@ class WebSessionsMixin:
         """GET /api/sessions/{id}/last — return last assistant message for recovery."""
         if not self._require_auth("user"):
             return
-        import re as _re
 
         m = _re.match(r"^/api/sessions/([^/]+)/last$", self.path)
         if not m:
@@ -287,7 +294,6 @@ class WebSessionsMixin:
         Used by the web UI to load cross-channel sessions (Telegram, Discord, etc.)
         that are not stored in the browser's localStorage.
         """
-        import re as _re
         if not self._require_auth("user"):
             return
         m = _re.match(r"^/api/sessions/([^/]+)/messages", self.path)
@@ -360,16 +366,21 @@ async def get_sessions(_u=_Depends(_auth)):
             msg_count = 0
         else:
             try:
-                msgs = _json.loads(conn.execute("SELECT messages FROM session_store WHERE session_id=?", (sid,)).fetchone()[0])
+                _row2 = conn.execute("SELECT messages FROM session_store WHERE session_id=?", (sid,)).fetchone()
+                if _row2 is None:
+                    title = stored_title or ""
+                    msg_count = 0
+                    continue
+                msgs = _json.loads(_row2[0])
                 title = ""
                 for m in msgs:
                     if m.get("role") == "user" and isinstance(m.get("content"), str):
                         _raw = m["content"].strip()
                         if _raw.startswith("[") and ("uploaded" in _raw or "📎" in _raw or "🖼" in _raw):
                             continue
-                        _raw = _re.sub(r'\*\*([^*]+)\*\*', r'\1', _raw)
-                        _raw = _re.sub(r'\*([^*]+)\*', r'\1', _raw)
-                        _raw = _re.sub(r'`([^`]+)`', r'\1', _raw).replace("*", "").replace("`", "")
+                        _raw = _RE_BOLD.sub(r'\1', _raw)
+                        _raw = _RE_ITALIC.sub(r'\1', _raw)
+                        _raw = _RE_CODE.sub(r'\1', _raw).replace("*", "").replace("`", "")
                         title = _raw[:60]
                         break
                 msg_count = len([m for m in msgs if m.get("role") in ("user", "assistant")])

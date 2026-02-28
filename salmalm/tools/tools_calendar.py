@@ -2,7 +2,7 @@
 
 import json
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from salmalm.tools.tool_registry import register
 from salmalm.tools.tools_google import _google_oauth_headers
 
@@ -15,7 +15,7 @@ def handle_calendar_list(args: dict) -> str:
     period = args.get("period", "week")  # today, week, month
     base_url = f"https://www.googleapis.com/calendar/v3/calendars/{cal_id}"
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if period == "today":
         time_max = now.replace(hour=23, minute=59, second=59)
         label = "today"

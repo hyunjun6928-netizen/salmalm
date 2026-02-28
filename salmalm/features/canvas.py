@@ -124,7 +124,7 @@ li{{margin:8px 0}}a{{color:#2563eb}}</style></head>
         if not self._running:
             self.start()
 
-        page_id = hashlib.md5(f"{time.time()}{title}".encode()).hexdigest()[:8]
+        page_id = hashlib.md5(f"{time.time()}{title}".encode(), usedforsecurity=False).hexdigest()[:8]
 
         # Wrap raw HTML if it doesn't have doctype
         if not html_content.strip().lower().startswith("<!doctype"):

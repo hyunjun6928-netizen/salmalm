@@ -230,6 +230,8 @@ class HeartbeatManager:
             if not hasattr(web_session, "_notifications"):
                 web_session._notifications = []
             web_session._notifications.append({"time": time.time(), "text": f"💓 Heartbeat: {result[:200]}"})
+            if len(web_session._notifications) > 200:
+                web_session._notifications = web_session._notifications[-200:]
 
 
 heartbeat = HeartbeatManager()

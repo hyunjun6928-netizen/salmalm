@@ -3,7 +3,7 @@ import json
 import os
 import sys
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -153,27 +153,27 @@ class TestEnhancedTimeParsing(unittest.TestCase):
     def test_korean_tomorrow(self):
         from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('내일 오후 3시')
-        expected_day = (datetime.now() + timedelta(days=1)).day
+        expected_day = (datetime.now(timezone.utc) + timedelta(days=1)).day
         self.assertEqual(result.day, expected_day)
         self.assertEqual(result.hour, 15)
 
     def test_korean_tomorrow_morning(self):
         from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('내일 아침')
-        expected_day = (datetime.now() + timedelta(days=1)).day
+        expected_day = (datetime.now(timezone.utc) + timedelta(days=1)).day
         self.assertEqual(result.day, expected_day)
         self.assertEqual(result.hour, 8)
 
     def test_korean_today_evening(self):
         from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('오늘 저녁 7시')
-        self.assertEqual(result.day, datetime.now().day)
+        self.assertEqual(result.day, datetime.now(timezone.utc).day)
         self.assertEqual(result.hour, 19)
 
     def test_korean_day_after_tomorrow(self):
         from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('모레')
-        expected_day = (datetime.now() + timedelta(days=2)).day
+        expected_day = (datetime.now(timezone.utc) + timedelta(days=2)).day
         self.assertEqual(result.day, expected_day)
 
     def test_korean_am_pm(self):
@@ -185,14 +185,14 @@ class TestEnhancedTimeParsing(unittest.TestCase):
     def test_english_tomorrow_3pm(self):
         from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('tomorrow 3pm')
-        expected_day = (datetime.now() + timedelta(days=1)).day
+        expected_day = (datetime.now(timezone.utc) + timedelta(days=1)).day
         self.assertEqual(result.day, expected_day)
         self.assertEqual(result.hour, 15)
 
     def test_relative_still_works(self):
         from salmalm.tools.tool_handlers import _parse_relative_time
         result = _parse_relative_time('45m')
-        self.assertGreater(result, datetime.now() + timedelta(minutes=44))
+        self.assertGreater(result, datetime.now(timezone.utc) + timedelta(minutes=44))
 
     def test_iso_still_works(self):
         from salmalm.tools.tool_handlers import _parse_relative_time

@@ -3,7 +3,7 @@
 import json
 import base64
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from salmalm.tools.tool_registry import register
 from salmalm.security.crypto import vault
 
@@ -60,7 +60,7 @@ def handle_google_calendar(args: dict) -> str:
 
     if action == "list":
         days = args.get("days", 7)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         time_min = now.isoformat() + "Z"
         time_max = (now + timedelta(days=days)).isoformat() + "Z"
         url = (
