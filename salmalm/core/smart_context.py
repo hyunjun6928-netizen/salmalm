@@ -111,7 +111,7 @@ def relevance_score(keywords: List[str], text: str) -> float:
         return 0.0
     text_lower = text.lower()
     matches = sum(1 for k in keywords if k in text_lower)
-    return matches / len(keywords)
+    return matches / len(keywords) if keywords else 0.0
 
 
 class ContextChunk:

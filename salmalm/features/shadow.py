@@ -80,7 +80,7 @@ class ShadowMode:
 
         # Average message length
         lengths = [len(m) for m in user_msgs]
-        avg_len = sum(lengths) / len(lengths)
+        avg_len = sum(lengths) / len(lengths) if lengths else 0
 
         # Frequent words
         word_counter: Counter = Counter()
