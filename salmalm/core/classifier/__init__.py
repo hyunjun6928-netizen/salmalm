@@ -24,12 +24,18 @@ from salmalm.core.classifier.tokens import (  # noqa: F401
     _get_dynamic_max_tokens,
 )
 
+# Compat aliases
+from salmalm.core.cost import estimate_tokens  # noqa: F401
+classify_intent = classify_task  # noqa: F401 — backward-compat alias
+
 __all__ = [
     "TaskClassifier",
     "classify_task",
+    "classify_intent",
     "INTENT_TOOLS",
     "_KEYWORD_TOOLS",
     "get_extra_tools",
     "INTENT_MAX_TOKENS",
     "_get_dynamic_max_tokens",
+    "estimate_tokens",
 ]
