@@ -156,8 +156,10 @@ async def get_gateway_nodes(_u=_Depends(_auth)):
     return _JSON(content={"nodes": gateway.list_nodes()})
 
 @router.post("/api/config/telegram")
-async def post_config_telegram(request: _Request):
+async def post_config_telegram(request: _Request, _u=_Depends(_auth)):
     from salmalm.security.crypto import vault
+    if _u.get("role") != "admin":
+        return _JSON(content={"error": "Admin access required"}, status_code=403)
     body = await request.json()
     if not vault.is_unlocked:
         return _JSON(content={"error": "Vault locked"}, status_code=403)
@@ -190,7 +192,7 @@ async def post_gateway_unregister(request: _Request):
     return _JSON(content=gateway.unregister(body.get("node_id", "")))
 
 @router.post("/api/gateway/dispatch")
-async def post_gateway_dispatch(request: _Request):
+async def post_gateway_dispatch(request: _Request, _u=_Depends(_auth)):
     from salmalm.features.nodes import gateway
     body = await request.json()
     node_id = body.get("node_id", "")

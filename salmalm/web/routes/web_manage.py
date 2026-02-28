@@ -153,7 +153,9 @@ class ManageMixin:
         # Vault ops require admin
         user = extract_auth(dict(self.headers))
         ip = self._get_client_ip()
-        if not user and ip not in ("127.0.0.1", "::1", "localhost"):
+        _is_localhost = ip in ("127.0.0.1", "::1", "localhost")
+        _is_admin = user and user.get("role") == "admin"
+        if not _is_admin and not _is_localhost:
             self._json({"error": "Admin access required"}, 403)
             return
         action = body.get("action")
@@ -925,7 +927,9 @@ async def post_vault(request: _Request):
         return _JSON(content={"error": "Vault locked"}, status_code=403)
     user = extract_auth(dict(request.headers))
     ip = request.client.host if request.client else "unknown"
-    if not user and ip not in ("127.0.0.1", "::1", "localhost"):
+    _is_localhost = ip in ("127.0.0.1", "::1", "localhost")
+    _is_admin = user and user.get("role") == "admin"
+    if not _is_admin and not _is_localhost:
         return _JSON(content={"error": "Admin access required"}, status_code=403)
     body = await request.json()
     action = body.get("action")

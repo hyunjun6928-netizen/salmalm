@@ -443,7 +443,7 @@ async def get_api_queue(request: _Request, _u=_Depends(_auth)):
 
 
 @router.get("/api/metrics")
-async def get_api_metrics():
+async def get_api_metrics(_u=_Depends(_auth)):
     from salmalm.monitoring.metrics import metrics as _pm
     body = _pm.render_text().encode("utf-8")
     return _Response(content=body, media_type="text/plain; version=0.0.4; charset=utf-8")

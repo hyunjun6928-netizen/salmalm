@@ -110,8 +110,18 @@ class Session:
                 },
                 ensure_ascii=False,
             )
+            # Use UPSERT (INSERT ... ON CONFLICT DO UPDATE) instead of INSERT OR REPLACE.
+            # INSERT OR REPLACE = DELETE + INSERT → wipes columns not in the INSERT list
+            # (title, parent_session_id, branch_index → all reset to DEFAULT on every save).
+            # UPSERT only overwrites the columns we explicitly set, preserving the rest.
             conn.execute(
-                "INSERT OR REPLACE INTO session_store (session_id, messages, updated_at, user_id, session_meta) VALUES (?,?,?,?,?)",
+                """INSERT INTO session_store (session_id, messages, updated_at, user_id, session_meta)
+                   VALUES (?,?,?,?,?)
+                   ON CONFLICT(session_id) DO UPDATE SET
+                       messages=excluded.messages,
+                       updated_at=excluded.updated_at,
+                       user_id=excluded.user_id,
+                       session_meta=excluded.session_meta""",
                 (
                     self.id,
                     json.dumps(saveable, ensure_ascii=False),

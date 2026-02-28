@@ -523,7 +523,7 @@ async def get_personas(request: _Request):
     return _JSON(content={"personas": personas, "active": active})
 
 @router.get("/api/thoughts")
-async def get_thoughts(q: str = _Query(None), limit: int = _Query(20)):
+async def get_thoughts(q: str = _Query(None), limit: int = _Query(20), _u=_Depends(_auth)):
     from salmalm.features.thoughts import thought_stream
     if q:
         results = thought_stream.search(q)
@@ -532,12 +532,12 @@ async def get_thoughts(q: str = _Query(None), limit: int = _Query(20)):
     return _JSON(content={"thoughts": results})
 
 @router.get("/api/thoughts/stats")
-async def get_thoughts_stats():
+async def get_thoughts_stats(_u=_Depends(_auth)):
     from salmalm.features.thoughts import thought_stream
     return _JSON(content=thought_stream.stats())
 
 @router.get("/api/tools/list")
-async def get_tools_list():
+async def get_tools_list(_u=_Depends(_auth)):
     tools = []
     try:
         from salmalm.tools.tool_registry import _HANDLERS, _ensure_modules
@@ -702,7 +702,7 @@ async def post_bookmarks(request: _Request, _u=_Depends(_auth)):
     return _JSON(content={"error": "Unknown action"}, status_code=400)
 
 @router.post("/api/thoughts")
-async def post_thoughts(request: _Request):
+async def post_thoughts(request: _Request, _u=_Depends(_auth)):
     from salmalm.features.thoughts import thought_stream
     body = await request.json()
     content = body.get("content", "").strip()

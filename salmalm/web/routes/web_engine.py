@@ -339,13 +339,13 @@ from salmalm.web.schemas import EngineSettingsRequest, RoutingConfig
 router = _APIRouter()
 
 @router.get("/api/sla")
-async def get_sla():
+async def get_sla(_u=_Depends(_auth)):
     from salmalm.features.sla import uptime_monitor, latency_tracker, watchdog, sla_config
     return _JSON(content={"uptime": uptime_monitor.get_stats(), "latency": latency_tracker.get_stats(),
                            "health": watchdog.get_last_report(), "config": sla_config.get_all()})
 
 @router.get("/api/sla/config")
-async def get_sla_config():
+async def get_sla_config(_u=_Depends(_auth)):
     from salmalm.features.sla import sla_config
     return _JSON(content=sla_config.get_all())
 

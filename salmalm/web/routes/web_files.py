@@ -136,6 +136,8 @@ class WebFilesMixin:
 
     def _post_api_upload(self):
         """Post api upload."""
+        if not self._require_auth("user"):
+            return
         length = self._content_length
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
@@ -654,7 +656,7 @@ async def post_agent_import_preview(request: _Request, _u=_Depends(_auth)):
         return _JSON(content={"ok": False, "error": str(e)}, status_code=400)
 
 @router.post("/api/upload")
-async def post_upload(request: _Request):
+async def post_upload(request: _Request, _u=_Depends(_auth)):
     import email.parser, email.policy
     from pathlib import Path
     from salmalm.constants import WORKSPACE_DIR
