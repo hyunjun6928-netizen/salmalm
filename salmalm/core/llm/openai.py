@@ -63,7 +63,10 @@ def _call_openai(
     tool_calls = []
     for tc in choice.get("tool_calls") or []:
         tool_calls.append(
-            {"id": tc["id"], "name": tc["function"]["name"], "arguments": json.loads(tc["function"]["arguments"])}
+            {"id": tc["id"], "name": tc["function"]["name"],
+             # arguments may be str (standard OpenAI) or dict (local/mock models) — handle both
+             "arguments": tc["function"]["arguments"] if isinstance(tc["function"]["arguments"], dict)
+             else (json.loads(tc["function"]["arguments"]) if tc["function"]["arguments"] else {})}
         )
     usage = resp.get("usage", {})
     return {

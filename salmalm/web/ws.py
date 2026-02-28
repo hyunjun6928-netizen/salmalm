@@ -176,6 +176,27 @@ class WebSocketServer:
 
     async def handle_connection(self, websocket: WebSocket) -> None:
         """Entry point called by @app.websocket('/ws')."""
+        # Auth check: token via query param or cookie.
+        # WebSocket upgrade happens before headers arrive, so we use
+        # query-param token as the primary auth mechanism.
+        token = (
+            websocket.query_params.get("token")
+            or websocket.cookies.get("token")
+        )
+        if token:
+            from salmalm.web.auth import auth_manager
+            _user = auth_manager.verify_token(token)
+        else:
+            _user = None
+
+        # Reject unauthenticated connections unless server is in single-user
+        # localhost-only mode (vault auto-unlock implies local deployment).
+        _client_ip = websocket.client.host if websocket.client else "unknown"
+        _is_local = _client_ip in ("127.0.0.1", "::1", "localhost")
+        if not _user and not _is_local:
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+
         session_id = websocket.query_params.get("session", "web")
         client = _WSClientAdapter(websocket, session_id)
 
