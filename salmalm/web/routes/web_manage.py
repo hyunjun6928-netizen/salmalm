@@ -169,7 +169,8 @@ class ManageMixin:
                 vault.set(key, value)
                 self._json({"ok": True})
             except Exception as e:
-                self._json({"error": f"Vault error: {type(e).__name__}: {e}"}, 500)
+                log.warning("[VAULT] set failed for key=%s: %s", key, e)
+                self._json({"error": "Vault write failed — check server logs"}, 500)
         elif action == "get":
             key = body.get("key")
             if not key:
@@ -947,7 +948,8 @@ async def post_vault(request: _Request):
             vault.set(key, body.get("value"))
             return _JSON(content={"ok": True})
         except Exception as e:
-            return _JSON(content={"error": f"Vault error: {type(e).__name__}: {e}"}, status_code=500)
+            log.warning("[VAULT] FastAPI set failed for key=%s: %s", key, e)
+            return _JSON(content={"error": "Vault write failed — check server logs"}, status_code=500)
     elif action == "get":
         key = body.get("key")
         if not key:

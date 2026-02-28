@@ -875,6 +875,15 @@ def extract_auth(headers: dict) -> Optional[dict]:
     api_key = headers.get("x-api-key", "")
     if api_key:
         return auth_manager.authenticate_api_key(api_key)
+    # Check HttpOnly cookie (fallback for browser clients that set it on login)
+    cookie_header = headers.get("cookie", "")
+    if cookie_header:
+        for part in cookie_header.split(";"):
+            part = part.strip()
+            if part.startswith("salmalm_token="):
+                cookie_token = part[len("salmalm_token="):]
+                if cookie_token:
+                    return auth_manager.verify_token(cookie_token)
     return None
 
 

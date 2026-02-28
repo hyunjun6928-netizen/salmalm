@@ -392,6 +392,7 @@ async def post_users_register(req: UserCreate, request: _Request):
 async def post_auth_login(req: LoginRequest, request: _Request):
     from salmalm.web.auth import auth_manager
     from salmalm.core import audit_log
+    import os as _os_login
     username = req.username
     password = req.password
     user = auth_manager.authenticate(username, password)
@@ -399,7 +400,21 @@ async def post_auth_login(req: LoginRequest, request: _Request):
     if user:
         token = auth_manager.create_token(user)
         audit_log("auth_success", f"user={username}", detail_dict={"username": username, "ip": ip})
-        return _JSON(content={"ok": True, "token": token, "user": user})
+        resp = _JSON(content={"ok": True, "token": token, "user": user})
+        # Also set HttpOnly + SameSite cookie for XSS-resistant auth
+        # Secure flag set when not on loopback (HTTPS environments)
+        _is_local = ip in ("127.0.0.1", "::1", "localhost")
+        _secure = not _is_local
+        resp.set_cookie(
+            key="salmalm_token",
+            value=token,
+            httponly=True,
+            samesite="lax",
+            secure=_secure,
+            max_age=86400 * 30,  # 30 days (matches JWT expiry)
+            path="/",
+        )
+        return resp
     else:
         audit_log("auth_failure", f"user={username}", detail_dict={"username": username, "ip": ip})
         return _JSON(content={"error": "Invalid credentials"}, status_code=401)
