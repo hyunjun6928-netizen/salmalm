@@ -362,8 +362,9 @@ class WebFilesMixin:
         for k in stale:
             _google_oauth_pending_states.pop(k, None)
         if error:
+            import html as _html_mod
             self._html(
-                f'<html><body><h2>Google OAuth Error</h2><p>{error}</p><p><a href="/">Back</a></p></body></html>'
+                f'<html><body><h2>Google OAuth Error</h2><p>{_html_mod.escape(error)}</p><p><a href="/">Back</a></p></body></html>'
             )
             return
         if not code:
@@ -552,7 +553,8 @@ async def get_google_callback(request: _Request):
     if time.time() - issued_at > 600:
         return _HTML(content="<html><body><h2>OAuth State Expired</h2><p><a href=\"/\">Back</a></p></body></html>")
     if error:
-        return _HTML(content=f"<html><body><h2>Google OAuth Error</h2><p>{error}</p><p><a href=\"/\">Back</a></p></body></html>")
+        import html as _html_escape_mod
+        return _HTML(content=f"<html><body><h2>Google OAuth Error</h2><p>{_html_escape_mod.escape(error)}</p><p><a href=\"/\">Back</a></p></body></html>")
     if not code:
         return _HTML(content="<html><body><h2>No code received</h2><p><a href=\"/\">Back</a></p></body></html>")
     client_id = vault.get("google_client_id") or ""

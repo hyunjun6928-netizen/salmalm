@@ -560,7 +560,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         log.warning(f"[CUT] Token overflow with {len(session.messages)} messages — running compaction")
 
         # Stage A: Compaction
-        session.messages = compact_messages(session.messages, session=session, on_status=on_status)
+        # compact_messages calls call_llm (sync) internally — run in thread to avoid blocking event loop
+        import functools as _functools
+        session.messages = await asyncio.to_thread(
+            compact_messages, session.messages, session=session, on_status=on_status
+        )
         result, _ = await self._call_with_failover(
             session.messages, model=model, tools=tools, max_tokens=max_tokens, thinking=thinking
         )
@@ -806,9 +810,11 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
                 )
                 if break_msg:
                     return break_msg
-                # Mid-loop compaction
+                # Mid-loop compaction — run in thread so LLM summarization doesn't block event loop
                 if len(session.messages) > 40:
-                    session.messages = compact_messages(session.messages, session=session, on_status=on_status)
+                    session.messages = await asyncio.to_thread(
+                        compact_messages, session.messages, session=session, on_status=on_status
+                    )
                     log.info(f"[CUT] Mid-loop compaction: -> {len(session.messages)} msgs")
                 iteration += 1
                 continue

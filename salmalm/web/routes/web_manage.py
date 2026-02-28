@@ -492,7 +492,7 @@ class ManageMixin:
     def _post_api_hooks(self):
         """Post api hooks."""
         body = self._body
-        if not self._require_auth("user"):
+        if not self._require_auth("admin"):  # Hooks can register shell commands — admin only
             return
         from salmalm.features.hooks import hook_manager
 
@@ -515,7 +515,7 @@ class ManageMixin:
     def _post_api_plugins_manage(self):
         """Post api plugins manage."""
         body = self._body
-        if not self._require_auth("user"):
+        if not self._require_auth("admin"):  # plugin enable executes arbitrary code — admin only
             return
         from salmalm.features.plugin_manager import plugin_manager
 
@@ -845,6 +845,8 @@ async def post_agents_manage(request: _Request, _u=_Depends(_auth)):
 
 @router.post("/api/hooks")
 async def post_hooks(request: _Request, _u=_Depends(_auth)):
+    if _u.get("role") != "admin":  # Hooks execute shell commands — admin only
+        return _JSON(content={"error": "Admin access required"}, status_code=403)
     from salmalm.features.hooks import hook_manager
     body = await request.json()
     action = body.get("action", "")
@@ -864,6 +866,8 @@ async def post_hooks(request: _Request, _u=_Depends(_auth)):
 
 @router.post("/api/plugins/manage")
 async def post_plugins_manage(request: _Request, _u=_Depends(_auth)):
+    if _u.get("role") != "admin":  # plugin enable executes arbitrary code — admin only
+        return _JSON(content={"error": "Admin access required"}, status_code=403)
     from salmalm.features.plugin_manager import plugin_manager
     body = await request.json()
     action = body.get("action", "")
