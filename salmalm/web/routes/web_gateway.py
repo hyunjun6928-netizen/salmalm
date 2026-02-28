@@ -28,6 +28,8 @@ class WebGatewayMixin:
 
     def _post_api_config_telegram(self):
         """Post api config telegram."""
+        if not self._require_auth("admin"):
+            return
         body = self._body
         if not vault.is_unlocked:
             self._json({"error": "Vault locked"}, 403)
@@ -65,6 +67,8 @@ class WebGatewayMixin:
 
     def _post_api_gateway_dispatch(self):
         """Post api gateway dispatch."""
+        if not self._require_auth("user"):
+            return
         body = self._body
         from salmalm.features.nodes import gateway
 
