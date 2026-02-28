@@ -274,7 +274,7 @@ class TestGeminiRouterAvailability(unittest.TestCase):
 class TestGeminiCallGoogle(unittest.TestCase):
     """Test _call_google non-streaming."""
 
-    @patch('salmalm.core.llm._http_post')
+    @patch('salmalm.core.llm.google._http_post')
     def test_call_google_basic(self, mock_post):
         from salmalm.core.llm import _call_google
         mock_post.return_value = {
@@ -287,7 +287,7 @@ class TestGeminiCallGoogle(unittest.TestCase):
         self.assertEqual(result['usage']['input'], 10)
         self.assertEqual(result['usage']['output'], 5)
 
-    @patch('salmalm.core.llm._http_post')
+    @patch('salmalm.core.llm.google._http_post')
     def test_call_google_with_tools(self, mock_post):
         from salmalm.core.llm import _call_google
         mock_post.return_value = {
@@ -304,7 +304,7 @@ class TestGeminiCallGoogle(unittest.TestCase):
         self.assertEqual(result['tool_calls'][0]['name'], 'web_search')
         self.assertEqual(result['tool_calls'][0]['arguments'], {'q': 'test'})
 
-    @patch('salmalm.core.llm._http_post')
+    @patch('salmalm.core.llm.google._http_post')
     def test_call_google_empty_response(self, mock_post):
         from salmalm.core.llm import _call_google
         mock_post.return_value = {'candidates': [], 'usageMetadata': {}}

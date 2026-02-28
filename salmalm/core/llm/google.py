@@ -5,11 +5,12 @@ Extracted from salmalm.core.llm.
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Dict, List, Optional
 import urllib.error
 import urllib.request
 
-from salmalm.core.llm.common import _http_post
+from salmalm.core.llm.common import _http_post, _get_temperature
 
 def _call_google(
     api_key: str, model_id: str, messages: List[Dict[str, Any]], max_tokens: int, tools: Optional[List[dict]] = None
