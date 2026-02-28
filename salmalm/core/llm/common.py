@@ -272,7 +272,7 @@ def _sanitize_messages_for_provider(messages: list, provider: str) -> list:
         #   tool → user+functionResponse
         # Pass through unchanged; do not pre-convert or drop messages.
         return list(messages)
-    elif provider in ("openai", "xai", "deepseek", "openrouter"):
+    elif provider in ("openai", "xai", "deepseek", "openrouter", "meta-llama", "mistralai", "qwen"):
         # OpenAI-compatible: filter out Anthropic-specific content blocks
         sanitized = []
         for msg in messages:
@@ -350,7 +350,10 @@ def call_llm(
         return {"content": f"❌ {model} is not a chat model and no fallback available.",
                 "tool_calls": [], "usage": {"input": 0, "output": 0}, "model": model}
 
-    # Sanitize messages for provider compatibility
+    # Sanitize messages for provider compatibility.
+    # Keep original_messages for cross-provider fallback: _try_fallback must
+    # receive raw (unsanitized) messages so it can re-sanitize for each target provider.
+    original_messages = messages
     messages = _sanitize_messages_for_provider(messages, provider)
 
     log.info(f"[BOT] LLM call: {model} ({len(messages)} msgs, tools={len(tools or [])})")
@@ -433,7 +436,7 @@ def call_llm(
                 "model": model,
             }
 
-        fb_result = _try_fallback(provider, model, messages, tools, max_tokens, _t0)
+        fb_result = _try_fallback(provider, model, original_messages, tools, max_tokens, _t0)
         if fb_result:
             return fb_result
         return {

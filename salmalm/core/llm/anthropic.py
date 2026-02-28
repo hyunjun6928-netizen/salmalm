@@ -11,6 +11,7 @@ import urllib.error
 import urllib.request
 
 from salmalm.core.llm.common import _http_post, _get_temperature, _LLM_TIMEOUT
+from salmalm.security.crypto import log
 
 def _call_anthropic(
     api_key: str,

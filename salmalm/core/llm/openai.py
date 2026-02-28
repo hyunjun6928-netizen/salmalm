@@ -163,14 +163,22 @@ def _call_openai_responses(
                     output_text += block.get("text", "")
         elif itype == "function_call":
             raw_args = item.get("arguments", "{}")
-            # Store in standard OpenAI chat format so engine/sanitize code works uniformly
+            # Store in flat format matching all other providers:
+            # {"id": ..., "name": ..., "arguments": dict}
+            # This is what validate_tool_calls / _execute_tools_parallel / _append_tool_results expect.
+            if isinstance(raw_args, str):
+                try:
+                    parsed_args = json.loads(raw_args)
+                except (json.JSONDecodeError, ValueError):
+                    parsed_args = {}
+            elif isinstance(raw_args, dict):
+                parsed_args = raw_args
+            else:
+                parsed_args = {}
             tool_calls_out.append({
                 "id": item.get("id", ""),
-                "type": "function",
-                "function": {
-                    "name": item.get("name", ""),
-                    "arguments": raw_args if isinstance(raw_args, str) else json.dumps(raw_args),
-                },
+                "name": item.get("name", ""),
+                "arguments": parsed_args,
             })
 
     usage = resp.get("usage", {})
