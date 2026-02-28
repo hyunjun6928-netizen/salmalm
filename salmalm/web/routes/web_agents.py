@@ -83,6 +83,154 @@ def _run_task(task_id: str, description: str, model: str) -> None:
         loop.close()
 
 
+# ── Directive handlers (shared by class mixin + FastAPI route) ────────────────
+
+def _spawn_task(args: str, model: str) -> Dict[str, Any]:
+    """Spawn a new agent task and return the response dict."""
+    if not args:
+        return {"ok": False, "result": "Usage: $task <description>"}
+    task_id = uuid.uuid4().hex[:12]
+    rec = _task_record(task_id, args, model)
+    with _tasks_lock:
+        _tasks[task_id] = rec
+    threading.Thread(target=_run_task, args=(task_id, args, model), daemon=True).start()
+    return {
+        "ok": True,
+        "type": "task",
+        "result": f"✅ Agent task `{task_id}` spawned\n\n**Task:** {args[:80]}",
+        "task_id": task_id,
+    }
+
+
+def _handle_directive_task(args: str, model: str) -> Dict[str, Any]:
+    """Handle $task directive."""
+    return _spawn_task(args, model)
+
+
+def _handle_directive_status() -> Dict[str, Any]:
+    """Handle $status directive."""
+    with _tasks_lock:
+        all_tasks = list(_tasks.values())
+    running = [t for t in all_tasks if t["status"] == "running"]
+    done = [t for t in all_tasks if t["status"] == "done"]
+    failed = [t for t in all_tasks if t["status"] == "failed"]
+    lines = [
+        "**Agent Status**",
+        f"- 🔄 Running: {len(running)}",
+        f"- ✅ Done: {len(done)}",
+        f"- ❌ Failed: {len(failed)}",
+    ]
+    if running:
+        lines.append("\n**Active tasks:**")
+        for t in running[:3]:
+            lines.append(f"- `{t['id']}` — {t['description'][:60]}")
+    return {"ok": True, "type": "status", "result": "\n".join(lines)}
+
+
+def _handle_directive_vault_list() -> Dict[str, Any]:
+    keys = vault.keys()
+    return {"ok": True, "type": "vault", "result": f"**Vault keys:** {', '.join(keys) or '(empty)'}"}
+
+
+def _handle_directive_vault_get(key: str) -> Dict[str, Any]:
+    val = vault.get(key)
+    masked = ("••••" + str(val)[-4:]) if val and len(str(val)) > 8 else ("(empty)" if not val else str(val))
+    return {"ok": True, "type": "vault", "result": f"**{key}:** {masked}"}
+
+
+def _handle_directive_vault_set(key: str, value: str) -> Dict[str, Any]:
+    vault.set(key, value)
+    return {"ok": True, "type": "vault", "result": f"✅ `{key}` saved to vault"}
+
+
+def _handle_directive_vault_delete(key: str) -> Dict[str, Any]:
+    vault.delete(key)
+    return {"ok": True, "type": "vault", "result": f"✅ `{key}` deleted from vault"}
+
+
+def _handle_directive_vault(args: str) -> Dict[str, Any]:
+    """Handle $vault [list|get|set|delete] directive."""
+    if not vault.is_unlocked:
+        return {"ok": False, "result": "❌ Vault is locked"}
+    sub_parts = args.split(None, 2)
+    sub = sub_parts[0].lower() if sub_parts else "list"
+    if sub == "list":
+        return _handle_directive_vault_list()
+    if sub == "get" and len(sub_parts) >= 2:
+        return _handle_directive_vault_get(sub_parts[1])
+    if sub == "set" and len(sub_parts) >= 3:
+        return _handle_directive_vault_set(sub_parts[1], sub_parts[2])
+    if sub == "delete" and len(sub_parts) >= 2:
+        return _handle_directive_vault_delete(sub_parts[1])
+    return {"ok": True, "type": "vault", "result": "Usage: $vault [list|get key|set key val|delete key]"}
+
+
+def _handle_directive_model(args: str) -> Dict[str, Any]:
+    """Handle $model <name> directive."""
+    if not args:
+        return {"ok": False, "result": "Usage: $model <auto|haiku|sonnet|opus|model-name>"}
+    try:
+        from salmalm.core.llm_router import llm_router
+        msg = llm_router.switch_model(args)
+        try:
+            from salmalm.core.core import router as _router
+            _router.set_force_model(None if args == "auto" else args)
+        except Exception as _e:
+            log.warning("[AGENT] set_force_model failed: %s", _e)
+        return {"ok": True, "type": "model", "result": f"✅ {msg}"}
+    except Exception as e:
+        return {"ok": False, "result": f"❌ {e}"}
+
+
+def _handle_directive_help() -> Dict[str, Any]:
+    """Handle $help directive."""
+    return {
+        "ok": True,
+        "type": "help",
+        "result": (
+            "**Available directives:**\n"
+            "- `$task <description>` — spawn an autonomous agent\n"
+            "- `$status` — show running agent tasks\n"
+            "- `$vault list` — list vault keys\n"
+            "- `$vault get <key>` — get a vault value (masked)\n"
+            "- `$vault set <key> <value>` — store a vault key\n"
+            "- `$vault delete <key>` — delete a vault key\n"
+            "- `$model <name>` — switch active model\n"
+            "- `$help` — show this help"
+        ),
+    }
+
+
+def _dispatch_directive(raw: str, model: str = "auto") -> tuple[Dict[str, Any], int]:
+    """Parse and dispatch a $-prefixed directive string.
+
+    Returns (response_dict, http_status_code).
+    """
+    if not raw.startswith("$"):
+        return {"error": "Not a directive"}, 400
+
+    text = raw[1:].strip()
+    parts = text.split(None, 1)
+    cmd = parts[0].lower() if parts else ""
+    args = parts[1] if len(parts) > 1 else ""
+
+    if cmd == "task":
+        return _handle_directive_task(args, model), 200
+    if cmd == "status":
+        return _handle_directive_status(), 200
+    if cmd == "vault":
+        return _handle_directive_vault(args), 200
+    if cmd == "model":
+        return _handle_directive_model(args), 200
+    if cmd in ("help", "?", ""):
+        return _handle_directive_help(), 200
+
+    return {
+        "ok": False,
+        "result": f"❌ Unknown directive: `${cmd}`\nType `$help` for available commands.",
+    }, 200
+
+
 class AgentsMixin:
     GET_ROUTES = {
         "/api/agent/tasks": "_get_api_agent_tasks",
@@ -120,7 +268,6 @@ class AgentsMixin:
         with _tasks_lock:
             _tasks[task_id] = rec
 
-        # Spawn background thread
         t = threading.Thread(target=_run_task, args=(task_id, description, model), daemon=True)
         t.start()
 
@@ -133,7 +280,6 @@ class AgentsMixin:
             return
         with _tasks_lock:
             tasks = list(_tasks.values())
-        # Sort: running first, then by created_at desc
         tasks.sort(key=lambda t: (t["status"] != "running", -t["created_at"]))
         self._json({"tasks": tasks})
 
@@ -170,118 +316,9 @@ class AgentsMixin:
             return
         body = self._body
         raw = (body.get("text") or "").strip()
-
-        if not raw.startswith("$"):
-            self._json({"error": "Not a directive"}, 400)
-            return
-
-        # Parse: $command [args...]
-        text = raw[1:].strip()
-        parts = text.split(None, 1)
-        cmd = parts[0].lower() if parts else ""
-        args = parts[1] if len(parts) > 1 else ""
-
-        # ── $task <description> ───────────────────────────────────────────
-        if cmd == "task":
-            if not args:
-                self._json({"ok": False, "result": "Usage: $task <description>"})
-                return
-            task_id = uuid.uuid4().hex[:12]
-            model = body.get("model", "auto") or "auto"
-            rec = _task_record(task_id, args, model)
-            with _tasks_lock:
-                _tasks[task_id] = rec
-            t = threading.Thread(target=_run_task, args=(task_id, args, model), daemon=True)
-            t.start()
-            self._json({
-                "ok": True,
-                "type": "task",
-                "result": f"✅ Agent task `{task_id}` spawned\n\n**Task:** {args[:80]}",
-                "task_id": task_id,
-            })
-
-        # ── $status ───────────────────────────────────────────────────────
-        elif cmd == "status":
-            with _tasks_lock:
-                all_tasks = list(_tasks.values())
-            running = [t for t in all_tasks if t["status"] == "running"]
-            done = [t for t in all_tasks if t["status"] == "done"]
-            failed = [t for t in all_tasks if t["status"] == "failed"]
-            lines = [
-                "**Agent Status**",
-                f"- 🔄 Running: {len(running)}",
-                f"- ✅ Done: {len(done)}",
-                f"- ❌ Failed: {len(failed)}",
-            ]
-            if running:
-                lines.append("\n**Active tasks:**")
-                for t in running[:3]:
-                    lines.append(f"- `{t['id']}` — {t['description'][:60]}")
-            self._json({"ok": True, "type": "status", "result": "\n".join(lines)})
-
-        # ── $vault list / set / get / delete ─────────────────────────────
-        elif cmd == "vault":
-            if not vault.is_unlocked:
-                self._json({"ok": False, "result": "❌ Vault is locked"})
-                return
-            sub_parts = args.split(None, 2)
-            sub = sub_parts[0].lower() if sub_parts else "list"
-            if sub == "list":
-                keys = vault.keys()
-                self._json({"ok": True, "type": "vault", "result": f"**Vault keys:** {', '.join(keys) or '(empty)'}"})
-            elif sub == "get" and len(sub_parts) >= 2:
-                val = vault.get(sub_parts[1])
-                masked = ("••••" + str(val)[-4:]) if val and len(str(val)) > 8 else ("(empty)" if not val else str(val))
-                self._json({"ok": True, "type": "vault", "result": f"**{sub_parts[1]}:** {masked}"})
-            elif sub == "set" and len(sub_parts) >= 3:
-                vault.set(sub_parts[1], sub_parts[2])
-                self._json({"ok": True, "type": "vault", "result": f"✅ `{sub_parts[1]}` saved to vault"})
-            elif sub == "delete" and len(sub_parts) >= 2:
-                vault.delete(sub_parts[1])
-                self._json({"ok": True, "type": "vault", "result": f"✅ `{sub_parts[1]}` deleted from vault"})
-            else:
-                self._json({"ok": True, "type": "vault", "result": "Usage: $vault [list|get key|set key val|delete key]"})
-
-        # ── $model <name> ─────────────────────────────────────────────────
-        elif cmd == "model":
-            if not args:
-                self._json({"ok": False, "result": "Usage: $model <auto|haiku|sonnet|opus|model-name>"})
-                return
-            try:
-                from salmalm.core.llm_router import llm_router
-                msg = llm_router.switch_model(args)
-                # Persist as global force_model (same as UI model switch)
-                try:
-                    from salmalm.core.core import router as _router
-                    _router.set_force_model(None if args == "auto" else args)
-                except Exception as _e:
-                    log.warning("[AGENT] set_force_model failed: %s", _e)
-                self._json({"ok": True, "type": "model", "result": f"✅ {msg}"})
-            except Exception as e:
-                self._json({"ok": False, "result": f"❌ {e}"})
-
-        # ── $help ─────────────────────────────────────────────────────────
-        elif cmd in ("help", "?", ""):
-            self._json({
-                "ok": True, "type": "help",
-                "result": (
-                    "**Available directives:**\n"
-                    "- `$task <description>` — spawn an autonomous agent\n"
-                    "- `$status` — show running agent tasks\n"
-                    "- `$vault list` — list vault keys\n"
-                    "- `$vault get <key>` — get a vault value (masked)\n"
-                    "- `$vault set <key> <value>` — store a vault key\n"
-                    "- `$vault delete <key>` — delete a vault key\n"
-                    "- `$model <name>` — switch active model\n"
-                    "- `$help` — show this help"
-                ),
-            })
-
-        else:
-            self._json({
-                "ok": False,
-                "result": f"❌ Unknown directive: `${cmd}`\nType `$help` for available commands.",
-            })
+        model = body.get("model", "auto") or "auto"
+        result, status = _dispatch_directive(raw, model)
+        self._json(result, status)
 
 
 # ── FastAPI router ────────────────────────────────────────────────────────────
@@ -293,7 +330,6 @@ router = _APIRouter()
 
 @router.get("/api/agent/tasks")
 async def get_agent_tasks(_u=_Depends(_auth)):
-    from salmalm.web.routes.web_agents import _tasks, _tasks_lock
     with _tasks_lock:
         tasks = list(_tasks.values())
     tasks.sort(key=lambda t: (t["status"] != "running", -t["created_at"]))
@@ -301,9 +337,6 @@ async def get_agent_tasks(_u=_Depends(_auth)):
 
 @router.post("/api/agent/task")
 async def post_agent_task(request: _Request, _u=_Depends(_auth)):
-    import threading, uuid
-    from salmalm.security.crypto import vault
-    from salmalm.web.routes.web_agents import _tasks, _tasks_lock, _task_record, _run_task
     if not vault.is_unlocked:
         return _JSON(content={"error": "Vault locked"}, status_code=403)
     body = await request.json()
@@ -322,7 +355,6 @@ async def post_agent_task(request: _Request, _u=_Depends(_auth)):
 
 @router.post("/api/agent/task/cancel")
 async def post_agent_task_cancel(request: _Request, _u=_Depends(_auth)):
-    from salmalm.web.routes.web_agents import _tasks, _tasks_lock
     body = await request.json()
     task_id = body.get("task_id", "")
     if not task_id:
@@ -335,7 +367,6 @@ async def post_agent_task_cancel(request: _Request, _u=_Depends(_auth)):
 
 @router.post("/api/agent/tasks/clear")
 async def post_agent_tasks_clear(_u=_Depends(_auth)):
-    from salmalm.web.routes.web_agents import _tasks, _tasks_lock
     _DONE_STATUSES = {"done", "failed", "cancelled"}
     with _tasks_lock:
         to_remove = [tid for tid, t in _tasks.items() if t.get("status") in _DONE_STATUSES]
@@ -345,72 +376,8 @@ async def post_agent_tasks_clear(_u=_Depends(_auth)):
 
 @router.post("/api/directive")
 async def post_directive(request: _Request, _u=_Depends(_auth)):
-    import threading, uuid
-    from salmalm.security.crypto import vault
-    from salmalm.web.routes.web_agents import _tasks, _tasks_lock, _task_record, _run_task
     body = await request.json()
     raw = (body.get("text") or "").strip()
-    if not raw.startswith("$"):
-        return _JSON(content={"error": "Not a directive"}, status_code=400)
-    text = raw[1:].strip()
-    parts = text.split(None, 1)
-    cmd = parts[0].lower() if parts else ""
-    args = parts[1] if len(parts) > 1 else ""
-    if cmd == "task":
-        if not args:
-            return _JSON(content={"ok": False, "result": "Usage: $task <description>"})
-        task_id = uuid.uuid4().hex[:12]
-        model = body.get("model", "auto") or "auto"
-        rec = _task_record(task_id, args, model)
-        with _tasks_lock:
-            _tasks[task_id] = rec
-        threading.Thread(target=_run_task, args=(task_id, args, model), daemon=True).start()
-        return _JSON(content={"ok": True, "type": "task", "result": f"✅ Agent task `{task_id}` spawned\n\n**Task:** {args[:80]}", "task_id": task_id})
-    elif cmd == "status":
-        with _tasks_lock:
-            all_tasks = list(_tasks.values())
-        running = [t for t in all_tasks if t["status"] == "running"]
-        done = [t for t in all_tasks if t["status"] == "done"]
-        failed = [t for t in all_tasks if t["status"] == "failed"]
-        lines = ["**Agent Status**", f"- 🔄 Running: {len(running)}", f"- ✅ Done: {len(done)}", f"- ❌ Failed: {len(failed)}"]
-        if running:
-            lines.append("\n**Active tasks:**")
-            for t in running[:3]:
-                lines.append(f"- `{t['id']}` — {t['description'][:60]}")
-        return _JSON(content={"ok": True, "type": "status", "result": "\n".join(lines)})
-    elif cmd == "vault":
-        if not vault.is_unlocked:
-            return _JSON(content={"ok": False, "result": "❌ Vault is locked"})
-        sub_parts = args.split(None, 2)
-        sub = sub_parts[0].lower() if sub_parts else "list"
-        if sub == "list":
-            keys = vault.keys()
-            return _JSON(content={"ok": True, "type": "vault", "result": f"**Vault keys:** {', '.join(keys) or '(empty)'}"})
-        elif sub == "get" and len(sub_parts) >= 2:
-            val = vault.get(sub_parts[1])
-            masked = ("••••" + str(val)[-4:]) if val and len(str(val)) > 8 else ("(empty)" if not val else str(val))
-            return _JSON(content={"ok": True, "type": "vault", "result": f"**{sub_parts[1]}:** {masked}"})
-        elif sub == "set" and len(sub_parts) >= 3:
-            vault.set(sub_parts[1], sub_parts[2])
-            return _JSON(content={"ok": True, "type": "vault", "result": f"✅ `{sub_parts[1]}` saved to vault"})
-        elif sub == "delete" and len(sub_parts) >= 2:
-            vault.delete(sub_parts[1])
-            return _JSON(content={"ok": True, "type": "vault", "result": f"✅ `{sub_parts[1]}` deleted from vault"})
-        return _JSON(content={"ok": True, "type": "vault", "result": "Usage: $vault [list|get key|set key val|delete key]"})
-    elif cmd == "model":
-        if not args:
-            return _JSON(content={"ok": False, "result": "Usage: $model <auto|haiku|sonnet|opus|model-name>"})
-        try:
-            from salmalm.core.llm_router import llm_router
-            msg = llm_router.switch_model(args)
-            try:
-                from salmalm.core.core import router as _router
-                _router.set_force_model(None if args == "auto" else args)
-            except Exception:
-                pass
-            return _JSON(content={"ok": True, "type": "model", "result": f"✅ {msg}"})
-        except Exception as e:
-            return _JSON(content={"ok": False, "result": f"❌ {e}"})
-    elif cmd in ("help", "?", ""):
-        return _JSON(content={"ok": True, "type": "help", "result": "**Available directives:**\n- `$task <description>` — spawn an autonomous agent\n- `$status` — show running agent tasks\n- `$vault list` — list vault keys\n- `$model <name>` — switch active model\n- `$help` — show this help"})
-    return _JSON(content={"ok": False, "result": f"❌ Unknown directive: `${cmd}`\nType `$help` for available commands."})
+    model = body.get("model", "auto") or "auto"
+    result, status = _dispatch_directive(raw, model)
+    return _JSON(content=result, status_code=status)

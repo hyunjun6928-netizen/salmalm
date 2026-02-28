@@ -1,27 +1,18 @@
+version: '3.8'
 services:
   salmalm:
     build: .
-    container_name: salmalm
     ports:
-      - "127.0.0.1:18800:18800"
-      - "127.0.0.1:18801:18801"
+      - "8000:8000"
     volumes:
-      - ./data/memory:/app/memory
-      - ./data/workspace:/app/workspace
-      - ./data/uploads:/app/uploads
-      - ./data/plugins:/app/plugins
-      - ./data/data:/app/data
+      - ./data:/root/SalmAlm
     environment:
-      - SALMALM_BIND=0.0.0.0
-      # API Keys (set in .env or export before running)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - SALMALM_MODEL=${SALMALM_MODEL:-}
-      # - SALMALM_VAULT_PW=changeme
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:18800/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
-      timeout: 5s
-      start_period: 10s
+      timeout: 10s
       retries: 3

@@ -1,3 +1,37 @@
+# SalmAlm — Private AI Gateway
+
+> Self-hosted, privacy-first AI gateway. Your data never leaves your machine.
+
+[![PyPI](https://img.shields.io/pypi/v/salmalm)](https://pypi.org/project/salmalm/)
+[![Python](https://img.shields.io/badge/python-3.10+-blue)](https://python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+## Quick Start
+```bash
+pip install salmalm
+salmalm start
+# Open http://localhost:8000
+```
+
+## Features
+- 🔒 **100% Local** — no data sent to third parties
+- 🤖 **Multi-LLM** — Claude, GPT, Gemini in one interface
+- 📚 **RAG** — chat with your own documents
+- 🛠️ **62 built-in tools** — web search, file ops, code execution
+- 🔐 **Vault encryption** for sensitive data
+- 🐳 **Docker ready**
+
+## Docker
+```bash
+docker-compose up -d
+```
+
+## Requirements
+- Python 3.10+
+- API key for at least one LLM provider
+
+---
+
 <div align="center">
 
 # 😈 SalmAlm
@@ -137,3 +171,28 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 *Your life, understood by AI.*
 
 </div>
+
+---
+
+# SalmAlm — Private AI Gateway
+
+> Self-hosted, privacy-first AI gateway. Your data never leaves your machine.
+
+## Quick Start
+```bash
+pip install salmalm
+salmalm start
+# Open http://localhost:8000
+```
+
+## Features
+- 🔒 100% local — no data sent to third parties
+- 🤖 Multi-LLM — Claude, GPT, Gemini in one place
+- 📚 RAG — chat with your documents
+- 🛠️ 62 built-in tools
+- 🔐 Vault encryption for sensitive data
+
+## Docker
+```bash
+docker-compose up -d
+```

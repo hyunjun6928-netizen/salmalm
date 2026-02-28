@@ -129,7 +129,7 @@ class UserManager:
             self._multi_tenant_enabled = row and row[0] == "true"
         except Exception as e:  # noqa: broad-except
             self._multi_tenant_enabled = False
-        return self._multi_tenant_enabled  # type: ignore
+        return bool(self._multi_tenant_enabled)
 
     def enable_multi_tenant(self, enabled: bool = True) -> None:
         """Enable or disable multi-tenant mode."""
