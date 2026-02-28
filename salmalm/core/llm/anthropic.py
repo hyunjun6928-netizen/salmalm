@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 import urllib.error
 import urllib.request
 
-from salmalm.core.llm.common import _http_post, _get_temperature
+from salmalm.core.llm.common import _http_post, _get_temperature, _LLM_TIMEOUT
 
 def _call_anthropic(
     api_key: str,

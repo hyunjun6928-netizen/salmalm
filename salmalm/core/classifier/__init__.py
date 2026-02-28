@@ -21,6 +21,7 @@ from salmalm.core.classifier.keywords import (  # noqa: F401
 # Token allocation
 from salmalm.core.classifier.tokens import (  # noqa: F401
     INTENT_MAX_TOKENS,
+    _DETAIL_KEYWORDS,
     _get_dynamic_max_tokens,
 )
 
@@ -36,6 +37,7 @@ __all__ = [
     "_KEYWORD_TOOLS",
     "get_extra_tools",
     "INTENT_MAX_TOKENS",
+    "_DETAIL_KEYWORDS",
     "_get_dynamic_max_tokens",
     "estimate_tokens",
 ]
