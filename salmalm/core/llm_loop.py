@@ -17,6 +17,7 @@ from salmalm.core.llm import (
     call_llm as _call_llm_sync,
     stream_anthropic as _stream_anthropic,
     stream_google as _stream_google,
+    stream_openai as _stream_openai,
 )
 
 # ============================================================
@@ -346,6 +347,64 @@ async def _call_llm_streaming(
     return await asyncio.to_thread(_run)
 
 
+async def _call_openai_streaming(messages: list, model=None, tools=None, max_tokens=4096, on_token=None) -> dict:
+    """Streaming OpenAI-compatible call — yields tokens via on_token, returns final result.
+
+    Supports: openai, xai, deepseek, openrouter, meta-llama, mistralai, qwen, ollama.
+    """
+    def _run() -> dict:
+        accumulated_text = []
+        tool_calls_out = []
+        final_result = None
+        try:
+            for event in _stream_openai(messages, model=model, tools=tools, max_tokens=max_tokens):
+                if on_token:
+                    on_token(event)
+                if event.get("type") == "text_delta":
+                    accumulated_text.append(event.get("text", ""))
+                elif event.get("type") == "tool_use_end":
+                    tool_calls_out.append({
+                        "id": event["id"],
+                        "name": event["name"],
+                        "arguments": event["arguments"],
+                    })
+                elif event.get("type") == "message_end":
+                    final_result = event
+                elif event.get("type") == "error":
+                    return {
+                        "content": event.get("error", "❌ OpenAI streaming error"),
+                        "tool_calls": [],
+                        "usage": {"input": 0, "output": 0},
+                        "model": model or "?",
+                    }
+        except Exception as e:
+            partial = "".join(accumulated_text)
+            if partial:
+                log.warning(f"[STREAM] OpenAI interrupted with {len(partial)} chars partial: {e}")
+                return {
+                    "content": partial + "\n\n⚠️ [Streaming interrupted]",
+                    "tool_calls": [],
+                    "usage": {"input": 0, "output": 0},
+                    "model": model or "?",
+                }
+            raise
+        return final_result or {
+            "content": "".join(accumulated_text),
+            "tool_calls": tool_calls_out,
+            "usage": {"input": 0, "output": 0},
+            "model": model or "?",
+        }
+
+    return await asyncio.to_thread(_run)
+
+
+# OpenAI-compatible providers that support our streaming implementation
+_OPENAI_COMPATIBLE_PROVIDERS = frozenset({
+    "openai", "xai", "deepseek", "openrouter",
+    "meta-llama", "mistralai", "qwen", "ollama",
+})
+
+
 # ============================================================
 # Failover-aware LLM calls (used by IntelligenceEngine)
 # ============================================================
@@ -480,6 +539,10 @@ async def try_llm_call(
                 )
             elif on_token and provider == "google":
                 result = await _call_google_streaming(
+                    messages, model=model, tools=tools, max_tokens=max_tokens, on_token=on_token
+                )
+            elif on_token and provider in _OPENAI_COMPATIBLE_PROVIDERS:
+                result = await _call_openai_streaming(
                     messages, model=model, tools=tools, max_tokens=max_tokens, on_token=on_token
                 )
             else:

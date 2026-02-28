@@ -29,6 +29,7 @@ from salmalm.web.auth import (
     rate_limiter, llm_rate_limiter, ip_ban_list, daily_quota,
     RateLimitExceeded, DailyQuotaExceeded, extract_auth,
 )
+from salmalm.web.middleware import get_route_policy, _SENSITIVE_ROUTES
 import uuid
 
 # LLM-triggering paths that get the tighter LLMRateLimiter bucket
@@ -312,6 +313,24 @@ def create_asgi_app() -> FastAPI:
                     "Access-Control-Max-Age": "86400",
                 },
             )
+
+        # ── RoutePolicy enforcement ──────────────────────────────────────────
+        _req_path_policy = request.url.path.split("?")[0]
+        _policy = get_route_policy(_req_path_policy, method)
+
+        # CSRF-sensitive routes: verify Origin header matches Host on write requests
+        if _policy.csrf and method in ("POST", "PUT", "DELETE", "PATCH"):
+            _origin = request.headers.get("origin", "")
+            _host = request.headers.get("host", "")
+            if _origin and not any(
+                _origin.endswith(h) for h in (
+                    f"://{_host}", "://localhost", "://127.0.0.1", "://::1"
+                )
+            ):
+                return JSONResponse(
+                    {"error": "CSRF: Origin mismatch"},
+                    status_code=403,
+                )
 
         # ── Abuse Guard ──────────────────────────────────────────────────────
         # Resolve client IP (trust X-Forwarded-For only when proxy env is set)

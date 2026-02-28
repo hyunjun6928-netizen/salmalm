@@ -36,6 +36,7 @@ from salmalm.core.llm.dispatcher import _call_provider  # noqa: F401
 from salmalm.core.llm_stream import (  # noqa: F401
     stream_google,
     stream_anthropic,
+    stream_openai,
 )
 from salmalm.core.llm.anthropic import _call_anthropic  # noqa: F401
 from salmalm.core.llm.openai import _call_openai, _call_openai_responses  # noqa: F401

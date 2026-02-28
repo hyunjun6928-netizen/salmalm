@@ -771,8 +771,19 @@ class AuthManager:
             if row is None or not row[0]:
                 return None  # User deleted or disabled since token was issued
         except Exception as _e:
-            log.debug("[TOKEN] verify_token user-existence check failed: %s", _e)
-            # DB unavailable — allow the JWT to pass (fail open for availability)
+            # DB unavailable check: default is fail-closed (reject) for security.
+            # Set SALMALM_AUTH_FAIL_OPEN=1 to revert to fail-open (availability-first).
+            import os as _os_auth
+            if _os_auth.environ.get("SALMALM_AUTH_FAIL_OPEN", "0") == "1":
+                log.warning(
+                    "[TOKEN] DB unavailable, fail-OPEN (SALMALM_AUTH_FAIL_OPEN=1): user %s passed — %s", uid, _e
+                )
+            else:
+                log.warning(
+                    "[TOKEN] DB unavailable, fail-CLOSED (default): rejecting token for user %s — %s. "
+                    "Set SALMALM_AUTH_FAIL_OPEN=1 to allow tokens when DB is unreachable.", uid, _e
+                )
+                return None
         return payload
 
     def revoke_token(self, token: str) -> bool:

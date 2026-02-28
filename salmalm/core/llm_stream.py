@@ -412,3 +412,183 @@ def _process_stream_event(
             except json.JSONDecodeError:
                 args = {}
             yield {"type": "tool_use_end", "id": current_tool["id"], "name": current_tool["name"], "arguments": args}
+
+
+def stream_openai(
+    messages: List[Dict[str, Any]],
+    model: Optional[str] = None,
+    tools: Optional[List[dict]] = None,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
+    thinking: bool = False,
+) -> Generator[Dict[str, Any], None, None]:
+    """Stream OpenAI-compatible API responses token-by-token using SSE.
+
+    Supports: openai, xai, deepseek, openrouter, meta-llama, mistralai, qwen, ollama.
+    Yields same event format as stream_anthropic/stream_google for uniform consumer.
+
+    Yields events:
+        {'type': 'text_delta', 'text': '...'}
+        {'type': 'tool_use_start', 'id': '...', 'name': '...'}
+        {'type': 'tool_use_delta', 'partial_json': '...'}
+        {'type': 'tool_use_end', 'id': '...', 'name': '...', 'arguments': {...}}
+        {'type': 'message_end', 'content': '...', 'tool_calls': [...], 'usage': {...}, 'model': '...'}
+        {'type': 'error', 'error': '...'}
+    """
+    if not model:
+        last_user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
+        model = router.route(last_user, has_tools=bool(tools))
+
+    try:
+        check_cost_cap()
+    except CostCapExceeded as e:
+        yield {"type": "error", "error": str(e)}
+        return
+
+    provider, model_id = model.split("/", 1) if "/" in model else ("openai", model)
+
+    # ── Resolve API key and base URL ──
+    _PROVIDER_KEY_VAULT = {
+        "openai": "openai_api_key",
+        "xai": "xai_api_key",
+        "deepseek": "deepseek_api_key",
+        "openrouter": "openrouter_api_key",
+    }
+    _PROVIDER_BASE_URL = {
+        "openai": "https://api.openai.com/v1",
+        "xai": "https://api.x.ai/v1",
+        "deepseek": "https://api.deepseek.com/v1",
+        "openrouter": "https://openrouter.ai/api/v1",
+        "ollama": vault.get("ollama_url") or "http://localhost:11434/v1",
+    }
+
+    if provider == "ollama":
+        api_key = "ollama"
+        base_url = _PROVIDER_BASE_URL["ollama"]
+    elif provider in ("meta-llama", "mistralai", "qwen"):
+        api_key = vault.get("openrouter_api_key") or ""
+        base_url = _PROVIDER_BASE_URL["openrouter"]
+        model_id = f"{provider}/{model_id}"
+    else:
+        vault_key = _PROVIDER_KEY_VAULT.get(provider, "openai_api_key")
+        api_key = vault.get(vault_key) or ""
+        base_url = _PROVIDER_BASE_URL.get(provider, "https://api.openai.com/v1")
+
+    if not api_key and provider not in ("ollama",):
+        yield {"type": "error", "error": f"❌ {provider} API key not configured."}
+        return
+
+    from salmalm.core.llm import _sanitize_messages_for_provider
+    messages = _sanitize_messages_for_provider(messages, provider)
+
+    body: dict = {
+        "model": model_id,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "stream": True,
+        "temperature": _lazy_get_temperature(tools),
+    }
+    if tools:
+        body["tools"] = [{"type": "function", "function": t} for t in tools]
+        body["tool_choice"] = "auto"
+
+    headers: dict = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+    if api_key and api_key != "ollama":
+        headers["Authorization"] = f"Bearer {api_key}"
+    if provider == "openrouter":
+        headers["HTTP-Referer"] = "https://salmalm.local"
+        headers["X-Title"] = "SalmAlm"
+
+    url = f"{base_url}/chat/completions"
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
+
+    # ── Stream SSE ──
+    full_text = ""
+    tool_calls_buf: dict = {}   # index → {id, name, json_buf}
+    in_tokens = 0
+    out_tokens = 0
+    finish_reason = ""
+
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            for raw_line in resp:
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+                if not line.startswith("data: "):
+                    continue
+                data_str = line[6:]
+                if data_str.strip() == "[DONE]":
+                    break
+                try:
+                    event = json.loads(data_str)
+                except json.JSONDecodeError:
+                    continue
+
+                usage = event.get("usage") or {}
+                if usage:
+                    in_tokens = usage.get("prompt_tokens", in_tokens)
+                    out_tokens = usage.get("completion_tokens", out_tokens)
+
+                choices = event.get("choices", [])
+                if not choices:
+                    continue
+                choice = choices[0]
+                finish_reason = choice.get("finish_reason") or finish_reason
+                delta = choice.get("delta", {})
+
+                # ── Text delta ──
+                text_chunk = delta.get("content") or ""
+                if text_chunk:
+                    full_text += text_chunk
+                    yield {"type": "text_delta", "text": text_chunk}
+
+                # ── Tool call deltas ──
+                for tc_delta in delta.get("tool_calls", []):
+                    idx = tc_delta.get("index", 0)
+                    if idx not in tool_calls_buf:
+                        tool_calls_buf[idx] = {"id": "", "name": "", "json_buf": ""}
+                        tc_id = tc_delta.get("id") or f"call_{idx}_{int(time.time()*1000)}"
+                        tc_name = (tc_delta.get("function") or {}).get("name", "")
+                        tool_calls_buf[idx]["id"] = tc_id
+                        tool_calls_buf[idx]["name"] = tc_name
+                        yield {"type": "tool_use_start", "id": tc_id, "name": tc_name}
+                    else:
+                        tc_name = (tc_delta.get("function") or {}).get("name", "")
+                        if tc_name:
+                            tool_calls_buf[idx]["name"] = tc_name
+                    args_chunk = (tc_delta.get("function") or {}).get("arguments", "")
+                    if args_chunk:
+                        tool_calls_buf[idx]["json_buf"] += args_chunk
+                        yield {"type": "tool_use_delta", "partial_json": args_chunk}
+
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8", errors="replace")[:300]
+        except Exception:
+            pass
+        yield {"type": "error", "error": f"❌ {provider} HTTP {e.code}: {err_body}"}
+        return
+    except Exception as e:
+        yield {"type": "error", "error": f"❌ {provider} streaming error: {e}"}
+        return
+
+    # ── Finalize tool calls ──
+    tool_calls_out = []
+    for idx in sorted(tool_calls_buf.keys()):
+        tc = tool_calls_buf[idx]
+        try:
+            args = json.loads(tc["json_buf"]) if tc["json_buf"] else {}
+        except json.JSONDecodeError:
+            args = {}
+        yield {"type": "tool_use_end", "id": tc["id"], "name": tc["name"], "arguments": args}
+        tool_calls_out.append({"id": tc["id"], "name": tc["name"], "arguments": args})
+
+    _lazy_track_usage(model, in_tokens, out_tokens)
+
+    yield {
+        "type": "message_end",
+        "content": full_text,
+        "tool_calls": tool_calls_out,
+        "stop_reason": finish_reason,
+        "usage": {"input": in_tokens, "output": out_tokens},
+        "model": model,
+    }
