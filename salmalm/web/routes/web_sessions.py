@@ -506,10 +506,18 @@ async def post_sessions_delete(request: _Request, _u=_Depends(_auth)):
     sid = body.get("session_id", "")
     if not sid:
         return _JSON(content={"ok": False, "error": "Missing session_id"}, status_code=400)
+    uid = _u.get("id") or _u.get("uid") or _u.get("username")
+    conn = _get_db()
+    # Ownership check: only delete if session belongs to this user (or is legacy/local)
+    _row = conn.execute(
+        "SELECT 1 FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+        (sid, uid)
+    ).fetchone()
+    if not _row:
+        return _JSON(content={"ok": False, "error": "Session not found or access denied"}, status_code=403)
     if sid in _sessions:
         del _sessions[sid]
-    conn = _get_db()
-    conn.execute("DELETE FROM session_store WHERE session_id=?", (sid,))
+    conn.execute("DELETE FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)", (sid, uid))
     conn.commit()
     _json_path = _SESSIONS_DIR / f"{sid}.json"
     try:
@@ -527,8 +535,13 @@ async def post_sessions_clear(request: _Request, _u=_Depends(_auth)):
     from salmalm.core.session_store import _SESSIONS_DIR
     body = await request.json()
     keep = body.get("keep", "web")
+    uid = _u.get("id") or _u.get("uid") or _u.get("username")
     conn = _get_db()
-    rows = conn.execute("SELECT session_id FROM session_store WHERE session_id != ?", (keep,)).fetchall()
+    # Only delete sessions belonging to this user (or legacy null-owner sessions)
+    rows = conn.execute(
+        "SELECT session_id FROM session_store WHERE session_id != ? AND (user_id=? OR user_id IS NULL)",
+        (keep, uid)
+    ).fetchall()
     deleted = 0
     for r in rows:
         sid = r[0]
@@ -541,7 +554,10 @@ async def post_sessions_clear(request: _Request, _u=_Depends(_auth)):
         except Exception:
             pass
         deleted += 1
-    conn.execute("DELETE FROM session_store WHERE session_id != ?", (keep,))
+    conn.execute(
+        "DELETE FROM session_store WHERE session_id != ? AND (user_id=? OR user_id IS NULL)",
+        (keep, uid)
+    )
     conn.commit()
     audit_log("session_clear", keep, detail_dict={"deleted": deleted, "kept": keep})
     return _JSON(content={"ok": True, "deleted": deleted})
@@ -571,8 +587,19 @@ async def post_sessions_rename(request: _Request, _u=_Depends(_auth)):
     title = body.get("title", "").strip()[:60]
     if not sid or not title:
         return _JSON(content={"ok": False, "error": "Missing session_id or title"}, status_code=400)
+    uid = _u.get("id") or _u.get("uid") or _u.get("username")
     conn = _get_db()
-    conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
+    # Ownership check before rename
+    _row = conn.execute(
+        "SELECT 1 FROM session_store WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+        (sid, uid)
+    ).fetchone()
+    if not _row:
+        return _JSON(content={"ok": False, "error": "Session not found or access denied"}, status_code=403)
+    conn.execute(
+        "UPDATE session_store SET title=? WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+        (title, sid, uid)
+    )
     conn.commit()
     return _JSON(content={"ok": True})
 

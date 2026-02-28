@@ -18,19 +18,43 @@ _RESP_CACHE_TTL = 300  # 5 minutes — enough to cover any SSE→HTTP fallback w
 
 
 def _get_cached_response(req_id: str, session_id: str, wait_if_processing: bool = False) -> dict | None:
-    """Sync version: return cached response or None (no waiting). Used by legacy Mixin handlers."""
+    """Sync version: return cached response or None. Used by legacy Mixin handlers.
+
+    If wait_if_processing=True and entry has status='processing', polls up to 12s
+    for the SSE path to finish before returning. Prevents HTTP fallback
+    double-processing when SSE stall timer fires while server is still generating.
+    """
     if not req_id:
         return None
     key = f"{req_id}:{session_id}"
-    with _RESP_CACHE_LOCK:
-        entry = _RESP_CACHE.get(key)
-        if not entry:
-            return None
-        if _time.time() - entry["ts"] >= _RESP_CACHE_TTL:
-            del _RESP_CACHE[key]
-            return None
-    if entry.get("status") == "processing":
+
+    def _get_entry():
+        with _RESP_CACHE_LOCK:
+            entry = _RESP_CACHE.get(key)
+            if not entry:
+                return None
+            if _time.time() - entry["ts"] >= _RESP_CACHE_TTL:
+                del _RESP_CACHE[key]
+                return None
+            return entry
+
+    if wait_if_processing:
+        for _ in range(24):  # 24 × 0.5s = 12s max wait
+            entry = _get_entry()
+            if not entry:
+                break
+            if entry.get("status") == "done":
+                log.info(f"[IDEMPOTENCY] Cache hit (waited) for req_id={req_id[:12]}…")
+                return entry
+            if _time.time() - entry["ts"] > _RESP_CACHE_TTL:
+                break
+            _time.sleep(0.5)
+
+    entry = _get_entry()
+    if not entry:
         return None
+    if entry.get("status") == "processing":
+        return None  # Still running — fall through to HTTP path
     log.info(f"[IDEMPOTENCY] Cache hit for req_id={req_id[:12]}… — skipping re-process")
     return entry
 

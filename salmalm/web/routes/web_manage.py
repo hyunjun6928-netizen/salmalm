@@ -1003,7 +1003,7 @@ async def post_presence(request: _Request):
     return _JSON(content={"ok": True, "state": entry.state})
 
 @router.post("/api/node/execute")
-async def post_node_execute(request: _Request):
+async def post_node_execute(request: _Request, _u=_Depends(_auth)):
     from salmalm.tools.tool_handlers import execute_tool
     body = await request.json()
     tool = body.get("tool", "")
