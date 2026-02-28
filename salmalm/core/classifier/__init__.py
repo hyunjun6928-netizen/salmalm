@@ -15,6 +15,11 @@ from salmalm.core.classifier.intent import (  # noqa: F401
 from salmalm.core.classifier.keywords import (  # noqa: F401
     INTENT_TOOLS,
     _KEYWORD_TOOLS,
+    _EMOJI_TOOLS,
+    _QUESTION_WORDS,
+    _QUESTION_INJECT_TOOLS,
+    _TIME_PATTERN_RE,
+    _TIME_INJECT_TOOLS,
     get_extra_tools,
 )
 
@@ -35,6 +40,11 @@ __all__ = [
     "classify_intent",
     "INTENT_TOOLS",
     "_KEYWORD_TOOLS",
+    "_EMOJI_TOOLS",
+    "_QUESTION_WORDS",
+    "_QUESTION_INJECT_TOOLS",
+    "_TIME_PATTERN_RE",
+    "_TIME_INJECT_TOOLS",
     "get_extra_tools",
     "INTENT_MAX_TOKENS",
     "_DETAIL_KEYWORDS",
