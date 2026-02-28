@@ -10,6 +10,9 @@ from salmalm.security.crypto import vault, log  # noqa: F401
 
 log = logging.getLogger(__name__)
 
+_RE_SESSION_SUMMARY = re.compile(r"^/api/sessions/([^/]+)/summary")
+_RE_SESSION_ALT = re.compile(r"^/api/sessions/([^/]+)/alternatives/(\d+)")
+
 
 class ContentMixin:
     GET_ROUTES = {
@@ -307,7 +310,7 @@ class ContentMixin:
         # Conversation summary card — BIG-AGI style (대화 요약 카드)
         if not self._require_auth("user"):
             return
-        m = re.match(r"^/api/sessions/([^/]+)/summary", self.path)
+        m = _RE_SESSION_SUMMARY.match(self.path)
         if m:
             from salmalm.features.edge_cases import get_summary_card
 
@@ -321,7 +324,7 @@ class ContentMixin:
         # Conversation fork alternatives — LibreChat style (대화 포크)
         if not self._require_auth("user"):
             return
-        m = re.match(r"^/api/sessions/([^/]+)/alternatives/(\d+)", self.path)
+        m = _RE_SESSION_ALT.match(self.path)
         if m:
             from salmalm.features.edge_cases import conversation_fork
 

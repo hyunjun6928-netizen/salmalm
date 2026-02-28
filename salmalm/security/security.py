@@ -27,6 +27,8 @@ from urllib.parse import urlparse
 from salmalm.constants import VERSION, KST, DATA_DIR
 # ── Sensitive Data Redaction ─────────────────────────────────
 
+_SESSION_ID_RE = re.compile(r"[^a-zA-Z0-9_\-]")
+
 REDACT_PATTERNS = [
     r"sk-[a-zA-Z0-9]{20,}",  # OpenAI/Anthropic API 키
     r"ghp_[a-zA-Z0-9]{36}",  # GitHub 토큰
@@ -591,7 +593,7 @@ def sanitize_session_id(session_id: str) -> str:
     if not session_id or not isinstance(session_id, str):
         return "default"
     # Allow only alphanumeric, dash, underscore
-    cleaned = re.sub(r"[^a-zA-Z0-9_\-]", "", session_id)
+    cleaned = _SESSION_ID_RE.sub("", session_id)
     return cleaned[:64] or "default"
 
 

@@ -895,7 +895,6 @@ class AuthManager:
         conn = get_connection(AUTH_DB)
         try:
             uid, raw_api_key = self._create_user_db(conn, username, password, role)
-            conn.close()
             # Return raw API key only at creation time — it's hashed in DB
             return {
                 "id": uid,
@@ -904,8 +903,9 @@ class AuthManager:
                 "api_key": raw_api_key,
             }
         except sqlite3.IntegrityError:
-            conn.close()
             raise ValueError(f"Username already exists: {username}")
+        finally:
+            conn.close()
 
     def authenticate(self, username: str, password: str) -> Optional[dict]:
         """Authenticate user. Returns user dict or None."""
@@ -952,11 +952,13 @@ class AuthManager:
         self._ensure_db()
         key_hash = self._hash_api_key(api_key)
         conn = get_connection(AUTH_DB)
-        row = conn.execute(
-            "SELECT id, username, role, enabled FROM users WHERE api_key=? AND enabled=1",
-            (key_hash,),
-        ).fetchone()
-        conn.close()
+        try:
+            row = conn.execute(
+                "SELECT id, username, role, enabled FROM users WHERE api_key=? AND enabled=1",
+                (key_hash,),
+            ).fetchone()
+        finally:
+            conn.close()
         if not row:
             return None
         return {"id": row[0], "username": row[1], "role": row[2]}
@@ -1037,8 +1039,10 @@ class AuthManager:
         """List all users (admin only)."""
         self._ensure_db()
         conn = get_connection(AUTH_DB)
-        rows = conn.execute("SELECT id, username, role, created_at, last_login, enabled FROM users").fetchall()
-        conn.close()
+        try:
+            rows = conn.execute("SELECT id, username, role, created_at, last_login, enabled FROM users").fetchall()
+        finally:
+            conn.close()
         return [
             {
                 "id": r[0],
@@ -1055,10 +1059,12 @@ class AuthManager:
         """Delete a user account by username."""
         self._ensure_db()
         conn = get_connection(AUTH_DB)
-        cursor = conn.execute("DELETE FROM users WHERE username=? AND role != ?", (username, "admin"))
-        conn.commit()
-        deleted = cursor.rowcount > 0
-        conn.close()
+        try:
+            cursor = conn.execute("DELETE FROM users WHERE username=? AND role != ?", (username, "admin"))
+            conn.commit()
+            deleted = cursor.rowcount > 0
+        finally:
+            conn.close()
         return deleted
 
     def change_password(self, username: str, new_password: str) -> bool:
@@ -1070,13 +1076,15 @@ class AuthManager:
         self._ensure_db()
         pw_hash, salt = _hash_password(new_password)
         conn = get_connection(AUTH_DB)
-        cursor = conn.execute(
-            "UPDATE users SET password_hash=?, password_salt=? WHERE username=?",
-            (pw_hash, salt, username),
-        )
-        conn.commit()
-        ok = cursor.rowcount > 0
-        conn.close()
+        try:
+            cursor = conn.execute(
+                "UPDATE users SET password_hash=?, password_salt=? WHERE username=?",
+                (pw_hash, salt, username),
+            )
+            conn.commit()
+            ok = cursor.rowcount > 0
+        finally:
+            conn.close()
         return ok
 
     def has_permission(self, user: dict, action: str) -> bool:

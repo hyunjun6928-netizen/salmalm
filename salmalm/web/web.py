@@ -45,6 +45,8 @@ from salmalm.web.routes.web_agents import AgentsMixin
 # Google OAuth CSRF state tokens {state: timestamp}
 _google_oauth_pending_states: dict = {}
 
+_RE_SESSION_TITLE = re.compile(r"^/api/sessions/([^/]+)/title$")
+
 # ============================================================
 
 
@@ -264,7 +266,7 @@ class WebHandler(
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length)) if length else {}
         # PUT /api/sessions/{id}/title
-        m = re.match(r"^/api/sessions/([^/]+)/title$", self.path)
+        m = _RE_SESSION_TITLE.match(self.path)
         if m:
             if not self._require_auth("user"):
                 return

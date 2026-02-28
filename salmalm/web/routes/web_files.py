@@ -9,6 +9,8 @@ from salmalm.constants import WORKSPACE_DIR
 from salmalm.core import audit_log
 from salmalm.security.crypto import vault, log
 
+_RE_SESSION_EXPORT = re.compile(r"^/api/sessions/([^/]+)/export")
+
 
 def _populate_export_zip(zf, inc_sessions, inc_data, inc_vault, export_user, _json, datetime) -> None:
     """Populate export zip file with soul, memory, config, sessions, data, vault."""
@@ -258,7 +260,7 @@ class WebFilesMixin:
             return
         import urllib.parse
 
-        m = re.match(r"^/api/sessions/([^/]+)/export", self.path)
+        m = _RE_SESSION_EXPORT.match(self.path)
         if not m:
             self._json({"error": "Invalid path"}, 400)
             return
