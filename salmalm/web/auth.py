@@ -654,6 +654,9 @@ class AuthManager:
 
     def authenticate(self, username: str, password: str) -> Optional[dict]:
         """Authenticate user. Returns user dict or None."""
+        # Input size guard (prevents DoS via oversized payloads in DB/log)
+        if len(username) > 256 or len(password) > 1024:
+            return None
         self._ensure_db()
 
         # Check lockout (DB-persisted)
@@ -815,13 +818,28 @@ class AuthManager:
         ]
 
     def delete_user(self, username: str) -> bool:
-        """Delete a user account by username."""
+        """Delete a user account by username. Cascades to tokens and quota."""
         self._ensure_db()
         conn = get_connection(AUTH_DB)
         try:
+            # Fetch user_id before deletion for cascade cleanup
+            row = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
             cursor = conn.execute("DELETE FROM users WHERE username=? AND role != ?", (username, "admin"))
             conn.commit()
             deleted = cursor.rowcount > 0
+            if deleted and row:
+                uid = row[0]
+                # Revoke all tokens immediately
+                self.revoke_all_for_user(uid)
+                # Clean up daily quota records
+                try:
+                    qconn = get_connection(AUTH_DB)
+                    qconn.execute("DELETE FROM daily_quota WHERE user_id=?", (str(uid),))
+                    qconn.commit()
+                    qconn.close()
+                except Exception as _qe:
+                    log.warning("[AUTH] Failed to clean quota for deleted user %s: %s", uid, _qe)
+                log.warning("[AUTH] User %s (id=%s) deleted — tokens revoked, quota cleared", username, uid)
         finally:
             conn.close()
         return deleted

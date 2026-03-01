@@ -202,7 +202,7 @@ class WebAuthMixin:
         password = body.get("password", "")
         user = auth_manager.authenticate(username, password)
         if user:
-            token = auth_manager.create_token(user)
+            token = auth_manager.create_token(user, expires_in=86400 * 30)  # 30 days — matches cookie lifetime
             audit_log(
                 "auth_success",
                 f"user={username}",
@@ -411,7 +411,7 @@ async def post_auth_login(req: LoginRequest, request: _Request):
             httponly=True,
             samesite="lax",
             secure=_secure,
-            max_age=86400 * 30,  # 30 days (matches JWT expiry)
+            max_age=86400 * 30,  # 30 days (matches JWT expires_in above)
             path="/",
         )
         return resp

@@ -541,7 +541,7 @@ async def _handle_sse_stream(handler: FastHandler) -> StreamingResponse:
         finally:
             sse_q.close()  # always signal end
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     thread_future = loop.run_in_executor(None, _run_handler)
 
     async def generate() -> AsyncIterator[bytes]:

@@ -118,7 +118,7 @@ def handle_note(args: dict) -> str:
         return "\n".join(lines)
 
     elif action == "list":
-        count = int(args.get("count", 10))
+        count = max(1, min(int(args.get("count", 10)), 100))
         with _db_lock:
             conn = _get_db()
             rows = conn.execute(
@@ -314,7 +314,7 @@ def handle_save_link(args: dict) -> str:
         return _save_link_impl(args)
 
     elif action == "list":
-        count = int(args.get("count", 10))
+        count = max(1, min(int(args.get("count", 10)), 100))
         with _db_lock:
             conn = _get_db()
             rows = conn.execute(

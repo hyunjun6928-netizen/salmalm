@@ -290,7 +290,7 @@ class ManageMixin:
                 from salmalm.web.ws import ws_server
                 import asyncio
 
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 if loop.is_running():
                     asyncio.ensure_future(ws_server.broadcast({"type": "update_status", "status": "installing"}))
             except Exception as e:
@@ -316,7 +316,7 @@ class ManageMixin:
                     from salmalm.web.ws import ws_server
                     import asyncio
 
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                     if loop.is_running():
                         asyncio.ensure_future(ws_server.broadcast({
                             "type": "update_status", "status": "complete", "version": new_ver
