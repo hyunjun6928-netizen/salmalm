@@ -719,7 +719,7 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
         _session_id = getattr(session, "id", "")
         result: dict = {}   # guard against NameError if _max_iter=0 or loop exits early
 
-        _max_iter = int(_os.environ.get("SALMALM_MAX_TOOL_ITER", str(self.MAX_TOOL_ITERATIONS)))
+        _max_iter = min(int(_os.environ.get("SALMALM_MAX_TOOL_ITER", str(self.MAX_TOOL_ITERATIONS))), 50)  # Hard cap: env var cannot exceed 50
         while iteration < _max_iter:
             # Abort check
             abort_msg = check_abort(_session_id)

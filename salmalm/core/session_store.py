@@ -419,7 +419,7 @@ def rollback_session(session_id: str, count: int) -> dict:
     return {"ok": True, "removed": pairs_removed}
 
 
-def branch_session(session_id: str, message_index: int) -> dict:
+def branch_session(session_id: str, message_index: int, user_id: int | None = None) -> dict:
     """Create a new session branching from session_id at message_index.
 
     Copies messages[0:message_index+1] into a new session.
@@ -427,6 +427,10 @@ def branch_session(session_id: str, message_index: int) -> dict:
     """
 
     session = get_session(session_id)
+    # Ownership check: non-admin users can only branch their own sessions
+    if user_id is not None and session.user_id is not None and session.user_id != user_id:
+        log.warning("[BRANCH] User %s denied branch of session %s (owned by %s)", user_id, session_id, session.user_id)
+        return {"ok": False, "error": "Access denied — session belongs to another user"}
     if message_index < 0 or message_index >= len(session.messages):
         return {"ok": False, "error": f"Invalid message_index: {message_index}"}
 

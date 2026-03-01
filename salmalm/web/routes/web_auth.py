@@ -488,3 +488,18 @@ async def post_auto_unlock(request: _Request):
         audit_log("unlock", "vault auto-unlocked (no password)")
         return _JSON(content={"ok": True, "token": secrets.token_hex(32)})
     return _JSON(content={"ok": False}, status_code=401)
+
+
+@router.post("/api/auth/logout")
+async def post_auth_logout(request: _Request):
+    """Revoke the current JWT (server-side logout). Clears HttpOnly cookie."""
+    from salmalm.web.auth import extract_auth
+    from salmalm.web.token_manager import token_manager
+    user = extract_auth(dict(request.headers))
+    resp = _JSON(content={"ok": True, "message": "Logged out"})
+    # Revoke JTI so this token cannot be reused even if intercepted
+    if user and user.get("jti"):
+        token_manager.revoke(user["_jti"])
+    # Clear cookie
+    resp.delete_cookie(key="salmalm_token", path="/")
+    return resp

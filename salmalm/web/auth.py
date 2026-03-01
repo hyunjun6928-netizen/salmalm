@@ -827,8 +827,10 @@ class AuthManager:
         """Change a user password. Returns True on success."""
         if len(new_password) < 8:
             from salmalm.core.exceptions import AuthError
-
             raise AuthError("Password must be at least 8 characters")
+        if len(new_password) > 1024:
+            from salmalm.core.exceptions import AuthError
+            raise AuthError("Password too long (max 1024 characters)")
         self._ensure_db()
         pw_hash, salt = _hash_password(new_password)
         conn = get_connection(AUTH_DB)

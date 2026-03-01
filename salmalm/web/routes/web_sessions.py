@@ -321,8 +321,10 @@ class WebSessionsMixin:
     def _post_api_sessions_branch(self):
         """Post api sessions branch."""
         body = self._body
-        if not self._require_auth("user"):
+        _u = self._require_auth("user")
+        if not _u:
             return
+        _uid = _u.get("id") if _u.get("role") != "admin" else None
         sid = body.get("session_id", "")
         message_index = body.get("message_index")
         if not sid or message_index is None:
@@ -335,7 +337,7 @@ class WebSessionsMixin:
         except (TypeError, ValueError):
             self._json({"ok": False, "error": "Invalid message_index"}, 400)
             return
-        result = branch_session(sid, _mi)
+        result = branch_session(sid, _mi, user_id=_uid)
         self._json(result)
 
     def _get_api_sessions_messages(self):
@@ -678,4 +680,5 @@ async def post_sessions_branch(request: _Request, _u=_Depends(_auth)):
         _mi = max(0, int(message_index))
     except (TypeError, ValueError):
         return _JSON(content={"ok": False, "error": "Invalid message_index"}, status_code=400)
-    return _JSON(content=branch_session(sid, _mi))
+    _uid = _u.get("id") if _u and _u.get("role") != "admin" else None
+    return _JSON(content=branch_session(sid, _mi, user_id=_uid))
