@@ -33,7 +33,10 @@ class WebCronMixin:
             self._json({"ok": False, "error": "Cron not available"}, 500)
             return
         name = body.get("name", "untitled")
-        interval = int(body.get("interval", 3600))
+        try:
+            interval = int(body.get("interval", 3600))
+        except (TypeError, ValueError):
+            interval = 3600
         prompt = body.get("prompt", "")
         run_at = body.get("run_at", "")  # HH:MM or ISO datetime
         if not prompt:
@@ -122,7 +125,10 @@ async def post_cron_add(request: _Request, _u=_Depends(_auth)):
     if not _llm_cron:
         return _JSON(content={"ok": False, "error": "Cron not available"}, status_code=500)
     name = body.get("name", "untitled")
-    interval = int(body.get("interval", 3600))
+    try:
+        interval = int(body.get("interval", 3600))
+    except (TypeError, ValueError):
+        interval = 3600
     prompt = body.get("prompt", "")
     run_at = body.get("run_at", "")
     if not prompt:

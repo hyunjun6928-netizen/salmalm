@@ -306,7 +306,10 @@ class WebSessionsMixin:
         if not self._require_auth("user"):
             return
         sid = body.get("session_id", "")
-        count = int(body.get("count", 1))
+        try:
+            count = int(body.get("count", 1))
+        except (TypeError, ValueError):
+            count = 1
         if not sid:
             self._json({"ok": False, "error": "Missing session_id"}, 400)
             return
@@ -650,7 +653,10 @@ async def post_sessions_rollback(request: _Request, _u=_Depends(_auth)):
     from salmalm.core import rollback_session
     body = await request.json()
     sid = body.get("session_id", "")
-    count = int(body.get("count", 1))
+    try:
+        count = int(body.get("count", 1))
+    except (TypeError, ValueError):
+        count = 1
     if not sid:
         return _JSON(content={"ok": False, "error": "Missing session_id"}, status_code=400)
     return _JSON(content=rollback_session(sid, count))

@@ -407,10 +407,13 @@ class BrowserController:
     async def get_tabs(self) -> List[dict]:
         """List all browser tabs."""
         try:
+            import asyncio as _asyncio_bt
             url = f"http://{self.debug_host}:{self.debug_port}/json"
             req = urllib.request.Request(url)
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                targets = json.loads(resp.read())
+            def _fetch():
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    return json.loads(resp.read())
+            targets = await _asyncio_bt.to_thread(_fetch)
             return [
                 {"id": t["id"], "title": t.get("title", ""), "url": t.get("url", ""), "type": t.get("type", "")}
                 for t in targets
@@ -422,10 +425,13 @@ class BrowserController:
     async def new_tab(self, url: str = "about:blank") -> dict:
         """Open a new tab."""
         try:
+            import asyncio as _aio_nt
             api_url = f"http://{self.debug_host}:{self.debug_port}/json/new?{url}"
             req = urllib.request.Request(api_url, method="PUT")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                return json.loads(resp.read())  # type: ignore[no-any-return]
+            def _do_new_tab():
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    return json.loads(resp.read())
+            return await _aio_nt.to_thread(_do_new_tab)  # type: ignore[no-any-return]
         except Exception as e:
             return {"error": str(e)}
 

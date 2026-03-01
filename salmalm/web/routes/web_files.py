@@ -566,8 +566,11 @@ async def get_google_callback(request: _Request):
                                     "redirect_uri": redirect_uri, "grant_type": "authorization_code"}).encode()
         req = urllib.request.Request("https://oauth2.googleapis.com/token", data=data,
                                     headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST")
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            result = _json.loads(resp.read())
+        import asyncio as _aio_oauth
+        def _do_token_req():
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return _json.loads(resp.read())
+        result = await _aio_oauth.to_thread(_do_token_req)
         access_token = result.get("access_token", "")
         refresh_token = result.get("refresh_token", "")
         if refresh_token:
