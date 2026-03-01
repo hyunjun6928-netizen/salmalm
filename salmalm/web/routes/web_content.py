@@ -310,7 +310,8 @@ class ContentMixin:
             content = full.read_text(encoding="utf-8")[:50000]
             self._json({"file": fpath, "content": content, "size": full.stat().st_size})
         except Exception as e:
-            self._json({"error": str(e)}, 500)
+            log.warning("[FILE] Read error for %s: %s", fpath, e)
+            self._json({"error": "File read error — check server logs"}, 500)
 
     def _get_api_sessions_summary(self) -> None:
         """Handle GET /api/sessions/ routes."""
@@ -681,7 +682,8 @@ async def get_memory_read(file: str = _Query(""), _u=_Depends(_auth)):
         content = full.read_text(encoding="utf-8")[:50000]
         return _JSON(content={"file": file, "content": content, "size": full.stat().st_size})
     except Exception as e:
-        return _JSON(content={"error": str(e)}, status_code=500)
+        log.warning("[FILE] Error: %s", e)
+    return _JSON(content={"error": "Internal error — check server logs"}, status_code=500)
 
 @router.get("/api/thoughts/search")
 async def get_thoughts_search(q: str = _Query(""), _u=_Depends(_auth)):

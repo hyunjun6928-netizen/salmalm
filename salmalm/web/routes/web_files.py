@@ -253,7 +253,7 @@ class WebFilesMixin:
             self._json({"error": "No file found"}, 400)
         except Exception as e:
             log.error(f"Upload error: {e}")
-            self._json({"error": str(e)[:200]}, 500)
+            self._json({"error": "Internal server error"}, 500)
             return
 
     def _get_api_sessions_export(self) -> None:
@@ -720,4 +720,4 @@ async def post_upload(request: _Request, _u=_Depends(_auth)):
             return _JSON(content=resp)
         return _JSON(content={"error": "No file found"}, status_code=400)
     except Exception as e:
-        return _JSON(content={"error": str(e)[:200]}, status_code=500)
+        return _JSON(content={"error": "Internal server error"}, status_code=500)

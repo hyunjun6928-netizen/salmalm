@@ -413,7 +413,7 @@ class WebChatMixin:
             else:
                 self._json({"ok": False, "error": "Could not regenerate"}, 400)
         except Exception as e:
-            self._json({"ok": False, "error": str(e)[:200]}, 500)
+            self._json({"ok": False, "error": "Internal server error"}, 500)
         return
 
     def _post_api_chat_compare(self):
@@ -439,7 +439,7 @@ class WebChatMixin:
                 results = asyncio.run(_coro_cmp)
             self._json({"ok": True, "results": results})
         except Exception as e:
-            self._json({"ok": False, "error": str(e)[:200]}, 500)
+            self._json({"ok": False, "error": "Internal server error"}, 500)
         return
 
     def _post_api_alternatives_switch(self):
@@ -699,7 +699,7 @@ async def post_chat_regenerate(request: _Request, _u=_Depends(_auth)):
             return _JSON(content={"ok": True, "response": response})
         return _JSON(content={"ok": False, "error": "Could not regenerate"}, status_code=400)
     except Exception as e:
-        return _JSON(content={"ok": False, "error": str(e)[:200]}, status_code=500)
+        return _JSON(content={"ok": False, "error": "Internal server error"}, status_code=500)
 
 @router.post("/api/chat/compare")
 async def post_chat_compare(request: _Request, _u=_Depends(_auth)):
@@ -714,7 +714,7 @@ async def post_chat_compare(request: _Request, _u=_Depends(_auth)):
         results = await compare_models(session_id, message, models or None)
         return _JSON(content={"ok": True, "results": results})
     except Exception as e:
-        return _JSON(content={"ok": False, "error": str(e)[:200]}, status_code=500)
+        return _JSON(content={"ok": False, "error": "Internal server error"}, status_code=500)
 
 @router.post("/api/alternatives/switch")
 async def post_alternatives_switch(request: _Request, _u=_Depends(_auth)):

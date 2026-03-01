@@ -5,6 +5,7 @@ use lazy imports to avoid circular import issues.
 """
 
 import json
+import re
 import threading
 import time
 import uuid as _uuid
@@ -242,31 +243,34 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
     If user_id is provided and the session already exists with a different user_id,
     access is denied (returns a new isolated session instead of the existing one).
     """
+    # Sanitize session_id: prevent path traversal and memory key injection
+    if not session_id or len(session_id) > 128:
+        session_id = "default"
+    elif re.search(r'[/\\\x00\r\n]|\.\.', session_id):
+        session_id = re.sub(r"[^a-zA-Z0-9_\-\.@:]", "_", session_id)[:128]
     _cleanup_sessions()
     with _session_lock:
         if session_id in _sessions:
             existing = _sessions[session_id]
             # Access control: deny if owned by a *different* authenticated user.
-        # Also deny if the session has no owner (None) and we're in multi-user mode,
-        # unless it's the special "web" or "local" single-user legacy session.
-        if user_id is not None:
-            _owner_conflict = (
-                existing.user_id is not None and existing.user_id != user_id
-            ) or (
-                # In multi-user mode: treat ownerless sessions as protected
-                existing.user_id is None
-                and session_id not in ("web", "local", "default")
-                and _is_multi_user_mode()
-            )
-            if _owner_conflict:
-                # Session belongs to another user — create isolated session
-                log.warning(
-                    f"[SESSION] User {user_id} denied access to session {session_id} (owned by {existing.user_id})"
+            if user_id is not None:
+                _owner_conflict = (
+                    existing.user_id is not None and existing.user_id != user_id
+                ) or (
+                    existing.user_id is None
+                    and session_id not in ("web", "local", "default")
+                    and _is_multi_user_mode()
                 )
-                isolated_id = f"{session_id}_u{user_id}"
-                if isolated_id not in _sessions:
-                    _sessions[isolated_id] = Session(isolated_id, user_id=user_id)
-                return _sessions[isolated_id]
+                if _owner_conflict:
+                    log.warning(
+                        "[SESSION] User %s denied access to session %s (owned by %s)",
+                        user_id, session_id, existing.user_id
+                    )
+                    isolated_id = f"{session_id}_u{user_id}"
+                    if isolated_id not in _sessions:
+                        _sessions[isolated_id] = Session(isolated_id, user_id=user_id)
+                    return _sessions[isolated_id]
+            return existing
         if session_id not in _sessions:
             _sessions[session_id] = Session(session_id, user_id=user_id)
             # Try to restore from SQLite
@@ -486,7 +490,9 @@ def save_session_to_disk(session_id: str) -> None:
             "last_active": session.last_active,
             "metadata": session.metadata,
         }
-        path = _SESSIONS_DIR / f"{session_id}.json"
+        # Path traversal guard: sanitize session_id before using as filename
+        _safe_sid = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", session_id)[:128]
+        path = _SESSIONS_DIR / f"{_safe_sid}.json"
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception as e:
         log.warning(f"[DISK] Failed to save session {session_id}: {e}")

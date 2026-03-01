@@ -246,7 +246,7 @@ class ManageMixin:
             else:
                 self._json({"ok": False, "error": result.stderr[-200:]})
         except Exception as e:
-            self._json({"ok": False, "error": str(e)[:200]})
+            self._json({"ok": False, "error": "Internal server error"})
         return
 
     def _post_api_restart(self):
@@ -328,7 +328,7 @@ class ManageMixin:
             else:
                 self._json({"ok": False, "error": result.stderr[-200:]})
         except Exception as e:
-            self._json({"ok": False, "error": str(e)[:200]})
+            self._json({"ok": False, "error": "Internal server error"})
         return
 
     def _post_api_persona_switch(self):
@@ -404,7 +404,7 @@ class ManageMixin:
             text = result.replace("🎤 Transcription:\n", "") if isinstance(result, str) else ""
             self._json({"ok": True, "text": text})
         except Exception as e:
-            self._json({"ok": False, "error": str(e)}, 500)
+            self._json({"ok": False, "error": "Internal server error"}, 500)
 
     def _post_api_agent_sync(self):
         """Post api agent sync."""
@@ -624,7 +624,7 @@ class ManageMixin:
             result = execute_tool(tool, args)  # type: ignore[assignment]
             self._json({"ok": True, "result": result[:50000]})  # type: ignore[index]
         except Exception as e:
-            self._json({"error": str(e)[:500]}, 500)
+            self._json({"error": "Internal server error"}, 500)
 
 
 # ── FastAPI router ────────────────────────────────────────────────────────────
@@ -688,7 +688,7 @@ async def post_do_update(request: _Request, _u=_Depends(_auth)):
             return _JSON(content={"ok": True, "version": new_ver, "output": result.stdout[-200:]})
         return _JSON(content={"ok": False, "error": result.stderr[-200:]})
     except Exception as e:
-        return _JSON(content={"ok": False, "error": str(e)[:200]})
+        return _JSON(content={"ok": False, "error": "Internal server error"})
 
 @router.post("/api/restart")
 async def post_restart(request: _Request, _u=_Depends(_auth)):
@@ -726,7 +726,7 @@ async def post_update(request: _Request, _u=_Depends(_auth)):
             return _JSON(content={"ok": True, "version": new_ver, "output": result.stdout[-200:]})
         return _JSON(content={"ok": False, "error": result.stderr[-200:]})
     except Exception as e:
-        return _JSON(content={"ok": False, "error": str(e)[:200]})
+        return _JSON(content={"ok": False, "error": "Internal server error"})
 
 @router.post("/api/persona/switch")
 async def post_persona_switch(request: _Request, _u=_Depends(_auth)):
@@ -775,7 +775,7 @@ async def post_stt(request: _Request, _u=_Depends(_auth)):
         text = result.replace("🎤 Transcription:\n", "") if isinstance(result, str) else ""
         return _JSON(content={"ok": True, "text": text})
     except Exception as e:
-        return _JSON(content={"ok": False, "error": str(e)}, status_code=500)
+        return _JSON(content={"ok": False, "error": "Internal server error"}, status_code=500)
 
 @router.post("/api/agent/sync")
 async def post_agent_sync(request: _Request, _u=_Depends(_auth)):
@@ -1026,4 +1026,4 @@ async def post_node_execute(request: _Request, _u=_Depends(_auth)):
         result = await _asyncio.to_thread(execute_tool, tool, args)
         return _JSON(content={"ok": True, "result": result[:50000]})
     except Exception as e:
-        return _JSON(content={"error": str(e)[:500]}, status_code=500)
+        return _JSON(content={"error": "Internal server error"}, status_code=500)

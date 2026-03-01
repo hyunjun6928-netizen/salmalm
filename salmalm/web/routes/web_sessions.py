@@ -303,8 +303,10 @@ class WebSessionsMixin:
     def _post_api_sessions_rollback(self):
         """Post api sessions rollback."""
         body = self._body
-        if not self._require_auth("user"):
+        _u = self._require_auth("user")
+        if not _u:
             return
+        _uid = _u.get("id") if _u.get("role") != "admin" else None
         sid = body.get("session_id", "")
         try:
             count = max(1, min(int(body.get("count", 1)), 50))
@@ -315,7 +317,7 @@ class WebSessionsMixin:
             return
         from salmalm.core import rollback_session
 
-        result = rollback_session(sid, count)
+        result = rollback_session(sid, count, user_id=_uid)
         self._json(result)
 
     def _post_api_sessions_branch(self):
@@ -666,7 +668,8 @@ async def post_sessions_rollback(request: _Request, _u=_Depends(_auth)):
         count = 1
     if not sid:
         return _JSON(content={"ok": False, "error": "Missing session_id"}, status_code=400)
-    return _JSON(content=rollback_session(sid, count))
+    _uid = _u.get("id") if _u and _u.get("role") != "admin" else None
+    return _JSON(content=rollback_session(sid, count, user_id=_uid))
 
 @router.post("/api/sessions/branch")
 async def post_sessions_branch(request: _Request, _u=_Depends(_auth)):
