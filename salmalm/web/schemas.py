@@ -1,17 +1,22 @@
 """Pydantic request/response schemas for SalmAlm API."""
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class _StrictModel(BaseModel):
+    """Base model: extra fields forbidden (mass-assignment protection)."""
+    model_config = ConfigDict(extra="ignore")  # silently ignore unknown fields
 
 
 # ── Chat ──────────────────────────────────────────────────────
-class ChatRequest(BaseModel):
+class ChatRequest(_StrictModel):
     message: str = Field(..., description="User message")
     session_id: str = Field("web", description="Session ID")
     model: Optional[str] = Field(None, description="Model override (e.g. 'anthropic/claude-sonnet-4-6')")
     stream: bool = Field(False, description="SSE streaming response")
 
-class ChatResponse(BaseModel):
+class ChatResponse(_StrictModel):
     content: str
     model: Optional[str] = None
     usage: Optional[Dict[str, int]] = None
@@ -19,40 +24,40 @@ class ChatResponse(BaseModel):
 
 
 # ── Auth ──────────────────────────────────────────────────────
-class LoginRequest(BaseModel):
+class LoginRequest(_StrictModel):
     username: str
     password: str
 
-class LoginResponse(BaseModel):
+class LoginResponse(_StrictModel):
     token: str
     expires_in: int
     role: str
 
-class UnlockRequest(BaseModel):
+class UnlockRequest(_StrictModel):
     password: str
 
-class UnlockResponse(BaseModel):
+class UnlockResponse(_StrictModel):
     success: bool
     message: str
 
 
 # ── Sessions ──────────────────────────────────────────────────
-class SessionInfo(BaseModel):
+class SessionInfo(_StrictModel):
     id: str
     created_at: Optional[str] = None
     message_count: int = 0
     model_override: Optional[str] = None
 
-class SessionListResponse(BaseModel):
+class SessionListResponse(_StrictModel):
     sessions: List[SessionInfo]
 
-class CreateSessionRequest(BaseModel):
+class CreateSessionRequest(_StrictModel):
     session_id: Optional[str] = None
     model: Optional[str] = None
 
 
 # ── Engine Settings ───────────────────────────────────────────
-class EngineSettingsRequest(BaseModel):
+class EngineSettingsRequest(_StrictModel):
     compaction_threshold: Optional[int] = None
     max_tokens: Optional[int] = None
     temperature: Optional[float] = None
@@ -61,7 +66,7 @@ class EngineSettingsRequest(BaseModel):
     tool_iterations: Optional[int] = None
     cost_cap_daily: Optional[float] = None
 
-class EngineSettingsResponse(BaseModel):
+class EngineSettingsResponse(_StrictModel):
     compaction_threshold: int
     max_tokens: int
     temperature: float
@@ -72,27 +77,27 @@ class EngineSettingsResponse(BaseModel):
 
 
 # ── Models ────────────────────────────────────────────────────
-class ModelInfo(BaseModel):
+class ModelInfo(_StrictModel):
     id: str
     provider: str
     available: bool = True
 
-class ModelsResponse(BaseModel):
+class ModelsResponse(_StrictModel):
     models: List[ModelInfo]
 
-class RoutingConfig(BaseModel):
+class RoutingConfig(_StrictModel):
     simple: Optional[str] = None
     chat: Optional[str] = None
     complex: Optional[str] = None
 
 
 # ── Users ─────────────────────────────────────────────────────
-class UserCreate(BaseModel):
+class UserCreate(_StrictModel):
     username: str
     password: str
     role: str = "user"
 
-class UserResponse(BaseModel):
+class UserResponse(_StrictModel):
     id: str
     username: str
     role: str
@@ -100,10 +105,10 @@ class UserResponse(BaseModel):
 
 
 # ── Generic ───────────────────────────────────────────────────
-class SuccessResponse(BaseModel):
+class SuccessResponse(_StrictModel):
     success: bool = True
     message: Optional[str] = None
 
-class ErrorResponse(BaseModel):
+class ErrorResponse(_StrictModel):
     error: str
     detail: Optional[str] = None

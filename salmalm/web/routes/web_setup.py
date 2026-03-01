@@ -245,9 +245,9 @@ class WebSetupMixin:
 
                 gk = body["google_api_key"]
                 req = urllib.request.Request(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={gk}",  # noqa: F405
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent",  # noqa: F405
                     data=json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode(),
-                    headers={"Content-Type": "application/json"},
+                    headers={"Content-Type": "application/json", "x-goog-api-key": gk},
                 )
                 urllib.request.urlopen(req, timeout=15)
                 test_results.append("✅ Google OK")

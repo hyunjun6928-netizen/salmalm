@@ -189,9 +189,9 @@ class WebModelMixin:
             "google": lambda: (
                 lambda k: __import__("urllib.request", fromlist=["urlopen"]).urlopen(
                     __import__("urllib.request", fromlist=["Request"]).Request(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={k}",  # noqa: F405
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent",  # noqa: F405
                         data=json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode(),
-                        headers={"Content-Type": "application/json"},
+                        headers={"Content-Type": "application/json", "x-goog-api-key": k},
                     ),
                     timeout=15,
                 )

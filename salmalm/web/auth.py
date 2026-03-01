@@ -444,10 +444,11 @@ class DailyQuotaManager:
             ).fetchone()
             conn.close()
             val = row[0] if row else 0
-        except Exception:
-            val = 0
-        with self._lock:
-            self._cache[key] = val
+            with self._lock:
+                self._cache[key] = val  # Only cache on successful DB read
+        except Exception as _qe:
+            log.warning("[QUOTA] DB read failed for %s — returning conservative 0: %s", user_id, _qe)
+            val = 0  # Do NOT cache: next call will re-read DB
         return val
 
     def limit_for(self, role: str) -> int:

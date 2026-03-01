@@ -246,7 +246,19 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
     with _session_lock:
         if session_id in _sessions:
             existing = _sessions[session_id]
-            if user_id is not None and existing.user_id is not None and existing.user_id != user_id:
+            # Access control: deny if owned by a *different* authenticated user.
+        # Also deny if the session has no owner (None) and we're in multi-user mode,
+        # unless it's the special "web" or "local" single-user legacy session.
+        if user_id is not None:
+            _owner_conflict = (
+                existing.user_id is not None and existing.user_id != user_id
+            ) or (
+                # In multi-user mode: treat ownerless sessions as protected
+                existing.user_id is None
+                and session_id not in ("web", "local", "default")
+                and _is_multi_user_mode()
+            )
+            if _owner_conflict:
                 # Session belongs to another user — create isolated session
                 log.warning(
                     f"[SESSION] User {user_id} denied access to session {session_id} (owned by {existing.user_id})"
