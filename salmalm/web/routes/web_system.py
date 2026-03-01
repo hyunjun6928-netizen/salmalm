@@ -256,7 +256,10 @@ class SystemMixin:
 
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
-        limit = int(params.get("limit", ["50"])[0])
+        try:
+            limit = max(1, min(int(params.get("limit", ["50"])[0]), 500))
+        except (TypeError, ValueError, IndexError):
+            limit = 50
         event_type = params.get("type", [None])[0]
         sid = params.get("session_id", [None])[0]
         from salmalm.core import query_audit_log

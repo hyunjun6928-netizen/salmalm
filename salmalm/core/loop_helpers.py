@@ -113,10 +113,17 @@ def record_usage(session_id: str, model: str, result, classification, iteration)
             log.debug(f"Suppressed: {_exc}")
 
 
+_MAX_TOOL_CALLS_PER_TURN = 20  # Guard against LLM returning runaway tool lists
+
 def validate_tool_calls(tool_calls: list) -> tuple[list, dict]:
     """Validate and parse tool call arguments. Returns (valid_tools, error_outputs)."""
     valid_tools = []
     error_outputs = {}
+    # Hard cap: ignore excess tool calls to prevent DoS / runaway loops
+    if len(tool_calls) > _MAX_TOOL_CALLS_PER_TURN:
+        log.warning("[TOOLS] %d tool calls in one turn — capped to %d",
+                    len(tool_calls), _MAX_TOOL_CALLS_PER_TURN)
+        tool_calls = tool_calls[:_MAX_TOOL_CALLS_PER_TURN]
     for tc in tool_calls:
         if not isinstance(tc.get("arguments"), dict):
             try:

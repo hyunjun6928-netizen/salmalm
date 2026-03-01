@@ -307,7 +307,7 @@ class WebSessionsMixin:
             return
         sid = body.get("session_id", "")
         try:
-            count = int(body.get("count", 1))
+            count = max(1, min(int(body.get("count", 1)), 50))
         except (TypeError, ValueError):
             count = 1
         if not sid:
@@ -330,7 +330,12 @@ class WebSessionsMixin:
             return
         from salmalm.core import branch_session
 
-        result = branch_session(sid, int(message_index))
+        try:
+            _mi = max(0, int(message_index))
+        except (TypeError, ValueError):
+            self._json({"ok": False, "error": "Invalid message_index"}, 400)
+            return
+        result = branch_session(sid, _mi)
         self._json(result)
 
     def _get_api_sessions_messages(self):
@@ -654,7 +659,7 @@ async def post_sessions_rollback(request: _Request, _u=_Depends(_auth)):
     body = await request.json()
     sid = body.get("session_id", "")
     try:
-        count = int(body.get("count", 1))
+        count = max(1, min(int(body.get("count", 1)), 50))
     except (TypeError, ValueError):
         count = 1
     if not sid:
@@ -669,4 +674,8 @@ async def post_sessions_branch(request: _Request, _u=_Depends(_auth)):
     message_index = body.get("message_index")
     if not sid or message_index is None:
         return _JSON(content={"ok": False, "error": "Missing session_id or message_index"}, status_code=400)
-    return _JSON(content=branch_session(sid, int(message_index)))
+    try:
+        _mi = max(0, int(message_index))
+    except (TypeError, ValueError):
+        return _JSON(content={"ok": False, "error": "Invalid message_index"}, status_code=400)
+    return _JSON(content=branch_session(sid, _mi))

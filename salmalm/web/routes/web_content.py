@@ -253,7 +253,10 @@ class ContentMixin:
         if not query:
             self._json({"error": "Missing q parameter"}, 400)
             return
-        lim = int(params.get("limit", ["20"])[0])
+        try:
+            lim = max(1, min(int(params.get("limit", ["20"])[0]), 200))
+        except (TypeError, ValueError, IndexError):
+            lim = 20
         from salmalm.core import search_messages
 
         results = search_messages(query, limit=lim)
@@ -272,7 +275,11 @@ class ContentMixin:
         if not query:
             self._json({"error": "Missing q parameter"}, 400)
         else:
-            results = rag_engine.search(query, max_results=int(params.get("n", ["5"])[0]))
+            try:
+                _rag_n = max(1, min(int(params.get("n", ["5"])[0]), 50))
+            except (TypeError, ValueError, IndexError):
+                _rag_n = 5
+            results = rag_engine.search(query, max_results=_rag_n)
             self._json({"query": query, "results": results})
 
     def _get_api_memory_read(self) -> None:
