@@ -124,10 +124,17 @@ class WebGatewayMixin:
             return
         # Verify secret token
         secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if telegram_bot._webhook_secret and not telegram_bot.verify_webhook_request(secret):
-            log.warning("[BLOCK] Telegram webhook: invalid secret token")
-            self._json({"error": "Forbidden"}, 403)
-            return
+        if telegram_bot._webhook_secret:
+            if not telegram_bot.verify_webhook_request(secret):
+                log.warning("[BLOCK] Telegram webhook: invalid secret token")
+                self._json({"error": "Forbidden"}, 403)
+                return
+        else:
+            _wh_ip = self._get_client_ip()
+            if _wh_ip not in ("127.0.0.1", "::1", "localhost"):
+                log.warning("[BLOCK] Telegram webhook without secret rejected from %s", _wh_ip)
+                self._json({"error": "Webhook secret not configured"}, 403)
+                return
         try:
             update = body
             # Run async handler in event loop
@@ -233,9 +240,16 @@ async def post_webhook_telegram(request: _Request):
     if not telegram_bot.token:
         return _JSON(content={"error": "Telegram not configured"}, status_code=503)
     secret = request.headers.get("x-telegram-bot-api-secret-token", "")
-    if telegram_bot._webhook_secret and not telegram_bot.verify_webhook_request(secret):
-        log.warning("[BLOCK] Telegram webhook: invalid secret token")
-        return _JSON(content={"error": "Forbidden"}, status_code=403)
+    if telegram_bot._webhook_secret:
+        if not telegram_bot.verify_webhook_request(secret):
+            log.warning("[BLOCK] Telegram webhook: invalid secret token")
+            return _JSON(content={"error": "Forbidden"}, status_code=403)
+    else:
+        # No webhook secret configured — only allow loopback (localhost-only guard)
+        _wh_ip = request.client.host if request.client else ""
+        if _wh_ip not in ("127.0.0.1", "::1", "localhost"):
+            log.warning("[BLOCK] Telegram webhook without secret rejected from %s", _wh_ip)
+            return _JSON(content={"error": "Webhook secret not configured"}, status_code=403)
     try:
         await telegram_bot.handle_webhook_update(body)
         return _JSON(content={"ok": True})

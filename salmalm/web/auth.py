@@ -669,6 +669,9 @@ class AuthManager:
             ).fetchone()
 
             if not row or not row[6]:  # Not found or disabled
+                # Constant-time: run dummy hash to prevent username enumeration via timing
+                _DUMMY_SALT = b"\x00" * 16
+                _verify_password("dummy", b"\x00" * 32, _DUMMY_SALT)
                 self._record_attempt(username)
                 return None
 

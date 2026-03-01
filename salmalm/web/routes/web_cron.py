@@ -47,7 +47,7 @@ class WebCronMixin:
             if len(run_at) <= 5:  # HH:MM format → daily
                 schedule = {
                     "kind": "cron",
-                    "expr": f"{run_at.split(':')[1]} {run_at.split(':')[0]} * * *",
+                    "expr": (lambda _p: f"{_p[1].zfill(2)} {_p[0].zfill(2)} * * *" if len(_p) == 2 else "0 9 * * *")(run_at.split(':', 1)),
                 }
             else:  # ISO datetime → one-shot
                 schedule = {"kind": "at", "time": run_at}
@@ -135,7 +135,7 @@ async def post_cron_add(request: _Request, _u=_Depends(_auth)):
         return _JSON(content={"ok": False, "error": "Prompt required"}, status_code=400)
     if run_at:
         if len(run_at) <= 5:
-            schedule = {"kind": "cron", "expr": f"{run_at.split(':')[1]} {run_at.split(':')[0]} * * *"}
+            schedule = {"kind": "cron", "expr": (lambda _p: f"{_p[1].zfill(2)} {_p[0].zfill(2)} * * *" if len(_p) == 2 else "0 9 * * *")(run_at.split(':', 1))}
         else:
             schedule = {"kind": "at", "time": run_at}
     else:

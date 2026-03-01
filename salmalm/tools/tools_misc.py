@@ -729,6 +729,14 @@ def _rss_fetch(args: dict) -> str:
     count = args.get("count", 5)
     if not url:
         return _rss_fetch_all_feeds(count)
+    # SSRF guard: reject private/loopback/metadata URLs
+    try:
+        from salmalm.tools.tools_common import _is_private_url_follow_redirects
+        _blocked, _reason, url = _is_private_url_follow_redirects(url)
+        if _blocked:
+            return f"❌ RSS fetch blocked: {_reason}"
+    except Exception:
+        pass
     req = urllib.request.Request(url, headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:

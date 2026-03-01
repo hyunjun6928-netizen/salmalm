@@ -432,11 +432,20 @@ async def post_auth_register(req: UserCreate, request: _Request):
         return _JSON(content={"error": str(e)}, status_code=400)
 
 @router.post("/api/unlock")
-async def post_unlock(req: UnlockRequest):
+async def post_unlock(req: UnlockRequest, request: _Request):
     from salmalm.security.crypto import vault
     from salmalm.constants import VAULT_FILE
     from salmalm.core import audit_log
+    from salmalm.web.auth import rate_limiter, ip_ban_list, RateLimitExceeded
     import secrets
+    _ip = request.client.host if request.client else "unknown"
+    # Rate-limit vault unlock: 5 attempts/5min per IP (brute-force protection)
+    try:
+        rate_limiter.check(f"vault:{_ip}", "anonymous")
+    except RateLimitExceeded as _rle:
+        ip_ban_list.record_violation(_ip)
+        return _JSON(content={"error": "Too many unlock attempts"}, status_code=429,
+                     headers={"Retry-After": str(int(_rle.retry_after))})
     password = req.password
     if VAULT_FILE.exists():
         ok = vault.unlock(password, save_to_keychain=True)

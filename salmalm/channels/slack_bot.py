@@ -90,10 +90,18 @@ class SlackBot:
     def verify_request(self, timestamp: str, signature: str, body: bytes) -> bool:
         """Verify Slack request signature."""
         if not self.signing_secret:
-            return True  # No secret configured, skip verification
+            return False  # No secret configured → fail-closed (reject all)
         import hashlib
         import hmac
 
+        # Replay attack prevention: reject requests older than 5 minutes
+        import time as _t
+        try:
+            ts_age = abs(_t.time() - float(timestamp))
+            if ts_age > 300:  # 5 minutes
+                return False
+        except (ValueError, TypeError):
+            return False
         base = f"v0:{timestamp}:{body.decode('utf-8')}"
         computed = "v0=" + hmac.new(self.signing_secret.encode(), base.encode(), hashlib.sha256).hexdigest()
         return hmac.compare_digest(computed, signature)

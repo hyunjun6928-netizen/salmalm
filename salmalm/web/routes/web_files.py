@@ -161,7 +161,7 @@ class WebFilesMixin:
                     continue
                 fname = Path(fname_raw).name  # basename only (prevent path traversal)
                 # Reject suspicious filenames
-                if not fname or ".." in fname or "/" in fname or "\\" in fname or "\x00" in fname:
+                if not fname or ".." in fname or "/" in fname or "\\" in fname or "\x00" in fname or "\r" in fname or "\n" in fname:
                     self._json({"error": "Invalid filename"}, 400)
                     return
                 # Validate file type (Open WebUI style)
