@@ -400,7 +400,7 @@ async def post_auth_login(req: LoginRequest, request: _Request):
     if user:
         token = auth_manager.create_token(user)
         audit_log("auth_success", f"user={username}", detail_dict={"username": username, "ip": ip})
-        resp = _JSON(content={"ok": True, "token": token, "user": user})
+        resp = _JSON(content={"ok": True, "token": token, "user": user}, headers={"Cache-Control": "no-store, no-cache", "Pragma": "no-cache"})
         # Also set HttpOnly + SameSite cookie for XSS-resistant auth
         # Secure flag set when not on loopback (HTTPS environments)
         _is_local = ip in ("127.0.0.1", "::1", "localhost")

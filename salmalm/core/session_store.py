@@ -281,8 +281,14 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                         restored = json.loads(row[0])
                         if not isinstance(restored, list):
                             raise ValueError("Session data is not a list")
-                        _sessions[session_id].messages = restored
-                        log.info(f"[NOTE] Session restored: {session_id} ({len(restored)} msgs)")
+                        # Sanitize: only allow known roles from DB
+                        _ALLOWED_ROLES = {"user", "assistant", "system", "tool"}
+                        sanitized = [m for m in restored if isinstance(m, dict) and m.get("role") in _ALLOWED_ROLES]
+                        if len(sanitized) != len(restored):
+                            log.warning("[SESSION] Dropped %d invalid-role messages from DB for %s",
+                                        len(restored) - len(sanitized), session_id)
+                        _sessions[session_id].messages = sanitized
+                        log.info(f"[NOTE] Session restored: {session_id} ({len(sanitized)} msgs)")
                     except (json.JSONDecodeError, ValueError, TypeError) as je:
                         # Corrupted session JSON — start fresh
                         log.warning(f"[SESSION] Corrupt session JSON for {session_id}: {je}")

@@ -36,6 +36,17 @@ OP_PONG = 0xA
 WS_MAGIC = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
+def _safe_task(coro, *, name: str = "") -> asyncio.Task:
+    """Create a task with error logging (prevents silent fire-and-forget failures)."""
+    task = asyncio.create_task(coro, name=name or None)
+    task.add_done_callback(
+        lambda t: log.warning("[TASK] %s raised: %s", t.get_name(), t.exception())
+        if not t.cancelled() and t.exception() is not None
+        else None
+    )
+    return task
+
+
 class WSClient:
     """Represents a single WebSocket connection."""
 
@@ -194,7 +205,7 @@ class WebSocketServer:
         self._running = True
         self._server = await asyncio.start_server(self._handle_connection, self.host, self.port)
         log.info(f"[FAST] WebSocket server: ws://{self.host}:{self.port}")
-        asyncio.create_task(self._keepalive_loop())
+        _safe_task(self._keepalive_loop(), name="ws-keepalive")
 
     async def shutdown(self) -> None:
         """Graceful shutdown: notify clients with shutdown message, then close."""
@@ -434,7 +445,7 @@ class WebSocketServer:
                 if opcode == OP_TEXT:
                     client.last_ping = time.time()  # Any activity = alive
                     # Fire-and-forget so recv loop continues reading PONG frames
-                    asyncio.create_task(self._handle_text_frame(client, payload))
+                    _safe_task(self._handle_text_frame(client, payload), name="ws-frame")
                 elif opcode == OP_PING:
                     await client._send_frame(OP_PONG, payload)
                     client.last_ping = time.time()

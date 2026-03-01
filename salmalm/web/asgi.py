@@ -280,6 +280,21 @@ def create_asgi_app() -> FastAPI:
 
     app = FastAPI(title="SalmAlm", docs_url=None, redoc_url=None)
 
+    @app.middleware("http")
+    async def _security_headers_middleware(request: Request, call_next):
+        """Inject security headers on every HTTP response (OWASP baseline)."""
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
+        if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        return response
+
+
+
+
     # ── Static files (React bundles, dist assets) ───────────────────────────
     _static_dist = Path(__file__).parent.parent / "static" / "dist"
     _static_dist.mkdir(parents=True, exist_ok=True)
@@ -304,7 +319,7 @@ def create_asgi_app() -> FastAPI:
             return Response(
                 status_code=204,
                 headers={
-                    "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+                    **_cors_headers(request),  # Only allow trusted origins
                     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH",
                     "Access-Control-Allow-Headers": (
                         "Content-Type,Authorization,X-API-Key,"
@@ -426,6 +441,9 @@ def create_asgi_app() -> FastAPI:
             if content_length > _max_body:
                 return JSONResponse({"error": "Request too large"}, status_code=413)
             body_bytes = await request.body()
+            # Defence-in-depth: also check actual body size (Content-Length may be spoofed)
+            if len(body_bytes) > _max_body:
+                return JSONResponse({"error": "Request too large"}, status_code=413)
 
         handler = FastHandler(request, body_bytes)
         req_path = handler.path.split("?")[0]

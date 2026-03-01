@@ -841,6 +841,19 @@ class AuthManager:
             ok = cursor.rowcount > 0
         finally:
             conn.close()
+        if ok:
+            # Invalidate all existing tokens for this user — password change = session reset
+            try:
+                _conn_rev = get_connection(AUTH_DB)
+                _row_rev = _conn_rev.execute(
+                    "SELECT id FROM users WHERE username=?", (username,)
+                ).fetchone()
+                _conn_rev.close()
+                if _row_rev:
+                    self.revoke_all_for_user(_row_rev[0])
+                    log.warning("[AUTH] All tokens revoked for user %s after password change", username)
+            except Exception as _rev_e:
+                log.warning("[AUTH] Failed to revoke tokens after password change: %s", _rev_e)
         return ok
 
     def has_permission(self, user: dict, action: str) -> bool:
