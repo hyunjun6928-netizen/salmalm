@@ -16,22 +16,46 @@ def _agent_spawn(args):
 
 
 def _agent_list(args):
+    lines = []
+    # v2 tasks
+    try:
+        from salmalm.features.subagents import subagent_manager
+        for task in subagent_manager._tasks.values():
+            icon = "🟢" if task.status == "running" else "✅" if task.status == "completed" else "❌"
+            lines.append(f"{icon} [{task.task_id}] {task.label or task.description[:40]} — {task.status} ({task.elapsed_s}s)")
+    except Exception:
+        pass
+    # legacy
     agents = SubAgent.list_agents()
-    if not agents:
-        return "📋 No running sub-agents."
-    return "\n".join(
-        f"{'🟢' if a['status'] == 'running' else '✅' if a['status'] == 'completed' else '❌'} [{a['id']}] {a['task']} — {a['status']}"
-        for a in agents
-    )
+    for a in agents:
+        if a.get("id") not in {l.split("[")[1].split("]")[0] for l in lines if "[" in l}:
+            icon = "🟢" if a["status"] == "running" else "✅" if a["status"] == "completed" else "❌"
+            lines.append(f"{icon} [{a['id']}] {a['task']} — {a['status']}")
+    return "\n".join(lines) if lines else "📋 No sub-agents."
 
 
 def _agent_result(args):
-    info = SubAgent.get_result(args.get("agent_id", ""))
+    aid = args.get("agent_id", "").strip()
+    # Try v2 first
+    try:
+        from salmalm.features.subagents import subagent_manager
+        task = subagent_manager.get_task(aid)
+        if task:
+            label = task.label or task.description[:40]
+            if task.status == "running":
+                return f"⏳ [{task.task_id}] '{label}' still running ({task.elapsed_s}s, {task.turns_used} turns)"
+            if task.status == "completed":
+                return f"✅ [{task.task_id}] '{label}' ({task.elapsed_s}s, {task.turns_used} turns)\n\n{task.result}"
+            return f"❌ [{task.task_id}] '{label}' {task.status}: {task.error}"
+    except Exception:
+        pass
+    # Fallback: legacy SubAgent._agents
+    info = SubAgent.get_result(aid)
     if "error" in info:
         return f"❌ {info['error']}"
     if info["status"] == "running":
-        return f"⏳ [{args.get('agent_id', '')}] Still running.\nStarted: {info['started']}"
-    return f"{'✅' if info['status'] == 'completed' else '❌'} [{args.get('agent_id', '')}] {info['status']}\nStarted: {info['started']}\nFinished: {info['completed']}\n\n{info.get('result', '')[:3000]}"
+        return f"⏳ [{aid}] Still running.\nStarted: {info['started']}"
+    return f"{'✅' if info['status'] == 'completed' else '❌'} [{aid}] {info['status']}\nStarted: {info['started']}\nFinished: {info['completed']}\n\n{info.get('result', '')[:3000]}"
 
 
 def _agent_send(args):
@@ -45,11 +69,25 @@ def _agent_stop(args):
 
 
 def _agent_log(args):
-    return (
-        SubAgent.get_log(args.get("agent_id", ""), limit=args.get("limit", 20))
-        if args.get("agent_id")
-        else "❌ agent_id is required"
-    )
+    aid = args.get("agent_id", "").strip()
+    if not aid:
+        return "❌ agent_id is required"
+    # Try v2
+    try:
+        from salmalm.features.subagents import subagent_manager
+        task = subagent_manager.get_task(aid)
+        if task:
+            msgs = task.messages[-20:]
+            lines = [f"📜 Transcript [{task.task_id}] ({len(task.messages)} messages, showing last {len(msgs)})"]
+            for m in msgs:
+                role = m.get("role", "?")
+                icon = "👤" if role == "user" else "🤖" if role == "assistant" else "🔧"
+                content = str(m.get("content", ""))[:300]
+                lines.append(f"{icon} {role}: {content}")
+            return "\n".join(lines)
+    except Exception:
+        pass
+    return SubAgent.get_log(aid, limit=args.get("limit", 20))
 
 
 def _agent_info(args):
