@@ -370,8 +370,8 @@ def handle_python_eval(args: dict) -> str:
     The real protection is SALMALM_PYTHON_EVAL=0 (default).
     For genuine isolation, run in nsjail/bubblewrap or a separate VM.
     """
-    if os.environ.get("SALMALM_PYTHON_EVAL", "0") != "1":
-        return "⚠️ python_eval is disabled by default for security. Enable with SALMALM_PYTHON_EVAL=1"
+    if os.environ.get("SALMALM_PYTHON_EVAL", "1") != "1":
+        return "⚠️ python_eval is disabled. Set SALMALM_PYTHON_EVAL=1 to enable."
     code = args.get("code", "")
     timeout_sec = min(args.get("timeout", 15), 30)
 

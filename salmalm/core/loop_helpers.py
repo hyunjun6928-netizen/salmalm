@@ -137,7 +137,7 @@ def validate_tool_calls(tool_calls: list) -> tuple[list, dict]:
 
 def check_circuit_breaker(tool_outputs: dict, consecutive_errors: int, max_errors: int) -> tuple[int, str | None]:
     """Check for consecutive tool errors. Returns (new_error_count, error_message_or_None)."""
-    errors = sum(1 for v in tool_outputs.values() if str(v).startswith("❌"))
+    errors = sum(1 for v in tool_outputs.values() if str(v).startswith(("❌", "⚠️")))
     if errors > 0:
         consecutive_errors += errors
         if consecutive_errors >= max_errors:
@@ -157,10 +157,10 @@ def check_loop_detection(tool_calls: list, recent_calls: list) -> str | None:
         )
         recent_calls.append(sig)
 
-    if len(recent_calls) >= 6:
+    if len(recent_calls) >= 4:
         freq = Counter(recent_calls[-6:])
         top = freq.most_common(1)[0]
-        if top[1] >= 3:
+        if top[1] >= 2:
             log.warning(f"[BREAK] Loop detected: {top[0][0]} called {top[1]}x with same args in last 6 iterations")
             return f"⚠️ Infinite loop detected — tool `{top[0][0]}` repeating with same arguments. Stopping."
     return None
