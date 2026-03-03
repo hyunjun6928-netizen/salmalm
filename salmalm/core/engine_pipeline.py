@@ -396,10 +396,19 @@ async def _process_message_inner(
         try:
             from salmalm.features.subagents import subagent_manager
             # Strip Korean spawn-request suffix to extract the actual task
-            _task = _msg_lower
-            for _suf in ("서브에이전트로 돌리시오", "서브 에이전트로 돌리시오", "서브에이전트로",
-                         "서브 에이전트로", "서브에이전트를 써서", "백그라운드로 실행해"):
+            _task = user_message.strip()
+            for _suf in sorted([
+                "서브에이전트로 돌리시오", "서브 에이전트로 돌리시오",
+                "서브에이전트로 돌려주시오", "서브 에이전트로 돌려주시오",
+                "서브에이전트로 돌려", "서브 에이전트로 돌려",
+                "서브에이전트로 실행하시오", "서브 에이전트로 실행하시오",
+                "서브에이전트를 써서", "서브에이전트로", "서브 에이전트로",
+                "백그라운드로 실행해", "서브에이전트 실행",
+            ], key=len, reverse=True):
                 _task = _task.replace(_suf, "").strip()
+            # Remove trailing Korean particles (을/를/이/가/은/는)
+            import re as _re
+            _task = _re.sub(r"[을를이가은는]$", "", _task.strip()).strip()
             _task = _task.strip("., ") or user_message.strip()
             _task_obj = subagent_manager.spawn(
                 description=_task,
