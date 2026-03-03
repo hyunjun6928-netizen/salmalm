@@ -215,6 +215,61 @@ class LLMCronManager:
             self.save_jobs()
             log.warning(f"[CRON] Job {job['name']} disabled after 5 consecutive failures")
 
+    def _execute_job(self, job: dict) -> None:
+        """Execute a single cron job synchronously (runs in a background thread).
+
+        Called from web_cron._post_api_cron_run via threading.Thread so it must
+        be a plain (non-async) method.  It spins up its own event loop to drive
+        the async process_message call.
+        """
+        import asyncio as _asyncio_cron
+
+        async def _run():
+            from salmalm.core.engine import process_message
+
+            log.info(f"[CRON] Manual run: {job['name']} ({job['id']})")
+            cost_before = _usage["total_cost"]
+            try:
+                response = await process_message(
+                    f"cron-{job['id']}", job["prompt"], model_override=job.get("model")
+                )
+                cost_after = _usage["total_cost"]
+                cron_cost = cost_after - cost_before
+                MAX_CRON_JOB_COST = 2.0
+                if cron_cost > MAX_CRON_JOB_COST:
+                    log.warning(f"[CRON] Job {job['name']} cost ${cron_cost:.2f} — exceeds ${MAX_CRON_JOB_COST} cap")
+                job["last_run"] = datetime.now(KST).isoformat()  # noqa: F405
+                job["run_count"] = job.get("run_count", 0) + 1
+                job["error_count"] = 0
+                job.pop("last_error", None)
+                self.save_jobs()
+                log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
+                self._notify_completion(job, response)
+                write_daily_log(f"[CRON] {job['name']}: {response[:150]}")
+                if job["schedule"]["kind"] == "at":
+                    job["enabled"] = False
+                    self.save_jobs()
+            except Exception as e:
+                log.error(f"LLM cron error ({job['name']}): {e}")
+                job["last_run"] = datetime.now(KST).isoformat()  # noqa: F405
+                job["last_error"] = str(e)[:200]
+                job["error_count"] = job.get("error_count", 0) + 1
+                self.save_jobs()
+                self._handle_cron_failure(job, e)
+
+        # Try to schedule on the running main loop; fall back to a new loop
+        try:
+            import salmalm.core._main_loop as _ml_mod
+            _loop = getattr(_ml_mod, "_loop", None)
+            if _loop and _loop.is_running():
+                import concurrent.futures as _cf
+                fut = _asyncio_cron.run_coroutine_threadsafe(_run(), _loop)
+                fut.result(timeout=300)
+                return
+        except Exception as _e:
+            log.debug(f"[CRON] main-loop dispatch failed, using new loop: {_e}")
+        _asyncio_cron.run(_run())
+
     async def tick(self) -> None:
         """Check and execute due jobs. Also runs heartbeat if due."""
         # OpenClaw-style heartbeat check
