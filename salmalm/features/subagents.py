@@ -154,7 +154,7 @@ class SubAgentManager:
 
             session_id = f"subagent_{task.task_id}"
             session = get_session(session_id)
-            system_prompt = build_system_prompt(session)
+            system_prompt = build_system_prompt(mode='minimal')
 
             # Bootstrap messages (system excluded from task.messages)
             all_messages = [

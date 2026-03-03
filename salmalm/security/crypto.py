@@ -200,7 +200,7 @@ class Vault:
                 log.warning(f"[VAULT] Unlock failed: {e}")
                 return False
             except Exception as e:  # noqa: broad-except
-                log.warning(f"[VAULT] Unlock failed: {type(e).__name__}: {e}")
+                log.debug(f"[VAULT] Unlock failed (retrying with legacy format): {type(e).__name__}: {e}")
                 return False
 
     def _unlock_hmac_ctr(self, password: str, ciphertext: bytes,

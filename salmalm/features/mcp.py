@@ -634,7 +634,8 @@ async def _run_server_stdio():
         logging.root.removeHandler(handler)
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-    from salmalm.tools import TOOL_DEFINITIONS, execute_tool
+    from salmalm.tools.tool_handlers import execute_tool
+    from salmalm.tools.tool_registry import get_all_tools as TOOL_DEFINITIONS
 
     server = MCPServer()
 

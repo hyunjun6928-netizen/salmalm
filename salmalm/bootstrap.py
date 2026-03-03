@@ -469,7 +469,8 @@ async def _setup_services(host: str, port: int, _httpd, server_thread, url: str)
     # ── Phase 8: MCP (Model Context Protocol) ──
     try:
         mcp_manager.load_config()
-        from salmalm.tools import TOOL_DEFINITIONS, execute_tool
+        from salmalm.tools.tool_handlers import execute_tool
+        from salmalm.tools.tool_registry import get_all_tools as TOOL_DEFINITIONS
 
         async def mcp_tool_executor(name: str, args):
             """Mcp tool executor."""

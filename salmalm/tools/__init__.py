@@ -29,3 +29,10 @@ _install_shim(
         "tools_web",
     },
 )
+
+# Re-export commonly imported names for backward compat
+from salmalm.tools.tool_handlers import execute_tool  # noqa: F401
+try:
+    from salmalm.tools.tool_registry import get_all_tools as TOOL_DEFINITIONS  # noqa: F401
+except Exception:
+    pass

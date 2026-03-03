@@ -291,7 +291,7 @@ class WebChatMixin:
                 except RuntimeError:
                     response = asyncio.run(_coro)
             except Exception as e:
-                log.error(f"[SSE] process_message error: {e}")
+                import traceback as _tbsse; log.error(f"[SSE] process_message error: {type(e).__name__}: {e}\n{_tbsse.format_exc()}")
                 response = f"❌ Internal error: {type(e).__name__}"
             finally:
                 _keepalive_stop.set()  # Fix #3: stop keepalive thread
@@ -362,8 +362,8 @@ class WebChatMixin:
                 except RuntimeError:
                     response = asyncio.run(_coro2)
             except Exception as e:
-                log.error(f"[Chat] process_message error: {e}")
-                response = f"❌ Internal error: {type(e).__name__}"
+                import traceback as _tb2; log.error(f"[Chat] process_message error: {type(e).__name__}: {e}\n{_tb2.format_exc()}")
+                response = f"❌ Internal error: {type(e).__name__}: {e}"
             from salmalm.core import get_session as _gs
 
             _sess = _gs(session_id)
@@ -635,7 +635,7 @@ async def post_chat_stream(req: _ChatBody, _u=_Depends(_auth)):
         try:
             response = await task
         except Exception as e:
-            log.error(f"[SSE] process_message error: {e}")
+            import traceback as _tbsse; log.error(f"[SSE] process_message error: {type(e).__name__}: {e}\n{_tbsse.format_exc()}")
             yield _sse("error", {"text": str(e)})
             return
 
