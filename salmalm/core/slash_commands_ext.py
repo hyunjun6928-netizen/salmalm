@@ -207,9 +207,8 @@ def _cmd_subagents(cmd: str, session, **_) -> str:
                 parent_session=getattr(session, "id", "web"),
             )
             return f"🤖 Sub-agent spawned: `{task.task_id}`\nLabel: {task.label or '-'}\nModel: {model or 'auto'}\nThinking: {thinking or 'off'}\nWill notify on completion."
-        except Exception:
-            agent_id = SubAgent.spawn(arg.strip(), model=model)
-            return f"🤖 Sub-agent spawned: `{agent_id}`\nTask: {arg[:100]}\nWill notify on completion."
+        except Exception as _spawn_err:
+            return f"❌ subagent_manager.spawn failed: {_spawn_err}" 
 
     elif sub == "stop":
         if not arg:
@@ -243,6 +242,23 @@ def _cmd_subagents(cmd: str, session, **_) -> str:
         if not arg:
             return "❌ Usage: /subagents info <id|#N>"
         return SubAgent.get_info(arg)
+
+    elif sub == "result":
+        # Alias: show result of a specific task
+        if not arg:
+            return "❌ Usage: /subagents result <id>"
+        from salmalm.features.subagents import subagent_manager
+        task = subagent_manager.get_task(arg.strip())
+        if not task:
+            return f"❌ Task {arg.strip()} not found"
+        label = task.label or task.description[:40]
+        if task.status == "running":
+            return f"⏳ [{task.task_id}] '{label}' is still running ({task.elapsed_s}s, {task.turns_used} turns so far)"
+        if task.status == "completed":
+            return f"✅ [{task.task_id}] '{label}' ({task.elapsed_s}s, {task.turns_used} turns)\n\n{task.result}"
+        if task.status == "failed":
+            return f"❌ [{task.task_id}] '{label}' failed: {task.error}"
+        return f"🚫 [{task.task_id}] '{label}' status: {task.status}"
 
     elif sub == "collect":
         # OpenClaw-style: collect all completed results

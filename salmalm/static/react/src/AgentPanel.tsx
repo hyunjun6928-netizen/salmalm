@@ -26,6 +26,21 @@ interface SubTask {
   messages?: Message[];
 }
 
+// ── Static model list (kept in sync with /api/routing available_models) ──────
+const MODEL_OPTIONS = [
+  { value: '', label: '⚡ auto (recommended)' },
+  { value: 'sonnet',        label: '🌟 sonnet' },
+  { value: 'haiku',         label: '🐦 haiku (fast)' },
+  { value: 'opus',          label: '🏔️ opus (best)' },
+  { value: 'gemini3flash',  label: '✨ gemini3flash (fast)' },
+  { value: 'gemini3pro',    label: '✨ gemini3pro' },
+  { value: 'gemini2.5flash',label: '✨ gemini2.5flash' },
+  { value: 'gpt4.1',        label: '🤖 gpt4.1' },
+  { value: 'gpt4.1mini',    label: '🤖 gpt4.1mini' },
+  { value: 'grok4',         label: '𝕏 grok4' },
+  { value: 'grok3',         label: '𝕏 grok3' },
+];
+
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 
 function getToken(): string {
@@ -281,7 +296,15 @@ export default function AgentPanel() {
           />
           <div style={S.row}>
             <input style={S.input} placeholder="Label (optional)" value={label} onChange={e => setLabel(e.target.value)} />
-            <input style={{ ...S.input, maxWidth: 120 }} placeholder="Model" value={model} onChange={e => setModel(e.target.value)} />
+            <select
+              style={{ ...S.input, maxWidth: 160, cursor: 'pointer' }}
+              value={model}
+              onChange={e => setModel(e.target.value)}
+            >
+              {MODEL_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </div>
           <button style={{ ...S.btn, opacity: spawning ? .6 : 1 }} onClick={handleSpawn} disabled={spawning || !desc.trim()}>
             {spawning ? '⏳ Spawning…' : '⚡ Spawn'}
