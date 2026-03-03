@@ -69,15 +69,26 @@ class SubAgent:
     def spawn(
         cls, task: str, model: Optional[str] = None, notify_telegram: bool = True, _depth: int = 0, label: str = ""
     ) -> str:
-        """Spawn a background sub-agent. Returns agent ID."""
+        """Spawn via v2 SubAgentManagerV2 — unified task registry."""
+        try:
+            from salmalm.features.subagents import sub_agent_manager
+            task_obj = sub_agent_manager.spawn(
+                description=task,
+                model=model,
+                label=label or task[:40],
+                parent_session="web",
+            )
+            log.info(f"[BOT] Sub-agent {task_obj.task_id} spawned: {task[:80]}")
+            return task_obj.task_id
+        except Exception as e:
+            log.error(f"[SubAgent] v2 spawn failed, falling back: {e}")
+        # ── legacy fallback ──
         if _depth >= cls.MAX_DEPTH:
             from salmalm.core.exceptions import SessionError
-
             raise SessionError(f"Sub-agent nesting depth limit ({cls.MAX_DEPTH}) reached")
         running = sum(1 for a in cls._agents.values() if a["status"] == "running")
         if running >= cls.MAX_CONCURRENT:
             from salmalm.core.exceptions import SessionError
-
             raise SessionError(f"Max concurrent sub-agents ({cls.MAX_CONCURRENT}) reached")
         with cls._lock:
             cls._counter += 1

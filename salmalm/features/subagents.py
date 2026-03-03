@@ -287,18 +287,28 @@ class SubAgentManager:
 
         # Push message into parent session chat (OpenClaw-style)
         try:
-            from salmalm.core.engine import process_message
-            import asyncio
-            loop = None
+            from salmalm.core.core import get_session
+            parent_sid = task.parent_session or "web"
+            parent_sess = get_session(parent_sid)
+            parent_sess.add_assistant(msg)
+            # Also broadcast via SSE so the UI updates live
             try:
-                loop = asyncio.get_event_loop()
-            except Exception:
-                pass
-            if loop and loop.is_running():
-                asyncio.run_coroutine_threadsafe(
-                    process_message(task.parent_session, msg, is_system=True),
-                    loop,
-                )
+                from salmalm.web.ws import ws_server
+                import asyncio as _aio
+                _loop = getattr(ws_server, "_loop", None)
+                if _loop and _loop.is_running():
+                    _aio.run_coroutine_threadsafe(
+                        ws_server.broadcast({
+                            "type": "chat",
+                            "role": "assistant",
+                            "content": msg,
+                            "session": parent_sid,
+                            "source": "subagent_notify",
+                        }),
+                        _loop,
+                    )
+            except Exception as _e:
+                log.debug(f"[SUBAGENT] SSE push skipped: {_e}")
         except Exception as e:
             log.debug(f"[SUBAGENT] Parent push skipped: {e}")
 
