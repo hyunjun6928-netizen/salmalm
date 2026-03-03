@@ -238,21 +238,25 @@ def _exec_image_generate(args: dict) -> str:
         img_data = b64mod.b64decode(resp["data"][0]["b64_json"])
         save_path.write_bytes(img_data)
     elif provider == "google":
-        import base64 as b64mod, json as _json
+        import base64 as b64mod
         api_key = vault.get("google_api_key") or vault.get("gemini_api_key")
         if not api_key:
             return "❌ Google API key not found in vault (key: google_api_key or gemini_api_key)"
-        resp = _http_post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={api_key}",
-            {"Content-Type": "application/json"},
-            {
-                "instances": [{"prompt": prompt}],
-                "parameters": {"sampleCount": 1, "aspectRatio": "1:1"},
-            },
-        )
+        # Try imagen-3.0-generate-002 first, fallback to imagen-3.0-fast-generate-001
+        for _model in ["imagen-3.0-generate-002", "imagen-3.0-fast-generate-001"]:
+            resp = _http_post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:predict",
+                {"Content-Type": "application/json", "x-goog-api-key": api_key},
+                {
+                    "instances": [{"prompt": prompt}],
+                    "parameters": {"sampleCount": 1, "aspectRatio": "1:1"},
+                },
+            )
+            if not resp.get("_failed"):
+                break
         predictions = resp.get("predictions", [])
         if not predictions:
-            return f"❌ Google Imagen returned no predictions: {resp}"
+            return f"❌ Google Imagen returned no predictions. Check API key has Imagen access. Response: {str(resp)[:200]}"
         img_data = b64mod.b64decode(predictions[0].get("bytesBase64Encoded", ""))
         save_path.write_bytes(img_data)
     else:
