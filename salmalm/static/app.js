@@ -276,23 +276,74 @@
   /* --- Helpers --- */
   var _copyId=0;
   function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+  /* Tool icon + label mapping (OpenClaw-style) */
+  var _TOOL_META={
+    exec:{icon:'⚡',label:'Exec'},bash:{icon:'⚡',label:'Exec'},shell:{icon:'⚡',label:'Exec'},run:{icon:'⚡',label:'Exec'},
+    edit:{icon:'✏️',label:'Edit'},write:{icon:'✏️',label:'Edit'},file_write:{icon:'✏️',label:'Edit'},
+    read:{icon:'📖',label:'Read'},file_read:{icon:'📖',label:'Read'},
+    web_search:{icon:'🔍',label:'Search'},search:{icon:'🔍',label:'Search'},
+    web_fetch:{icon:'🌐',label:'Fetch'},fetch:{icon:'🌐',label:'Fetch'},
+    browser:{icon:'🖥️',label:'Browser'},
+    image:{icon:'🖼️',label:'Image'},
+    memory_search:{icon:'🧠',label:'Memory'},memory_get:{icon:'🧠',label:'Memory'},
+  };
+  function _toolMeta(name){
+    var m=_TOOL_META[name]||_TOOL_META[name.toLowerCase()];
+    if(m)return m;
+    return {icon:'🔧',label:name.charAt(0).toUpperCase()+name.slice(1).replace(/_/g,' ')};
+  }
+  /* Build a one-liner preview from tool call args */
+  function _toolPreview(callBody){
+    try{
+      var parsed=JSON.parse(callBody.trim());
+      var args=parsed.arguments||parsed;
+      delete args.name;
+      var keys=Object.keys(args);
+      if(!keys.length)return '';
+      // First meaningful string arg, truncated
+      var first=String(args[keys[0]]||'').replace(/\n/g,' ').trim();
+      if(keys.length>1)first+=' (+'+( keys.length-1)+' more)';
+      return first.length>120?first.substring(0,120)+'…':first;
+    }catch(e){
+      var s=callBody.replace(/"?name"?\s*[:=]\s*"[^"]*",?\s*/,'').trim();
+      return s.length>120?s.substring(0,120)+'…':s;
+    }
+  }
+  function _toolCard(name,preview,resultSnippet,done){
+    var m=_toolMeta(name);
+    var status=done
+      ?'<span class="tc-status tc-done">✓</span>'
+      :'<span class="tc-status tc-pending">…</span>';
+    var previewHtml=preview?'<div class="tc-preview">with '+escHtml(preview)+'</div>':'';
+    var resultHtml='';
+    if(done&&resultSnippet){
+      var rs=resultSnippet.trim();
+      if(rs.length>200)rs=rs.substring(0,200)+'…';
+      resultHtml='<div class="tc-result">'+escHtml(rs)+'</div>';
+    }
+    return '<div class="tool-card">'
+      +'<div class="tc-header"><span class="tc-icon">'+m.icon+'</span><span class="tc-label">'+escHtml(m.label)+'</span>'+status+'</div>'
+      +previewHtml
+      +(done?'<div class="tc-completed">Completed</div>':'')
+      +'</div>';
+  }
   function _renderToolBlocks(t){
-    /* Merge consecutive tool_call+tool_result into single compact block */
+    /* Merge consecutive tool_call+tool_result into single card */
     t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>\s*<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,callBody,resultBody){
-      var name2=(callBody.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
-      var preview2=resultBody.length>300?resultBody.substring(0,300)+'…':resultBody;
-      return '<details class="tool-block"><summary class="tool-header">🔧 <b>'+name2+'</b> <span style="margin-left:auto;font-size:10px;opacity:0.6">✓ done</span></summary><pre class="tool-body">'+preview2.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+      var name=(callBody.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
+      var preview=_toolPreview(callBody);
+      return _toolCard(name,preview,resultBody,true);
     });
-    /* Remaining unmatched tool_call (no result yet) */
+    /* Pending tool_call (no result yet) */
     t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g,function(_,body){
-      var name='tool';var args='';
-      try{var parsed=JSON.parse(body.trim());name=parsed.name||'tool';args=JSON.stringify(parsed.arguments||parsed,null,2)}catch(e){args=body.trim()}
-      if(args.length>200)args=args.substring(0,200)+'…';
-      return '<details class="tool-block"><summary class="tool-header">🔧 <strong>'+name+'</strong> <span style="margin-left:auto;font-size:10px;opacity:0.6">⏳</span></summary><pre class="tool-body">'+args.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+      var name=(body.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
+      var preview=_toolPreview(body);
+      return _toolCard(name,preview,'',false);
     });
+    /* Orphan tool_result */
     t=t.replace(/<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,body){
-      var preview=body.trim();if(preview.length>300)preview=preview.substring(0,300)+'...';
-      return '<details class="tool-block"><summary class="tool-header">📤 Result</summary><pre class="tool-body">'+preview.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
+      var preview=body.trim();if(preview.length>200)preview=preview.substring(0,200)+'…';
+      return '<div class="tool-card tc-result-only"><div class="tc-header"><span class="tc-icon">📤</span><span class="tc-label">Result</span></div><div class="tc-preview">'+escHtml(preview)+'</div></div>';
     });
     return t;
   }
@@ -758,7 +809,25 @@
     }else if(data.type==='error'){
       _wsRequestPending=false;
       if(typingEl)typingEl.remove();
-      addMsg('assistant','❌ '+data.error);
+      /* Convert technical errors to friendly messages */
+      var _rawErr=data.error||'Unknown error';
+      var _friendlyErr=_rawErr;
+      var _eLow=_rawErr.toLowerCase();
+      if(_eLow.indexOf('rate limit')>=0||_eLow.indexOf('429')>=0)
+        _friendlyErr='⏳ 잠깐 너무 많은 요청이 왔어요. 잠시 후 자동으로 다시 시도합니다...';
+      else if(_eLow.indexOf('timeout')>=0||_eLow.indexOf('timed out')>=0)
+        _friendlyErr='⏰ 응답이 조금 오래 걸렸어요. 다시 시도해주세요.';
+      else if(_eLow.indexOf('overloaded')>=0||_eLow.indexOf('529')>=0)
+        _friendlyErr='🏋️ AI 서버가 잠시 바쁩니다. 곧 복구됩니다...';
+      else if(_eLow.indexOf('api key')>=0||_eLow.indexOf('auth')>=0||_eLow.indexOf('401')>=0)
+        _friendlyErr='🔑 API 키 설정을 확인해주세요. (Settings → API Keys)';
+      else if(_eLow.indexOf('unavailable')>=0||_eLow.indexOf('all ai')>=0)
+        _friendlyErr='😓 AI 모델이 일시적으로 점검 중입니다. 잠시 후 다시 시도해주세요.';
+      else if(_eLow.indexOf('context')>=0||_eLow.indexOf('too long')>=0)
+        _friendlyErr='📏 대화가 너무 길어졌어요. /compact 명령으로 정리해보세요.';
+      else
+        _friendlyErr='😅 잠깐 문제가 생겼어요. 다시 시도해주세요.';
+      addMsg('assistant',_friendlyErr);
       var _sb2=document.getElementById('stop-btn');var _sb2Send=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb2Send)_sb2Send.style.display='flex';
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
     }else if(data.type==='shutdown'){
@@ -899,15 +968,11 @@
       if(!r.ok||!r.body){throw new Error('stream unavailable')}
       var reader=r.body.getReader();var decoder=new TextDecoder();var buf='';var gotDone=false;
       var typingEl=document.getElementById('typing-row');
-      /* Per-chunk stall timeout: if server holds connection open but sends nothing for 60s,
-         abort and fall back to HTTP POST (prevents indefinite hang) */
-      var _STALL_MS=60000;
+      /* No stall timeout — wait indefinitely like OpenClaw.
+         Heavy models (opus) can take 3+ minutes for complex tasks. */
       var _stallTimer=null;
       function _readWithTimeout(){
-        return Promise.race([
-          reader.read(),
-          new Promise(function(_,reject){_stallTimer=setTimeout(function(){reject(new Error('SSE stall: no data for '+_STALL_MS+'ms'))},_STALL_MS)})
-        ]);
+        return reader.read();
       }
       while(true){
         var chunk=await _readWithTimeout();
