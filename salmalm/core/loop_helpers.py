@@ -172,6 +172,19 @@ def check_loop_detection(tool_calls: list, recent_calls: list) -> str | None:
 
     return None
 
+async def handle_empty_response(call_fn, pruned_messages, model: str, tools: list) -> str:
+    """Retry empty responses up to 2 times with backoff."""
+    import asyncio as _aio_er
+    for _retry in range(2):
+        log.warning(f"[LLM] Empty response, retry #{_retry + 1}")
+        await _aio_er.sleep(0.5 * (_retry + 1))
+        retry_result, _ = await call_fn(pruned_messages, model=model, tools=tools, max_tokens=4096, thinking=False)
+        response = retry_result.get("content", "")
+        if response and response.strip():
+            return response
+    return "⚠️ 응답을 생성할 수 없습니다. / Could not generate a response."
+
+
 def finalize_response(result: dict, response: str) -> str:
     """Handle truncation and content filter edge cases.
 
