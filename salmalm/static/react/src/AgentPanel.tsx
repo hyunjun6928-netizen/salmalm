@@ -1,541 +1,426 @@
-import { useState, useEffect, useCallback, CSSProperties } from 'react';
+import { useState, useEffect, useCallback, useRef, CSSProperties } from 'react';
 
-interface Task {
-  id: string;
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface Message {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  name?: string;
+  tool_calls?: { name: string; arguments: unknown }[];
+}
+
+interface SubTask {
+  task_id: string;
+  label: string;
   description: string;
-  model: string;
-  status: 'pending' | 'running' | 'done' | 'failed' | 'cancelled';
+  model: string | null;
+  thinking_level: string | null;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'killed';
+  result: string;
+  error: string;
+  elapsed_s: number;
+  turns_used: number;
+  tokens_used: number;
   created_at: number;
-  elapsed_ms: number;
-  result_preview: string;
-  output: string;
+  completed_at: number;
+  messages?: Message[];
 }
 
-// Use main app CSS variables so agent panel respects light/dark theme
-const colors = {
-  bg: 'var(--bg)',
-  bgCard: 'var(--bg2)',
-  accent: 'var(--accent)',
-  accentHover: 'var(--accent2)',
-  text: 'var(--text)',
-  textMuted: 'var(--text2)',
-  success: 'var(--green)',
-  error: 'var(--red)',
-  border: 'var(--border)',
-  danger: 'var(--red)',
-  dangerHover: 'var(--red)',
-};
-
-const styles: Record<string, CSSProperties> = {
-  container: {
-    background: colors.bg,
-    color: colors.text,
-    fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-    fontSize: '14px',
-    padding: '16px',
-    borderRadius: '8px',
-    border: `1px solid ${colors.border}`,
-    minWidth: '360px',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: '16px',
-  },
-  title: {
-    margin: 0,
-    fontSize: '16px',
-    fontWeight: 600,
-    color: colors.text,
-  },
-  refreshBtn: {
-    background: 'transparent',
-    border: `1px solid ${colors.border}`,
-    color: colors.textMuted,
-    borderRadius: '6px',
-    padding: '4px 10px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    transition: 'color 0.15s, border-color 0.15s',
-  },
-  form: {
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: '8px',
-    padding: '12px',
-    marginBottom: '16px',
-  },
-  textarea: {
-    width: '100%',
-    background: colors.bg,
-    border: `1px solid ${colors.border}`,
-    borderRadius: '6px',
-    color: colors.text,
-    padding: '8px 10px',
-    fontSize: '13px',
-    resize: 'vertical',
-    minHeight: '72px',
-    boxSizing: 'border-box',
-    outline: 'none',
-    fontFamily: 'inherit',
-  },
-  formRow: {
-    display: 'flex',
-    gap: '8px',
-    marginTop: '8px',
-    alignItems: 'center',
-  },
-  select: {
-    background: colors.bg,
-    border: `1px solid ${colors.border}`,
-    borderRadius: '6px',
-    color: colors.text,
-    padding: '6px 10px',
-    fontSize: '13px',
-    outline: 'none',
-    cursor: 'pointer',
-    flex: '0 0 auto',
-  },
-  spawnBtn: {
-    background: colors.accent,
-    border: 'none',
-    borderRadius: '6px',
-    color: 'white',
-    padding: '6px 16px',
-    fontSize: '13px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    flex: '1',
-    transition: 'background 0.15s',
-  },
-  spawnBtnDisabled: {
-    background: 'var(--accent-dim, rgba(99,140,255,0.3))',
-    cursor: 'not-allowed',
-    opacity: 0.6,
-  },
-  section: {
-    marginBottom: '12px',
-  },
-  sectionTitle: {
-    fontSize: '11px',
-    fontWeight: 700,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.08em',
-    color: colors.textMuted,
-    marginBottom: '8px',
-    marginTop: 0,
-  },
-  taskCard: {
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: '6px',
-    padding: '10px 12px',
-    marginBottom: '6px',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '6px',
-  },
-  taskRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '8px',
-  },
-  taskDesc: {
-    color: colors.text,
-    fontSize: '13px',
-    flex: 1,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap' as const,
-  },
-  taskMeta: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    flexShrink: 0,
-  },
-  modelBadge: {
-    background: 'var(--accent-dim, rgba(99,140,255,0.15))',
-    color: 'var(--accent)',
-    borderRadius: '4px',
-    padding: '2px 6px',
-    fontSize: '11px',
-    fontWeight: 600,
-    textTransform: 'capitalize' as const,
-  },
-  elapsed: {
-    color: colors.textMuted,
-    fontSize: '12px',
-    flexShrink: 0,
-  },
-  spinner: {
-    display: 'inline-block',
-    width: '14px',
-    height: '14px',
-    border: `2px solid ${colors.border}`,
-    borderTopColor: colors.accent,
-    borderRadius: '50%',
-    flexShrink: 0,
-  },
-  killBtn: {
-    background: 'transparent',
-    border: `1px solid ${colors.danger}`,
-    color: colors.error,
-    borderRadius: '4px',
-    padding: '2px 8px',
-    fontSize: '12px',
-    cursor: 'pointer',
-    flexShrink: 0,
-  },
-  viewBtn: {
-    background: 'transparent',
-    border: `1px solid ${colors.border}`,
-    color: colors.textMuted,
-    borderRadius: '4px',
-    padding: '2px 8px',
-    fontSize: '12px',
-    cursor: 'pointer',
-    flexShrink: 0,
-  },
-  emptyState: {
-    color: colors.textMuted,
-    fontSize: '13px',
-    textAlign: 'center' as const,
-    padding: '12px 0',
-    fontStyle: 'italic',
-  },
-  errorMsg: {
-    color: colors.error,
-    fontSize: '12px',
-    marginTop: '6px',
-  },
-  // Modal
-  modalOverlay: {
-    position: 'fixed' as const,
-    inset: 0,
-    background: 'rgba(0,0,0,0.7)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 9999,
-  },
-  modalBox: {
-    background: colors.bgCard,
-    border: `1px solid ${colors.border}`,
-    borderRadius: '10px',
-    width: '90vw',
-    maxWidth: '640px',
-    maxHeight: '80vh',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '12px 16px',
-    borderBottom: `1px solid ${colors.border}`,
-  },
-  modalTitle: {
-    color: colors.text,
-    fontWeight: 600,
-    fontSize: '14px',
-    margin: 0,
-  },
-  modalCloseBtn: {
-    background: 'transparent',
-    border: 'none',
-    color: colors.textMuted,
-    fontSize: '18px',
-    cursor: 'pointer',
-    lineHeight: 1,
-    padding: '0 4px',
-  },
-  modalBody: {
-    overflowY: 'auto' as const,
-    padding: '16px',
-    flex: 1,
-  },
-  outputPre: {
-    background: colors.bg,
-    border: `1px solid ${colors.border}`,
-    borderRadius: '6px',
-    padding: '12px',
-    color: colors.text,
-    fontSize: '12px',
-    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    whiteSpace: 'pre-wrap' as const,
-    wordBreak: 'break-all' as const,
-    margin: 0,
-    lineHeight: 1.6,
-  },
-};
-
-function formatElapsed(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  return `${m}m ${s}s`;
-}
-
-function truncate(str: string, n: number): string {
-  return str.length > n ? str.slice(0, n) + '…' : str;
-}
+// ── Auth helpers ──────────────────────────────────────────────────────────────
 
 function getToken(): string {
-  return (window as any)._tok || localStorage.getItem('session_token') || '';
-}
-
-function authHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    'X-Session-Token': getToken(),
-  };
-}
-
-// Spinner with keyframe animation injected once
-let spinnerStyleInjected = false;
-function ensureSpinnerStyle() {
-  if (spinnerStyleInjected) return;
-  spinnerStyleInjected = true;
-  const s = document.createElement('style');
-  s.textContent = `@keyframes _salmalm_spin { to { transform: rotate(360deg); } }`;
-  document.head.appendChild(s);
-}
-
-interface OutputModalProps {
-  task: Task;
-  onClose: () => void;
-}
-
-function OutputModal({ task, onClose }: OutputModalProps) {
   return (
-    <div style={styles.modalOverlay} onClick={onClose}>
-      <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
-        <div style={styles.modalHeader}>
-          <p style={styles.modalTitle}>Task Output — {truncate(task.description, 60)}</p>
-          <button style={styles.modalCloseBtn} onClick={onClose}>×</button>
-        </div>
-        <div style={styles.modalBody}>
-          <pre style={styles.outputPre}>{task.output || task.result_preview || '(no output)'}</pre>
-        </div>
-      </div>
-    </div>
+    localStorage.getItem('salmalm_token') ||
+    localStorage.getItem('auth_token') ||
+    sessionStorage.getItem('salmalm_token') ||
+    ''
   );
 }
+function authHeaders(): Record<string, string> {
+  const t = getToken();
+  return t ? { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` }
+           : { 'Content-Type': 'application/json' };
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+
+function fmtElapsed(s: number): string {
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+}
+
+function statusDot(status: SubTask['status']): string {
+  return { running: '🟡', completed: '🟢', failed: '🔴', killed: '⚫', pending: '⚪' }[status] ?? '⚪';
+}
+
+// ── Palette (inherits CSS vars from host page) ───────────────────────────────
+
+const C = {
+  bg: 'var(--bg)',
+  bg2: 'var(--bg2)',
+  bg3: 'var(--bg3, #1a1a2e)',
+  border: 'var(--border)',
+  accent: 'var(--accent)',
+  text: 'var(--text)',
+  text2: 'var(--text2)',
+  green: '#4caf50',
+  red: '#f44336',
+  yellow: '#ffc107',
+};
+
+const S: Record<string, CSSProperties> = {
+  root: { display: 'flex', height: '100%', fontFamily: "'Inter','Segoe UI',system-ui,sans-serif", fontSize: 14, color: C.text, background: C.bg, overflow: 'hidden' },
+  // Left pane
+  left: { width: 340, minWidth: 280, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, background: C.bg },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: `1px solid ${C.border}` },
+  title: { margin: 0, fontSize: 15, fontWeight: 700 },
+  spawnForm: { padding: '12px 14px', borderBottom: `1px solid ${C.border}`, background: C.bg2, display: 'flex', flexDirection: 'column', gap: 8 },
+  textarea: { width: '100%', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, padding: '7px 10px', fontSize: 13, resize: 'vertical', minHeight: 64, boxSizing: 'border-box', outline: 'none' },
+  row: { display: 'flex', gap: 8 },
+  input: { flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, padding: '5px 9px', fontSize: 12, outline: 'none' },
+  btn: { background: C.accent, border: 'none', color: '#fff', borderRadius: 6, padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  btnSm: { background: 'transparent', border: `1px solid ${C.border}`, color: C.text2, borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' },
+  taskList: { flex: 1, overflowY: 'auto', padding: '8px 0' },
+  taskCard: { padding: '10px 14px', cursor: 'pointer', borderBottom: `1px solid ${C.border}`, transition: 'background .12s' },
+  taskCardActive: { background: C.bg2 },
+  taskTop: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 },
+  taskLabel: { fontWeight: 600, fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  taskMeta: { fontSize: 11, color: C.text2 },
+  steerBar: { display: 'flex', gap: 6, marginTop: 7 },
+  steerInput: { flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, color: C.text, padding: '4px 8px', fontSize: 12, outline: 'none' },
+  steerBtn: { background: C.accent, border: 'none', color: '#fff', borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer' },
+  // Right pane
+  right: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  rightHeader: { padding: '12px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 10 },
+  rightTitle: { margin: 0, fontSize: 14, fontWeight: 600, flex: 1 },
+  historyPane: { flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
+  msgBubble: { borderRadius: 8, padding: '8px 12px', fontSize: 13, lineHeight: 1.5, maxWidth: '90%', wordBreak: 'break-word', whiteSpace: 'pre-wrap' },
+  msgUser: { background: C.accent, color: '#fff', alignSelf: 'flex-end' },
+  msgAssistant: { background: C.bg2, alignSelf: 'flex-start' },
+  msgTool: { background: C.bg3, color: C.text2, alignSelf: 'flex-start', fontFamily: 'monospace', fontSize: 12 },
+  resultBox: { margin: '12px 16px', padding: '12px', background: C.bg2, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  emptyRight: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.text2, fontSize: 13 },
+  // Toast
+  toast: { position: 'fixed', bottom: 20, right: 20, background: C.accent, color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, zIndex: 9999, boxShadow: '0 4px 12px rgba(0,0,0,.3)' },
+};
+
+// ── AgentPanel component ──────────────────────────────────────────────────────
 
 export default function AgentPanel() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [description, setDescription] = useState('');
-  const [model, setModel] = useState('auto');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [viewTask, setViewTask] = useState<Task | null>(null);
+  const [tasks, setTasks] = useState<SubTask[]>([]);
+  const [selected, setSelected] = useState<SubTask | null>(null);
+  const [detailTask, setDetailTask] = useState<SubTask | null>(null);
+  const [desc, setDesc] = useState('');
+  const [label, setLabel] = useState('');
+  const [model, setModel] = useState('');
+  const [spawning, setSpawning] = useState(false);
+  const [steerInputs, setSteerInputs] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState('');
+  const historyRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    ensureSpinnerStyle();
-  }, []);
+  // ── Fetch list ───────────────────────────────────────────────────────────
 
   const fetchTasks = useCallback(async () => {
     try {
-      const res = await fetch('/api/agent/tasks', { headers: authHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        setTasks(data.tasks ?? []);
-      }
-    } catch {
-      // silently ignore network errors during polling
-    }
+      const res = await fetch('/api/subagents', { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setTasks(data.tasks || []);
+    } catch { /* ignore */ }
   }, []);
+
+  // ── Fetch detail (with messages) ─────────────────────────────────────────
+
+  const fetchDetail = useCallback(async (task_id: string) => {
+    try {
+      const res = await fetch(`/api/subagents/${task_id}`, { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setDetailTask(data.task || null);
+    } catch { /* ignore */ }
+  }, []);
+
+  // ── Auto-refresh ─────────────────────────────────────────────────────────
 
   useEffect(() => {
     fetchTasks();
-    const id = setInterval(fetchTasks, 3000);
+    const id = setInterval(() => {
+      fetchTasks();
+      if (selected && selected.status === 'running') fetchDetail(selected.task_id);
+    }, 2500);
     return () => clearInterval(id);
-  }, [fetchTasks]);
+  }, [fetchTasks, fetchDetail, selected]);
+
+  // Re-fetch detail when selected changes
+  useEffect(() => {
+    if (selected) fetchDetail(selected.task_id);
+  }, [selected, fetchDetail]);
+
+  // Scroll history to bottom
+  useEffect(() => {
+    if (historyRef.current) {
+      historyRef.current.scrollTop = historyRef.current.scrollHeight;
+    }
+  }, [detailTask?.messages?.length]);
+
+  // WS subagent_done listener
+  useEffect(() => {
+    const handleMsg = (e: MessageEvent) => {
+      try {
+        const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (d.type === 'subagent_done') {
+          fetchTasks();
+          const t = d.task as SubTask;
+          showToast(`${t.status === 'completed' ? '✅' : '❌'} Sub-agent "${t.label}" ${t.status}`);
+          if (selected?.task_id === t.task_id) fetchDetail(t.task_id);
+        }
+      } catch { /* ignore */ }
+    };
+    // Attach to existing WS if available
+    const ws = (window as Record<string, unknown>)._ws as WebSocket | undefined;
+    if (ws) ws.addEventListener('message', handleMsg);
+    return () => { if (ws) ws.removeEventListener('message', handleMsg); };
+  }, [fetchTasks, fetchDetail, selected]);
+
+  // ── Spawn ────────────────────────────────────────────────────────────────
 
   const handleSpawn = async () => {
-    if (!description.trim()) return;
-    setSubmitting(true);
-    setSubmitError('');
+    if (!desc.trim()) return;
+    setSpawning(true);
     try {
-      const res = await fetch('/api/agent/task', {
+      const res = await fetch('/api/subagents', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ description: description.trim(), model }),
+        body: JSON.stringify({ description: desc.trim(), label: label.trim() || undefined, model: model.trim() || undefined }),
       });
       const data = await res.json();
-      if (data.ok) {
-        setDescription('');
+      if (data.task) {
+        setDesc(''); setLabel(''); setModel('');
         await fetchTasks();
-      } else {
-        setSubmitError(data.error || 'Failed to spawn agent');
+        setSelected(data.task);
       }
-    } catch (err: any) {
-      setSubmitError(err?.message || 'Network error');
     } finally {
-      setSubmitting(false);
+      setSpawning(false);
     }
   };
 
-  const handleKill = async (id: string) => {
-    try {
-      await fetch(`/api/agent/task/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-      });
-      await fetchTasks();
-    } catch {
-      // ignore
-    }
+  // ── Kill ─────────────────────────────────────────────────────────────────
+
+  const handleKill = async (task_id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await fetch(`/api/subagents/${task_id}/kill`, { method: 'POST', headers: authHeaders(), body: '{}' });
+    fetchTasks();
   };
 
-  const handleClearCompleted = async () => {
-    try {
-      await fetch('/api/agent/tasks/clear', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      await fetchTasks();
-    } catch {
-      // ignore
-    }
+  // ── Steer ────────────────────────────────────────────────────────────────
+
+  const handleSteer = async (task_id: string) => {
+    const msg = (steerInputs[task_id] || '').trim();
+    if (!msg) return;
+    const res = await fetch(`/api/subagents/${task_id}/steer`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ message: msg }),
+    });
+    const data = await res.json();
+    showToast(data.result?.slice(0, 80) || '📡 Steered');
+    setSteerInputs(p => ({ ...p, [task_id]: '' }));
+    if (selected?.task_id === task_id) setTimeout(() => fetchDetail(task_id), 1000);
   };
 
-  const activeTasks = tasks.filter(t => t.status === 'running' || t.status === 'pending');
-  const completedTasks = tasks.filter(t => t.status === 'done' || t.status === 'failed' || t.status === 'cancelled');
+  // ── Clear ────────────────────────────────────────────────────────────────
+
+  const handleClear = async () => {
+    const res = await fetch('/api/subagents/clear', { method: 'POST', headers: authHeaders(), body: '{}' });
+    const data = await res.json();
+    showToast(`🗑️ Removed ${data.removed} completed tasks`);
+    if (selected && ['completed','failed','killed'].includes(selected.status)) setSelected(null);
+    fetchTasks();
+  };
+
+  // ── Toast ────────────────────────────────────────────────────────────────
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3500);
+  };
+
+  // ── Select task ──────────────────────────────────────────────────────────
+
+  const handleSelect = (task: SubTask) => {
+    setSelected(task);
+    fetchDetail(task.task_id);
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  const displayTask = detailTask && selected && detailTask.task_id === selected.task_id ? detailTask : selected;
+  const runningCount = tasks.filter(t => t.status === 'running').length;
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <h2 style={styles.title}>🤖 Agent Tasks</h2>
-        <button style={styles.refreshBtn} onClick={fetchTasks}>↻ Refresh</button>
-      </div>
+    <div style={S.root}>
+      {/* ── Left pane ── */}
+      <div style={S.left}>
+        {/* Header */}
+        <div style={S.header}>
+          <h3 style={S.title}>🤖 Sub-agents {runningCount > 0 && <span style={{ fontSize: 12, background: C.yellow, color: '#000', borderRadius: 10, padding: '1px 7px', marginLeft: 6 }}>{runningCount}</span>}</h3>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button style={S.btnSm} onClick={handleClear}>🗑️</button>
+            <button style={S.btnSm} onClick={fetchTasks}>↻</button>
+          </div>
+        </div>
 
-      {/* Create Task Form */}
-      <div style={styles.form}>
-        <textarea
-          style={styles.textarea}
-          value={description}
-          onChange={e => setDescription(e.target.value)}
-          placeholder="Describe what you want the agent to do..."
-          rows={3}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSpawn();
-          }}
-        />
-        <div style={styles.formRow}>
-          <select
-            style={styles.select}
-            value={model}
-            onChange={e => setModel(e.target.value)}
-          >
-            <option value="auto">auto</option>
-            <optgroup label="── Anthropic ──">
-              <option value="haiku">haiku</option>
-              <option value="sonnet">sonnet</option>
-              <option value="opus">opus</option>
-            </optgroup>
-            <optgroup label="── OpenAI ──">
-              <option value="gpt-4o-mini">gpt-4o-mini</option>
-              <option value="gpt-4o">gpt-4o</option>
-              <option value="gpt">gpt (5.2)</option>
-            </optgroup>
-            <optgroup label="── Google ──">
-              <option value="gemini-2.0-flash">gemini-flash</option>
-              <option value="gemini-2.5-pro-preview-03-25">gemini-pro</option>
-            </optgroup>
-            <optgroup label="── xAI ──">
-              <option value="grok-3-mini">grok-mini</option>
-              <option value="grok-3">grok-3</option>
-            </optgroup>
-          </select>
-          <button
-            style={{ ...styles.spawnBtn, ...(submitting ? styles.spawnBtnDisabled : {}) }}
-            disabled={submitting}
-            onClick={handleSpawn}
-          >
-            {submitting ? 'Spawning…' : '⚡ Spawn Agent'}
+        {/* Spawn form */}
+        <div style={S.spawnForm}>
+          <textarea
+            style={S.textarea}
+            placeholder="Task description…"
+            value={desc}
+            onChange={e => setDesc(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) handleSpawn(); }}
+          />
+          <div style={S.row}>
+            <input style={S.input} placeholder="Label (optional)" value={label} onChange={e => setLabel(e.target.value)} />
+            <input style={{ ...S.input, maxWidth: 120 }} placeholder="Model" value={model} onChange={e => setModel(e.target.value)} />
+          </div>
+          <button style={{ ...S.btn, opacity: spawning ? .6 : 1 }} onClick={handleSpawn} disabled={spawning || !desc.trim()}>
+            {spawning ? '⏳ Spawning…' : '⚡ Spawn'}
           </button>
         </div>
-        {submitError && <p style={styles.errorMsg}>⚠ {submitError}</p>}
-      </div>
 
-      {/* Active Tasks */}
-      <div style={styles.section}>
-        <p style={styles.sectionTitle}>⚙ Active ({activeTasks.length})</p>
-        {activeTasks.length === 0 ? (
-          <p style={styles.emptyState}>No active tasks — spawn one above!</p>
-        ) : (
-          activeTasks.map(task => (
-            <div key={task.id} style={styles.taskCard}>
-              <div style={styles.taskRow}>
-                <span
-                  style={{
-                    ...styles.spinner,
-                    animation: '_salmalm_spin 0.8s linear infinite',
-                  }}
-                />
-                <span style={styles.taskDesc}>{truncate(task.description, 80)}</span>
-                <div style={styles.taskMeta}>
-                  <span style={styles.modelBadge}>{task.model}</span>
-                  <span style={styles.elapsed}>{formatElapsed(task.elapsed_ms)}</span>
-                  <button style={styles.killBtn} onClick={() => handleKill(task.id)}>
-                    Kill
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Completed Tasks */}
-      <div style={styles.section}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <p style={{ ...styles.sectionTitle, margin: 0 }}>✓ Completed ({completedTasks.length})</p>
-          {completedTasks.length > 0 && (
-            <button
-              onClick={handleClearCompleted}
-              style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', border: '1px solid #7f1d1d', background: '#1a0505', color: '#fca5a5', cursor: 'pointer' }}
-            >
-              🗑 전체 삭제
-            </button>
+        {/* Task list */}
+        <div style={S.taskList}>
+          {tasks.length === 0 && (
+            <div style={{ padding: '20px', textAlign: 'center', color: C.text2, fontSize: 13 }}>No tasks yet</div>
           )}
-        </div>
-        {completedTasks.length === 0 ? (
-          <p style={styles.emptyState}>Completed tasks will appear here.</p>
-        ) : (
-          completedTasks.map(task => (
-            <div key={task.id} style={styles.taskCard}>
-              <div style={styles.taskRow}>
-                <span style={{ fontSize: '15px', flexShrink: 0 }}>
-                  {task.status === 'done' ? '✅' : '❌'}
-                </span>
-                <span style={styles.taskDesc}>{truncate(task.description, 80)}</span>
-                <div style={styles.taskMeta}>
-                  <span style={styles.modelBadge}>{task.model}</span>
-                  <span style={styles.elapsed}>{formatElapsed(task.elapsed_ms)}</span>
-                  <button style={styles.viewBtn} onClick={() => setViewTask(task)}>
-                    View Output
-                  </button>
+          {tasks.map(task => {
+            const isActive = selected?.task_id === task.task_id;
+            return (
+              <div
+                key={task.task_id}
+                style={{ ...S.taskCard, ...(isActive ? S.taskCardActive : {}) }}
+                onClick={() => handleSelect(task)}
+              >
+                <div style={S.taskTop}>
+                  <span>{statusDot(task.status)}</span>
+                  <span style={S.taskLabel}>{task.label}</span>
+                  {task.status === 'running' && (
+                    <button style={{ ...S.btnSm, padding: '2px 7px', fontSize: 11, color: C.red }} onClick={e => handleKill(task.task_id, e)}>✕</button>
+                  )}
                 </div>
+                <div style={S.taskMeta}>
+                  {task.task_id} · {fmtElapsed(task.elapsed_s)}
+                  {task.turns_used > 0 && ` · ${task.turns_used} turns`}
+                  {task.model && ` · ${task.model.split('/').pop()}`}
+                </div>
+                {/* Steer bar for running tasks */}
+                {task.status === 'running' && (
+                  <div style={S.steerBar} onClick={e => e.stopPropagation()}>
+                    <input
+                      style={S.steerInput}
+                      placeholder="Steer message…"
+                      value={steerInputs[task.task_id] || ''}
+                      onChange={e => setSteerInputs(p => ({ ...p, [task.task_id]: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSteer(task.task_id); }}
+                    />
+                    <button style={S.steerBtn} onClick={() => handleSteer(task.task_id)}>📡</button>
+                  </div>
+                )}
               </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Right pane ── */}
+      <div style={S.right}>
+        {!displayTask ? (
+          <div style={S.emptyRight}>Select a task to view history</div>
+        ) : (
+          <>
+            <div style={S.rightHeader}>
+              <span>{statusDot(displayTask.status)}</span>
+              <h4 style={S.rightTitle}>{displayTask.label}</h4>
+              <span style={{ fontSize: 12, color: C.text2 }}>{fmtElapsed(displayTask.elapsed_s)} · {displayTask.turns_used} turns</span>
+              {displayTask.model && <span style={{ fontSize: 11, color: C.text2, background: C.bg2, padding: '2px 7px', borderRadius: 10 }}>{displayTask.model.split('/').pop()}</span>}
             </div>
-          ))
+
+            <div style={S.historyPane} ref={historyRef}>
+              {/* Show messages if available */}
+              {displayTask.messages && displayTask.messages.length > 0 ? (
+                displayTask.messages.map((msg, i) => (
+                  <MessageBubble key={i} msg={msg} />
+                ))
+              ) : (
+                <>
+                  {/* Fallback: show description + result */}
+                  <div style={{ ...S.msgBubble, ...S.msgUser }}>{displayTask.description}</div>
+                  {displayTask.status === 'running' && (
+                    <div style={{ ...S.msgBubble, ...S.msgAssistant, color: C.text2 }}>
+                      <Spinner /> Working…
+                    </div>
+                  )}
+                </>
+              )}
+              {displayTask.status === 'running' && (
+                <div style={{ ...S.msgBubble, ...S.msgAssistant, color: C.text2 }}>
+                  <Spinner /> Thinking…
+                </div>
+              )}
+            </div>
+
+            {/* Result box */}
+            {displayTask.status === 'completed' && displayTask.result && (
+              <div style={S.resultBox}>
+                <div style={{ fontSize: 11, color: C.text2, marginBottom: 6, fontWeight: 600 }}>✅ RESULT</div>
+                {displayTask.result}
+              </div>
+            )}
+            {displayTask.status === 'failed' && displayTask.error && (
+              <div style={{ ...S.resultBox, borderColor: C.red, color: C.red }}>
+                <div style={{ fontSize: 11, marginBottom: 6, fontWeight: 600 }}>❌ ERROR</div>
+                {displayTask.error}
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Output Modal */}
-      {viewTask && (
-        <OutputModal task={viewTask} onClose={() => setViewTask(null)} />
-      )}
+      {/* Toast */}
+      {toast && <div style={S.toast}>{toast}</div>}
     </div>
   );
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function MessageBubble({ msg }: { msg: Message }) {
+  if (msg.role === 'user') {
+    return <div style={{ ...S.msgBubble, ...S.msgUser }}>{msg.content}</div>;
+  }
+  if (msg.role === 'tool') {
+    return (
+      <div style={{ ...S.msgBubble, ...S.msgTool }}>
+        🔧 {msg.name || 'tool'}: {msg.content?.slice(0, 300)}{(msg.content?.length ?? 0) > 300 ? '…' : ''}
+      </div>
+    );
+  }
+  // assistant
+  if (msg.tool_calls && msg.tool_calls.length > 0) {
+    return (
+      <div style={{ ...S.msgBubble, ...S.msgAssistant }}>
+        {msg.content && <div style={{ marginBottom: 6 }}>{msg.content}</div>}
+        {msg.tool_calls.map((tc, i) => (
+          <div key={i} style={{ fontSize: 12, color: C.text2, fontFamily: 'monospace' }}>
+            ⚡ {tc.name}({typeof tc.arguments === 'object' ? JSON.stringify(tc.arguments).slice(0, 80) : String(tc.arguments).slice(0, 80)})
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return <div style={{ ...S.msgBubble, ...S.msgAssistant }}>{msg.content}</div>;
+}
+
+function Spinner() {
+  return <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite', marginRight: 6 }}>⏳</span>;
 }

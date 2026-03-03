@@ -41,6 +41,7 @@ from salmalm.web.routes.web_system import SystemMixin as WebSystemMixin
 from salmalm.web.routes.web_manage import ManageMixin as WebManageMixin
 from salmalm.web.routes.web_content import ContentMixin as WebContentMixin
 from salmalm.web.routes.web_agents import AgentsMixin
+from salmalm.web.routes.web_subagents import WebSubagentsMixin
 
 # Google OAuth CSRF state tokens {state: timestamp}
 _google_oauth_pending_states: dict = {}
@@ -66,6 +67,7 @@ class WebHandler(
     WebManageMixin,
     WebContentMixin,
     AgentsMixin,
+    WebSubagentsMixin,
     http.server.BaseHTTPRequestHandler,
 ):
     """HTTP handler for web UI and API."""
@@ -330,7 +332,7 @@ class WebHandler(
     # ── GET Route Table (exact path → method) ──
     _GET_ROUTES: dict = {}
     for _mixin_cls in [
-        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin,
+        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin, WebSubagentsMixin,
     ]:
         _GET_ROUTES.update(getattr(_mixin_cls, 'GET_ROUTES', {}))
     _GET_ROUTES.update({
@@ -685,7 +687,7 @@ self.addEventListener('fetch',e=>{{
 
     _POST_ROUTES: dict = {}
     for _mixin_cls in [
-        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin,
+        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin, WebSubagentsMixin,
     ]:
         _POST_ROUTES.update(getattr(_mixin_cls, 'POST_ROUTES', {}))
     _POST_ROUTES.update({
@@ -747,12 +749,14 @@ self.addEventListener('fetch',e=>{{
             return self._post_api_test_provider()
         elif self.path.startswith("/api/thoughts/search"):
             return self._post_api_thoughts_search()
+        elif self.path.startswith("/api/subagents/"):
+            return self._post_subagent_action()
         else:
             self._json({"error": "Not found"}, 404)
 
     _GET_PREFIX_ROUTES: list = []
     for _mixin_cls in [
-        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin,
+        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin, WebSubagentsMixin,
     ]:
         _GET_PREFIX_ROUTES.extend(getattr(_mixin_cls, 'GET_PREFIX_ROUTES', []))
 
