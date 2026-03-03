@@ -151,41 +151,29 @@ def check_circuit_breaker(tool_outputs: dict, consecutive_errors: int, max_error
 def check_loop_detection(tool_calls: list, recent_calls: list) -> str | None:
     """Detect infinite loops from repeated tool calls. Returns error message or None."""
     for tc in tool_calls:
+        name = tc.get("name", "")
         sig = (
-            tc.get("name", ""),
+            name,
             hashlib.sha256(json.dumps(tc.get("arguments", {}), sort_keys=True).encode()).hexdigest()[:12],
         )
         recent_calls.append(sig)
 
-    # 1) Same exact call repeated
+    # 1) Exact same call (name+args) repeated 2+ times in last 4
     if len(recent_calls) >= 4:
-        freq = Counter(recent_calls[-6:])
+        freq = Counter(recent_calls[-4:])
         top = freq.most_common(1)[0]
         if top[1] >= 2:
-            log.warning(f"[BREAK] Loop detected: {top[0][0]} called {top[1]}x with same args in last 6 iterations")
-            return f"⚠️ Infinite loop detected — tool `{top[0][0]}` repeating with same arguments. Stopping."
+            log.warning(f"[BREAK] Loop: {top[0][0]} x{top[1]} same args")
+            return f"⚠️ Tool `{top[0][0]}` repeating with same arguments. Result is already available — use it to answer."
 
-    # 2) Same tool name called 4+ times regardless of arguments
-    if len(recent_calls) >= 4:
-        name_streak = [s[0] for s in recent_calls[-4:]]
-        if len(set(name_streak)) == 1:
-            tool_name = name_streak[0]
-            log.warning(f"[BREAK] Name-loop: {tool_name} called 4x consecutively (different args)")
-            return f"⚠️ Tool `{tool_name}` called {len(name_streak)} times in a row — result is available, please use it to answer."
+    # 2) Same tool name 3+ times in last 4 calls (regardless of args)
+    if len(recent_calls) >= 3:
+        names = [s[0] for s in recent_calls[-3:]]
+        if len(set(names)) == 1 and names[0]:
+            log.warning(f"[BREAK] Name-streak: {names[0]} x3 consecutive")
+            return f"⚠️ Tool `{names[0]}` called 3 times in a row. The result is available — write the final answer now without calling any more tools."
 
     return None
-
-
-async def handle_empty_response(call_fn, pruned_messages, model: str, tools: list) -> str:
-    """Retry empty responses up to 2 times with backoff."""
-    for _retry in range(2):
-        log.warning(f"[LLM] Empty response, retry #{_retry + 1}")
-        await asyncio.sleep(0.5 * (_retry + 1))
-        retry_result, _ = await call_fn(pruned_messages, model=model, tools=tools, max_tokens=4096, thinking=False)
-        response = retry_result.get("content", "")
-        if response and response.strip():
-            return response
-    return "⚠️ 응답을 생성할 수 없습니다. / Could not generate a response."
 
 
 def finalize_response(result: dict, response: str) -> str:
