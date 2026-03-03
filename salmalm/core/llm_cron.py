@@ -380,7 +380,7 @@ class LLMCronManager:
                     "3. Return ONLY the tool result as your final answer. No apologies, no explanations.\n"
                     "[TASK] " + job["prompt"]
                 )
-                response = await process_message(_cron_sid, _cron_prompt, model_override=job.get("model"))
+                response = await process_message(_cron_sid, _cron_prompt, model_override=job.get("model") or "google/gemini-2.5-flash")
                 try:
                     from salmalm.features.edge_cases import _usage as _u_tick2
                     cron_cost = _u_tick2.get("total_cost", 0) - cost_before
