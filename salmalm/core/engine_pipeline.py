@@ -43,6 +43,58 @@ def _sanitize_input(text: str) -> str:
     return "".join(c for c in text if c == "\n" or c == "\t" or c == "\r" or ord(c) >= 32)
 
 
+
+
+# --- Natural language model switch ---
+import re as _re_model
+_MODEL_SWITCH_PATTERNS = [
+    # Korean
+    _re_model.compile(r'모델.*(?:바꿔|변경|전환|스위치|바꾸|바꿈|변경해)'),
+    _re_model.compile(r'(?:바꿔|변경|전환).*모델'),
+    # English
+    _re_model.compile(r'(?:switch|change|set|use)\s+(?:the\s+)?model', _re_model.IGNORECASE),
+    _re_model.compile(r'model\s+(?:to|=)', _re_model.IGNORECASE),
+]
+_MODEL_NAME_MAP = {
+    'opus': 'anthropic/claude-opus-4-6',
+    '오푸스': 'anthropic/claude-opus-4-6',
+    'claude opus': 'anthropic/claude-opus-4-6',
+    '클로드 오푸스': 'anthropic/claude-opus-4-6',
+    'sonnet': 'anthropic/claude-sonnet-4-6',
+    '소네트': 'anthropic/claude-sonnet-4-6',
+    'claude sonnet': 'anthropic/claude-sonnet-4-6',
+    '클로드 소네트': 'anthropic/claude-sonnet-4-6',
+    'claude': 'anthropic/claude-sonnet-4-6',
+    '클로드': 'anthropic/claude-sonnet-4-6',
+    'haiku': 'anthropic/claude-haiku-4-5-20251001',
+    '하이쿠': 'anthropic/claude-haiku-4-5-20251001',
+    'gpt': 'openai/gpt-4.1',
+    'gpt-4': 'openai/gpt-4.1',
+    'gpt-4.1': 'openai/gpt-4.1',
+    'gemini': 'google/gemini-2.5-flash',
+    '제미니': 'google/gemini-2.5-flash',
+    'gemini flash': 'google/gemini-2.5-flash',
+    'gemini pro': 'google/gemini-2.5-pro',
+    'grok': 'xai/grok-4',
+    '그록': 'xai/grok-4',
+    'auto': None,
+    '자동': None,
+}
+
+def _detect_model_switch(text: str):
+    """Detect natural language model switch request. Returns model name or None."""
+    text = text.strip()
+    if len(text) > 100:
+        return None
+    matched = any(p.search(text) for p in _MODEL_SWITCH_PATTERNS)
+    if not matched:
+        return None
+    text_lower = text.lower()
+    for name, model in sorted(_MODEL_NAME_MAP.items(), key=lambda x: -len(x[0])):
+        if name in text_lower:
+            return model
+    return None
+
 async def _process_message_guarded(
     session_id: str,
     user_message: str,
@@ -102,6 +154,16 @@ async def _process_message_guarded(
         _active_requests_event.clear()
 
     try:
+        # --- Natural language model switch interceptor ---
+        _model_switch = _detect_model_switch(user_message)
+        if _model_switch:
+            from salmalm.core.session_store import get_session as _gs
+            _sess = _gs(session_id)
+            _sess.model_override = _model_switch
+            _model_short = _model_switch.split('/')[-1]
+            log.info(f'[MODEL-SWITCH] {session_id} -> {_model_switch}')
+            return f'✅ 모델을 **{_model_short}**로 변경했습니다.'
+
         return await _process_message_inner(
             session_id,
             user_message,
