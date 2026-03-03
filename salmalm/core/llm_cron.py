@@ -365,7 +365,15 @@ class LLMCronManager:
                     cost_before = _u_tick.get("total_cost", 0)
                 except Exception:
                     cost_before = 0
-                response = await process_message(f"cron-{job['id']}", job["prompt"], model_override=job.get("model"))
+                # Fresh session per run — clears orphan tool_calls from prior runs
+                _cron_sid = f"cron-{job['id']}"
+                try:
+                    from salmalm.core.core import get_session as _gs_cron
+                    _cs = _gs_cron(_cron_sid)
+                    _cs.messages = [m for m in _cs.messages if m.get("role") == "system"]
+                except Exception:
+                    pass
+                response = await process_message(_cron_sid, job["prompt"], model_override=job.get("model"))
                 try:
                     from salmalm.features.edge_cases import _usage as _u_tick2
                     cron_cost = _u_tick2.get("total_cost", 0) - cost_before
