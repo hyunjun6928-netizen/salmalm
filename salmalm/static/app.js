@@ -830,6 +830,32 @@
       addMsg('assistant',_friendlyErr);
       var _sb2=document.getElementById('stop-btn');var _sb2Send=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb2Send)_sb2Send.style.display='flex';
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
+    }else if(data.type==='chat'){
+      // Push from cron/subagent/system — inject into current chat
+      if(data.content){
+        if(window._currentSession==='web'||!window._currentSession||data.session===window._currentSession){
+          if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
+          addMsg('assistant',data.content);
+          var _src=data.source||'';
+          if(_src==='cron'||_src==='subagent_notify'){
+            // Flash the tab title briefly
+            var _origTitle=document.title;
+            document.title='🔔 '+_origTitle;
+            setTimeout(function(){document.title=_origTitle;},4000);
+          }
+        }
+      }
+    }else if(data.type==='subagent_done'){
+      // Already handled by AgentPanel — also show in chat
+      var _t=data.task||{};var _label=_t.label||_t.description||'';
+      if(_t.status==='completed'&&_t.result){
+        var _notify='✅ **서브에이전트 완료** `'+(_t.task_id||'')+'`\n\n'+_t.result.substring(0,500);
+        addMsg('assistant',_notify);
+        var _origTitle2=document.title;document.title='✅ '+_origTitle2;
+        setTimeout(function(){document.title=_origTitle2;},4000);
+      }else if(_t.status==='failed'){
+        addMsg('assistant','❌ **서브에이전트 실패** `'+(_t.task_id||'')+'`: '+(_t.error||''));
+      }
     }else if(data.type==='shutdown'){
       if(typingEl)typingEl.remove();
       addMsg('assistant','⚠️ '+(data.message||'Server is shutting down...'));
@@ -3589,13 +3615,7 @@ window._i18n={
       jobs.forEach(function(j){
         var sched=j.schedule||{};var interval=sched.seconds?_fmtInterval(sched.seconds):(sched.expr||'—');
         h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;font-size:13px;border-top:1px solid var(--border)">';
-        var promptPreview=j.prompt?j.prompt.substring(0,80)+(j.prompt.length>80?'…':''):'';
-        var lastResult=j.last_result?j.last_result.substring(0,100)+(j.last_result.length>100?'…':''):'';
-        h+='<div style="padding:10px 14px">';
-        h+='<div style="font-weight:500;margin-bottom:2px">'+j.name+'</div>';
-        if(promptPreview)h+='<div style="font-size:11px;color:var(--text2);margin-top:2px;font-style:italic">📝 '+escHtml(promptPreview)+'</div>';
-        if(lastResult)h+='<div style="font-size:11px;color:var(--text2);margin-top:2px;padding:3px 6px;background:var(--bg2);border-radius:4px;border-left:2px solid var(--accent)">'+escHtml(lastResult)+'</div>';
-        h+='</div>';
+        h+='<div style="padding:10px 14px;font-weight:500">'+j.name+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+interval+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+j.run_count+'</div>';
         h+='<div style="padding:10px 14px"><button data-action="toggleCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:13px">'+(j.enabled?'🟢 '+(kr?'활성':'On'):'🔴 '+(kr?'비활성':'Off'))+'</button></div>';
