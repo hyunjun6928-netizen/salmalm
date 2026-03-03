@@ -831,30 +831,23 @@
       var _sb2=document.getElementById('stop-btn');var _sb2Send=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb2Send)_sb2Send.style.display='flex';
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
     }else if(data.type==='chat'){
-      // Push from cron/subagent/system — inject into current chat
       if(data.content){
-        if(window._currentSession==='web'||!window._currentSession||data.session===window._currentSession){
-          if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
+        if(!window._currentSession||window._currentSession==='web'||data.session===window._currentSession){
+          var _te=document.getElementById('typing-row');if(_te)_te.remove();
           addMsg('assistant',data.content);
-          var _src=data.source||'';
-          if(_src==='cron'||_src==='subagent_notify'){
-            // Flash the tab title briefly
-            var _origTitle=document.title;
-            document.title='🔔 '+_origTitle;
-            setTimeout(function(){document.title=_origTitle;},4000);
+          var _src2=data.source||'';
+          if(_src2==='cron'||_src2==='subagent_notify'){
+            var _ot=document.title;document.title='🔔 '+_ot;setTimeout(function(){document.title=_ot;},4000);
           }
         }
       }
     }else if(data.type==='subagent_done'){
-      // Already handled by AgentPanel — also show in chat
-      var _t=data.task||{};var _label=_t.label||_t.description||'';
-      if(_t.status==='completed'&&_t.result){
-        var _notify='✅ **서브에이전트 완료** `'+(_t.task_id||'')+'`\n\n'+_t.result.substring(0,500);
-        addMsg('assistant',_notify);
-        var _origTitle2=document.title;document.title='✅ '+_origTitle2;
-        setTimeout(function(){document.title=_origTitle2;},4000);
-      }else if(_t.status==='failed'){
-        addMsg('assistant','❌ **서브에이전트 실패** `'+(_t.task_id||'')+'`: '+(_t.error||''));
+      var _t2=data.task||{};
+      if(_t2.status==='completed'&&_t2.result){
+        addMsg('assistant','✅ **서브에이전트 완료** `'+(_t2.task_id||'')+'`\n\n'+_t2.result.substring(0,500));
+        var _ot2=document.title;document.title='✅ '+_ot2;setTimeout(function(){document.title=_ot2;},4000);
+      }else if(_t2.status==='failed'){
+        addMsg('assistant','❌ **서브에이전트 실패** `'+(_t2.task_id||'')+'`: '+(_t2.error||''));
       }
     }else if(data.type==='shutdown'){
       if(typingEl)typingEl.remove();

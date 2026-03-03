@@ -158,23 +158,22 @@ def check_loop_detection(tool_calls: list, recent_calls: list) -> str | None:
         )
         recent_calls.append(sig)
 
-    # 1) Exact same call (name+args) repeated 2+ times in last 4
+    # 1) Same exact call repeated 2+ times in last 4
     if len(recent_calls) >= 4:
         freq = Counter(recent_calls[-4:])
         top = freq.most_common(1)[0]
         if top[1] >= 2:
             log.warning(f"[BREAK] Loop: {top[0][0]} x{top[1]} same args")
-            return f"⚠️ Tool `{top[0][0]}` repeating with same arguments. Result is already available — use it to answer."
+            return f"⚠️ Tool `{top[0][0]}` repeating — result is already available, use it to answer."
 
-    # 2) Same tool name 3+ times in last 4 calls (regardless of args)
+    # 2) Same tool name 3+ consecutive (any args)
     if len(recent_calls) >= 3:
         names = [s[0] for s in recent_calls[-3:]]
         if len(set(names)) == 1 and names[0]:
-            log.warning(f"[BREAK] Name-streak: {names[0]} x3 consecutive")
-            return f"⚠️ Tool `{names[0]}` called 3 times in a row. The result is available — write the final answer now without calling any more tools."
+            log.warning(f"[BREAK] Name-streak: {names[0]} x3")
+            return f"⚠️ Tool `{names[0]}` called 3 times in a row. Result is available — write the final answer now without calling any more tools."
 
     return None
-
 
 def finalize_response(result: dict, response: str) -> str:
     """Handle truncation and content filter edge cases.
