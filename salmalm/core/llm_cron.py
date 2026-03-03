@@ -279,32 +279,28 @@ class LLMCronManager:
                 self.save_jobs()
                 log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
                 self._notify_completion(job, response)
-                # Push result to web chat session
+                # Push result to web chat session + WS broadcast
                 try:
                     from salmalm.core.session_store import get_session as _gs
                     _web_sess = _gs("web")
                     _cron_msg = f"⏰ **[크론]** `{job['name']}`\n\n{response}"
                     _web_sess.add_assistant(_cron_msg)
-                    # WS broadcast so UI updates live
-                    try:
-                        from salmalm.web.ws import ws_server as _ws
+                    _cloop = LLMCronManager._main_loop
+                    if _cloop and _cloop.is_running():
                         import asyncio as _aio2
-                        _wloop = getattr(_ws, "_loop", None)
-                        if _wloop and _wloop.is_running():
-                            _aio2.run_coroutine_threadsafe(
-                                _ws.broadcast({
-                                    "type": "chat",
-                                    "role": "assistant",
-                                    "content": _cron_msg,
-                                    "session": "web",
-                                    "source": "cron",
-                                }),
-                                _wloop,
-                            )
-                    except Exception as _we:
-                        log.debug(f"[CRON] WS push skipped: {_we}")
+                        from salmalm.web.ws import ws_server as _ws
+                        async def _push():
+                            await _ws.broadcast({
+                                "type": "chat",
+                                "role": "assistant",
+                                "content": _cron_msg,
+                                "session": "web",
+                                "source": "cron",
+                            })
+                        _aio2.run_coroutine_threadsafe(_push(), _cloop)
+                        log.debug(f"[CRON] WS push queued for '{job['name']}'")
                 except Exception as _pe:
-                    log.debug(f"[CRON] Web push skipped: {_pe}")
+                    log.debug(f"[CRON] Web push failed: {_pe}")
                 try:
                     from salmalm.core.memory import write_daily_log as _wdl; _wdl(f"[CRON] {job['name']}: {response[:150]}")
                 except Exception: pass

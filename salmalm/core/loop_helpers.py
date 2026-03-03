@@ -157,12 +157,22 @@ def check_loop_detection(tool_calls: list, recent_calls: list) -> str | None:
         )
         recent_calls.append(sig)
 
+    # 1) Same exact call repeated
     if len(recent_calls) >= 4:
         freq = Counter(recent_calls[-6:])
         top = freq.most_common(1)[0]
         if top[1] >= 2:
             log.warning(f"[BREAK] Loop detected: {top[0][0]} called {top[1]}x with same args in last 6 iterations")
             return f"⚠️ Infinite loop detected — tool `{top[0][0]}` repeating with same arguments. Stopping."
+
+    # 2) Same tool name called 4+ times regardless of arguments
+    if len(recent_calls) >= 4:
+        name_streak = [s[0] for s in recent_calls[-4:]]
+        if len(set(name_streak)) == 1:
+            tool_name = name_streak[0]
+            log.warning(f"[BREAK] Name-loop: {tool_name} called 4x consecutively (different args)")
+            return f"⚠️ Tool `{tool_name}` called {len(name_streak)} times in a row — result is available, please use it to answer."
+
     return None
 
 
