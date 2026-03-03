@@ -152,8 +152,8 @@ class SubAgentManager:
             model = task.model
             if not model:
                 from salmalm.core.core import router
-
-                model = router._pick_available(3)  # Pick a capable model
+                # Honour user's active model preference (force_model) if set
+                model = router.force_model or router._pick_available(3)
 
             total_tokens = 0
 
