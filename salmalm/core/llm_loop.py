@@ -528,7 +528,7 @@ async def try_llm_call(
         "rate limit",
         "429",
     )
-    _AUTH_PATTERNS = ("401", "invalid api key", "unauthorized", "authentication", "invalid x-api-key")
+    _AUTH_PATTERNS = ("401", "403", "invalid api key", "unauthorized", "authentication", "invalid x-api-key", "forbidden")
 
     last_error = None
     for attempt in range(2):  # 1 initial + 1 retry
