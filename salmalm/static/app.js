@@ -832,13 +832,12 @@
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
     }else if(data.type==='chat'){
       if(data.content){
-        if(!window._currentSession||window._currentSession==='web'||data.session===window._currentSession){
+        if(!window._currentSession||window._currentSession==='web'||data.session===window._currentSession||data.source==='cron'){
           var _te=document.getElementById('typing-row');if(_te)_te.remove();
           addMsg('assistant',data.content);
-          var _src2=data.source||'';
-          if(_src2==='cron'||_src2==='subagent_notify'){
-            var _ot=document.title;document.title='🔔 '+_ot;setTimeout(function(){document.title=_ot;},4000);
-          }
+          var _ot=document.title;
+          document.title=(data.source==='cron'?'⏰ ':'🔔 ')+_ot;
+          setTimeout(function(){document.title=_ot;},4000);
         }
       }
     }else if(data.type==='subagent_done'){
@@ -3602,17 +3601,24 @@ window._i18n={
     fetch('/api/cron',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(d){
       var jobs=d.jobs||[];var kr=_lang==='ko';
       if(!jobs.length){c.innerHTML='<div style="padding:24px;text-align:center;color:var(--text2);border:1px dashed var(--border);border-radius:10px">'+(kr?'크론 작업 없음 — 위의 ➕ 버튼으로 추가하세요':'No cron jobs — click ➕ above to add one')+'</div>';return}
+      var _cols='200px 60px 70px 100px 80px';
       var h='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-      h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;background:var(--bg3);font-weight:600;font-size:12px">';
-      h+='<div style="padding:10px 14px">'+(kr?'이름':'Name')+'</div><div style="padding:10px 14px">'+(kr?'간격':'Interval')+'</div><div style="padding:10px 14px">'+(kr?'실행 횟수':'Runs')+'</div><div style="padding:10px 14px">'+(kr?'상태':'Status')+'</div><div style="padding:10px 14px"></div></div>';
+      h+='<div style="display:grid;grid-template-columns:'+_cols+';background:var(--bg3);font-weight:600;font-size:12px;align-items:center">';
+      h+='<div style="padding:10px 14px">'+(kr?'이름':'Name')+'</div>';
+      h+='<div style="padding:10px 8px;text-align:center">'+(kr?'간격':'Interval')+'</div>';
+      h+='<div style="padding:10px 8px;text-align:center">'+(kr?'실행':'Runs')+'</div>';
+      h+='<div style="padding:10px 8px;text-align:center">'+(kr?'상태':'Status')+'</div>';
+      h+='<div style="padding:10px 8px;text-align:center">'+(kr?'실행':'Actions')+'</div></div>';
       jobs.forEach(function(j){
         var sched=j.schedule||{};var interval=sched.seconds?_fmtInterval(sched.seconds):(sched.expr||'—');
-        h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;font-size:13px;border-top:1px solid var(--border)">';
-        h+='<div style="padding:10px 14px;font-weight:500">'+j.name+'</div>';
-        h+='<div style="padding:10px 14px;color:var(--text2)">'+interval+'</div>';
-        h+='<div style="padding:10px 14px;color:var(--text2)">'+j.run_count+'</div>';
-        h+='<div style="padding:10px 14px"><button data-action="toggleCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:13px">'+(j.enabled?'🟢 '+(kr?'활성':'On'):'🔴 '+(kr?'비활성':'Off'))+'</button></div>';
-        h+='<div style="padding:10px 14px;display:flex;gap:4px"><button data-action="runCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Run Now">▶️</button><button data-action="deleteCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="Delete">🗑️</button></div>';
+        var preview=j.prompt?'<div style="font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">📝 '+j.prompt.substring(0,40)+(j.prompt.length>40?'…':'')+'</div>':'';
+        var lastRes=j.last_result?'<div style="font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px">→ '+j.last_result.substring(0,40)+'</div>':'';
+        h+='<div style="display:grid;grid-template-columns:'+_cols+';font-size:13px;border-top:1px solid var(--border);align-items:center">';
+        h+='<div style="padding:8px 14px;font-weight:500">'+j.name+preview+lastRes+'</div>';
+        h+='<div style="padding:8px;text-align:center;color:var(--text2)">'+interval+'</div>';
+        h+='<div style="padding:8px;text-align:center;color:var(--text2)">'+(j.run_count||0)+'</div>';
+        h+='<div style="padding:8px;text-align:center"><button data-action="toggleCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:12px;white-space:nowrap">'+(j.enabled?'🟢 '+(kr?'활성':'On'):'🔴 '+(kr?'비활성':'Off'))+'</button></div>';
+        h+='<div style="padding:8px;display:flex;gap:4px;justify-content:center"><button data-action="runCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="'+(kr?'지금 실행':'Run Now')+'">▶️</button><button data-action="deleteCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:14px" title="'+(kr?'삭제':'Delete')+'">🗑️</button></div>';
         h+='</div>';
       });
       h+='</div>';
