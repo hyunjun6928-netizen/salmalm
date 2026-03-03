@@ -490,6 +490,15 @@ async def _setup_services(host: str, port: int, _httpd, server_thread, url: str)
 
     cron.add_job("audit_cleanup", 86400, audit_log_cleanup, days=30)
 
+    # Schedule LLM cron tick (every 60s — runs user-defined AI cron jobs)
+    async def _llm_cron_tick_wrapper():
+        try:
+            await llm_cron.tick()
+        except Exception as _e:
+            log.warning(f"[CRON] LLM cron tick error: {_e}")
+
+    cron.add_job("llm_cron_tick", 60, _llm_cron_tick_wrapper)
+
     # ── Phase 10: Self-test, Nodes, Plugins, Cron start ──
     selftest = health_monitor.startup_selftest()
     log.info(f"[SELFTEST] {selftest.get('passed', 0)}/{selftest.get('total', 0)} passed")
