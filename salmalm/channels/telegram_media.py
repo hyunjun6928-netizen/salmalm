@@ -10,7 +10,7 @@ from pathlib import Path
 
 from salmalm.security.crypto import vault
 from salmalm.core import audit_log, get_session
-from salmalm.utils.chunker import load_config_from_file
+from salmalm.utils.chunker import load_config_from_file, CHANNEL_TELEGRAM
 
 log = logging.getLogger(__name__)
 
