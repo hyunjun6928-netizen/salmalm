@@ -326,6 +326,13 @@ def call_llm(
     except CostCapExceeded as e:
         return {"content": f"⚠️ {e}", "tool_calls": [], "usage": {"input": 0, "output": 0}, "model": model}
 
+    # Resolve alias before provider split (e.g. "sonnet" → "anthropic/claude-sonnet-4-6")
+    if model and "/" not in model:
+        try:
+            from salmalm.constants import MODEL_ALIASES as _MALI
+            model = _MALI.get(model, model)
+        except Exception:
+            pass
     provider, model_id = model.split("/", 1) if "/" in model else ("anthropic", model)
     api_key = _resolve_api_key(provider)
     if not api_key:

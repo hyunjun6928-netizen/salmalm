@@ -3589,7 +3589,13 @@ window._i18n={
       jobs.forEach(function(j){
         var sched=j.schedule||{};var interval=sched.seconds?_fmtInterval(sched.seconds):(sched.expr||'—');
         h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;font-size:13px;border-top:1px solid var(--border)">';
-        h+='<div style="padding:10px 14px;font-weight:500">'+j.name+'</div>';
+        var promptPreview=j.prompt?j.prompt.substring(0,80)+(j.prompt.length>80?'…':''):'';
+        var lastResult=j.last_result?j.last_result.substring(0,100)+(j.last_result.length>100?'…':''):'';
+        h+='<div style="padding:10px 14px">';
+        h+='<div style="font-weight:500;margin-bottom:2px">'+j.name+'</div>';
+        if(promptPreview)h+='<div style="font-size:11px;color:var(--text2);margin-top:2px;font-style:italic">📝 '+escHtml(promptPreview)+'</div>';
+        if(lastResult)h+='<div style="font-size:11px;color:var(--text2);margin-top:2px;padding:3px 6px;background:var(--bg2);border-radius:4px;border-left:2px solid var(--accent)">'+escHtml(lastResult)+'</div>';
+        h+='</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+interval+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+j.run_count+'</div>';
         h+='<div style="padding:10px 14px"><button data-action="toggleCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:13px">'+(j.enabled?'🟢 '+(kr?'활성':'On'):'🔴 '+(kr?'비활성':'Off'))+'</button></div>';

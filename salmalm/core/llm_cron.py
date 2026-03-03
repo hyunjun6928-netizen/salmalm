@@ -106,6 +106,7 @@ class LLMCronManager:
                 "last_run": j["last_run"],
                 "run_count": j.get("run_count", 0),
                 "error_count": j.get("error_count", 0),
+                "last_result": j.get("last_result", ""),
                 "last_error": j.get("last_error"),
             }
             for j in self.jobs
@@ -273,6 +274,7 @@ class LLMCronManager:
                 job["last_run"] = datetime.now(KST).isoformat()  # noqa: F405
                 job["run_count"] = job.get("run_count", 0) + 1
                 job["error_count"] = 0
+                job["last_result"] = response[:120] if response else ""
                 job.pop("last_error", None)
                 self.save_jobs()
                 log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")

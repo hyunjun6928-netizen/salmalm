@@ -84,9 +84,9 @@ const C = {
 };
 
 const S: Record<string, CSSProperties> = {
-  root: { display: 'flex', height: '100%', fontFamily: "'Inter','Segoe UI',system-ui,sans-serif", fontSize: 14, color: C.text, background: C.bg, overflow: 'hidden' },
+  root: { display: 'flex', flex: 1, minHeight: 0, fontFamily: "'Inter','Segoe UI',system-ui,sans-serif", fontSize: 14, color: C.text, background: C.bg, overflow: 'hidden', borderRadius: 8, border: `1px solid ${C.border}` },
   // Left pane
-  left: { width: 340, minWidth: 280, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, background: C.bg },
+  left: { width: 320, minWidth: 260, maxWidth: 320, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${C.border}`, background: C.bg, overflow: 'hidden' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: `1px solid ${C.border}` },
   title: { margin: 0, fontSize: 15, fontWeight: 700 },
   spawnForm: { padding: '12px 14px', borderBottom: `1px solid ${C.border}`, background: C.bg2, display: 'flex', flexDirection: 'column', gap: 8 },
