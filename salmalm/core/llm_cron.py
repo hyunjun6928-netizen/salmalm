@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional
 
 from salmalm.constants import BASE_DIR, KST
+from salmalm.config.paths import DATA_DIR as _CRON_DATA_DIR
 from salmalm.security.crypto import log
 
 
@@ -29,7 +30,7 @@ class LLMCronManager:
     Completed tasks announce results to configured channels.
     """
 
-    _JOBS_FILE = BASE_DIR / ".cron_jobs.json"  # noqa: F405
+    _JOBS_FILE = _CRON_DATA_DIR / ".cron_jobs.json"  # noqa: F405
 
     def __init__(self) -> None:
         """Init  ."""
