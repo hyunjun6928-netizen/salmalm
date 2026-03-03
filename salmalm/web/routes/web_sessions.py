@@ -52,7 +52,7 @@ class WebSessionsMixin:
                 "SELECT session_id, updated_at, title, parent_session_id FROM session_store ORDER BY updated_at DESC"
             ).fetchall()
         # Prefixes that are internal/ephemeral — never show in UI
-        _HIDDEN_PREFIXES = ("agent_", "subagent_", "cron-", "test_msg_", "e2e-", "save_test")
+        _HIDDEN_PREFIXES = ("agent_", "subagent_", "subagent-", "cron-", "test_msg_", "e2e-", "save_test")
 
         sessions = []
         for r in rows:
@@ -407,7 +407,7 @@ async def get_sessions(_u=_Depends(_auth)):
         rows = conn.execute("SELECT session_id, updated_at, title, parent_session_id FROM session_store WHERE user_id=? OR user_id IS NULL ORDER BY updated_at DESC", (_uid,)).fetchall()
     else:
         rows = conn.execute("SELECT session_id, updated_at, title, parent_session_id FROM session_store ORDER BY updated_at DESC").fetchall()
-    _HIDDEN_PREFIXES = ("agent_", "subagent_", "cron-", "test_msg_", "e2e-", "save_test")
+    _HIDDEN_PREFIXES = ("agent_", "subagent_", "subagent-", "cron-", "test_msg_", "e2e-", "save_test")
     sessions = []
     for r in rows:
         sid = r[0]

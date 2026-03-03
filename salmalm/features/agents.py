@@ -71,7 +71,7 @@ class SubAgent:
     ) -> str:
         """Spawn via v2 SubAgentManagerV2 — unified task registry."""
         try:
-            from salmalm.features.subagents import sub_agent_manager
+            from salmalm.features.subagents import subagent_manager as sub_agent_manager
             task_obj = sub_agent_manager.spawn(
                 description=task,
                 model=model,
