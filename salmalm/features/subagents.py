@@ -224,10 +224,18 @@ class SubAgentManager:
                     if len(_recent_names) >= 3:
                         _streak = _recent_names[-3:]
                         if len(set(_streak)) == 1 and _streak[0]:
-                            content = f"⚠️ Tool `{_streak[0]}` called 3 times in a row. STOP. Write the final answer now using the result you already have."
-                            task.messages.append({"role": "assistant", "content": content})
+                            # Extract last tool result as final answer
+                            _last_result = ""
+                            for _ltc in tool_calls:
+                                try:
+                                    _lr = execute_tool(_ltc.get("name",""), _ltc.get("arguments",{}))
+                                    _last_result = str(_lr)[:500]
+                                except Exception:
+                                    pass
+                            final_content = _last_result or f"(tool {_streak[0]} loop stopped)"
+                            task.messages.append({"role": "assistant", "content": final_content})
                             task.status = "completed"
-                            task.result = content
+                            task.result = final_content
                             break
 
                     asst_msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
@@ -291,8 +299,7 @@ class SubAgentManager:
         """Push completion event via WS and Telegram."""
         label = task.label or task.description[:40]
         if task.status == "completed":
-            msg = (f"✅ **Sub-agent `{task.task_id}`** '{label}' completed "
-                   f"({task.elapsed_s}s, {task.turns_used} turns)\n\n{task.result[:500]}")
+            msg = f"✅ **[서브에이전트 완료]** `{task.task_id}`\n\n{task.result[:500]}"
         else:
             msg = f"❌ **Sub-agent `{task.task_id}`** '{label}' failed: {task.error}"
 
@@ -319,25 +326,7 @@ class SubAgentManager:
             parent_sid = task.parent_session or "web"
             parent_sess = get_session(parent_sid)
             parent_sess.add_assistant(msg)
-            # Also broadcast via SSE so the UI updates live
-            try:
-                from salmalm.web.ws import ws_server
-                import asyncio as _aio
-                _loop2 = _get_ws_loop()
-                if _loop2:
-                    _aio.run_coroutine_threadsafe(
-                        ws_server.broadcast({
-                            "type": "chat",
-                            "role": "assistant",
-                            "content": msg,
-                            "session": parent_sid,
-                            "source": "subagent_notify",
-                        }),
-                        _loop2,
-                    )
-                    log.info(f"[SUBAGENT] WS push sent to session {parent_sid}")
-            except Exception as _e:
-                log.debug(f"[SUBAGENT] SSE push skipped: {_e}")
+            log.info(f"[SUBAGENT] WS push sent to session {parent_sid}")
         except Exception as e:
             log.debug(f"[SUBAGENT] Parent push skipped: {e}")
 
