@@ -81,7 +81,8 @@ class SubAgent:
             raise SessionError(f"Max concurrent sub-agents ({cls.MAX_CONCURRENT}) reached")
         with cls._lock:
             cls._counter += 1
-            agent_id = f"sub-{cls._counter}"
+            import uuid as _uuid
+            agent_id = f"sub-{_uuid.uuid4().hex[:8]}"
 
         agent_info = {
             "id": agent_id,
@@ -106,6 +107,12 @@ class SubAgent:
             try:
                 session_id = f"subagent-{agent_id}"
                 session = _core().get_session(session_id)
+                # Clear stale session state to prevent lock conflict on restart
+                try:
+                    from salmalm.features.abort import abort_controller
+                    abort_controller.clear(session_id)
+                except Exception:
+                    pass
                 from salmalm.core.engine import process_message
 
                 _loop = asyncio.new_event_loop()
