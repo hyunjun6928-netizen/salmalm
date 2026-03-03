@@ -705,7 +705,7 @@
     var port=location.port;
     /* Behind nginx (port 80/443/empty): WS through same nginx host */
     if(!port||port==='80'||port==='443'){return proto+'//'+location.host;}
-    /* Direct access: WS on same port as HTTP */
+    /* Direct access: WS on same port */
     return proto+'//'+host+':'+(port||'18800')+'/ws';
   }
 
@@ -3584,11 +3584,11 @@ window._i18n={
       var jobs=d.jobs||[];var kr=_lang==='ko';
       if(!jobs.length){c.innerHTML='<div style="padding:24px;text-align:center;color:var(--text2);border:1px dashed var(--border);border-radius:10px">'+(kr?'크론 작업 없음 — 위의 ➕ 버튼으로 추가하세요':'No cron jobs — click ➕ above to add one')+'</div>';return}
       var h='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-      h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;background:var(--bg3);font-weight:600;font-size:12px">';
+      h+='<div style="display:grid;grid-template-columns:2fr 80px 80px 80px 80px;background:var(--bg3);font-weight:600;font-size:12px">';
       h+='<div style="padding:10px 14px">'+(kr?'이름':'Name')+'</div><div style="padding:10px 14px">'+(kr?'간격':'Interval')+'</div><div style="padding:10px 14px">'+(kr?'실행 횟수':'Runs')+'</div><div style="padding:10px 14px">'+(kr?'상태':'Status')+'</div><div style="padding:10px 14px"></div></div>';
       jobs.forEach(function(j){
         var sched=j.schedule||{};var interval=sched.seconds?_fmtInterval(sched.seconds):(sched.expr||'—');
-        h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;font-size:13px;border-top:1px solid var(--border)">';
+        h+='<div style="display:grid;grid-template-columns:2fr 80px 80px 80px 80px;font-size:13px;border-top:1px solid var(--border)">';
         h+='<div style="padding:10px 14px;font-weight:500">'+j.name+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+interval+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+j.run_count+'</div>';
