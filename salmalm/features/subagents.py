@@ -202,6 +202,20 @@ class SubAgentManager:
                 tool_calls = result.get("tool_calls", [])
 
                 if tool_calls:
+                    # Loop detection — same tool 3x in a row
+                    _tc_names = [tc.get("name","") for tc in tool_calls]
+                    _recent_names = getattr(task, "_recent_tool_names", [])
+                    _recent_names.extend(_tc_names)
+                    task._recent_tool_names = _recent_names
+                    if len(_recent_names) >= 3:
+                        _streak = _recent_names[-3:]
+                        if len(set(_streak)) == 1 and _streak[0]:
+                            content = f"⚠️ Tool `{_streak[0]}` called 3 times in a row. STOP. Write the final answer now using the result you already have."
+                            task.messages.append({"role": "assistant", "content": content})
+                            task.status = "completed"
+                            task.result = content
+                            break
+
                     asst_msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
                     all_messages.append(asst_msg)
                     task.messages.append({
