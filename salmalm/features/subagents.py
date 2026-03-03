@@ -272,15 +272,15 @@ class SubAgentManager:
         try:
             from salmalm.web.ws import ws_server
             import asyncio
-            loop = getattr(ws_server, "_loop", None)
-            if loop and loop.is_running():
+            _ws_loop = _get_ws_loop()
+            if _ws_loop:
                 asyncio.run_coroutine_threadsafe(
                     ws_server.broadcast({
                         "type": "subagent_done",
                         "task": task.to_dict(),
                         "message": msg,
                     }),
-                    loop,
+                    _ws_loop,
                 )
         except Exception as e:
             log.debug(f"[SUBAGENT] WS broadcast skipped: {e}")
@@ -295,8 +295,8 @@ class SubAgentManager:
             try:
                 from salmalm.web.ws import ws_server
                 import asyncio as _aio
-                _loop = getattr(ws_server, "_loop", None)
-                if _loop and _loop.is_running():
+                _loop2 = _get_ws_loop()
+                if _loop2:
                     _aio.run_coroutine_threadsafe(
                         ws_server.broadcast({
                             "type": "chat",
@@ -305,8 +305,9 @@ class SubAgentManager:
                             "session": parent_sid,
                             "source": "subagent_notify",
                         }),
-                        _loop,
+                        _loop2,
                     )
+                    log.info(f"[SUBAGENT] WS push sent to session {parent_sid}")
             except Exception as _e:
                 log.debug(f"[SUBAGENT] SSE push skipped: {_e}")
         except Exception as e:
