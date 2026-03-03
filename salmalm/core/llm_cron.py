@@ -8,6 +8,45 @@ from typing import Optional
 from salmalm.constants import BASE_DIR, KST
 from salmalm.security.crypto import log
 
+# ── Lazy module-level singletons (imported at runtime to avoid circular deps) ──
+
+def _get_tg_bot():
+    """Return telegram bot singleton or None if unavailable."""
+    try:
+        from salmalm.core import _tg_bot as _b
+        return _b
+    except Exception:
+        pass
+    try:
+        from salmalm.features.channels import _tg_bot as _b2
+        return _b2
+    except Exception:
+        return None
+
+def _get_usage() -> dict:
+    """Return usage dict or empty fallback."""
+    try:
+        from salmalm.features.edge_cases import _usage as _u
+        return _u
+    except Exception:
+        return {}
+
+def _write_daily_log(msg: str) -> None:
+    """Write to daily log if available."""
+    try:
+        from salmalm.core.memory import write_daily_log as _wdl
+        _wdl(msg)
+    except Exception:
+        pass
+
+def _heartbeat_check() -> None:
+    """Run heartbeat check if available."""
+    try:
+        from salmalm.core import heartbeat as _hb
+        return _hb
+    except Exception:
+        return None
+
 
 class LLMCronManager:
     """OpenClaw-style LLM cron with isolated session execution.
@@ -163,7 +202,7 @@ class LLMCronManager:
         notified = False
         if isinstance(notify_cfg, dict):
             notified = self._send_to_channel(notify_cfg, notify_text, job["name"])
-        elif _tg_bot and _tg_bot.token and _tg_bot.owner_id:
+        elif (_tg_bot := _get_tg_bot()) and _tg_bot.token and _tg_bot.owner_id:
             try:
                 _tg_bot.send_message(_tg_bot.owner_id, notify_text)
                 notified = True
@@ -178,7 +217,7 @@ class LLMCronManager:
         try:
             if ch == "telegram":
                 chat_id = notify_cfg.get("chat_id", "")
-                if chat_id and _tg_bot and _tg_bot.token:
+                if chat_id and (_tg_bot := _get_tg_bot()) and _tg_bot.token:
                     _tg_bot.send_message(chat_id, text)
                     return True
             elif ch == "discord":
@@ -209,7 +248,7 @@ class LLMCronManager:
         """Handle cron job failure: notify owner, auto-disable after 5 failures."""
         error_text = f"⚠️ Cron job failed: {job['name']}\nError: {str(error)[:200]}"
         try:
-            if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
+            if (_tg_bot := _get_tg_bot()) and _tg_bot.token and _tg_bot.owner_id:
                 _tg_bot.send_message(_tg_bot.owner_id, error_text)
         except Exception as e:
             log.debug(f"Suppressed: {e}")
@@ -236,12 +275,12 @@ class LLMCronManager:
             from salmalm.core.engine import process_message
 
             log.info(f"[CRON] Manual run: {job['name']} ({job['id']})")
-            cost_before = _usage["total_cost"]
+            cost_before = _get_usage().get("total_cost", 0)
             try:
                 response = await process_message(
                     f"cron-{job['id']}", job["prompt"], model_override=job.get("model")
                 )
-                cost_after = _usage["total_cost"]
+                cost_after = _get_usage().get("total_cost", 0)
                 cron_cost = cost_after - cost_before
                 MAX_CRON_JOB_COST = 2.0
                 if cron_cost > MAX_CRON_JOB_COST:
@@ -253,7 +292,7 @@ class LLMCronManager:
                 self.save_jobs()
                 log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
                 self._notify_completion(job, response)
-                write_daily_log(f"[CRON] {job['name']}: {response[:150]}")
+                _write_daily_log(f"[CRON] {job['name']}: {response[:150]}")
                 if job["schedule"]["kind"] == "at":
                     job["enabled"] = False
                     self.save_jobs()
@@ -292,9 +331,10 @@ class LLMCronManager:
             pass
 
         # OpenClaw-style heartbeat check
-        if heartbeat.should_beat():
+        _hb = _heartbeat_check()
+        if _hb and _hb.should_beat():
             try:
-                await heartbeat.beat()
+                await _hb.beat()
             except Exception as e:
                 log.error(f"[HEARTBEAT] Tick error: {e}")
 
@@ -306,9 +346,9 @@ class LLMCronManager:
                 from salmalm.core.engine import process_message
 
                 # Track cost before/after to enforce per-cron-job cap
-                cost_before = _usage["total_cost"]
+                cost_before = _get_usage().get("total_cost", 0)
                 response = await process_message(f"cron-{job['id']}", job["prompt"], model_override=job.get("model"))
-                cost_after = _usage["total_cost"]
+                cost_after = _get_usage().get("total_cost", 0)
                 cron_cost = cost_after - cost_before
                 MAX_CRON_JOB_COST = 2.0  # $2 max per cron execution
                 if cron_cost > MAX_CRON_JOB_COST:
@@ -321,7 +361,7 @@ class LLMCronManager:
                 log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
 
                 self._notify_completion(job, response)
-                write_daily_log(f"[CRON] {job['name']}: {response[:150]}")
+                _write_daily_log(f"[CRON] {job['name']}: {response[:150]}")
                 if job["schedule"]["kind"] == "at":
                     job["enabled"] = False
                     self.save_jobs()
