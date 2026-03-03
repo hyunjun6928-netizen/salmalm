@@ -149,29 +149,26 @@ def check_circuit_breaker(tool_outputs: dict, consecutive_errors: int, max_error
 
 
 def check_loop_detection(tool_calls: list, recent_calls: list) -> str | None:
-    """Detect infinite loops from repeated tool calls. Returns error message or None."""
+    """Detect infinite loops from repeated tool calls."""
     for tc in tool_calls:
         name = tc.get("name", "")
-        sig = (
-            name,
-            hashlib.sha256(json.dumps(tc.get("arguments", {}), sort_keys=True).encode()).hexdigest()[:12],
-        )
+        sig = (name, hashlib.sha256(json.dumps(tc.get("arguments", {}), sort_keys=True).encode()).hexdigest()[:12])
         recent_calls.append(sig)
 
-    # 1) Same exact call repeated 2+ times in last 4
+    # Same call repeated 2+ times in last 4
     if len(recent_calls) >= 4:
         freq = Counter(recent_calls[-4:])
         top = freq.most_common(1)[0]
         if top[1] >= 2:
-            log.warning(f"[BREAK] Loop: {top[0][0]} x{top[1]} same args")
-            return f"⚠️ Tool `{top[0][0]}` repeating — result is already available, use it to answer."
+            log.warning(f"[BREAK] same-call loop: {top[0][0]} x{top[1]}")
+            return f"⚠️ Tool `{top[0][0]}` already returned a result. Use it to write the final answer NOW."
 
-    # 2) Same tool name 3+ consecutive (any args)
+    # Same tool NAME 3x in a row (any args)
     if len(recent_calls) >= 3:
-        names = [s[0] for s in recent_calls[-3:]]
-        if len(set(names)) == 1 and names[0]:
-            log.warning(f"[BREAK] Name-streak: {names[0]} x3")
-            return f"⚠️ Tool `{names[0]}` called 3 times in a row. Result is available — write the final answer now without calling any more tools."
+        name_streak = [s[0] for s in recent_calls[-3:]]
+        if len(set(name_streak)) == 1 and name_streak[0]:
+            log.warning(f"[BREAK] name-streak: {name_streak[0]} x3")
+            return f"⚠️ Tool `{name_streak[0]}` called 3 times in a row. STOP calling tools. Write the final answer using the result you already have."
 
     return None
 

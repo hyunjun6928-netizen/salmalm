@@ -62,10 +62,12 @@ def _call_anthropic(
         _BOUNDARY = "<!-- CACHE_BOUNDARY -->"
         if _BOUNDARY in sys_text:
             static_part, dynamic_part = sys_text.split(_BOUNDARY, 1)
-            body["system"] = [
-                {"type": "text", "text": static_part.strip(), "cache_control": {"type": "ephemeral"}},
-                {"type": "text", "text": dynamic_part.strip(), "cache_control": {"type": "ephemeral"}},
-            ]
+            _sys_blocks = []
+            if static_part.strip():
+                _sys_blocks.append({"type": "text", "text": static_part.strip(), "cache_control": {"type": "ephemeral"}})
+            if dynamic_part.strip():
+                _sys_blocks.append({"type": "text", "text": dynamic_part.strip(), "cache_control": {"type": "ephemeral"}})
+            body["system"] = _sys_blocks or [{"type": "text", "text": sys_text}]
         else:
             body["system"] = [{"type": "text", "text": sys_text, "cache_control": {"type": "ephemeral"}}]
     if tools:
