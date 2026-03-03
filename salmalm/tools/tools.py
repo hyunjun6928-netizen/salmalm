@@ -131,7 +131,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "image_generate",
-        "description": "Generate images using xAI Aurora or OpenAI DALL-E.",
+        "description": "Generate images using Google Imagen 4, xAI Aurora, or OpenAI DALL-E. Use provider=google for Google Imagen.",
         "input_schema": {
             "type": "object",
             "properties": {
