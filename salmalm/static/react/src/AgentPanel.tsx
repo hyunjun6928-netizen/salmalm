@@ -113,7 +113,7 @@ const S: Record<string, CSSProperties> = {
   msgUser: { background: C.accent, color: '#fff', alignSelf: 'flex-end' },
   msgAssistant: { background: C.bg2, alignSelf: 'flex-start' },
   msgTool: { background: C.bg3, color: C.text2, alignSelf: 'flex-start', fontFamily: 'monospace', fontSize: 12 },
-  resultBox: { margin: '12px 16px', padding: '12px', background: C.bg2, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  resultBox: { padding: '12px', background: C.bg2, borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
   emptyRight: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.text2, fontSize: 13 },
   // Toast
   toast: { position: 'fixed', bottom: 20, right: 20, background: C.accent, color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, zIndex: 9999, boxShadow: '0 4px 12px rgba(0,0,0,.3)' },
@@ -390,21 +390,21 @@ export default function AgentPanel() {
                   <Spinner /> Thinking…
                 </div>
               )}
-            </div>
 
-            {/* Result box */}
-            {displayTask.status === 'completed' && displayTask.result && (
-              <div style={S.resultBox}>
-                <div style={{ fontSize: 11, color: C.text2, marginBottom: 6, fontWeight: 600 }}>✅ RESULT</div>
-                {displayTask.result}
-              </div>
-            )}
-            {displayTask.status === 'failed' && displayTask.error && (
-              <div style={{ ...S.resultBox, borderColor: C.red, color: C.red }}>
-                <div style={{ fontSize: 11, marginBottom: 6, fontWeight: 600 }}>❌ ERROR</div>
-                {displayTask.error}
-              </div>
-            )}
+              {/* Result box — inside historyPane so it scrolls */}
+              {displayTask.status === 'completed' && displayTask.result && (
+                <div style={S.resultBox}>
+                  <div style={{ fontSize: 11, color: C.text2, marginBottom: 6, fontWeight: 600 }}>✅ RESULT</div>
+                  {displayTask.result}
+                </div>
+              )}
+              {displayTask.status === 'failed' && displayTask.error && (
+                <div style={{ ...S.resultBox, borderColor: C.red, color: C.red }}>
+                  <div style={{ fontSize: 11, marginBottom: 6, fontWeight: 600 }}>❌ ERROR</div>
+                  {displayTask.error}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
