@@ -262,7 +262,7 @@ class LLMCronManager:
                 cost_before = 0
             try:
                 response = await process_message(
-                    f"cron-{job['id']}", job["prompt"], model_override=job.get("model")
+                    f"cron-{job['id']}", job["prompt"], model_override=job.get("model") or __import__("salmalm.security.crypto", fromlist=["vault"]).vault.get("default_model")
                 )
                 try:
                     from salmalm.features.edge_cases import _usage as _u2
@@ -380,7 +380,7 @@ class LLMCronManager:
                     "3. Return ONLY the tool result as your final answer. No apologies, no explanations.\n"
                     "[TASK] " + job["prompt"]
                 )
-                response = await process_message(_cron_sid, _cron_prompt, model_override=job.get("model") or "google/gemini-2.5-flash")
+                response = await process_message(_cron_sid, _cron_prompt, model_override=job.get("model") or __import__("salmalm.security.crypto", fromlist=["vault"]).vault.get("default_model"))
                 try:
                     from salmalm.features.edge_cases import _usage as _u_tick2
                     cron_cost = _u_tick2.get("total_cost", 0) - cost_before
