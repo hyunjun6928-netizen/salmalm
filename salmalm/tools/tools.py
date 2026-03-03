@@ -136,7 +136,7 @@ TOOL_DEFINITIONS = [
             "type": "object",
             "properties": {
                 "prompt": {"type": "string", "description": "Image generation prompt (English recommended)"},
-                "provider": {"type": "string", "description": "xai or openai", "default": "xai"},
+                "provider": {"type": "string", "description": "xai, openai, or google (Imagen 3)", "default": "xai", "enum": ["xai", "openai", "google"]},
                 "size": {"type": "string", "description": "Image size", "default": "1024x1024"},
             },
             "required": ["prompt"],
