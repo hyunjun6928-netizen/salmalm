@@ -374,9 +374,11 @@ class LLMCronManager:
                 except Exception:
                     pass
                 _cron_prompt = (
-                    "You MUST use tools to get real-time data. Never estimate or guess.\n"
-                    "If the task needs current time: use python_eval with datetime.datetime.now().\n"
-                    "Task: " + job["prompt"]
+                    "[SYSTEM] You are a cron job executor. Rules:\n"
+                    "1. ALWAYS use tools for real-time data (time, files, web). NEVER guess or estimate.\n"
+                    "2. For current time: python_eval with: import datetime; kst=datetime.timezone(datetime.timedelta(hours=9)); _result=datetime.datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S KST')\n"
+                    "3. Return ONLY the tool result as your final answer. No apologies, no explanations.\n"
+                    "[TASK] " + job["prompt"]
                 )
                 response = await process_message(_cron_sid, _cron_prompt, model_override=job.get("model"))
                 try:
