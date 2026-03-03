@@ -387,7 +387,6 @@ def _register_all_routes() -> None:
 
 def _patch_app_js() -> None:
     """Ensure app.js has WS chat/subagent_done handlers. Auto-applied on every startup."""
-    import re as _re
     _js = Path(__file__).parent.parent / "static" / "app.js"
     if not _js.exists():
         return
@@ -395,30 +394,33 @@ def _patch_app_js() -> None:
     if "data.type==='chat'" in _src:
         return  # already patched
     _marker = "}else if(data.type==='shutdown'){"
+    if _marker not in _src:
+        return
     _inject = (
         "}else if(data.type==='chat'){"
         "if(data.content){"
-        "if(!window._currentSession||window._currentSession==='web'||data.session===window._currentSession||data.source==='cron'){"
+        "if(!window._currentSession||window._currentSession==='web'"
+        "||data.session===window._currentSession||data.source==='cron'){"
         "var _te=document.getElementById('typing-row');if(_te)_te.remove();"
         "addMsg('assistant',data.content);"
         "var _ot=document.title;"
-        "document.title=(data.source==='cron'?'⏰ ':'\U0001f514 ')+_ot;"
+        "document.title=(data.source==='cron'?'\u23f0 ':'\uD83D\uDD14 ')+_ot;"
         "setTimeout(function(){document.title=_ot;},4000);"
         "}}}"
         "}else if(data.type==='subagent_done'){"
         "var _t2=data.task||{};"
         "if(_t2.status==='completed'&&_t2.result){"
-        "addMsg('assistant','\u2705 **\uc11c\ube0c\uc5d0\uc774\uc804\ud2b8 \uc644\ub8cc** `'+(_t2.task_id||'')+'`\\n\\n'+_t2.result.substring(0,500));"
+        "addMsg('assistant','\u2705 \uc11c\ube0c\uc5d0\uc774\uc804\ud2b8 \uc644\ub8cc `'+(_t2.task_id||'')+'`\\n\\n'+_t2.result.substring(0,500));"
         "var _ot2=document.title;document.title='\u2705 '+_ot2;setTimeout(function(){document.title=_ot2;},4000);"
         "}else if(_t2.status==='failed'){"
-        "addMsg('assistant','\u274c **\uc11c\ube0c\uc5d0\uc774\uc804\ud2b8 \uc2e4\ud328** `'+(_t2.task_id||'')+'`: '+(_t2.error||''));"
+        "addMsg('assistant','\u274c \uc2e4\ud328 `'+(_t2.task_id||'')+'`: '+(_t2.error||''));"
         "}}"
         + _marker
     )
-    if _marker in _src:
-        _js.write_text(_src.replace(_marker, _inject), encoding="utf-8")
-        import logging as _log
-        _log.getLogger("salmalm").info("[STARTUP] app.js WS handlers auto-patched")
+    _js.write_text(_src.replace(_marker, _inject), encoding="utf-8")
+    import logging as _log
+    _log.getLogger("salmalm").info("[STARTUP] app.js WS handlers auto-patched")
+
 
 
 @app.on_event("startup")
