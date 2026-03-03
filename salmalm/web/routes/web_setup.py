@@ -398,6 +398,8 @@ async def post_setup(request: _Request):
 @router.post("/api/onboarding")
 async def post_onboarding(request: _Request, _u=_Depends(_optauth)):
     import os as _os_onb
+    import asyncio as _aio_onb
+    import types as _types_onb
     # On external bind: reject unauthenticated onboarding API key writes
     _bind_onb = _os_onb.environ.get("SALMALM_BIND", "127.0.0.1")
     if _bind_onb not in ("127.0.0.1", "localhost", "::1") and not _u:
@@ -411,10 +413,14 @@ async def post_onboarding(request: _Request, _u=_Depends(_optauth)):
         def _body(self): return body
         def _json(self, data, status=200): _result["d"] = (data, status)
     h = _H.__new__(_H)
-    import types
-    h._json = types.MethodType(_H._json, h)
-    h._body = body
-    h._post_api_onboarding_inner()
+    # _body is a read-only property — do NOT assign h._body = body (AttributeError)
+    h._json = _types_onb.MethodType(_H._json, h)
+    # Run in thread: _post_api_onboarding_inner() makes blocking HTTP calls (key tests)
+    try:
+        await _aio_onb.to_thread(h._post_api_onboarding_inner)
+    except Exception as _exc_onb:
+        log.exception(f"[ONBOARDING] Unhandled error in thread: {_exc_onb}")
+        return _JSON(content={"error": "Internal server error"}, status_code=500)
     data, status = _result.get("d", ({}, 200))
     return _JSON(content=data, status_code=status)
 
