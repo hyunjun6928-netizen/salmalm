@@ -830,7 +830,7 @@
       addMsg('assistant',_friendlyErr);
       var _sb2=document.getElementById('stop-btn');var _sb2Send=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb2Send)_sb2Send.style.display='flex';
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
-    }else if(data.type==='chat'){if(typingEl)typingEl.remove();if(data.content&&typeof addMsg==='function')addMsg('assistant',data.content);}else if(data.type==='subagent_done'){var _sd=data.task||{};if(_sd.status==='completed'&&_sd.result&&typeof addMsg==='function')addMsg('assistant','[subagent done]\n\n'+_sd.result.substring(0,500));else if(_sd.status==='failed'&&typeof addMsg==='function')addMsg('assistant','[subagent failed]: '+(_sd.error||''));}else if(data.type==='shutdown'){
+    }else if(data.type==='shutdown'){
       if(typingEl)typingEl.remove();
       addMsg('assistant','⚠️ '+(data.message||'Server is shutting down...'));
       var _sb3=document.getElementById('stop-btn');var _sb3Send=document.getElementById('send-btn');if(_sb3)_sb3.style.display='none';if(_sb3Send)_sb3Send.style.display='flex';

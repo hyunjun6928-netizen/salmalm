@@ -623,8 +623,18 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         loop_msg = check_loop_detection(result.get("tool_calls", []), recent_tool_calls)
         if loop_msg:
-            session.add_assistant(loop_msg)
-            return loop_msg, consecutive_errors
+            # Include last tool result in the final answer so user sees the computed value
+            _last_result = ""
+            for _tc in result.get("tool_calls", []):
+                _tid = _tc.get("id", "")
+                if _tid and _tid in tool_outputs:
+                    _last_result = str(tool_outputs[_tid])[:500]
+            if _last_result:
+                final_ans = f"{_last_result}"
+            else:
+                final_ans = loop_msg
+            session.add_assistant(final_ans)
+            return final_ans, consecutive_errors
 
         self._append_tool_results(session, provider, result, result["tool_calls"], tool_outputs)
         return None, consecutive_errors
