@@ -1,71 +1,50 @@
-"""SalmAlm HTML templates — thin loader over static/ files.
-
-Templates are stored as plain HTML in salmalm/static/ for easier editing.
-Uses module-level __getattr__ so templates are re-read on every access
-(no server restart needed during development).
-"""
-
+"""SalmAlm HTML templates."""
 from pathlib import Path
 
 _STATIC = Path(__file__).resolve().parent.parent / "static"
 
-
-def _load(name: str) -> str:
-    """Read a static HTML file, return empty string if missing."""
-    p = _STATIC / name
-    if p.exists():
-        from salmalm import __version__
-
-        import time as _t
-        _ts = str(int(_t.time()) // 3600)  # changes every hour
-        html = p.read_text(encoding="utf-8").replace("{{VERSION}}", f"v{__version__}.{_ts}")
-        if name == "index.html":
-            _ws_patch = """<script>
+_WS_PATCH = """<script>
 (function(){
-  var _orig = window._wsOnMsg;
-  function _patchWS(){
-    if(!window._ws||window._ws._salmalm_patched)return;
-    window._ws._salmalm_patched=true;
-    var _origOnMsg=window._ws.onmessage;
-    window._ws.onmessage=function(ev){
-      if(_origOnMsg)_origOnMsg.call(this,ev);
+  var O=window.WebSocket;
+  window.WebSocket=function(u,p){
+    var ws=p?new O(u,p):new O(u);
+    ws.addEventListener('message',function(ev){
       try{
         var d=JSON.parse(ev.data);
         if(d.type==='chat'&&d.content){
-          var _te=document.getElementById('typing-row');if(_te)_te.remove();
+          var te=document.getElementById('typing-row');if(te)te.remove();
           if(typeof addMsg==='function')addMsg('assistant',d.content);
-          var _ot=document.title;
-          document.title=(d.source==='cron'?'\u23F0 ':'🔔 ')+_ot;
-          setTimeout(function(){document.title=_ot;},4000);
+          var ot=document.title;
+          document.title=(d.source==='cron'?'[cron] ':'[notify] ')+ot;
+          setTimeout(function(){document.title=ot;},4000);
         }else if(d.type==='subagent_done'){
           var t=d.task||{};
           if(t.status==='completed'&&t.result&&typeof addMsg==='function'){
-            addMsg('assistant','\u2705 \uc11c\ube0c\uc5d0\uc774\uc804\ud2b8 \uc644\ub8cc\n\n'+t.result.substring(0,500));
+            addMsg('assistant','[subagent done]\n\n'+t.result.substring(0,500));
           }else if(t.status==='failed'&&typeof addMsg==='function'){
-            addMsg('assistant','\u274c \uc2e4\ud328: '+(t.error||''));
+            addMsg('assistant','[subagent failed]: '+(t.error||''));
           }
         }
       }catch(e){}
-    };
-  }
-  var _orig_ws=window.WebSocket;
-  window.WebSocket=function(url,protocols){
-    var ws=protocols?new _orig_ws(url,protocols):new _orig_ws(url);
-    window._ws=ws;
-    ws.addEventListener('open',function(){_patchWS();});
+    });
     return ws;
   };
-  window.WebSocket.prototype=_orig_ws.prototype;
-  window.WebSocket.CONNECTING=_orig_ws.CONNECTING;
-  window.WebSocket.OPEN=_orig_ws.OPEN;
-  window.WebSocket.CLOSING=_orig_ws.CLOSING;
-  window.WebSocket.CLOSED=_orig_ws.CLOSED;
-  setTimeout(function(){if(window._ws)_patchWS();},2000);
+  Object.assign(window.WebSocket,O);
 })();
 </script></body>"""
-            html = html.replace("</body>", _ws_patch)
-        return html
-    return ""
+
+
+def _load(name: str) -> str:
+    p = _STATIC / name
+    if not p.exists():
+        return ""
+    from salmalm import __version__
+    import time as _t
+    ts = str(int(_t.time()) // 3600)
+    html = p.read_text(encoding="utf-8").replace("{{VERSION}}", f"v{__version__}.{ts}")
+    if name == "index.html" and "</body>" in html:
+        html = html.replace("</body>", _WS_PATCH)
+    return html
 
 
 _TEMPLATE_MAP = {
