@@ -430,7 +430,7 @@ async def call_with_failover(
         chain = _load_failover_config().get(model, [])
         for fb in chain:
             if not _is_model_cooled_down(fb):
-                warn = f"⚠️ {model.split('/')[-1]} in cooldown, using {fb.split('/')[-1]}"
+                warn = ""  # suppress cooldown warning from chat UI (log already records it)
                 result = await try_llm_call(messages, fb, tools, max_tokens, thinking, on_token)
                 if not result.get("_failed"):
                     _clear_model_cooldown(fb)
