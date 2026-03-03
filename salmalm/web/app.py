@@ -426,7 +426,7 @@ def _patch_app_js() -> None:
 @app.on_event("startup")
 async def _on_startup() -> None:  # noqa: D401
     _register_all_routes()
-    _patch_app_js()
+    # _patch_app_js()  # disabled: now handled in templates.py
     # Capture main event loop for LLMCronManager._execute_job (daemon thread dispatch)
     import asyncio as _aio_startup
     try:
