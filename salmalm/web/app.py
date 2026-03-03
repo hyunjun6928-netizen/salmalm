@@ -406,17 +406,25 @@ def _patch_app_js() -> None:
         "addMsg('assistant','[subagent failed]: '+(_sd.error||''));"
         "}else if(data.type==='shutdown'){"
     )
+    _changed = False
     if _old in _src:
-        _js.write_text(_src.replace(_old, _new, 1), encoding="utf-8")
+        _src = _src.replace(_old, _new, 1)
+        _changed = True
+    if ":18801" in _src:
+        _src = _src.replace("return proto+'//'+host+':18801';", "return proto+'//'+host+':'+(port||'18800')+'/ws';")
+        _src = _src.replace("WS on port 18801", "WS on same port")
+        _changed = True
+    if _changed:
+        _js.write_text(_src, encoding="utf-8")
         import logging as _log
-        _log.getLogger("salmalm").info("[STARTUP] app.js chat/subagent_done handlers patched")
+        _log.getLogger("salmalm").info("[STARTUP] app.js patched (chat handler + WS URL)")
 
 
 
 @app.on_event("startup")
 async def _on_startup() -> None:  # noqa: D401
     _register_all_routes()
-    # _patch_app_js()  # disabled: now handled in templates.py
+    _patch_app_js()
     # Capture main event loop for LLMCronManager._execute_job (daemon thread dispatch)
     import asyncio as _aio_startup
     try:
