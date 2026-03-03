@@ -242,8 +242,8 @@ def _exec_image_generate(args: dict) -> str:
         api_key = vault.get("google_api_key") or vault.get("gemini_api_key")
         if not api_key:
             return "❌ Google API key not found in vault (key: google_api_key or gemini_api_key)"
-        # Try imagen-3.0-generate-002 first, fallback to imagen-3.0-fast-generate-001
-        for _model in ["imagen-3.0-generate-002", "imagen-3.0-fast-generate-001"]:
+        # Imagen 4.0 (3.0 deprecated)
+        for _model in ["imagen-4.0-generate-001", "imagen-4.0-fast-generate-001"]:
             resp = _http_post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:predict",
                 {"Content-Type": "application/json", "x-goog-api-key": api_key},

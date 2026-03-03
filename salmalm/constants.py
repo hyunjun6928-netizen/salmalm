@@ -399,7 +399,7 @@ MODEL_CLAUDE_SONNET = "claude-sonnet-4-6"
 MODEL_CLAUDE_HAIKU = "claude-haiku-4-5-20251001"
 MODEL_GPT_4_1_NANO_OPENAI = "gpt-4.1-nano"  # bare name, no provider prefix
 MODEL_GEMINI_FLASH = "google/gemini-2.5-flash"
-MODEL_GEMINI_2_FLASH = "gemini-2.0-flash"
+MODEL_GEMINI_2_FLASH = "gemini-2.5-flash"
 
 # ── Model fallback chains for retry logic ──
 MODEL_FALLBACKS = {
@@ -417,26 +417,26 @@ MODEL_FALLBACKS = {
     ],
     "anthropic/claude-haiku-4-5-20251001": [
         "anthropic/claude-sonnet-4-6",
-        "google/gemini-2.0-flash",
+        "google/gemini-2.5-flash",
         "openai/gpt-4.1-mini",
     ],
     "openai/gpt-5.2": ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
     "openai/gpt-4.1": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
-    "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"],
-    "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.0-flash", "anthropic/claude-sonnet-4-6"],
+    "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.5-flash", "anthropic/claude-sonnet-4-6"],
     "google/gemini-2.5-flash": [
-        "google/gemini-2.0-flash",
+        "google/gemini-2.5-flash",
         "google/gemini-2.5-pro",
         "anthropic/claude-haiku-4-5-20251001",
     ],
-    "google/gemini-2.0-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.5-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
     "google/gemini-3-pro-preview": [
         "google/gemini-2.5-pro",
         "google/gemini-3-flash-preview",
         "anthropic/claude-sonnet-4-6",
     ],
     "google/gemini-3-flash-preview": [
-        "google/gemini-2.0-flash",
+        "google/gemini-2.5-flash",
         "google/gemini-2.5-flash",
         "anthropic/claude-haiku-4-5-20251001",
     ],
