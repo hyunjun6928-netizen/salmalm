@@ -16,7 +16,9 @@ def _load(name: str) -> str:
     if p.exists():
         from salmalm import __version__
 
-        return p.read_text(encoding="utf-8").replace("{{VERSION}}", f"v{__version__}")
+        import time as _t
+        _ts = str(int(_t.time()) // 3600)  # changes every hour
+        return p.read_text(encoding="utf-8").replace("{{VERSION}}", f"v{__version__}.{_ts}")
     return ""
 
 
