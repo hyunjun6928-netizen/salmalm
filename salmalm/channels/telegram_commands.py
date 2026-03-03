@@ -3,8 +3,9 @@
 import json
 import textwrap
 
-from salmalm.constants import VERSION
+from salmalm.constants import VERSION, APP_NAME
 from salmalm.core.core import router
+from salmalm.core import get_session
 
 
 class TelegramCommandsMixin:

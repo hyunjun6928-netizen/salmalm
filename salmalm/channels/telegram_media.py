@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 
 from salmalm.security.crypto import vault
-from salmalm.core import audit_log
+from salmalm.core import audit_log, get_session
 
 log = logging.getLogger(__name__)
 
