@@ -388,6 +388,13 @@ def _register_all_routes() -> None:
 @app.on_event("startup")
 async def _on_startup() -> None:  # noqa: D401
     _register_all_routes()
+    # Capture main event loop for LLMCronManager._execute_job (daemon thread dispatch)
+    import asyncio as _aio_startup
+    try:
+        from salmalm.core.llm_cron import LLMCronManager
+        LLMCronManager._main_loop = _aio_startup.get_running_loop()
+    except Exception:
+        pass
 
 
 # ── WebSocket endpoint (single-port, same as HTTP) ────────────────────────
