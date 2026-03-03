@@ -86,6 +86,20 @@ class SubAgentTask:
         return d
 
 
+
+
+def _get_ws_loop():
+    """Return the running asyncio event loop for WS broadcasts from threads."""
+    try:
+        from salmalm.core.llm_cron import LLMCronManager
+        lp = getattr(LLMCronManager, "_main_loop", None)
+        if lp and not lp.is_closed():
+            return lp
+    except Exception:
+        pass
+    return None
+
+
 class SubAgentManager:
     """Manages sub-agent lifecycle: spawn, monitor, kill, steer, collect."""
 
