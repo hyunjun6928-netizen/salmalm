@@ -382,6 +382,12 @@ _KEYWORD_TOOLS = {
     "라이트모드":   ["ui_control"],
     "language":     ["ui_control"],
     "언어":         ["ui_control"],
+    "모델":         ["ui_control"],
+    "모델 변경":    ["ui_control"],
+    "모델 바꿔":    ["ui_control"],
+    "model":        ["ui_control"],
+    "switch model": ["ui_control"],
+    "change model": ["ui_control"],
     "폰트":         ["ui_control"],
     "font":         ["ui_control"],
 
