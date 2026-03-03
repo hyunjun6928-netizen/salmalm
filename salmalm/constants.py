@@ -358,7 +358,7 @@ TEST_MODELS = {
     "anthropic": "claude-haiku-4-5-20251001",
     "openai": "gpt-4.1-nano",
     "xai": "grok-3-mini",
-    "google": "gemini-2.0-flash",
+    "google": "gemini-2.5-flash",
 }
 
 # Model for /commands processing (fast + capable; sonnet is the right balance)
