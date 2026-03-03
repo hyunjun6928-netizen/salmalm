@@ -373,7 +373,12 @@ class LLMCronManager:
                     _cs.messages = [m for m in _cs.messages if m.get("role") == "system"]
                 except Exception:
                     pass
-                response = await process_message(_cron_sid, job["prompt"], model_override=job.get("model"))
+                _cron_prompt = (
+                    "You MUST use tools to get real-time data. Never estimate or guess.\n"
+                    "If the task needs current time: use python_eval with datetime.datetime.now().\n"
+                    "Task: " + job["prompt"]
+                )
+                response = await process_message(_cron_sid, _cron_prompt, model_override=job.get("model"))
                 try:
                     from salmalm.features.edge_cases import _usage as _u_tick2
                     cron_cost = _u_tick2.get("total_cost", 0) - cost_before
