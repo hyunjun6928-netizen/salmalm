@@ -380,8 +380,26 @@ class LLMCronManager:
                 job.pop("last_error", None)
                 self.save_jobs()
                 log.info(f"[CRON] Cron completed: {job['name']} ({len(response)} chars)")
-
                 self._notify_completion(job, response)
+
+                # Push result to web chat (async context — no loop capture needed)
+                try:
+                    from salmalm.core.session_store import get_session as _gs
+                    _ws_sess = _gs("web")
+                    _cron_msg = f"⏰ **[크론]** `{job['name']}`\n\n{response}"
+                    _ws_sess.add_assistant(_cron_msg)
+                    from salmalm.web.ws import ws_server as _ws
+                    import asyncio as _aio_push
+                    await _ws.broadcast({
+                        "type": "chat",
+                        "role": "assistant",
+                        "content": _cron_msg,
+                        "session": "web",
+                        "source": "cron",
+                    })
+                    log.info(f"[CRON] WS push sent: {job['name']}")
+                except Exception as _pe:
+                    log.debug(f"[CRON] WS push failed: {_pe}")
                 try:
                     from salmalm.core.memory import write_daily_log as _wdl; _wdl(f"[CRON] {job['name']}: {response[:150]}")
                 except Exception: pass
