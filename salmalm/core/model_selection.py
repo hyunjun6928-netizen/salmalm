@@ -46,6 +46,12 @@ _MODERATE_KEYWORDS = [
     "써줘",
     "만들어줘",
     "짜줘",
+    "그려",
+    "그려줘",
+    "draw",
+    "paint",
+    "generate image",
+    "이미지 생성",
 ]
 _COMPLEX_KEYWORDS = [
     "설계",

@@ -678,6 +678,28 @@ If the answer is insufficient, improve it now. If satisfactory, return it as-is.
 
         response = finalize_response(result, response)
 
+        # Auto-inject image paths from CURRENT TURN tool results that LLM omitted
+        _re = __import__("re")
+        _upload_pattern = _re.compile(r"uploads/[\w.-]+\.(?:png|jpg|jpeg|gif|webp)", _re.IGNORECASE)
+        _injected_images = set()
+        # Only check the last N messages (current turn's tool results), not entire history
+        _recent = session.messages[-10:] if len(session.messages) > 10 else session.messages
+        for msg in _recent:
+            if msg.get("role") == "tool" or (isinstance(msg.get("content"), str) and "Image generated" in msg.get("content", "")):
+                for _match in _upload_pattern.findall(str(msg.get("content", ""))):
+                    if _match not in response:
+                        _injected_images.add(_match)
+            # Anthropic tool_result format
+            if msg.get("role") == "user" and isinstance(msg.get("content"), list):
+                for _block in msg["content"]:
+                    if isinstance(_block, dict) and _block.get("type") == "tool_result":
+                        for _match in _upload_pattern.findall(str(_block.get("content", ""))):
+                            if _match not in response:
+                                _injected_images.add(_match)
+        if _injected_images:
+            response += "\n\n" + "\n".join(sorted(_injected_images))
+            log.info(f"[ART] Auto-injected {len(_injected_images)} image path(s) into response")
+
         if self._should_reflect(classification, response, iteration):
             response = await self._run_reflection(user_message, response)
 

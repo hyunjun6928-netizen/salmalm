@@ -217,7 +217,7 @@ def _legacy_execute(name: str, args: dict) -> str:
 def _exec_image_generate(args: dict) -> str:
     """Execute image_generate tool."""
     prompt = args["prompt"]
-    provider = args.get("provider", "xai")
+    provider = args.get("provider", "google")
     size = args.get("size", "1024x1024")
     save_dir = WORKSPACE_DIR / "uploads"
     save_dir.mkdir(exist_ok=True)
