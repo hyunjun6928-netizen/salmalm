@@ -666,10 +666,19 @@ async def run_server():
             "[WARN] Binding to 0.0.0.0 — server is accessible from LAN. "
             "Set SALMALM_BIND=127.0.0.1 to restrict to localhost."
         )
-        # External exposure safety checks
+        # External exposure safety checks — fail-closed if admin not configured
         from salmalm.web.middleware import check_external_exposure_safety
 
         exposure_warnings = check_external_exposure_safety(bind_addr, WebHandler)
+        _has_critical = any("CRITICAL" in w or "no admin" in w.lower() for w in exposure_warnings)
+        if _has_critical and os.environ.get("SALMALM_EXTERNAL_TOOLS_OK") != "1":
+            for w in exposure_warnings:
+                log.error(w)
+            log.error(
+                "❌ Refusing to start on 0.0.0.0 without admin password. "
+                "Set admin password first, or SALMALM_EXTERNAL_TOOLS_OK=1 to override."
+            )
+            sys.exit(1)
         for w in exposure_warnings:
             log.warning(w)
     url = f"http://{bind_addr}:{port}"

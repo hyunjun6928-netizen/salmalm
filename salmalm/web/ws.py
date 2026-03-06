@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Callable, Dict, Optional, Set
 
@@ -177,11 +178,11 @@ class WebSocketServer:
     async def handle_connection(self, websocket: WebSocket) -> None:
         """Entry point called by @app.websocket('/ws')."""
         # Auth check: token via query param or cookie.
-        # WebSocket upgrade happens before headers arrive, so we use
-        # query-param token as the primary auth mechanism.
+        # Prefer cookie/header over query-param to avoid token leakage in
+        # proxy logs, browser history, and error reports.
         token = (
-            websocket.query_params.get("token")
-            or websocket.cookies.get("token")
+            websocket.cookies.get("salmalm_token")
+            or websocket.query_params.get("token")
         )
         if token:
             from salmalm.web.auth import auth_manager
@@ -189,11 +190,12 @@ class WebSocketServer:
         else:
             _user = None
 
-        # Reject unauthenticated connections unless server is in single-user
-        # localhost-only mode (vault auto-unlock implies local deployment).
+        # Reject unauthenticated connections unless explicitly opted-in via
+        # SALMALM_TRUST_LOOPBACK=1 (default: off for defense-in-depth).
         _client_ip = websocket.client.host if websocket.client else "unknown"
         _is_local = _client_ip in ("127.0.0.1", "::1", "localhost")
-        if not _user and not _is_local:
+        _trust_loopback = os.environ.get("SALMALM_TRUST_LOOPBACK", "0") == "1"
+        if not _user and not (_is_local and _trust_loopback):
             await websocket.close(code=4001, reason="Unauthorized")
             return
 

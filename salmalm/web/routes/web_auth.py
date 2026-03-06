@@ -400,9 +400,15 @@ async def post_auth_login(req: LoginRequest, request: _Request):
     if user:
         token = auth_manager.create_token(user)
         audit_log("auth_success", f"user={username}", detail_dict={"username": username, "ip": ip})
-        resp = _JSON(content={"ok": True, "token": token, "user": user}, headers={"Cache-Control": "no-store, no-cache", "Pragma": "no-cache"})
-        # Also set HttpOnly + SameSite cookie for XSS-resistant auth
-        # Secure flag set when not on loopback (HTTPS environments)
+        # Browser clients use HttpOnly cookie (no token in body).
+        # API clients that send Accept: application/json get the token.
+        _accept = request.headers.get("accept", "")
+        _is_api_client = "application/json" in _accept and "text/html" not in _accept
+        _body = {"ok": True, "user": user}
+        if _is_api_client:
+            _body["token"] = token  # API/CLI clients need the raw token
+        resp = _JSON(content=_body, headers={"Cache-Control": "no-store, no-cache", "Pragma": "no-cache"})
+        # HttpOnly + SameSite cookie for XSS-resistant auth
         _is_local = ip in ("127.0.0.1", "::1", "localhost")
         _secure = not _is_local
         resp.set_cookie(
@@ -467,7 +473,10 @@ async def post_auto_unlock(request: _Request):
     if vault.is_unlocked:
         return _JSON(content={"ok": True, "token": secrets.token_hex(32)})
     ip = request.client.host if request.client else "unknown"
-    if ip not in ("127.0.0.1", "::1", "localhost"):
+    _is_local = ip in ("127.0.0.1", "::1", "localhost")
+    import os as _os_unlock
+    _trust_loopback = _os_unlock.environ.get("SALMALM_TRUST_LOOPBACK", "1") == "1"
+    if not _is_local or not _trust_loopback:
         return _JSON(content={"ok": False}, status_code=401)
     # Try auto-unlock via vault keychain/file
     if vault.try_keychain_unlock():
@@ -506,9 +515,16 @@ async def post_auth_logout(request: _Request):
     from salmalm.web.token_manager import token_manager
     user = extract_auth(dict(request.headers))
     resp = _JSON(content={"ok": True, "message": "Logged out"})
-    # Revoke JTI so this token cannot be reused even if intercepted
-    if user and user.get("jti"):
-        token_manager.revoke(user["_jti"])
+    # Revoke token so it cannot be reused even if intercepted
+    # extract raw token string from Authorization header or cookie
+    _raw_token = None
+    _auth_header = request.headers.get("authorization", "")
+    if _auth_header.startswith("Bearer "):
+        _raw_token = _auth_header[7:].strip()
+    if not _raw_token:
+        _raw_token = request.cookies.get("salmalm_token")
+    if _raw_token and user and user.get("jti"):
+        token_manager.revoke(_raw_token)
     # Clear cookie
     resp.delete_cookie(key="salmalm_token", path="/")
     return resp
