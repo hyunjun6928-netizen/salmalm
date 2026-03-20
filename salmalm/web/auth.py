@@ -556,15 +556,11 @@ class IPBanList:
         t = threading.Thread(target=_loop, daemon=True, name="IPBanList-cleanup")
         t.start()
 
-    _db_initialized = False
-
     def _get_conn(self):
         """Return thread-local auth DB connection (reuses _get_auth_db)."""
         conn = _get_auth_db(AUTH_DB)
-        if not IPBanList._db_initialized:
-            conn.execute(self._DB_TABLE)
-            conn.commit()
-            IPBanList._db_initialized = True
+        conn.execute(self._DB_TABLE)
+        conn.commit()
         return conn
 
     def _init_db(self) -> None:
@@ -598,17 +594,18 @@ class IPBanList:
 
     _persist_pool = None  # lazy ThreadPoolExecutor
 
-    def _persist(self, ip: str, rec: dict) -> None:
-        """Upsert a single record to DB via bounded thread pool.
+    def _persist(self, ip: str, rec: dict, *, sync: bool = False) -> None:
+        """Upsert a single record to DB.
 
-        Uses a 2-worker ThreadPoolExecutor instead of spawning a new thread
-        per violation — prevents thread explosion under IP flooding.
+        Uses a 2-worker ThreadPoolExecutor by default to prevent thread
+        explosion under IP flooding.  Pass sync=True to write immediately
+        (used when callers need guaranteed durability before returning).
         """
         rec_copy = dict(rec)  # snapshot under caller's lock before releasing
 
         def _write():
             try:
-                conn = _get_auth_db(AUTH_DB)
+                conn = self._get_conn()
                 conn.execute(
                     "INSERT OR REPLACE INTO ip_bans (ip, violations, first_at, banned_until) VALUES (?,?,?,?)",
                     (ip, rec_copy["count"], rec_copy["first_at"], rec_copy["banned_until"]),
@@ -616,6 +613,10 @@ class IPBanList:
                 conn.commit()
             except Exception as _e:
                 log.debug("[BAN] DB persist failed: %s", _e)
+
+        if sync:
+            _write()
+            return
 
         if IPBanList._persist_pool is None:
             from concurrent.futures import ThreadPoolExecutor
@@ -671,7 +672,7 @@ class IPBanList:
                     "[BAN] IP %s auto-banned for %ds after %d violations",
                     ip, self._ban_duration, rec["count"],
                 )
-                self._persist(ip, rec)
+                self._persist(ip, rec, sync=True)
                 return True
 
             self._persist(ip, rec)
@@ -681,11 +682,14 @@ class IPBanList:
         """Manually lift a ban (admin use)."""
         with self._lock:
             self._records.pop(ip, None)   # remove entirely — no lingering violation count
+        # Drain pending async persists so they don't re-insert after DELETE
+        if IPBanList._persist_pool is not None:
+            IPBanList._persist_pool.shutdown(wait=True)
+            IPBanList._persist_pool = None
         try:
             conn = self._get_conn()
             conn.execute("DELETE FROM ip_bans WHERE ip = ?", (ip,))
             conn.commit()
-            # conn.close()  # thread-local: do not close
         except Exception as _e:
             log.debug("[BAN] unban DB delete failed: %s", _e)
         log.info("[BAN] IP %s manually unbanned", ip)
@@ -779,15 +783,11 @@ class DailyQuotaManager:
         if _a > 0:
             self._ROLE_LIMITS["anonymous"] = _a
 
-    _dq_db_initialized = False
-
     def _get_conn(self):
         """Return thread-local auth DB connection (reuses _get_auth_db)."""
         conn = _get_auth_db(AUTH_DB)
-        if not DailyQuotaManager._dq_db_initialized:
-            conn.execute(self._DB_TABLE)
-            conn.commit()
-            DailyQuotaManager._dq_db_initialized = True
+        conn.execute(self._DB_TABLE)
+        conn.commit()
         return conn
 
     def _init_db(self) -> None:
