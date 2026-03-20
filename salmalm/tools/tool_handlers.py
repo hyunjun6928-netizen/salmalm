@@ -102,15 +102,11 @@ def _check_path_safety(tool_name: str, args: dict) -> Optional[str]:
         if ".." in val:
             return f'❌ Path traversal blocked: ".." not allowed in {key} / 경로 탈출 차단'
         try:
-            # Use os.path.realpath (follows symlinks) in addition to Path.resolve()
-            # to prevent symlink-based escapes to paths outside allowed roots.
-            import os as _os_ph
-            if _P(val).is_absolute():
-                resolved = _os_ph.path.realpath(str(_P(val)))
-            else:
-                resolved = _os_ph.path.realpath(str(WORKSPACE_DIR / val))
+            resolved = str(_P(val).resolve())
+            if not _P(val).is_absolute():
+                resolved = str((WORKSPACE_DIR / val).resolve())
             resolved_path = _P(resolved)
-            in_allowed = any(resolved_path == _P(r) or resolved_path.is_relative_to(_P(_os_ph.path.realpath(r))) for r in _allowed_roots)
+            in_allowed = any(resolved_path == _P(r) or resolved_path.is_relative_to(_P(r)) for r in _allowed_roots)
             home_read_ok = os.environ.get("SALMALM_ALLOW_HOME_READ") and resolved_path.is_relative_to(_P.home())
             if not in_allowed and not home_read_ok:
                 if tool_name in _WRITE_TOOLS or _P(resolved).exists() or _P(val).exists():
@@ -150,7 +146,7 @@ def execute_tool(name: str, args: dict) -> str:
 
         _audit_args = scrub_secrets(_audit_args_raw)
     except Exception as e:  # noqa: broad-except
-        _audit_args = _audit_args_raw
+        _audit_args = "[redaction failed — args omitted for safety]"
     _session_id = args.pop("_session_id", "")  # Injected by engine
     audit_log(
         "tool_exec",
@@ -173,14 +169,8 @@ def execute_tool(name: str, args: dict) -> str:
         ("google_calendar", "create"): "create calendar event",
     }
     _tool_action = args.get("action", "")
-    # Lookup order: exact (name, action) match first, then (name, None) wildcard.
-    # This allows per-action granularity while providing a catch-all via None.
-    def _lookup_irreversible(n: str, a: str):
-        """Lookup irreversible."""
-        return _IRREVERSIBLE_ACTIONS.get((n, a)) or _IRREVERSIBLE_ACTIONS.get((n, None))
-    _action_desc = _lookup_irreversible(name, _tool_action)
-    _is_irreversible = _action_desc is not None
-    _action_desc = _action_desc or ""
+    _is_irreversible = (name, _tool_action) in _IRREVERSIBLE_ACTIONS or (name, None) in _IRREVERSIBLE_ACTIONS
+    _action_desc = _IRREVERSIBLE_ACTIONS.get((name, _tool_action)) or _IRREVERSIBLE_ACTIONS.get((name, None), "")
     if _is_irreversible and not args.pop("_confirmed", False):
         action_desc = _action_desc
         preview = _audit_args[:150]
@@ -215,49 +205,65 @@ def _legacy_execute(name: str, args: dict) -> str:
 
 
 def _exec_image_generate(args: dict) -> str:
-    """Execute image_generate tool."""
+    """Execute image_generate tool. Auto-falls back across providers if primary fails."""
     prompt = args["prompt"]
-    provider = args.get("provider", "google")
+    provider = args.get("provider", "imagen")
     size = args.get("size", "1024x1024")
     save_dir = WORKSPACE_DIR / "uploads"
     save_dir.mkdir(exist_ok=True)
     fname = f"gen_{int(time.time())}.png"
     save_path = save_dir / fname
 
-    if provider == "xai":
+    if provider == "imagen":
+        api_key = vault.get("google_api_key") or vault.get("gemini_api_key")
+        if not api_key:
+            return "❌ Google API key not found (vault key: google_api_key)"
+        _VALID_IMAGEN = {"imagen-4.0-generate-001", "imagen-4.0-ultra-generate-001", "imagen-4.0-fast-generate-001"}
+        model = args.get("model", "imagen-4.0-generate-001")
+        if model not in _VALID_IMAGEN:
+            log.warning(f"[IMAGEN] Invalid model '{model}' — falling back to imagen-4.0-generate-001")
+            model = "imagen-4.0-generate-001"
+        aspect = args.get("aspect_ratio", "1:1")
+        resp = _http_post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:predict?key={api_key}",
+            {"Content-Type": "application/json"},
+            {
+                "instances": [{"prompt": prompt}],
+                "parameters": {"sampleCount": 1, "aspectRatio": aspect},
+            },
+        )
+        import base64 as b64mod
+        # Surface API-level errors (returned as 200 with error field)
+        if "error" in resp:
+            err = resp["error"]
+            code = err.get("code", "?")
+            msg = err.get("message", str(err))
+            log.error(f"[IMAGEN] API error {code}: {msg}")
+            if code in (403, "403"):
+                return f"❌ Imagen 접근 권한 없음 (403): Gemini API 콘솔에서 Imagen API 활성화 필요. {msg}"
+            return f"❌ Imagen API 오류 ({code}): {msg}"
+        predictions = resp.get("predictions") or []
+        if not predictions:
+            log.error(f"[IMAGEN] Empty predictions. Full resp: {resp}")
+            return f"❌ Imagen 응답 없음 — 전체 응답: {json.dumps(resp, ensure_ascii=False)[:300]}"
+        img_data = b64mod.b64decode(predictions[0]["bytesBase64Encoded"])
+        save_path.write_bytes(img_data)
+    elif provider == "xai":
         api_key = vault.get("xai_api_key")
         if not api_key:
             return "❌ xAI API key not found"
+        # aurora API: no 'size' param, response_format must be 'url'/'png'/'webp'/'jpeg'
         resp = _http_post(
             "https://api.x.ai/v1/images/generations",
             {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            {"model": "aurora", "prompt": prompt, "n": 1, "size": size, "response_format": "b64_json"},
+            {"model": "aurora", "prompt": prompt, "n": 1},
         )
-        import base64 as b64mod
-
-        img_data = b64mod.b64decode(resp["data"][0]["b64_json"])
-        save_path.write_bytes(img_data)
-    elif provider == "google":
-        import base64 as b64mod
-        api_key = vault.get("google_api_key") or vault.get("gemini_api_key")
-        if not api_key:
-            return "❌ Google API key not found in vault (key: google_api_key or gemini_api_key)"
-        # Imagen 4.0 (3.0 deprecated)
-        for _model in ["imagen-4.0-generate-001", "imagen-4.0-fast-generate-001"]:
-            resp = _http_post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{_model}:predict",
-                {"Content-Type": "application/json", "x-goog-api-key": api_key},
-                {
-                    "instances": [{"prompt": prompt}],
-                    "parameters": {"sampleCount": 1, "aspectRatio": "1:1"},
-                },
-            )
-            if not resp.get("_failed"):
-                break
-        predictions = resp.get("predictions", [])
-        if not predictions:
-            return f"❌ Google Imagen returned no predictions. Check API key has Imagen access. Response: {str(resp)[:200]}"
-        img_data = b64mod.b64decode(predictions[0].get("bytesBase64Encoded", ""))
+        import urllib.request as _ureq
+        img_url = resp["data"][0].get("url") or resp["data"][0].get("revised_prompt", "")
+        if not img_url:
+            return f"❌ xAI aurora 응답에서 URL을 찾을 수 없음: {resp}"
+        with _ureq.urlopen(img_url, timeout=60) as r:
+            img_data = r.read()
         save_path.write_bytes(img_data)
     else:
         api_key = vault.get("openai_api_key")
@@ -266,7 +272,7 @@ def _exec_image_generate(args: dict) -> str:
         resp = _http_post(
             "https://api.openai.com/v1/images/generations",
             {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            {"model": _MODEL_GPT_IMAGE, "prompt": prompt, "n": 1, "size": size, "output_format": "b64_json"},
+            {"model": "dall-e-3", "prompt": prompt, "n": 1, "size": size, "response_format": "b64_json"},
         )
         import base64 as b64mod
 
@@ -275,7 +281,39 @@ def _exec_image_generate(args: dict) -> str:
 
     size_kb = len(img_data) / 1024
     log.info(f"[ART] Image generated: {fname} ({size_kb:.1f}KB)")
-    return f"✅ Image generated: uploads/{fname} ({size_kb:.1f}KB)\nPrompt: {prompt}"
+    provider_label = {"imagen": "Google Imagen", "xai": "xAI Aurora", "openai": "OpenAI DALL-E"}.get(provider, provider)
+    return f"✅ Image generated: uploads/{fname} ({size_kb:.1f}KB)\nProvider: {provider_label}\nPrompt: {prompt}"
+
+
+def _exec_image_generate_with_fallback(args: dict) -> str:
+    """Wrapper: try providers in order until one succeeds.
+    If user explicitly set a provider and it fails due to missing API key, do NOT fall back.
+    """
+    requested = args.get("provider", "imagen")
+    _CHAIN = ["imagen", "xai", "openai"]
+    providers = [requested] + [p for p in _CHAIN if p != requested]
+
+    _KEY_MISSING = ("API key not found", "key not found")
+
+    last_err = "알 수 없는 오류"
+    for i, prov in enumerate(providers):
+        try:
+            result = _exec_image_generate({**args, "provider": prov})
+            if result.startswith("✅"):
+                if prov != requested:
+                    log.info(f"[ART] Fallback succeeded: {prov} (primary: {requested})")
+                return result
+            log.warning(f"[ART] Provider '{prov}' soft-fail: {result[:120]}")
+            last_err = result
+            # If explicitly requested and failed due to missing key — stop, don't silently fall back
+            if i == 0 and any(k in result for k in _KEY_MISSING):
+                _label = {"xai": "xAI", "openai": "OpenAI", "imagen": "Google"}.get(prov, prov)
+                return f"❌ {_label} API 키가 설정되지 않았습니다. Settings → API Keys에서 키를 추가해주세요."
+        except Exception as e:
+            log.warning(f"[ART] Provider '{prov}' exception: {e}")
+            last_err = str(e)[:200]
+
+    return f"❌ 모든 이미지 생성 제공업체 실패.\n마지막 오류: {last_err}"
 
 
 def _exec_image_analyze(args: dict) -> str:
@@ -453,7 +491,7 @@ def _exec_tts_generate(args: dict) -> str:
 def _execute_inner(name: str, args: dict) -> str:
     """Inner dispatch — ONLY media tools that tools_media.py delegates back here."""
     _MEDIA_DISPATCH = {
-        "image_generate": _exec_image_generate,
+        "image_generate": _exec_image_generate_with_fallback,
         "image_analyze": _exec_image_analyze,
         "tts": _exec_tts,
         "stt": _exec_stt,

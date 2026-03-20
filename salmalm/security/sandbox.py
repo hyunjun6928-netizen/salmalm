@@ -28,8 +28,19 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Optional
+import re as _re
 
 from salmalm.constants import WORKSPACE_DIR
+
+_SECRET_PAT = _re.compile(r"(?i)(API[_-]?KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AUTH|VAULT)")
+_SAFE_BASE_KEYS = {"PATH", "HOME", "USER", "LANG", "TMPDIR", "TERM", "SHELL",
+                    "XDG_RUNTIME_DIR", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "LC_ALL", "LC_CTYPE"}
+
+
+def _sandbox_safe_env() -> dict:
+    """Minimal environment for sandboxed subprocesses — strips secrets."""
+    return {k: v for k, v in os.environ.items()
+            if k in _SAFE_BASE_KEYS or not _SECRET_PAT.search(k)}
 
 
 class SandboxCapabilities:
@@ -210,6 +221,7 @@ def sandbox_exec(
                 timeout=timeout,
                 preexec_fn=lambda: _set_rlimits(timeout, memory_mb),
             )
+            proc.env = None  # already set
             result["method"] = "bwrap"
 
         elif caps["sandbox_exec"] and sys.platform == "darwin":
@@ -225,6 +237,7 @@ def sandbox_exec(
                     capture_output=True,
                     text=True,
                     timeout=timeout,
+                    env=_sandbox_safe_env(),
                     preexec_fn=lambda: _set_rlimits(timeout, memory_mb),
                 )
                 result["method"] = "sandbox-exec"
@@ -241,6 +254,7 @@ def sandbox_exec(
                 text=True,
                 timeout=timeout,
                 cwd=ws,
+                env=_sandbox_safe_env(),
                 preexec_fn=(lambda: _set_rlimits(timeout, memory_mb)) if sys.platform != "win32" else None,
             )
             result["method"] = "rlimit"
@@ -372,9 +386,11 @@ def path_jail(path_str: str, root: Optional[str] = None) -> tuple:
 
     root = root or str(WORKSPACE_DIR)
     try:
-        resolved = str(Path(path_str).resolve())
-        if resolved.startswith(root) or resolved.startswith("/tmp"):
-            return True, resolved
+        resolved_path = Path(path_str).resolve()
+        root_path = Path(root).resolve()
+        tmp_path = Path("/tmp").resolve()
+        if resolved_path.is_relative_to(root_path) or resolved_path.is_relative_to(tmp_path):
+            return True, str(resolved_path)
         return False, f"Path {path_str} escapes allowed root {root}"
     except Exception as e:
         return False, str(e)

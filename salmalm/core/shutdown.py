@@ -45,7 +45,7 @@ class ShutdownManager:
         # Phase 1: Reject new requests
         log.info("[SHUTDOWN] Phase 1: Reject new requests")
         try:
-            from salmalm.core.engine import begin_shutdown, wait_for_active_requests
+            from salmalm.core.engine_pipeline import begin_shutdown, wait_for_active_requests
 
             begin_shutdown()
         except Exception as e:
@@ -54,7 +54,7 @@ class ShutdownManager:
         # Phase 2: Drain active LLM requests (streaming)
         log.info("[SHUTDOWN] Phase 2: Drain active LLM requests")
         try:
-            from salmalm.core.engine import wait_for_active_requests  # noqa: F811
+            from salmalm.core.engine_pipeline import wait_for_active_requests  # noqa: F811
 
             drained = wait_for_active_requests(timeout=min(timeout, 15.0))
             if not drained:
@@ -65,7 +65,7 @@ class ShutdownManager:
         # Phase 3: Cancel active tool executions
         log.info("[SHUTDOWN] Phase 3: Cancel/wait for active tool executions")
         try:
-            from salmalm.core.engine import _engine
+            from salmalm.core.intelligence_engine import _get_engine as _ie_get; _engine = _ie_get()
 
             if hasattr(_engine, "_tool_executor"):
                 _engine._tool_executor.shutdown(wait=True, cancel_futures=True)
@@ -91,10 +91,12 @@ class ShutdownManager:
             log.warning(f"[SHUTDOWN] Session flush error: {e}")
 
         # Phase 5: Notify WebSocket clients
+        # Note: lazy import of web.ws is intentional here — shutdown.py is the
+        # one place where core legitimately needs to reach the transport layer.
+        # A hook would lose the await, so we keep the lazy import but document it.
         log.info("[SHUTDOWN] Phase 5: Notify WebSocket clients")
         try:
-            from salmalm.web.ws import ws_server
-
+            from salmalm.web.ws import ws_server  # intentional: shutdown coordination
             await ws_server.shutdown()
         except Exception as e:
             log.warning(f"[SHUTDOWN] WebSocket shutdown error: {e}")

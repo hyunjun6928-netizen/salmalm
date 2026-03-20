@@ -38,6 +38,13 @@ MODEL_PRICING: Dict[str, dict] = {
     "grok-4": {"input": 3.0, "output": 15.0, "cache_read": 0.3, "cache_write": 3.75},
     "grok-3": {"input": 3.0, "output": 15.0, "cache_read": 0.3, "cache_write": 3.75},
     "grok-3-mini": {"input": 0.30, "output": 0.50, "cache_read": 0.03, "cache_write": 0.375},
+    # OpenAI (2026-02)
+    "gpt-5.2": {"input": 2.0, "output": 8.0, "cache_read": 0.5, "cache_write": 2.0},
+    "gpt-4.1": {"input": 2.0, "output": 8.0, "cache_read": 0.5, "cache_write": 2.0},
+    "gpt-4.1-mini": {"input": 0.4, "output": 1.6, "cache_read": 0.1, "cache_write": 0.4},
+    "gpt-4.1-nano": {"input": 0.1, "output": 0.4, "cache_read": 0.025, "cache_write": 0.1},
+    "o3": {"input": 10.0, "output": 40.0, "cache_read": 2.5, "cache_write": 10.0},
+    "o4-mini": {"input": 1.1, "output": 4.4, "cache_read": 0.275, "cache_write": 1.1},
 }
 
 
@@ -51,7 +58,8 @@ def get_pricing(model: str) -> dict:
         if "pro" in m:
             return MODEL_PRICING["gemini-2.5-pro"]
         return MODEL_PRICING["gemini-2.5-flash"]
-    return MODEL_PRICING["claude-sonnet-4"]
+    # Unknown model — return zero-cost sentinel instead of misreporting
+    return {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0}
 
 
 def estimate_cost(model: str, usage: dict) -> float:

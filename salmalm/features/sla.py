@@ -15,7 +15,6 @@ import json
 import math
 import os
 import sqlite3
-from salmalm.db import get_connection
 import threading
 import time
 from collections import deque
@@ -36,7 +35,7 @@ _SLA_CONFIG_FILE = _SALMALM_DIR / "sla.json"
 
 _DEFAULT_SLA_CONFIG = {
     "uptime_target_pct": 99.9,
-    "ttft_target_ms": 3000,
+    "ttft_target_ms": 5000,
     "response_target_ms": 30000,
     "memory_limit_mb": 500,
     "disk_limit_pct": 90,
@@ -156,7 +155,7 @@ class UptimeMonitor:
 
     def _get_db(self) -> sqlite3.Connection:
         """Get db."""
-        conn = get_connection(AUDIT_DB)
+        conn = sqlite3.connect(str(AUDIT_DB), check_same_thread=True)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
@@ -558,7 +557,7 @@ class Watchdog:
 
         # 1. DB check
         try:
-            conn = get_connection(AUDIT_DB)
+            conn = sqlite3.connect(str(AUDIT_DB), timeout=5)
             conn.execute("SELECT 1")
             conn.close()
             report["checks"]["database"] = {"status": "ok"}
@@ -674,7 +673,7 @@ class Watchdog:
                     log.debug(f"Suppressed: {e}")
                 del _thread_local.audit_conn
             # Test new connection
-            conn = get_connection(AUDIT_DB)
+            conn = sqlite3.connect(str(AUDIT_DB), timeout=5)
             conn.execute("SELECT 1")
             conn.close()
             log.info("[SLA] DB recovery successful")

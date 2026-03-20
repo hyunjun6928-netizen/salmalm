@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 # ── Complexity keywords ──
 _SIMPLE_PATTERNS = re.compile(
     r"^(안녕|hi|hello|hey|ㅎㅇ|ㅎㅎ|ㄱㅅ|고마워|감사|ㅋㅋ|ㅎㅎ|ok|lol|yes|no|네|아니|응|ㅇㅇ|뭐해|잘자|굿|bye|잘가|좋아|ㅠㅠ|ㅜㅜ|오|와|대박|진짜|뭐|어|음|흠|뭐야|왜|어떻게|언제|어디|누구|얼마)[\?!？！.\s]*$",
-    re.IGNORECASE | re.UNICODE,  # re.UNICODE: Korean char class matching on all platforms
+    re.IGNORECASE,
 )
 _MODERATE_KEYWORDS = [
     "분석",
@@ -36,38 +36,21 @@ _MODERATE_KEYWORDS = [
     "debug",
     "디버그",
     "explain",
-    "설명해",    # "설명해줘", "설명해봐" 커버 (단독 "설명"은 너무 광범위)
-    "설명 해",
+    "설명",
     "번역",
     "translate",
-    "구현",
-    "implement",
-    "작성해",
-    "써줘",
-    "만들어줘",
-    "짜줘",
-    "그려",
-    "그려줘",
-    "draw",
-    "paint",
-    "generate image",
-    "이미지 생성",
 ]
 _COMPLEX_KEYWORDS = [
     "설계",
     "아키텍처",
     "architecture",
+    "design",
     "system design",
     "from scratch",
     "처음부터",
-    "전체 설계",    # "전체" 단독은 너무 광범위 — 복합어만 잡음
-    "전체 리팩",
-    "전체 마이그레이션",
+    "전체",
     "migration",
     "마이그레이션",
-    "design document",
-    "전면 개편",
-    "리아키텍처",
 ]
 
 # ── Model name corrections (from constants — single source of truth) ──
@@ -144,6 +127,7 @@ _TIER_CANDIDATES = {
         ("openai/gpt-4.1-mini", "openai_api_key"),  # $0.4/$1.6
         ("openai/o4-mini", "openai_api_key"),  # $1.1/$4.4 (reasoning)
         ("google/gemini-2.5-pro", "google_api_key"),  # $1.25/$10
+        ("google/gemini-2.5-pro-preview-06-05", "google_api_key"),  # $1.25/$10
         ("openai/gpt-4.1", "openai_api_key"),  # $2/$8
         ("xai/grok-3", "xai_api_key"),  # $3/$15
         ("anthropic/claude-sonnet-4-6", "anthropic_api_key"),  # $3/$15
@@ -151,12 +135,12 @@ _TIER_CANDIDATES = {
     ],
     "complex": [
         # Goal: strongest model per provider
-        # NOTE: gemini-3.1-pro removed — does not exist as of 2026-02
         ("openai/gpt-5.2", "openai_api_key"),  # $2/$8
         ("openai/gpt-5.2-codex", "openai_api_key"),  # $2/$8
-        ("google/gemini-2.5-pro", "google_api_key"),  # $1.25/$10
+        ("google/gemini-2.5-pro-preview-06-05", "google_api_key"),  # $1.25/$10
         ("xai/grok-4", "xai_api_key"),  # $3/$15
         ("anthropic/claude-sonnet-4-6", "anthropic_api_key"),  # $3/$15
+        ("google/gemini-2.5-pro", "google_api_key"),  # $1.25/$10
     ],
 }
 
@@ -172,16 +156,14 @@ def auto_optimize_routing(available_keys: list[str]) -> dict:
     """
     key_set = set(available_keys)
     result = {}
-    used_models: set = set()  # Each tier must pick a DIFFERENT model
 
     for tier in ("simple", "moderate", "complex"):
         for model_id, required_key in _TIER_CANDIDATES[tier]:
-            if required_key in key_set and model_id not in used_models:
+            if required_key in key_set:
                 result[tier] = model_id
-                used_models.add(model_id)
                 break
         if tier not in result:
-            # Fallback: use whatever is available (may overlap — acceptable for fallback)
+            # Fallback: use whatever is available
             result[tier] = _MODELS.get("sonnet", "anthropic/claude-sonnet-4-6")
 
     return result
@@ -263,13 +245,7 @@ def select_model(message: str, session) -> Tuple[str, str]:
     if getattr(session, "thinking_enabled", False):
         return rc["complex"], "complex"
 
-    # Complex: keyword match OR very long message
-    # chat/memory/creative는 긴 잡담이 많으므로 임계값을 높임 (800자)
-    # 코드/분석 intent는 300자만 넘어도 complex로
-    _intent_hint = getattr(session, "_last_intent", None)  # engine이 심어주면 참조
-    _is_chat_like = _intent_hint in {"chat", "memory", "creative"} if _intent_hint else False
-    _complex_len_threshold = 800 if _is_chat_like else 300  # 한국어 300자 ≈ 영어 150단어
-    if msg_len > _complex_len_threshold:
+    if msg_len > 500:
         return rc["complex"], "complex"
     for kw in _COMPLEX_KEYWORDS:
         if kw in msg_lower:
@@ -281,8 +257,13 @@ def select_model(message: str, session) -> Tuple[str, str]:
         if kw in msg_lower:
             return rc["moderate"], "moderate"
 
-    # Simple: 80자 이하 (한국어 짧은 질문 커버)
-    if msg_len <= 80:
+    if msg_len < 50 and _SIMPLE_PATTERNS.match(message.strip()):
+        return rc["simple"], "simple"
+    if msg_len < 50:
         return rc["simple"], "simple"
 
     return rc["moderate"], "moderate"
+
+# Backward-compat alias used by callers that imported from engine.py
+_save_routing_config = save_routing_config
+_fix_model_name = fix_model_name  # backward-compat alias

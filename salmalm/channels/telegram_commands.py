@@ -3,9 +3,8 @@
 import json
 import textwrap
 
-from salmalm.constants import VERSION, APP_NAME
+from salmalm.constants import VERSION
 from salmalm.core.core import router
-from salmalm.core import get_session
 
 
 class TelegramCommandsMixin:
@@ -109,7 +108,10 @@ class TelegramCommandsMixin:
         return
 
     async def _cmd_user(self, chat_id, text: str, tenant_user=None) -> None:
-        """Handle /user command."""
+        """Handle /user command. Admin only."""
+        if not tenant_user or tenant_user.get("role") != "admin":
+            self.send_message(chat_id, "❌ Admin only.")
+            return
         from salmalm.features.users import user_manager
         from salmalm.web.auth import auth_manager
 
@@ -266,7 +268,10 @@ class TelegramCommandsMixin:
         )
 
     async def _cmd_telegram(self, chat_id, text: str, tenant_user=None) -> None:
-        """Handle /telegram command."""
+        """Handle /telegram command. Admin only for webhook/config changes."""
+        if not tenant_user or tenant_user.get("role") != "admin":
+            self.send_message(chat_id, "❌ Admin only.")
+            return
         parts = text.split(maxsplit=2)
         if len(parts) >= 2 and parts[1] == "webhook":
             if len(parts) < 3:
@@ -547,7 +552,10 @@ class TelegramCommandsMixin:
         self.send_message(chat_id, result)
 
     async def _cmd_export(self, chat_id, text: str, tenant_user=None) -> None:
-        """Handle /export command."""
+        """Handle /export command. Admin only."""
+        if not tenant_user or tenant_user.get("role") != "admin":
+            self.send_message(chat_id, "❌ Admin only.")
+            return
         self.send_typing(chat_id)
         try:
             from salmalm.utils.migration import export_agent, export_filename
@@ -572,6 +580,9 @@ class TelegramCommandsMixin:
 
     async def _cmd_sync(self, chat_id, text: str, tenant_user=None) -> None:
         """Handle /sync command."""
+        if not tenant_user or tenant_user.get("role") != "admin":
+            self.send_message(chat_id, "❌ Admin only.")
+            return
         parts = text.split(maxsplit=1)
         sub = parts[1].strip() if len(parts) > 1 else "export"
         if sub == "export":

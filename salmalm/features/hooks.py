@@ -159,16 +159,20 @@ class HookManager:
         self.fire(event, {"session_id": "test", "message": "Hook test fired"})
         return f"✅ Fired {event}: {len(cmds)} commands, {len(plugin_cbs)} plugin callbacks"
 
-    def add_hook(self, event: str, command: str) -> str:
-        """Add a command to an event hook."""
+    def add_hook(self, event: str, command: str, *, caller_is_admin: bool = False) -> str:
+        """Add a command to an event hook. Requires admin privilege."""
+        if not caller_is_admin:
+            return "❌ Admin privilege required to register hooks."
         if event not in VALID_EVENTS:
             return f"❌ Invalid event: {event}"
         self._hooks.setdefault(event, []).append(command)
         self.save()
         return f"✅ Added hook for {event}: {command[:60]}"
 
-    def remove_hook(self, event: str, index: int) -> str:
-        """Remove a hook command by event and index."""
+    def remove_hook(self, event: str, index: int, *, caller_is_admin: bool = False) -> str:
+        """Remove a hook command by event and index. Requires admin privilege."""
+        if not caller_is_admin:
+            return "❌ Admin privilege required to modify hooks."
         cmds = self._hooks.get(event, [])
         if index < 0 or index >= len(cmds):
             return f"❌ Invalid index {index} for {event}"

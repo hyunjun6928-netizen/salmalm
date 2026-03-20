@@ -61,6 +61,7 @@ class SubAgent:
     _agents: dict = {}  # id -> {task, status, result, thread, started, completed, ...}
     _counter = 0
     _lock = threading.Lock()
+    _agents_lock = threading.RLock()
     _archive_timers: dict = {}  # id -> Timer
     MAX_CONCURRENT = 5  # Max concurrent sub-agents
     MAX_DEPTH = 2  # Max nesting depth (sub-agent spawning sub-agents)
@@ -69,31 +70,20 @@ class SubAgent:
     def spawn(
         cls, task: str, model: Optional[str] = None, notify_telegram: bool = True, _depth: int = 0, label: str = ""
     ) -> str:
-        """Spawn via v2 SubAgentManagerV2 — unified task registry."""
-        try:
-            from salmalm.features.subagents import subagent_manager as sub_agent_manager
-            task_obj = sub_agent_manager.spawn(
-                description=task,
-                model=model,
-                label=label or task[:40],
-                parent_session="web",
-            )
-            log.info(f"[BOT] Sub-agent {task_obj.task_id} spawned: {task[:80]}")
-            return task_obj.task_id
-        except Exception as e:
-            log.error(f"[SubAgent] v2 spawn failed, falling back: {e}")
-        # ── legacy fallback ──
+        """Spawn a background sub-agent. Returns agent ID."""
         if _depth >= cls.MAX_DEPTH:
             from salmalm.core.exceptions import SessionError
+
             raise SessionError(f"Sub-agent nesting depth limit ({cls.MAX_DEPTH}) reached")
-        running = sum(1 for a in cls._agents.values() if a["status"] == "running")
+        with cls._agents_lock:
+            running = sum(1 for a in cls._agents.values() if a["status"] == "running")
         if running >= cls.MAX_CONCURRENT:
             from salmalm.core.exceptions import SessionError
+
             raise SessionError(f"Max concurrent sub-agents ({cls.MAX_CONCURRENT}) reached")
         with cls._lock:
             cls._counter += 1
-            import uuid as _uuid
-            agent_id = f"sub-{_uuid.uuid4().hex[:8]}"
+            agent_id = f"sub-{cls._counter}"
 
         agent_info = {
             "id": agent_id,
@@ -118,38 +108,33 @@ class SubAgent:
             try:
                 session_id = f"subagent-{agent_id}"
                 session = _core().get_session(session_id)
-                # Clear stale session state to prevent lock conflict on restart
-                try:
-                    from salmalm.features.abort import abort_controller
-                    abort_controller.clear(session_id)
-                except Exception:
-                    pass
-                from salmalm.core.engine import process_message
+                from salmalm.core.engine_pipeline import process_message
 
-                _loop = asyncio.new_event_loop()
-                try:
-                    result = _loop.run_until_complete(process_message(session_id, task, model_override=model))
-                finally:
-                    _loop.close()
-                agent_info["result"] = result
-                agent_info["status"] = "completed"
+                result = asyncio.run(process_message(session_id, task, model_override=model))
+                with cls._agents_lock:
+                    agent_info["result"] = result
+                    agent_info["status"] = "completed"
                 now = datetime.now(KST)
-                agent_info["completed"] = now.isoformat()
-                agent_info["completed_ts"] = time.time()
+                with cls._agents_lock:
+                    agent_info["completed"] = now.isoformat()
+                    agent_info["completed_ts"] = time.time()
                 runtime_s = agent_info["completed_ts"] - agent_info["started_ts"]
 
                 # Collect transcript from session
                 try:
-                    agent_info["transcript"] = [
-                        {
-                            "role": m.get("role", "?"),
-                            "content": m.get("content", "")[:500]
-                            if isinstance(m.get("content"), str)
-                            else str(m.get("content", ""))[:500],
-                        }
-                        for m in session.messages
-                        if m.get("role") != "system"
-                    ]
+                    with session._messages_lock:
+                        _session_messages = list(session.messages)
+                    with cls._agents_lock:
+                        agent_info["transcript"] = [
+                            {
+                                "role": m.get("role", "?"),
+                                "content": m.get("content", "")[:500]
+                                if isinstance(m.get("content"), str)
+                                else str(m.get("content", ""))[:500],
+                            }
+                            for m in _session_messages
+                            if m.get("role") != "system"
+                        ]
                 except Exception as e:  # noqa: broad-except
                     log.debug(f"Suppressed: {e}")
 
@@ -160,7 +145,8 @@ class SubAgent:
                     # Rough estimate from result length
                     out_tokens = len(result) // 3
                     in_tokens = len(task) // 3
-                    agent_info["token_usage"] = {"input": in_tokens, "output": out_tokens}
+                    with cls._agents_lock:
+                        agent_info["token_usage"] = {"input": in_tokens, "output": out_tokens}
                     model_name = (model or "sonnet").lower()
                     if "opus" in model_name:
                         cost = (in_tokens * 15 + out_tokens * 75) / 1_000_000
@@ -168,7 +154,8 @@ class SubAgent:
                         cost = (in_tokens * 0.25 + out_tokens * 1.25) / 1_000_000
                     else:
                         cost = (in_tokens * 3 + out_tokens * 15) / 1_000_000
-                    agent_info["estimated_cost"] = round(cost, 6)
+                    with cls._agents_lock:
+                        agent_info["estimated_cost"] = round(cost, 6)
                 except Exception as e:  # noqa: broad-except
                     log.debug(f"Suppressed: {e}")
 
@@ -196,20 +183,24 @@ class SubAgent:
                 cls._schedule_archive(agent_id)
 
                 # Clean up session after a while
-                if session_id in _core()._sessions:
-                    del _core()._sessions[session_id]
+                _core_mod = _core()
+                with _core_mod._session_lock:
+                    if session_id in _core_mod._sessions:
+                        del _core_mod._sessions[session_id]
 
             except Exception as e:
-                agent_info["result"] = f"❌ Sub-agent error: {e}"
-                agent_info["status"] = "error"
-                agent_info["completed"] = datetime.now(KST).isoformat()
-                agent_info["completed_ts"] = time.time()
+                with cls._agents_lock:
+                    agent_info["result"] = f"❌ Sub-agent error: {e}"
+                    agent_info["status"] = "error"
+                    agent_info["completed"] = datetime.now(KST).isoformat()
+                    agent_info["completed_ts"] = time.time()
                 log.error(f"Sub-agent {agent_id} error: {e}")
                 cls._schedule_archive(agent_id)
 
         t = threading.Thread(target=_run, daemon=True, name=f"subagent-{agent_id}")
         agent_info["thread"] = t  # type: ignore[assignment]
-        cls._agents[agent_id] = agent_info
+        with cls._agents_lock:
+            cls._agents[agent_id] = agent_info
         t.start()
         log.info(f"[BOT] Sub-agent {agent_id} spawned: {task[:80]}")
         return agent_id
@@ -220,17 +211,19 @@ class SubAgent:
 
         def _do_archive():
             """Do archive."""
-            agent = cls._agents.get(agent_id)
-            if agent and not agent.get("archived"):
-                agent["archived"] = True
-                # Rename conceptually — mark as archived
-                agent["status"] = f"{agent['status']}.archived.{int(time.time())}"
-                log.info(f"[BOT] Sub-agent {agent_id} auto-archived")
-            cls._archive_timers.pop(agent_id, None)
+            with cls._agents_lock:
+                agent = cls._agents.get(agent_id)
+                if agent and not agent.get("archived"):
+                    agent["archived"] = True
+                    # Rename conceptually — mark as archived
+                    agent["status"] = f"{agent['status']}.archived.{int(time.time())}"
+                    log.info(f"[BOT] Sub-agent {agent_id} auto-archived")
+                cls._archive_timers.pop(agent_id, None)
 
         timer = threading.Timer(_ARCHIVE_DELAY_SEC, _do_archive)
         timer.daemon = True
-        cls._archive_timers[agent_id] = timer
+        with cls._agents_lock:
+            cls._archive_timers[agent_id] = timer
         timer.start()
 
     @classmethod
@@ -238,7 +231,9 @@ class SubAgent:
         """List all sub-agents with their status, label, and runtime."""
         result = []
         now_ts = time.time()
-        for a in cls._agents.values():
+        with cls._agents_lock:
+            agents_snapshot = [a for _, a in list(cls._agents.items())]
+        for a in agents_snapshot:
             if a.get("archived"):
                 continue
             runtime = (a.get("completed_ts") or now_ts) - a["started_ts"]
@@ -262,12 +257,13 @@ class SubAgent:
         """Stop a running sub-agent."""
         if agent_id == "all":
             stopped = []
-            for aid, a in cls._agents.items():
-                if a["status"] == "running":
-                    a["status"] = "stopped"
-                    a["completed"] = datetime.now(KST).isoformat()
-                    a["completed_ts"] = time.time()
-                    stopped.append(aid)
+            with cls._agents_lock:
+                for aid, a in list(cls._agents.items()):
+                    if a["status"] == "running":
+                        a["status"] = "stopped"
+                        a["completed"] = datetime.now(KST).isoformat()
+                        a["completed_ts"] = time.time()
+                        stopped.append(aid)
             return (
                 f"⏹ Stopped {len(stopped)} sub-agents: {', '.join(stopped)}" if stopped else "⚠️ No running sub-agents"
             )
@@ -276,20 +272,24 @@ class SubAgent:
         if agent_id.startswith("#"):
             try:
                 idx = int(agent_id[1:]) - 1
-                keys = list(cls._agents.keys())
+                with cls._agents_lock:
+                    keys = list(cls._agents.keys())
                 if 0 <= idx < len(keys):
                     agent_id = keys[idx]
             except ValueError:
                 return f"❌ Invalid index: {agent_id}"
 
-        agent = cls._agents.get(agent_id)
+        with cls._agents_lock:
+            _agent_ref = cls._agents.get(agent_id)
+            agent = dict(_agent_ref) if _agent_ref else None
         if not agent:
             return f"❌ Agent {agent_id} not found"
         if agent["status"] != "running":
             return f"⚠️ Agent {agent_id} is not running (status: {agent['status']})"
-        agent["status"] = "stopped"
-        agent["completed"] = datetime.now(KST).isoformat()
-        agent["completed_ts"] = time.time()
+        with cls._agents_lock:
+            agent["status"] = "stopped"
+            agent["completed"] = datetime.now(KST).isoformat()
+            agent["completed_ts"] = time.time()
         return f"⏹ Stopped sub-agent {agent_id}"
 
     @classmethod
@@ -299,13 +299,16 @@ class SubAgent:
         if agent_id.startswith("#"):
             try:
                 idx = int(agent_id[1:]) - 1
-                keys = list(cls._agents.keys())
+                with cls._agents_lock:
+                    keys = list(cls._agents.keys())
                 if 0 <= idx < len(keys):
                     agent_id = keys[idx]
             except ValueError:
                 return f"❌ Invalid index: {agent_id}"
 
-        agent = cls._agents.get(agent_id)
+        with cls._agents_lock:
+            _agent_ref = cls._agents.get(agent_id)
+            agent = dict(_agent_ref) if _agent_ref else None
         if not agent:
             return f"❌ Agent {agent_id} not found"
         transcript = agent.get("transcript", [])
@@ -328,13 +331,16 @@ class SubAgent:
         if agent_id.startswith("#"):
             try:
                 idx = int(agent_id[1:]) - 1
-                keys = list(cls._agents.keys())
+                with cls._agents_lock:
+                    keys = list(cls._agents.keys())
                 if 0 <= idx < len(keys):
                     agent_id = keys[idx]
             except ValueError:
                 return f"❌ Invalid index: {agent_id}"
 
-        agent = cls._agents.get(agent_id)
+        with cls._agents_lock:
+            _agent_ref = cls._agents.get(agent_id)
+            agent = dict(_agent_ref) if _agent_ref else None
         if not agent:
             return f"❌ Agent {agent_id} not found"
         now_ts = time.time()
@@ -358,7 +364,9 @@ class SubAgent:
     @classmethod
     def get_result(cls, agent_id: str) -> dict:
         """Get the result of a completed sub-agent run."""
-        agent = cls._agents.get(agent_id)
+        with cls._agents_lock:
+            _agent_ref = cls._agents.get(agent_id)
+            agent = dict(_agent_ref) if _agent_ref else None
         if not agent:
             return {"error": f"Agent {agent_id} not found"}
         return {
@@ -373,7 +381,9 @@ class SubAgent:
     @classmethod
     def send_message(cls, agent_id: str, message: str) -> str:
         """Send a follow-up message to a completed sub-agent's session."""
-        agent = cls._agents.get(agent_id)
+        with cls._agents_lock:
+            _agent_ref = cls._agents.get(agent_id)
+            agent = dict(_agent_ref) if _agent_ref else None
         if not agent:
             return f"❌ Agent {agent_id} not found"
         if agent["status"] == "running":
@@ -381,14 +391,11 @@ class SubAgent:
         # Run in the agent's existing session
         session_id = f"subagent-{agent_id}"
         try:
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
-            _loop = asyncio.new_event_loop()
-            try:
-                result = _loop.run_until_complete(process_message(session_id, message))
-            finally:
-                _loop.close()
-            agent["result"] = result  # Update with latest result
+            result = asyncio.run(process_message(session_id, message))
+            with cls._agents_lock:
+                agent["result"] = result  # Update with latest result
             return f"🤖 [{agent_id}] responded:\n\n{result[:3000]}"
         except Exception as e:
             return f"❌ Send failed: {str(e)[:200]}"
@@ -397,9 +404,12 @@ class SubAgent:
     def get_agent(cls, agent_id: str = "", label: str = "") -> Optional[dict]:
         """Get agent by id or label."""
         if agent_id:
-            return cls._agents.get(agent_id)
+            with cls._agents_lock:
+                return cls._agents.get(agent_id)
         if label:
-            for a in cls._agents.values():
+            with cls._agents_lock:
+                agents_snapshot = [a for _, a in list(cls._agents.items())]
+            for a in agents_snapshot:
                 if a.get("label") == label:
                     return a
         return None
@@ -423,20 +433,19 @@ class SubAgent:
         session_id = f"subagent-{aid}"
         try:
             session = _core().get_session(session_id)
-            session.messages.append({"role": "user", "content": f"[Steering from parent] {message}"})
+            session.add_user(f"[Steering from parent] {message}")
 
-            if agent["status"] == "running":
+            with cls._agents_lock:
+                _status = cls._agents.get(aid, {}).get("status")
+            if _status == "running":
                 return {"ok": True, "agent_id": aid, "status": "steered"}
 
             # Completed — re-run with steering message
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
-            _loop = asyncio.new_event_loop()
-            try:
-                result = _loop.run_until_complete(process_message(session_id, message, model_override=agent.get("model")))
-            finally:
-                _loop.close()
-            agent["result"] = result
+            result = asyncio.run(process_message(session_id, message, model_override=agent.get("model")))
+            with cls._agents_lock:
+                agent["result"] = result
             return {"ok": True, "agent_id": aid, "status": "steered", "result": result[:500]}
         except Exception as e:
             return {"ok": False, "error": f"Steer failed: {e}"}
@@ -452,22 +461,18 @@ class SubAgent:
         session_id = f"subagent-{tid}"
         try:
             session = _core().get_session(session_id)
-            session.messages.append({
-                "role": "user",
-                "content": f"[Message from agent {from_id}] {message}",
-            })
-            if target["status"] == "running":
+            session.add_user(f"[Message from agent {from_id}] {message}")
+            with cls._agents_lock:
+                _status = cls._agents.get(tid, {}).get("status")
+            if _status == "running":
                 return {"ok": True, "from": from_id, "to": tid, "status": "queued"}
 
             # If target is completed, re-process
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
-            _loop = asyncio.new_event_loop()
-            try:
-                result = _loop.run_until_complete(process_message(session_id, message, model_override=target.get("model")))
-            finally:
-                _loop.close()
-            target["result"] = result
+            result = asyncio.run(process_message(session_id, message, model_override=target.get("model")))
+            with cls._agents_lock:
+                target["result"] = result
             return {"ok": True, "from": from_id, "to": tid, "status": "delivered", "result": result[:500]}
         except Exception as e:
             return {"ok": False, "error": f"Send failed: {e}"}

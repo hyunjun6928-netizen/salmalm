@@ -97,10 +97,15 @@ class MemoryManager:
             fpath = MEMORY_DIR / filename
             if not fpath.resolve().is_relative_to(MEMORY_DIR.resolve()):
                 return "❌ Invalid memory path"
+        # Size guard
+        if len(content.encode("utf-8")) > 5 * 1024 * 1024:
+            return "❌ Content too large (max 5 MB per memory file)"
         if append and fpath.exists():
-            existing = fpath.read_text(encoding="utf-8", errors="replace")
-            content = existing + "\n" + content
-        fpath.write_text(content, encoding="utf-8")
+            # Atomic append (O_APPEND) to prevent concurrent write data loss
+            with open(fpath, "a", encoding="utf-8") as f:
+                f.write("\n" + content)
+        else:
+            fpath.write_text(content, encoding="utf-8")
         # Invalidate search index
         search = self._get_search()
         search._built = False
@@ -195,7 +200,7 @@ class MemoryManager:
                 source = r.get("source", "")
                 snippet = r.get("content", "")[:200]
                 score = r.get("score", 0)
-                if score < 0.25:  # Too low relevance — 0.1 was too permissive
+                if score < 0.1:  # Too low relevance
                     continue
                 parts.append(f"- {source}: {snippet}")
             if len(parts) <= 1:

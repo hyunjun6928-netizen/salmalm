@@ -28,7 +28,6 @@ import json
 import math
 import re
 import sqlite3
-from salmalm.db import get_connection
 import threading
 import time
 from pathlib import Path
@@ -193,55 +192,73 @@ class RAGEngine(RAGIndexerMixin):
 
     def _ensure_db(self):
         """Ensure db."""
-        if self._conn:
-            return
-        self._conn = get_connection(self._db_path)
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("""CREATE TABLE IF NOT EXISTS chunks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source TEXT NOT NULL,
-            line_start INTEGER NOT NULL,
-            line_end INTEGER NOT NULL,
-            text TEXT NOT NULL,
-            tokens TEXT NOT NULL,
-            token_count INTEGER NOT NULL,
-            mtime REAL NOT NULL,
-            hash TEXT NOT NULL
-        )""")
-        self._conn.execute("""CREATE TABLE IF NOT EXISTS doc_freq (
-            term TEXT PRIMARY KEY,
-            df INTEGER NOT NULL
-        )""")
-        self._conn.execute("""CREATE TABLE IF NOT EXISTS meta (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )""")
-        self._conn.execute("""CREATE TABLE IF NOT EXISTS tfidf_vectors (
-            chunk_id INTEGER PRIMARY KEY,
-            vector TEXT NOT NULL,
-            FOREIGN KEY (chunk_id) REFERENCES chunks(id)
-        )""")
-        self._conn.execute("""CREATE TABLE IF NOT EXISTS rag_embeddings (
-            chunk_hash TEXT PRIMARY KEY,
-            embedding TEXT NOT NULL,
-            provider TEXT,
-            dimensions INTEGER,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )""")
-        self._conn.execute("""CREATE INDEX IF NOT EXISTS idx_chunks_source
-            ON chunks(source)""")
-        self._conn.commit()
+        with self._db_lock:
+            if self._conn:
+                return
+            from salmalm.utils.db import connect as _db_connect
+
+            self._conn = _db_connect(self._db_path, check_same_thread=False)
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("""CREATE TABLE IF NOT EXISTS chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT NOT NULL,
+                line_start INTEGER NOT NULL,
+                line_end INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                tokens TEXT NOT NULL,
+                token_count INTEGER NOT NULL,
+                mtime REAL NOT NULL,
+                hash TEXT NOT NULL
+            )""")
+            self._conn.execute("""CREATE TABLE IF NOT EXISTS doc_freq (
+                term TEXT PRIMARY KEY,
+                df INTEGER NOT NULL
+            )""")
+            self._conn.execute("""CREATE TABLE IF NOT EXISTS meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )""")
+            self._conn.execute("""CREATE TABLE IF NOT EXISTS tfidf_vectors (
+                chunk_id INTEGER PRIMARY KEY,
+                vector TEXT NOT NULL,
+                FOREIGN KEY (chunk_id) REFERENCES chunks(id)
+            )""")
+            self._conn.execute("""CREATE TABLE IF NOT EXISTS rag_embeddings (
+                chunk_hash TEXT PRIMARY KEY,
+                embedding TEXT NOT NULL,
+                provider TEXT,
+                dimensions INTEGER,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )""")
+            self._conn.execute("""CREATE INDEX IF NOT EXISTS idx_chunks_source
+                ON chunks(source)""")
+            self._conn.commit()
         self._load_stats()
         self._initialized = True
 
+    def _db_fetchall(self, sql: str, params: tuple = ()) -> list:
+        with self._db_lock:
+            return self._conn.execute(sql, params).fetchall()
+
+    def _db_fetchone(self, sql: str, params: tuple = ()):
+        with self._db_lock:
+            return self._conn.execute(sql, params).fetchone()
+
+    def _db_execute(self, sql: str, params: tuple = ()) -> None:
+        with self._db_lock:
+            self._conn.execute(sql, params)
+
+    def _db_executemany(self, sql: str, params_seq) -> None:
+        with self._db_lock:
+            self._conn.executemany(sql, params_seq)
+
     def _load_stats(self):
         """Load cached statistics."""
-        row = self._conn.execute("SELECT COUNT(*), AVG(token_count) FROM chunks").fetchone()
+        row = self._db_fetchone("SELECT COUNT(*), AVG(token_count) FROM chunks")
         self._doc_count = row[0] or 0
         self._avg_dl = row[1] or 1.0
         self._idf_cache.clear()
-        for term, df in self._conn.execute("SELECT term, df FROM doc_freq"):
+        for term, df in self._db_fetchall("SELECT term, df FROM doc_freq"):
             self._idf_cache[term] = math.log((self._doc_count - df + 0.5) / (df + 0.5) + 1)
 
     @staticmethod
@@ -310,7 +327,7 @@ class RAGEngine(RAGIndexerMixin):
             tokens = self._tokenize(chunk_text)
             if not tokens:
                 continue
-            h = hashlib.md5(chunk_text.encode(), usedforsecurity=False).hexdigest()[:12]
+            h = hashlib.md5(chunk_text.encode()).hexdigest()[:12]
             new_docs.append((label, i + 1, i + len(chunk_lines), chunk_text, json.dumps(tokens), len(tokens), mtime, h))
             vectors.append(compute_tf(tokens))
             for t in set(tokens):
@@ -370,28 +387,29 @@ class RAGEngine(RAGIndexerMixin):
         if not new_docs:
             return
 
-        self._conn.execute("BEGIN IMMEDIATE")
-        try:
-            self._conn.execute("DELETE FROM tfidf_vectors")
-            self._conn.execute("DELETE FROM chunks")
-            self._conn.execute("DELETE FROM doc_freq")
-            self._conn.executemany(
-                "INSERT INTO chunks (source, line_start, line_end, text, tokens, token_count, mtime, hash) VALUES (?,?,?,?,?,?,?,?)",
-                new_docs,
-            )
-            # Insert TF-IDF vectors
-            # Get the inserted chunk IDs
-            rows = self._conn.execute("SELECT id FROM chunks ORDER BY id").fetchall()
-            for (chunk_id,), vec in zip(rows, vectors):
-                self._conn.execute(
-                    "INSERT INTO tfidf_vectors (chunk_id, vector) VALUES (?,?)", (chunk_id, json.dumps(vec))
+        with self._db_lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                self._conn.execute("DELETE FROM tfidf_vectors")
+                self._conn.execute("DELETE FROM chunks")
+                self._conn.execute("DELETE FROM doc_freq")
+                self._conn.executemany(
+                    "INSERT INTO chunks (source, line_start, line_end, text, tokens, token_count, mtime, hash) VALUES (?,?,?,?,?,?,?,?)",
+                    new_docs,
                 )
+                # Insert TF-IDF vectors
+                # Get the inserted chunk IDs
+                rows = self._conn.execute("SELECT id FROM chunks ORDER BY id").fetchall()
+                for (chunk_id,), vec in zip(rows, vectors):
+                    self._conn.execute(
+                        "INSERT INTO tfidf_vectors (chunk_id, vector) VALUES (?,?)", (chunk_id, json.dumps(vec))
+                    )
 
-            self._conn.executemany("INSERT OR REPLACE INTO doc_freq (term, df) VALUES (?,?)", list(doc_freq.items()))
-            self._conn.execute("COMMIT")
-        except Exception as e:  # noqa: broad-except
-            self._conn.execute("ROLLBACK")
-            raise
+                self._conn.executemany("INSERT OR REPLACE INTO doc_freq (term, df) VALUES (?,?)", list(doc_freq.items()))
+                self._conn.execute("COMMIT")
+            except Exception as e:  # noqa: broad-except
+                self._conn.execute("ROLLBACK")
+                raise
         self._load_stats()
         log.info(
             f"[AI] RAG index rebuilt: {len(new_docs)} chunks from {len(files) + len(session_files)} files, "
@@ -412,7 +430,7 @@ class RAGEngine(RAGIndexerMixin):
         term_set = set(query_tokens)
         scored = []
 
-        for row in self._conn.execute("SELECT id, source, line_start, text, tokens, token_count FROM chunks"):
+        for row in self._db_fetchall("SELECT id, source, line_start, text, tokens, token_count FROM chunks"):
             chunk_id, source, line_start, text, tokens_json, token_count = row
             chunk_tokens = json.loads(tokens_json)
             chunk_token_set = set(chunk_tokens)
@@ -471,16 +489,16 @@ class RAGEngine(RAGIndexerMixin):
 
         # Get all chunks that have embeddings
         scored = []
-        for row in self._conn.execute(
+        for row in self._db_fetchall(
             "SELECT c.id, c.source, c.line_start, c.text, c.hash "
             "FROM chunks c"
         ):
             chunk_id, source, line_start, text, chunk_hash = row
             # Look up embedding by chunk hash
-            emb_row = self._conn.execute(
+            emb_row = self._db_fetchone(
                 "SELECT embedding FROM rag_embeddings WHERE chunk_hash=?",
                 (hashlib.sha256(text.encode()).hexdigest()[:32],),
-            ).fetchone()
+            )
             if not emb_row:
                 continue
             chunk_emb = json.loads(emb_row[0])
@@ -517,7 +535,7 @@ class RAGEngine(RAGIndexerMixin):
             return []
 
         scored = []
-        for row in self._conn.execute(
+        for row in self._db_fetchall(
             "SELECT c.id, c.source, c.line_start, c.text, v.vector "
             "FROM chunks c JOIN tfidf_vectors v ON c.id = v.chunk_id"
         ):
@@ -545,8 +563,65 @@ class RAGEngine(RAGIndexerMixin):
         scored.sort(key=lambda x: -x["score"])
         return scored[:max_results]
 
+    # RRF constant k=60 (standard — from Cormack et al. 2009).
+    # Higher k → gentler rank penalty; 60 is the empirically dominant choice.
+    _RRF_K = 60
+
+    # Warn once per engine instance when running without semantic embeddings.
+    _embedding_warned: bool = False
+
+    @staticmethod
+    def _rrf_fuse(
+        ranked_lists: list,
+        weights: list,
+        data_maps: list,
+        k: int = 60,
+    ) -> Dict[int, tuple]:
+        """Reciprocal Rank Fusion across N ranked lists.
+
+        Replaces the previous BM25-rank-normalized + raw-cosine linear mix that
+        suffered from scale incompatibility.  RRF is rank-based so it works
+        regardless of whether the underlying scores are raw BM25, cosine
+        similarity, or embedding dot products.
+
+        Args:
+            ranked_lists: List of ordered chunk_id sequences (highest first).
+            weights:      Per-list weight (must sum to 1.0).
+            data_maps:    Dict[chunk_id → result_dict] per list.
+            k:            Smoothing constant (standard = 60).
+
+        Returns:
+            Dict[chunk_id → (rrf_score, result_dict)]
+        """
+        fused: Dict[int, float] = {}
+        best_data: Dict[int, Dict] = {}
+
+        for ranked, w, dmap in zip(ranked_lists, weights, data_maps):
+            for rank, cid in enumerate(ranked):
+                rrf = w * (1.0 / (k + rank))
+                fused[cid] = fused.get(cid, 0.0) + rrf
+                if cid not in best_data and cid in dmap:
+                    best_data[cid] = dmap[cid]
+
+        return {cid: (score, best_data.get(cid, {})) for cid, score in fused.items()}
+
     def search(self, query: str, max_results: int = 8, min_score: float = 0.1) -> List[Dict]:
-        """Hybrid search (BM25 + Vector). Returns list of {score, source, line, text}."""
+        """Hybrid search — BM25 + semantic embeddings (or TF-IDF fallback).
+
+        Fusion method: Reciprocal Rank Fusion (RRF, k=60).
+        RRF is rank-based, so it is robust to the scale mismatch between raw
+        BM25 scores and cosine/dot-product similarity values.  Previous
+        implementation used a weighted linear combination of incompatible
+        scales (BM25 rank-normalised ≠ cosine [0,1]).
+
+        Search modes (in priority order):
+          1. BM25 + semantic embeddings via OpenAI/Google API  ← best recall
+          2. BM25 + TF-IDF keyword vectors                     ← keyword-only
+          3. BM25 only (hybrid.enabled=false in rag.json)      ← legacy
+
+        Use case 1 activates automatically when an OpenAI or Google API key is
+        configured and embeddings have been generated for indexed chunks.
+        """
         self._ensure_db()
         self.reindex()
 
@@ -557,7 +632,6 @@ class RAGEngine(RAGIndexerMixin):
         if not query_tokens:
             return []
 
-        # Expand query with synonyms
         expanded_tokens = expand_query(query_tokens)
 
         cfg = self.config
@@ -565,77 +639,77 @@ class RAGEngine(RAGIndexerMixin):
         hybrid_enabled = hybrid_cfg.get("enabled", True)
 
         if not hybrid_enabled:
-            # BM25 only (legacy mode)
+            # BM25 only (legacy/explicit opt-out)
             results = self._bm25_search(expanded_tokens, max_results, min_score)
             for r in results:
                 r["score"] = round(r["score"], 4)
                 r.pop("chunk_id", None)
             return results
 
-        # Hybrid search
-        vector_weight = hybrid_cfg.get("vectorWeight", 0.7)
-        text_weight = hybrid_cfg.get("textWeight", 0.3)
-        # Normalize weights
-        total_w = vector_weight + text_weight
-        if total_w > 0:
-            vector_weight /= total_w
-            text_weight /= total_w
-
+        # ── Pool retrieval ────────────────────────────────────────────────────
         candidate_multiplier = 4
         pool_size = max_results * candidate_multiplier
 
-        # Try embedding search first (semantic), fall back to TF-IDF vector search
+        # Semantic embedding search (preferred) or TF-IDF keyword fallback
         use_embeddings = self._has_embedding_api()
         if use_embeddings:
             try:
                 vector_results = self._embedding_search(query, pool_size)
-            except Exception:
+                search_mode = "semantic+bm25"
+            except Exception as _emb_err:
+                log.debug(f"[RAG] Embedding search failed ({_emb_err}), falling back to TF-IDF")
                 vector_results = self._vector_search(expanded_tokens, pool_size)
+                search_mode = "tfidf+bm25"
         else:
+            if not self._embedding_warned:
+                log.warning(
+                    "[RAG] No embedding API configured — running keyword-only search "
+                    "(TF-IDF + BM25).  Semantic recall ('similar meaning, different words') "
+                    "requires an OpenAI or Google API key.  Set one via /vault to enable."
+                )
+                self._embedding_warned = True
             vector_results = self._vector_search(expanded_tokens, pool_size)
+            search_mode = "tfidf+bm25"
+
         bm25_results = self._bm25_search(expanded_tokens, pool_size, 0.0)
 
-        # Build score maps
-        # Vector scores are already cosine similarity [0,1]
-        vector_scores: Dict[int, float] = {}
-        vector_data: Dict[int, Dict] = {}
-        for r in vector_results:
-            cid = r["chunk_id"]
-            vector_scores[cid] = r["score"]
-            vector_data[cid] = r
+        # ── RRF fusion ────────────────────────────────────────────────────────
+        # Weights: semantic carries more signal than BM25 when available.
+        # TF-IDF and BM25 share more overlap, so equal weight is fine.
+        if search_mode == "semantic+bm25":
+            w_vector, w_bm25 = 0.65, 0.35
+        else:
+            w_vector, w_bm25 = 0.50, 0.50
 
-        # BM25: textScore = 1 / (1 + max(0, rank))
-        bm25_scores: Dict[int, float] = {}
-        bm25_data: Dict[int, Dict] = {}
-        for rank, r in enumerate(bm25_results):
-            cid = r["chunk_id"]
-            bm25_scores[cid] = 1.0 / (1.0 + max(0, rank))
-            bm25_data[cid] = r
+        vector_ranked = [r["chunk_id"] for r in vector_results]
+        bm25_ranked = [r["chunk_id"] for r in bm25_results]
+        vector_map = {r["chunk_id"]: r for r in vector_results}
+        bm25_map = {r["chunk_id"]: r for r in bm25_results}
 
-        # Merge all candidate chunk IDs
-        all_ids = set(vector_scores.keys()) | set(bm25_scores.keys())
+        fused = self._rrf_fuse(
+            ranked_lists=[vector_ranked, bm25_ranked],
+            weights=[w_vector, w_bm25],
+            data_maps=[vector_map, bm25_map],
+            k=self._RRF_K,
+        )
 
+        # ── Build final result list ───────────────────────────────────────────
+        # Normalise RRF scores to [0,1] so min_score threshold is meaningful.
+        max_rrf = max((s for s, _ in fused.values()), default=1.0) or 1.0
         final = []
-        for cid in all_ids:
-            vs = vector_scores.get(cid, 0.0)
-            ts = bm25_scores.get(cid, 0.0)
-            final_score = vector_weight * vs + text_weight * ts
-
-            data = vector_data.get(cid) or bm25_data.get(cid)
-            if data and final_score > 0:
-                final.append(
-                    {
-                        "score": round(final_score, 4),
-                        "source": data["source"],
-                        "line": data["line"],
-                        "text": data["text"],
-                    }
-                )
+        for cid, (rrf_score, data) in fused.items():
+            normalised = rrf_score / max_rrf
+            if data and normalised >= min_score:
+                final.append({
+                    "score": round(normalised, 4),
+                    "source": data.get("source", ""),
+                    "line": data.get("line", 0),
+                    "text": data.get("text", ""),
+                    "_search_mode": search_mode,  # diagnostic — stripped by build_context
+                })
 
         final.sort(key=lambda x: -x["score"])
-
-        # Filter by min_score
-        final = [r for r in final if r["score"] >= min_score]
+        log.debug(f"[RAG] {search_mode}: {len(final)} results for {query!r:.60}")
         return final[:max_results]
 
     def build_context(self, query: str, max_chars: int = 4000, max_results: int = 6) -> str:
@@ -720,6 +794,30 @@ def brave_augment_context(query: str, max_chars: int = 2000) -> str:
     return ""
 
 
-# ── Module-level instance ──────────────────────────────────────
+# ── Module-level instance ─────────────────────────────────────
 
 rag_engine = RAGEngine()
+
+# ── Per-user RAG isolation ─────────────────────────────────────
+# Each authenticated user gets their own RAG database (rag_<uid>.db) so that
+# one user's uploaded documents are never searchable by another user.
+
+import threading as _threading
+
+_rag_user_instances: dict = {}
+_rag_user_lock = _threading.Lock()
+
+
+def get_rag_for_user(user_id) -> "RAGEngine":
+    """Return a per-user RAGEngine singleton backed by rag_<user_id>.db.
+
+    Falls back to the shared rag_engine for unauthenticated / None user_id.
+    """
+    if user_id is None:
+        return rag_engine
+    uid_str = str(user_id)
+    with _rag_user_lock:
+        if uid_str not in _rag_user_instances:
+            user_db = DATA_DIR / f"rag_{uid_str}.db"
+            _rag_user_instances[uid_str] = RAGEngine(db_path=user_db)
+        return _rag_user_instances[uid_str]

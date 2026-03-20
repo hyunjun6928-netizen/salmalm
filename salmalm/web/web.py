@@ -41,12 +41,9 @@ from salmalm.web.routes.web_system import SystemMixin as WebSystemMixin
 from salmalm.web.routes.web_manage import ManageMixin as WebManageMixin
 from salmalm.web.routes.web_content import ContentMixin as WebContentMixin
 from salmalm.web.routes.web_agents import AgentsMixin
-from salmalm.web.routes.web_subagents import WebSubagentsMixin
 
 # Google OAuth CSRF state tokens {state: timestamp}
 _google_oauth_pending_states: dict = {}
-
-_RE_SESSION_TITLE = re.compile(r"^/api/sessions/([^/]+)/title$")
 
 # ============================================================
 
@@ -67,7 +64,6 @@ class WebHandler(
     WebManageMixin,
     WebContentMixin,
     AgentsMixin,
-    WebSubagentsMixin,
     http.server.BaseHTTPRequestHandler,
 ):
     """HTTP handler for web UI and API."""
@@ -75,14 +71,6 @@ class WebHandler(
     def log_message(self, format: str, *args) -> None:
         """Suppress default HTTP stderr logging — requests logged via salmalm logger in each handler."""
         pass
-
-    # Track last HTTP status code for metrics instrumentation
-    _last_status: int = 200
-
-    def send_response(self, code, message=None):
-        """Override to capture status code for metrics."""
-        self._last_status = code
-        super().send_response(code, message)
 
     # Allowed origins for CORS (same-host only, dynamic port)
     @staticmethod
@@ -147,9 +135,15 @@ class WebHandler(
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self._security_headers()
-        # Inject CSP nonce into inline <script> tags (after _security_headers generates nonce)
-        if self._csp_nonce and "<script>" in body_raw:
-            body_raw = body_raw.replace("<script>", f'<script nonce="{self._csp_nonce}">')
+        # Inject CSP nonce into ALL <script> variants (<script>, <script type="module">, etc.)
+        # Uses regex to avoid missing type= / async / defer attributes.
+        # Only injects where nonce= is absent — prevents double injection.
+        if self._csp_nonce:
+            body_raw = re.sub(
+                r'<script\b(?![^>]*\bnonce=)',
+                f'<script nonce="{self._csp_nonce}"',
+                body_raw,
+            )
         body = body_raw.encode("utf-8")
         body = self._maybe_gzip(body)
         self.send_header("Content-Length", str(len(body)))
@@ -157,6 +151,14 @@ class WebHandler(
         self.wfile.write(body)
 
     # Public endpoints (no auth required)
+    # /api/users/register is public only when SALMALM_OPEN_REGISTRATION=1.
+    # Default: closed — prevents self-registration on internet-exposed instances.
+    # Note: evaluated at runtime (not class definition time) so env var changes
+    # take effect without restart when _build_public_paths() is called.
+    @classmethod
+    def _open_registration(cls) -> bool:
+        return os.environ.get("SALMALM_OPEN_REGISTRATION", "0") == "1"
+
     _PUBLIC_PATHS = {
         "/",
         "/index.html",
@@ -165,17 +167,55 @@ class WebHandler(
         "/api/unlock",
         "/api/auto-unlock",
         "/api/auth/login",
-        "/api/users/register",
         "/api/onboarding",
         "/api/onboarding/preferences",
         "/api/setup",
-        "/docs",
+        # NOTE: /docs is intentionally NOT public — see _get_docs() for details.
+        # Set SALMALM_DOCS_PUBLIC=1 to restore public access for local dev.
         "/api/google/callback",
-        "/api/google/auth",
         "/webhook/telegram",
         "/webhook/slack",
         "/api/check-update",
     }
+
+    @classmethod
+    def _build_public_paths(cls) -> frozenset:
+        """Build the effective public path set (called once at startup)."""
+        paths = set(cls._PUBLIC_PATHS)
+        if cls._open_registration():
+            paths.add("/api/users/register")
+        return frozenset(paths)
+
+    def _try_auth(self) -> Optional[dict]:
+        """Silently attempt authentication without sending any error response.
+
+        Returns the authenticated user dict on success, or None if the request
+        is unauthenticated.  Use this for endpoints that serve a *reduced*
+        payload to unauthenticated callers instead of rejecting them outright
+        (e.g. /api/health, /api/status, /docs).
+        """
+        user = extract_auth(dict(self.headers))
+        if user:
+            return user
+        # Loopback fallback — mirrors _require_auth; only when SALMALM_SINGLE_USER=1
+        if self._single_user_mode() and vault.is_unlocked:
+            ip = self._get_client_ip()
+            bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+            if bind in ("127.0.0.1", "localhost", "::1") and ip in ("127.0.0.1", "::1", "localhost"):
+                return {"username": "local", "role": "admin", "id": 0}
+        return None
+
+    # Single-user loopback mode: enabled ONLY when SALMALM_SINGLE_USER=1 is set explicitly.
+    # When enabled, unauthenticated requests from 127.0.0.1 are treated as local admin.
+    # Default: DISABLED (require explicit opt-in) to prevent SSRF/malicious-page attacks.
+    # Users who relied on the old implicit behaviour must set SALMALM_SINGLE_USER=1.
+    _SINGLE_USER_MODE: Optional[bool] = None
+
+    @classmethod
+    def _single_user_mode(cls) -> bool:
+        if cls._SINGLE_USER_MODE is None:
+            cls._SINGLE_USER_MODE = os.environ.get("SALMALM_SINGLE_USER", "0") == "1"
+        return cls._SINGLE_USER_MODE
 
     def _require_auth(self, min_role: str = "user") -> Optional[dict]:
         """Check auth for protected endpoints. Returns user dict or sends 401 and returns None.
@@ -197,46 +237,63 @@ class WebHandler(
             self._json({"error": "Insufficient permissions"}, 403)
             return None
 
-        # Fallback: if request is from loopback AND vault is unlocked, allow (single-user local mode)
-        # Disabled when binding to 0.0.0.0 (external exposure) for safety
-        ip = self._get_client_ip()
-        bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
-        if bind in ("127.0.0.1", "localhost", "::1"):
-            if ip in ("127.0.0.1", "::1", "localhost") and vault.is_unlocked:
+        # Loopback admin fallback — ONLY when SALMALM_SINGLE_USER=1 is explicitly set.
+        # Implicit admin from localhost is DISABLED by default to prevent:
+        #   - SSRF attacks where a remote exploit reaches 127.0.0.1
+        #   - Malicious web pages using fetch()/XHR to ws://127.0.0.1:18800
+        if self._single_user_mode() and vault.is_unlocked:
+            ip = self._get_client_ip()
+            bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
+            if bind in ("127.0.0.1", "localhost", "::1") and ip in ("127.0.0.1", "::1", "localhost"):
                 return {"username": "local", "role": "admin", "id": 0}
 
         self._json({"error": "Authentication required"}, 401)
         return None
 
-    # Trusted proxy subnets — only accept X-Forwarded-For from these
-    _TRUSTED_PROXY_NETS = (
-        "127.",
-        "::1",
-        "10.",
-        "172.16.",
-        "172.17.",
-        "172.18.",
-        "172.19.",
-        "172.2",
-        "172.30.",
-        "172.31.",
-        "192.168.",
-    )
+    # Trusted proxy networks (RFC 1918 private + loopback + Docker defaults).
+    # Evaluated with ipaddress — no string-prefix ambiguity.
+    _TRUSTED_PROXY_NETWORKS = None  # lazily built on first use
+
+    @classmethod
+    def _build_trusted_networks(cls):
+        import ipaddress as _ip
+        cls._TRUSTED_PROXY_NETWORKS = [
+            _ip.ip_network("127.0.0.0/8"),    # loopback IPv4
+            _ip.ip_network("::1/128"),          # loopback IPv6
+            _ip.ip_network("10.0.0.0/8"),       # RFC 1918
+            _ip.ip_network("172.16.0.0/12"),    # RFC 1918 (172.16–172.31)
+            _ip.ip_network("192.168.0.0/16"),   # RFC 1918
+            _ip.ip_network("fc00::/7"),          # IPv6 ULA
+        ]
+
+    @classmethod
+    def _is_trusted_proxy(cls, addr: str) -> bool:
+        import ipaddress as _ip
+        if cls._TRUSTED_PROXY_NETWORKS is None:
+            cls._build_trusted_networks()
+        try:
+            ip_obj = _ip.ip_address(addr)
+            return any(ip_obj in net for net in cls._TRUSTED_PROXY_NETWORKS)
+        except ValueError:
+            return False  # unparseable — not trusted
 
     def _get_client_ip(self) -> str:
-        """Get client IP. Only trusts X-Forwarded-For if:
-        1. SALMALM_TRUST_PROXY is set, AND
-        2. The actual socket peer is from a trusted proxy subnet (private/loopback).
-        This prevents XFF spoofing from untrusted sources.
+        """Get real client IP.
+        Only trusts X-Forwarded-For when SALMALM_TRUST_PROXY is set AND
+        the direct peer address is within a trusted private/loopback network.
+        XFF first-hop is parsed as an IP to reject malformed values.
         """
+        import ipaddress as _ip
         remote_addr = self.client_address[0] if self.client_address else "?"
-        if os.environ.get("SALMALM_TRUST_PROXY"):
-            # Only trust XFF if the direct connection is from a trusted proxy
-            is_trusted = any(remote_addr.startswith(net) for net in self._TRUSTED_PROXY_NETS)
-            if is_trusted:
-                xff = self.headers.get("X-Forwarded-For")
-                if xff:
-                    return xff.split(",")[0].strip()
+        if os.environ.get("SALMALM_TRUST_PROXY") and self._is_trusted_proxy(remote_addr):
+            xff = self.headers.get("X-Forwarded-For", "")
+            if xff:
+                candidate = xff.split(",")[0].strip()
+                try:
+                    _ip.ip_address(candidate)  # validate — reject junk
+                    return candidate
+                except ValueError:
+                    log.warning(f"[IP] Ignoring malformed XFF value: {candidate!r}")
         return remote_addr
 
     def do_PUT(self) -> None:
@@ -268,7 +325,7 @@ class WebHandler(
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length)) if length else {}
         # PUT /api/sessions/{id}/title
-        m = _RE_SESSION_TITLE.match(self.path)
+        m = re.match(r"^/api/sessions/([^/]+)/title$", self.path)
         if m:
             if not self._require_auth("user"):
                 return
@@ -278,10 +335,20 @@ class WebHandler(
                 self._json({"ok": False, "error": "Missing title"}, 400)
                 return
             from salmalm.core import _get_db
+            from salmalm.web.auth import extract_auth
 
+            user = extract_auth({k.lower(): v for k, v in self.headers.items()})
+            uid = user["id"] if user else None
             conn = _get_db()
-            conn.execute("UPDATE session_store SET title=? WHERE session_id=?", (title, sid))
+            # Ownership check: only update rows owned by this user (or unowned rows in single-user mode)
+            result = conn.execute(
+                "UPDATE session_store SET title=? WHERE session_id=? AND (user_id=? OR user_id IS NULL)",
+                (title, sid, uid),
+            )
             conn.commit()
+            if result.rowcount == 0:
+                self._json({"ok": False, "error": "Session not found or permission denied"}, 403)
+                return
             self._json({"ok": True})
             return
         self._json({"error": "Not found"}, 404)
@@ -290,7 +357,7 @@ class WebHandler(
         """Handle CORS preflight requests."""
         self.send_response(204)
         self._cors()
-        self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
         self.end_headers()
 
     def do_GET(self) -> None:
@@ -315,30 +382,59 @@ class WebHandler(
                 pass
         finally:
             duration = (time.time() - _start) * 1000
-            _clean = self.path.split("?")[0]
             request_logger.log_request(
                 "GET",
-                _clean,
+                self.path.split("?")[0],
                 ip=self._get_client_ip(),
                 duration_ms=duration,
             )
-            try:
-                from salmalm.monitoring.metrics import requests_total, request_duration
-                requests_total.inc(method="GET", path=_clean, status=str(self._last_status))
-                request_duration.observe(duration / 1000.0, method="GET")
-            except Exception:
-                pass
 
     # ── GET Route Table (exact path → method) ──
-    _GET_ROUTES: dict = {}
-    for _mixin_cls in [
-        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin, WebSubagentsMixin,
-    ]:
-        _GET_ROUTES.update(getattr(_mixin_cls, 'GET_ROUTES', {}))
-    _GET_ROUTES.update({
+    _GET_ROUTES = {
+        "/api/uptime": "_get_uptime",
+        "/api/latency": "_get_latency",
+        "/api/sla": "_get_sla",
+        "/api/sla/config": "_get_sla_config",
+        "/api/nodes": "_get_nodes",
+        "/api/gateway/nodes": "_get_gateway_nodes",
+        "/api/status": "_get_status",
+        "/api/debug": "_get_debug",
+        "/api/queue": "_get_queue",
+        "/api/metrics": "_get_metrics",
+        "/api/cert": "_get_cert",
+        "/api/ws/status": "_get_ws_status",
+        "/api/usage/daily": "_get_usage_daily",
+        "/api/usage/monthly": "_get_usage_monthly",
+        "/api/usage/models": "_get_usage_models",
+        "/api/groups": "_get_groups",
+        "/api/models": "_get_models",
+        "/api/llm-router/providers": "_get_llm_router_providers",
+        "/api/llm-router/current": "_get_llm_router_current",
+        "/api/soul": "_get_soul",
+        "/api/onboarding": "_get_api_onboarding",
+        "/api/routing": "_get_routing",
+        "/api/failover": "_get_failover",
+        "/api/doctor": "_get_doctor",
+        "/api/backup": "_get_backup",
+        "/api/cron": "_get_cron",
+        "/api/memory/files": "_get_memory_files",
+        "/api/mcp": "_get_mcp",
+        "/api/rag": "_get_rag",
+        "/api/personas": "_get_personas",
+        "/api/thoughts": "_get_thoughts",
+        "/api/thoughts/stats": "_get_thoughts_stats",
+        "/api/features": "_get_features",
+        "/api/engine/settings": "_get_api_engine_settings",
+        "/api/tools/list": "_get_tools_list",
+        "/api/browser/status": "_get_api_browser_status",
+        "/api/ollama/detect": "_get_ollama_detect",
+        "/api/commands": "_get_commands",
+        "/setup": "_get_setup",
+        "/api/sessions": "_get_api_sessions",
         "/api/notifications": "_get_api_notifications",
         "/api/presence": "_get_api_presence",
         "/api/channels": "_get_api_channels",
+        "/api/dashboard": "_get_api_dashboard",
         "/api/plugins": "_get_api_plugins",
         "/api/agents": "_get_api_agents",
         "/api/hooks": "_get_api_hooks",
@@ -346,18 +442,28 @@ class WebHandler(
         "/api/security/bans": "_get_api_security_bans",
         "/api/quota/usage": "_get_api_quota_usage",
         "/api/quota/my": "_get_api_quota_my",
+        "/api/health/providers": "_get_api_health_providers",
         "/api/bookmarks": "_get_api_bookmarks",
         "/api/paste/detect": "_get_api_paste_detect",
         "/api/health": "_get_api_health",
         "/api/check-update": "_get_api_check_update",
+        "/api/update/check": "_get_api_update_check",
+        "/api/auth/users": "_get_api_auth_users",
+        "/api/users": "_get_api_users",
+        "/api/users/quota": "_get_api_users_quota",
+        "/api/users/settings": "_get_api_users_settings",
+        "/api/tenant/config": "_get_api_tenant_config",
+        "/api/google/auth": "_get_api_google_auth",
+        "/manifest.json": "_get_manifest_json",
         "/sw.js": "_get_sw_js",
+        "/static/app.js": "_get_static_app_js",
         "/dashboard": "_get_dashboard",
         "/docs": "_get_docs",
-    })
-
+        "/api/agent/tasks": "_get_api_agent_tasks",
+    }
 
     def _get_api_notifications(self):
-        """Get api notifications."""
+        """GET /api/notifications — read-only. Does NOT clear (idempotent)."""
         if not self._require_auth("user"):
             return
         from salmalm.core import _sessions
@@ -365,9 +471,21 @@ class WebHandler(
         web_session = _sessions.get("web")
         notifications = []
         if web_session and hasattr(web_session, "_notifications"):
-            notifications = web_session._notifications
-            web_session._notifications = []  # clear after read
+            notifications = list(web_session._notifications)  # snapshot, no mutation
         self._json({"notifications": notifications})
+
+    def _post_api_notifications_clear(self):
+        """POST /api/notifications/clear — explicit clear (state-mutating, CSRF-safe)."""
+        if not self._require_auth("user"):
+            return
+        from salmalm.core import _sessions
+
+        web_session = _sessions.get("web")
+        cleared = 0
+        if web_session and hasattr(web_session, "_notifications"):
+            cleared = len(web_session._notifications)
+            web_session._notifications = []
+        self._json({"ok": True, "cleared": cleared})
 
     def _get_api_presence(self):
         """Get api presence."""
@@ -538,28 +656,64 @@ class WebHandler(
 
     def _get_api_health(self):
         # K8s readiness/liveness probe compatible: 200=healthy, 503=unhealthy
-        """Get api health."""
+        """Get api health.
+
+        Unauthenticated callers receive a minimal probe-compatible response:
+            {"status": "healthy"}  or  {"status": "unhealthy"}
+        This preserves K8s liveness/readiness probe behaviour without leaking
+        component details (memory, disk, llm, vault, uptime, version) to
+        unauthenticated external observers.
+        Full report is returned when the request carries a valid auth token.
+        """
         from salmalm.core.health import get_health_report
 
         report = get_health_report()
         status_code = 200 if report.get("status") == "healthy" else 503
-        self._json(report, status=status_code)
+        # Authenticated callers get the full diagnostic report.
+        if self._try_auth():
+            self._json(report, status=status_code)
+            return
+        # Unauthenticated: K8s probe-compatible minimal response only.
+        self._json({"status": report.get("status", "unknown")}, status=status_code)
+
+    # PyPI version cache: avoid blocking on every request.
+    # TTL = 10 minutes. Background refresh on cache miss.
+    _pypi_cache: dict = {"version": None, "fetched_at": 0.0}
+    _PYPI_TTL = 600  # seconds
 
     def _get_api_check_update(self):
-        """Get api check update."""
-        try:
-            import urllib.request
+        """GET /api/check-update — returns cached PyPI version (TTL 10 min)."""
+        import threading as _threading
+        is_exe = getattr(sys, "frozen", False)
+        cache = self.__class__._pypi_cache
+        now = time.time()
 
-            resp = urllib.request.urlopen("https://pypi.org/pypi/salmalm/json", timeout=10)
-            data = json.loads(resp.read().decode())
-            latest = data.get("info", {}).get("version", VERSION)  # noqa: F405
-            is_exe = getattr(sys, "frozen", False)
-            result = {"current": VERSION, "latest": latest, "exe": is_exe}  # noqa: F405
+        # Serve cached value immediately if fresh
+        if cache["version"] and (now - cache["fetched_at"]) < self._PYPI_TTL:
+            result = {"current": VERSION, "latest": cache["version"], "exe": is_exe, "cached": True}  # noqa: F405
             if is_exe:
                 result["download_url"] = "https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
             self._json(result)
-        except Exception as e:
-            self._json({"current": VERSION, "latest": None, "error": str(e)[:100]})  # noqa: F405
+            return
+
+        # Stale/empty — fetch in background, return stale immediately if available
+        def _refresh():
+            try:
+                import urllib.request
+                resp = urllib.request.urlopen("https://pypi.org/pypi/salmalm/json", timeout=10)
+                data = json.loads(resp.read().decode())
+                cache["version"] = data.get("info", {}).get("version")
+                cache["fetched_at"] = time.time()
+            except Exception as _e:
+                log.debug(f"PyPI version check failed: {_e}")
+
+        _threading.Thread(target=_refresh, daemon=True).start()
+
+        # Return stale or unknown while refresh runs
+        result = {"current": VERSION, "latest": cache["version"], "exe": is_exe, "cached": bool(cache["version"])}  # noqa: F405
+        if is_exe:
+            result["download_url"] = "https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
+        self._json(result)
 
     def _get_sw_js(self):
         """Service worker — PWA offline cache + install support."""
@@ -580,8 +734,13 @@ self.addEventListener('fetch',e=>{{
 }});"""
         self.send_response(200)
         self._cors()
-        self.send_header("Content-Type", "application/javascript")
-        self.send_header("Cache-Control", "no-cache, no-store")
+        # Service workers need Cache-Control: no-cache to re-check on every load.
+        # We intentionally skip CSP here — SW scope is script-only, not document context.
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Service-Worker-Allowed", "/")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Length", str(len(sw_js.encode())))
         self.end_headers()
         self.wfile.write(sw_js.encode())
 
@@ -592,10 +751,22 @@ self.addEventListener('fetch',e=>{{
         self._html(_tmpl.DASHBOARD_HTML)
 
     def _get_docs(self):
-        """Get docs."""
+        """Get API documentation.
+
+        Protected by default: exposes the full endpoint inventory (names, params,
+        auth roles) which would hand an attacker a ready-made attack surface map.
+
+        Access rules:
+          1. Authenticated users always have access.
+          2. SALMALM_DOCS_PUBLIC=1 env var re-opens to unauthenticated callers
+             (convenience for local development only — never set in production).
+        """
         from salmalm.features.docs import generate_api_docs_html
 
-        self._html(generate_api_docs_html())
+        if os.environ.get("SALMALM_DOCS_PUBLIC", "0") == "1" or self._try_auth():
+            self._html(generate_api_docs_html())
+            return
+        self._json({"error": "Authentication required"}, 401)
 
     def _do_get_inner(self):
         # Route table dispatch for simple API endpoints
@@ -637,7 +808,10 @@ self.addEventListener('fetch',e=>{{
 </svg>'''
             self.send_response(200)
             self._cors()
+            self._security_headers()
             self.send_header("Content-Type", "image/svg+xml")
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self.send_header("Content-Length", str(len(svg.encode())))
             self.end_headers()
             self.wfile.write(svg.encode())
 
@@ -667,37 +841,100 @@ self.addEventListener('fetch',e=>{{
 
             err_detail = traceback.format_exc()
             log.error(f"POST {self.path} error: {e}\n{err_detail}")
+            print(f"[ERROR] POST {self.path}: {e}", flush=True)
             try:
-                self._json({"error": f"Internal error: {str(e)[:200]}"}, 500)
+                self._json({"error": "Internal server error"}, 500)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass  # Client already gone
         finally:
             duration = (time.time() - _start) * 1000
-            _post_path = self.path.split("?")[0]
-            request_logger.log_request("POST", _post_path, ip=self._get_client_ip(), duration_ms=duration)
-            try:
-                from salmalm.monitoring.metrics import requests_total, request_duration
-                requests_total.inc(method="POST", path=_post_path, status=str(self._last_status))
-                request_duration.observe(duration / 1000.0, method="POST")
-            except Exception:
-                pass
+            request_logger.log_request("POST", self.path, ip=self._get_client_ip(), duration_ms=duration)
 
     # Max POST body size: 10MB
     _MAX_POST_SIZE = 10 * 1024 * 1024
 
-    _POST_ROUTES: dict = {}
-    for _mixin_cls in [
-        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin, WebSubagentsMixin,
-    ]:
-        _POST_ROUTES.update(getattr(_mixin_cls, 'POST_ROUTES', {}))
-    _POST_ROUTES.update({
+    _POST_ROUTES = {
+        "/api/users/register": "_post_api_users_register",
+        "/api/users/delete": "_post_api_users_delete",
+        "/api/users/toggle": "_post_api_users_toggle",
+        "/api/users/quota/set": "_post_api_users_quota_set",
+        "/api/users/settings": "_post_api_users_settings",
+        "/api/tenant/config": "_post_api_tenant_config",
+        "/api/auth/login": "_post_api_auth_login",
+        "/api/auth/logout": "_post_api_auth_logout",
+        "/api/auth/register": "_post_api_auth_register",
+        "/api/setup": "_post_api_setup",
         "/api/security/unban": "_post_api_security_unban",
-    })
-
+        "/api/do-update": "_post_api_do_update",
+        "/api/restart": "_post_api_restart",
+        "/api/update": "_post_api_update",
+        "/api/persona/switch": "_post_api_persona_switch",
+        "/api/persona/create": "_post_api_persona_create",
+        "/api/persona/delete": "_post_api_persona_delete",
+        "/api/test-key": "_post_api_test_key",
+        "/api/models/refresh": "_post_api_models_refresh",
+        "/api/unlock": "_post_api_unlock",
+        "/api/auto-unlock": "_post_api_auto_unlock",
+        "/api/stt": "_post_api_stt",
+        "/api/agent/sync": "_post_api_agent_sync",
+        "/api/agent/import/preview": "_post_api_agent_import_preview",
+        "/api/agent/import": "_post_api_agent_import",
+        "/api/queue/mode": "_post_api_queue_mode",
+        "/api/cron/add": "_post_api_cron_add",
+        "/api/cron/delete": "_post_api_cron_delete",
+        "/api/cron/toggle": "_post_api_cron_toggle",
+        "/api/cron/run": "_post_api_cron_run",
+        "/api/sessions/create": "_post_api_sessions_create",
+        "/api/sessions/delete": "_post_api_sessions_delete",
+        "/api/sessions/clear": "_post_api_sessions_clear",
+        "/api/notifications/clear": "_post_api_notifications_clear",
+        "/api/sessions/import": "_post_api_sessions_import",
+        "/api/soul": "_post_api_soul",
+        "/api/routing": "_post_api_routing",
+        "/api/routing/optimize": "_post_api_routing_optimize",
+        "/api/failover": "_post_api_failover",
+        "/api/cooldowns/reset": "_post_api_cooldowns_reset",
+        "/api/backup/restore": "_post_api_backup_restore",
+        "/api/sessions/rename": "_post_api_sessions_rename",
+        "/api/sessions/rollback": "_post_api_sessions_rollback",
+        "/api/messages/edit": "_post_api_messages_edit",
+        "/api/messages/delete": "_post_api_messages_delete",
+        "/api/sessions/branch": "_post_api_sessions_branch",
+        "/api/agents": "_post_api_agents",
+        "/api/hooks": "_post_api_hooks",
+        "/api/plugins/manage": "_post_api_plugins_manage",
+        "/api/chat/abort": "_post_api_chat_abort",
+        "/api/chat/regenerate": "_post_api_chat_regenerate",
+        "/api/chat/compare": "_post_api_chat_compare",
+        "/api/alternatives/switch": "_post_api_alternatives_switch",
+        "/api/bookmarks": "_post_api_bookmarks",
+        "/api/groups": "_post_api_groups",
+        "/api/paste/detect": "_post_api_paste_detect",
+        "/api/vault": "_post_api_vault",
+        "/api/upload": "_post_api_upload",
+        "/api/onboarding": "_post_api_onboarding",
+        "/api/onboarding/preferences": "_post_api_onboarding_preferences",
+        "/api/config/telegram": "_post_api_config_telegram",
+        "/api/gateway/register": "_post_api_gateway_register",
+        "/api/gateway/heartbeat": "_post_api_gateway_heartbeat",
+        "/api/gateway/unregister": "_post_api_gateway_unregister",
+        "/api/gateway/dispatch": "_post_api_gateway_dispatch",
+        "/webhook/slack": "_post_webhook_slack",
+        "/api/presence": "_post_api_presence",
+        "/webhook/telegram": "_post_webhook_telegram",
+        "/api/sla/config": "_post_api_sla_config",
+        "/api/node/execute": "_post_api_node_execute",
+        "/api/thoughts": "_post_api_thoughts",
+        "/api/engine/settings": "_post_api_engine_settings",
+        "/api/agent/task": "_post_api_agent_task",
+        "/api/agent/task/cancel": "_delete_api_agent_task",
+        "/api/agent/tasks/clear": "_post_api_agent_tasks_clear",
+        "/api/directive": "_post_api_directive",
+    }
 
     def _do_post_inner(self):
         """Do post inner."""
-        from salmalm.core.engine import process_message  # noqa: F401
+        from salmalm.core.engine_pipeline import process_message  # noqa: F401
 
         length = int(self.headers.get("Content-Length", 0))
 
@@ -749,14 +986,71 @@ self.addEventListener('fetch',e=>{{
             return self._post_api_test_provider()
         elif self.path.startswith("/api/thoughts/search"):
             return self._post_api_thoughts_search()
-        elif self.path.startswith("/api/subagents/"):
-            return self._post_subagent_action()
         else:
             self._json({"error": "Not found"}, 404)
 
-    _GET_PREFIX_ROUTES: list = []
-    for _mixin_cls in [
-        WebAuthMixin, WebChatMixin, WebCronMixin, WebEngineMixin, WebGatewayMixin, WebModelMixin, WebSessionsMixin, WebSetupMixin, WebUsersMixin, WebFeaturesMixin, WebFilesMixin, WebSystemMixin, WebManageMixin, WebContentMixin, AgentsMixin, WebSubagentsMixin,
-    ]:
-        _GET_PREFIX_ROUTES.extend(getattr(_mixin_cls, 'GET_PREFIX_ROUTES', []))
+    _GET_PREFIX_ROUTES = [
+        ("/api/search", "_get_api_search", None),
+        ("/api/sessions/", "_get_api_sessions_messages", "/messages"),
+        ("/api/sessions/", "_get_api_sessions_export", "/export"),
+        ("/api/rag/search", "_get_api_rag_search", None),
+        ("/api/audit", "_get_api_audit", None),
+        ("/api/sessions/", "_get_api_sessions_summary", "/summary"),
+        ("/api/sessions/", "_get_api_sessions_alternatives", "/alternatives"),
+        ("/api/sessions/", "_get_api_sessions_last", "/last"),
+        ("/api/logs", "_get_api_logs", None),
+        ("/api/memory/read?", "_get_api_memory_read", None),
+        ("/api/google/callback", "_get_api_google_callback", None),
+        ("/api/agent/export", "_get_api_agent_export", None),
+        ("/uploads/", "_get_uploads", None),
+    ]
 
+
+# ── Open-registration gate ───────────────────────────────────────────────────
+# /api/users/register is private by default. Set SALMALM_OPEN_REGISTRATION=1
+# to re-enable self-registration (development / single-tenant setups only).
+if os.environ.get("SALMALM_OPEN_REGISTRATION", "0") == "1":
+    WebHandler._PUBLIC_PATHS = WebHandler._PUBLIC_PATHS | {"/api/users/register"}
+    import logging as _log_reg
+    _log_reg.getLogger(__name__).warning(
+        "[AUTH] Open registration enabled (SALMALM_OPEN_REGISTRATION=1). "
+        "Anyone can create an account — disable in production."
+    )
+# ── Route startup validator ─────────────────────────────────────────────────
+def _validate_web_routes() -> None:
+    """Sanity-check WebHandler route tables at import time.
+
+    Detects:
+    - Duplicate route registrations
+    - Handler names that don't resolve to actual methods
+    - /api/ paths listed in PUBLIC_PATHS that might be accidentally exposed
+    """
+    errors: list = []
+    seen: dict = {}
+
+    all_routes = list(WebHandler._GET_ROUTES.items()) + list(WebHandler._POST_ROUTES.items())
+    all_routes += [(prefix, handler) for prefix, handler, _ in WebHandler._GET_PREFIX_ROUTES]
+
+    for path, handler in all_routes:
+        if path in seen:
+            errors.append(f"Duplicate route '{path}' (handlers: {seen[path]!r} and {handler!r})")
+        seen[path] = handler
+        if not hasattr(WebHandler, handler):
+            errors.append(f"Route '{path}' → handler '{handler}' not found on WebHandler")
+
+    # Warn about /api/ paths that are in PUBLIC_PATHS (intentional but worth auditing)
+    exposed_api = [p for p in WebHandler._PUBLIC_PATHS if p.startswith("/api/")]
+    if exposed_api:
+        import logging
+        logging.getLogger(__name__).debug(
+            f"[ROUTES] Public /api/ paths (no auth required): {sorted(exposed_api)}"
+        )
+
+    if errors:
+        import logging
+        _log = logging.getLogger(__name__)
+        for e in errors:
+            _log.warning(f"[ROUTES] {e}")
+
+
+_validate_web_routes()

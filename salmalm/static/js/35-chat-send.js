@@ -58,16 +58,34 @@
       /* Mark pending so page refresh can recover */
       localStorage.setItem('salm_sse_pending',chatBody.session||'web');
       _currentAbort=new AbortController();
+      /* Show "Waiting..." immediately so user knows request is in-flight (prevents premature stop on long TTFT) */
+      var _earlyTyping=document.getElementById('typing-row');
+      if(_earlyTyping){var _et=_earlyTyping.querySelector('.bubble');if(_et&&!_et._streaming)_et.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> ⏳ '+((_lang==='ko')?'응답 대기 중...':'Waiting for response...')}
       var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify(chatBody),signal:_currentAbort.signal});
       if(!r.ok||!r.body){throw new Error('stream unavailable')}
       var reader=r.body.getReader();var decoder=new TextDecoder();var buf='';var gotDone=false;
       var typingEl=document.getElementById('typing-row');
-      /* No stall timeout — wait indefinitely like OpenClaw.
-         Heavy models (opus) can take 3+ minutes for complex tasks. */
+      /* Per-chunk stall timeout: if server holds connection open but sends nothing for 60s,
+         abort and fall back to HTTP POST (prevents indefinite hang) */
+      var _STALL_MS=60000;
       var _stallTimer=null;
+      /* Fix #8: track last REAL SSE event time (not keepalive comments).
+         Keepalive pings (": keep-alive") are raw bytes but not real events — they
+         previously reset the stall timer and masked LLM API hangs indefinitely. */
+      var _lastRealEvent=Date.now();
+      var _REAL_EVENT_TIMEOUT=90000; /* 90s without a real event → abort */
+      var _realEventTimer=setInterval(function(){
+        if(Date.now()-_lastRealEvent>_REAL_EVENT_TIMEOUT){
+          clearInterval(_realEventTimer);
+          if(_currentAbort){try{_currentAbort.abort();}catch(e){}}
+        }
+      },5000);
       function _readWithTimeout(){
-        return reader.read();
+        return Promise.race([
+          reader.read(),
+          new Promise(function(_,reject){_stallTimer=setTimeout(function(){reject(new Error('SSE stall: no data for '+_STALL_MS+'ms'))},_STALL_MS)})
+        ]);
       }
       while(true){
         var chunk=await _readWithTimeout();
@@ -80,6 +98,7 @@
           var em=evt.match(/^event: (\w+)\ndata: (.+)$/m);
           if(!em)continue;
           var etype=em[1],edata=JSON.parse(em[2]);
+          _lastRealEvent=Date.now(); /* real SSE event received — reset real-event timer */
           if(etype==='status'){
             if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb)tb.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> '+edata.text}
           }else if(etype==='tool'){
@@ -116,6 +135,7 @@
           }else if(etype==='done'){
             gotDone=true;
             _currentAbort=null; /* Prevent stale abort after completion */
+            clearInterval(_realEventTimer);
             localStorage.removeItem('salm_sse_pending');
             if(typingEl)typingEl.remove();
             /* Restore send button immediately */
@@ -127,11 +147,11 @@
             var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
             var _cIcons={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
             var _cLabel=edata.complexity&&edata.complexity!=='auto'&&edata.complexity!=='manual'?(_cIcons[edata.complexity]||'')+edata.complexity+' → ':'';
-            if(edata.complexity==='manual')_isAutoRouting=false;
+            
             var _mShort=(edata.model||'').split('/').pop();
             var _sMeta=(_cLabel||'')+(_mShort||'');if(_sMeta)_sMeta+=' · ';_sMeta+='⏱️'+_secs+'s';addMsg('assistant',edata.response||'',_sMeta);
             modelBadge.textContent=_mShort?(_isAutoRouting?'Auto → '+_mShort:_mShort):'auto routing';
-            fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+            fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r2){return r2.json()}).then(function(s){if(s&&s.usage)costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
             break; /* Exit reader loop immediately after done event */
           }
         }
@@ -150,17 +170,18 @@
             var _secs3=((Date.now()-_sendStart)/1000).toFixed(1);
             var _cI2={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
             var _cL2=edata2.complexity&&edata2.complexity!=='auto'&&edata2.complexity!=='manual'?(_cI2[edata2.complexity]||'')+edata2.complexity+' → ':'';
-            if(edata2.complexity==='manual')_isAutoRouting=false;
+            
             var _mS2=(edata2.model||'').split('/').pop();
             var _sM2=(_cL2||'')+(_mS2||'');if(_sM2)_sM2+=' · ';_sM2+='⏱️'+_secs3+'s';addMsg('assistant',edata2.response||'',_sM2);
             modelBadge.textContent=_mS2?(_isAutoRouting?'Auto → '+_mS2:_mS2):'auto routing';
-            fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+            fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r2){return r2.json()}).then(function(s){if(s&&s.usage)costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
           }
         }
       }
       if(!gotDone)throw new Error('stream incomplete');
       if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
     }catch(streamErr){
+      clearInterval(_realEventTimer);
       /* User-initiated abort: clean up and stop — don't fallback */
       if(streamErr.name==='AbortError'){
         console.log('SSE aborted by user');
@@ -188,7 +209,7 @@
         var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
         if(d.response){localStorage.removeItem('salm_sse_pending');var _fcI={simple:'⚡',moderate:'🔧',complex:'💎'};var _fcL=d.complexity&&d.complexity!=='auto'?(_fcI[d.complexity]||'')+d.complexity+' → ':'';var _fmS=(d.model||'').split('/').pop();var _meta=(_fcL||'')+(_fmS||'');if(_meta)_meta+=' · ';_meta+='⏱️'+_secs2+'s';addMsg('assistant',d.response,_meta);if(_fmS)modelBadge.textContent=_isAutoRouting?'Auto → '+_fmS:_fmS;}
         else if(d.error){localStorage.removeItem('salm_sse_pending');addMsg('assistant','❌ '+d.error);}
-        fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+        fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r3){return r3.json()}).then(function(s){if(s&&s.usage)costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
       }catch(fbErr){
         console.error('Fallback POST also failed:',fbErr);
         if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();

@@ -184,7 +184,7 @@ class MeshManager:
     def add_peer(self, url: str, name: str = "", secret: str = "") -> str:
         """Add a peer by URL. Returns status message."""
         url = url.rstrip("/")
-        peer_id = hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()[:8]
+        peer_id = hashlib.md5(url.encode()).hexdigest()[:8]
 
         with self._lock:
             if len(self._peers) >= self._MAX_PEERS:
@@ -283,15 +283,9 @@ class MeshManager:
         log.info(f"[MESH] Task from {from_host}: {task[:80]}")
         try:
             import asyncio
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
-            try:
-                _loop = asyncio.get_running_loop()
-                result = asyncio.run_coroutine_threadsafe(
-                    process_message(f"mesh-{from_host}", task, model_override=model), _loop
-                ).result(timeout=120)
-            except RuntimeError:
-                result = asyncio.run(process_message(f"mesh-{from_host}", task, model_override=model))
+            result = asyncio.run(process_message(f"mesh-{from_host}", task, model_override=model))
             return {"result": result[:5000], "status": "completed"}
         except Exception as e:
             return {"error": str(e), "status": "failed"}

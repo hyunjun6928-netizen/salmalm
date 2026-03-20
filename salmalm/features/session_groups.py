@@ -87,22 +87,18 @@ class SessionGroupManager:
         gid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         return {"id": gid, "name": name, "color": color, "ok": True}
 
-    _ALLOWED_UPDATE_COLS = frozenset({"name", "color", "sort_order", "collapsed"})
-
     def update_group(self, group_id: int, **kwargs) -> bool:
         """Update group."""
         from salmalm.core import _get_db
 
-        for key in kwargs:
-            if key not in self._ALLOWED_UPDATE_COLS:
-                raise ValueError(f"Invalid column: {key}")
-
         conn = _get_db()
+        # Explicit column allowlist — column names are never derived from caller input
+        _SAFE_COLS = ("name", "color", "sort_order", "collapsed")
         sets = []
         vals = []
-        for key in sorted(self._ALLOWED_UPDATE_COLS):
+        for key in _SAFE_COLS:
             if key in kwargs:
-                sets.append(f"{key}=?")
+                sets.append(f"{key}=?")   # key is from the hardcoded tuple, not caller input
                 vals.append(kwargs[key])
         if not sets:
             return False

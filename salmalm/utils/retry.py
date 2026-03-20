@@ -79,7 +79,7 @@ def _should_retry(error: Exception) -> tuple:
 def _add_jitter(delay: float) -> float:
     """Add ±10% jitter to delay."""
     jitter = delay * JITTER_FACTOR
-    return delay + random.uniform(-jitter, jitter)  # not security-sensitive: retry jitter
+    return delay + random.uniform(-jitter, jitter)
 
 
 def retry_with_backoff(
@@ -102,13 +102,6 @@ def retry_with_backoff(
     """
 
     def decorator(func: Callable) -> Callable:
-        import asyncio as _asyncio
-        if _asyncio.iscoroutinefunction(func):
-            raise TypeError(
-                f"retry_with_backoff cannot decorate async function '{func.__name__}'. "
-                "Use async_retry_with_backoff() instead."
-            )
-
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             """Wrapper."""
@@ -195,6 +188,8 @@ def retry_call(
     Usage:
         result = retry_call(requests.post, url, json=data)
     """
+    if max_attempts < 1:
+        raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
     last_error = None
     for attempt in range(1, max_attempts + 1):
         try:

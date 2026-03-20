@@ -10,6 +10,14 @@ from __future__ import annotations
 import hashlib
 import json
 import zipfile
+
+def _safe_dest(base_dir, rel_path: str):
+    """Resolve dest path and block traversal outside base_dir. Returns (dest, error)."""
+    dest = (base_dir / rel_path).resolve()
+    if not dest.is_relative_to(base_dir.resolve()):
+        return None, f"Path traversal blocked: {rel_path}"
+    return dest, None
+
 from datetime import datetime
 from io import BytesIO
 from typing import Any, Dict, List
@@ -462,7 +470,10 @@ class AgentImporter:
             for name in zf.namelist():
                 if name.startswith("personas/") and name.endswith(".md"):
                     fname = name.split("/")[-1]
-                    dest = _PERSONAS_DIR / fname
+                    dest, err = _safe_dest(_PERSONAS_DIR, fname)
+                    if err:
+                        result.errors.append(err)
+                        continue
                     if dest.exists() and self.conflict_mode == "skip":
                         continue
                     dest.write_text(zf.read(name).decode("utf-8"), encoding="utf-8")
@@ -486,7 +497,10 @@ class AgentImporter:
                 if fname == "MEMORY.md":
                     dest = BASE_DIR / "MEMORY.md"
                 else:
-                    dest = MEMORY_DIR / fname
+                    dest, err = _safe_dest(MEMORY_DIR, fname)
+                    if err:
+                        result.errors.append(err)
+                        continue
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 if dest.exists() and self.conflict_mode == "skip":
                     continue
@@ -587,7 +601,10 @@ class AgentImporter:
                 if not name.startswith("plugins/") or name.endswith("/"):
                     continue
                 rel = name[len("plugins/") :]
-                dest = _PLUGINS_DIR / rel
+                dest, err = _safe_dest(_PLUGINS_DIR, rel)
+                if err:
+                    result.errors.append(err)
+                    continue
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(zf.read(name))
                 count += 1
@@ -605,7 +622,10 @@ class AgentImporter:
                 if not name.startswith("skills/") or name.endswith("/"):
                     continue
                 rel = name[len("skills/") :]
-                dest = _SKILLS_DIR / rel
+                dest, err = _safe_dest(_SKILLS_DIR, rel)
+                if err:
+                    result.errors.append(err)
+                    continue
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(zf.read(name))
                 count += 1
@@ -652,7 +672,7 @@ def quick_sync_export() -> dict:
 
     # Routing config
     try:
-        from salmalm.core.engine import get_routing_config
+        from salmalm.core.model_selection import load_routing_config as get_routing_config
 
         data["routing"] = get_routing_config()
     except Exception as e:  # noqa: broad-except
@@ -676,7 +696,7 @@ def quick_sync_export() -> dict:
 
     # Failover config
     try:
-        from salmalm.core.engine import get_failover_config
+        from salmalm.core.llm_loop import get_failover_config
 
         data["failover"] = get_failover_config()
     except Exception as e:  # noqa: broad-except
@@ -703,7 +723,7 @@ def quick_sync_import(data: dict) -> None:
     # Routing config
     if "routing" in data:
         try:
-            from salmalm.core.engine import _save_routing_config
+            from salmalm.core.model_selection import _save_routing_config
 
             _save_routing_config(data["routing"])
         except Exception as e:
@@ -712,7 +732,7 @@ def quick_sync_import(data: dict) -> None:
     # Failover config
     if "failover" in data:
         try:
-            from salmalm.core.engine import save_failover_config
+            from salmalm.core.llm_loop import save_failover_config
 
             save_failover_config(data["failover"])
         except Exception as e:

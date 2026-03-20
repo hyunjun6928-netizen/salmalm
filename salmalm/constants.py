@@ -1,6 +1,7 @@
 """SalmAlm constants — paths, costs, thresholds."""
 
 from datetime import timedelta, timezone
+from pathlib import Path
 
 try:
     from importlib.metadata import version as _pkg_version
@@ -16,32 +17,25 @@ KST = timezone(timedelta(hours=9))
 # DATA_DIR = runtime data root (user data: DB, vault, memory, logs)
 #   Priority: $SALMALM_HOME > ~/SalmAlm
 import os as _os
-import importlib as _importlib
-from salmalm.config import limits as _limits
-from salmalm.config import models as _models
-from salmalm.config import paths as _paths
 
-_importlib.reload(_paths)
-_importlib.reload(_limits)
-
-AGENTS_FILE = _paths.AGENTS_FILE
-AUDIT_DB = _paths.AUDIT_DB
-BASE_DIR = _paths.BASE_DIR
-CACHE_DB = _paths.CACHE_DB
-DATA_DIR = _paths.DATA_DIR
-LOG_FILE = _paths.LOG_FILE
-MEMORY_DB = _paths.MEMORY_DB
-MEMORY_DIR = _paths.MEMORY_DIR
-MEMORY_FILE = _paths.MEMORY_FILE
-SOUL_FILE = _paths.SOUL_FILE
-TOOLS_FILE = _paths.TOOLS_FILE
-USER_FILE = _paths.USER_FILE
-VAULT_FILE = _paths.VAULT_FILE
-WORKSPACE_DIR = _paths.WORKSPACE_DIR
+BASE_DIR = Path(__file__).parent.resolve()  # salmalm/ package dir
+DATA_DIR = Path(_os.environ.get("SALMALM_HOME", "") or Path.home() / "SalmAlm")
+MEMORY_DIR = DATA_DIR / "memory"
+WORKSPACE_DIR = DATA_DIR
+SOUL_FILE = DATA_DIR / "soul.md"
+AGENTS_FILE = DATA_DIR / "agents.md"
+MEMORY_FILE = DATA_DIR / "memory.md"
+USER_FILE = DATA_DIR / "user.md"
+TOOLS_FILE = DATA_DIR / "tools.md"
+VAULT_FILE = DATA_DIR / ".vault.enc"
+AUDIT_DB = DATA_DIR / "audit.db"
+MEMORY_DB = DATA_DIR / "memory.db"
+CACHE_DB = DATA_DIR / "cache.db"
+LOG_FILE = DATA_DIR / "salmalm.log"
 
 # Security
 VAULT_VERSION = b"\x03"
-PBKDF2_ITER = 600_000  # OWASP 2023 recommendation for PBKDF2-HMAC-SHA256
+PBKDF2_ITER = 200_000
 SESSION_TIMEOUT = 3600 * 8
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_DURATION = 60
@@ -71,7 +65,7 @@ _EXEC_TIER_BASIC = {
     "tee",
     "diff",
     "patch",
-    "env",
+    # "env" removed — bare `env` dumps all API keys/secrets from os.environ
     "pwd",
     "whoami",
     "uname",
@@ -142,8 +136,8 @@ _EXEC_TIER_DATABASE = {
 }
 
 
-def _build_exec_allowlist() -> frozenset:
-    """Build effective allowlist from tiers + env vars. Returns frozenset (immutable)."""
+def _build_exec_allowlist() -> set:
+    """Build effective allowlist from tiers + env vars."""
     allowed = set(_EXEC_TIER_BASIC)
     # Tier 2/3 default OFF (opt-in): set env var to "1" to enable.
     # Security: network/database tools should not be available unless explicitly requested.
@@ -151,34 +145,19 @@ def _build_exec_allowlist() -> frozenset:
         allowed |= _EXEC_TIER_NETWORK
     if _os.environ.get("SALMALM_EXEC_DATABASE", "0") == "1":
         allowed |= _EXEC_TIER_DATABASE
-    return frozenset(allowed)  # Immutable — built once at import time
+    return allowed
 
 
-EXEC_ALLOWLIST: frozenset = _build_exec_allowlist()
+EXEC_ALLOWLIST = _build_exec_allowlist()
 # Per-command dangerous argument/flag blocklist — blocks code execution vectors
 EXEC_ARG_BLOCKLIST: dict = {
     "awk": {"-f", "--file"},
     "find": {"-exec", "-execdir", "-delete", "-ok", "-okdir"},
     "xargs": {"-I", "--replace", "-i"},
     "tar": {"--to-command", "--checkpoint-action", "--use-compress-program"},
-    # "hook"/"submodule" blocked: direct hook/submodule manipulation is too risky.
-    # commit/push/pull/clone are allowed via EXEC_GIT_SAFE_OVERRIDES (auto --no-verify injection).
-    "git": {"submodule", "hook", "am"},
+    "git": {"clone", "pull", "push", "fetch", "remote", "submodule", "hook"},
     "sed": {"-i", "--in-place"},
 }
-# Git safe-override flags: automatically injected when these subcommands are used.
-# This allows normal git workflow while preventing hook execution (security boundary).
-EXEC_GIT_SAFE_OVERRIDES: dict = {
-    "commit": ["--no-verify"],           # skip pre-commit / commit-msg hooks
-    "push": ["--no-verify"],             # skip pre-push hooks
-    "pull": ["--no-verify"],             # skip post-merge hooks
-    "clone": ["--config", "core.hooksPath=/dev/null"],  # disable all hooks in clone
-    "rebase": ["--no-exec"],             # prevent --exec arbitrary command injection
-    "merge": ["--no-verify"],            # skip pre-merge hooks
-    "fetch": [],                         # safe as-is
-    "remote": [],                        # safe as-is
-}
-
 # Pattern blocklist for inline code execution in awk/sed
 EXEC_INLINE_CODE_PATTERNS = [
     r"\bawk\b[^|;]*\bsystem\s*\(",  # awk '{ system("...") }'
@@ -264,7 +243,7 @@ EXEC_BLOCKLIST = {
 EXEC_BLOCKLIST_PATTERNS = [
     r"[;&|`]\s*(rm|dd|mkfs|shutdown|reboot|halt|sudo|su)\b",  # chained dangerous cmds
     r"\$\(",  # command substitution (any)
-    r"`[^`]+`",  # backtick substitution — requires at least 1 char inside (empty backticks are harmless)
+    r"`[^`]*`",  # backtick substitution (any, including empty)
     r">\s*/dev/sd",  # write to raw device
     r">\s*/etc/",  # overwrite system config
     r"/proc/sysrq",  # sysrq trigger
@@ -272,16 +251,18 @@ EXEC_BLOCKLIST_PATTERNS = [
     r"\beval\b",  # eval bypass
     r"\bsource\b",  # source bypass
 ]
-PROTECTED_FILES = {".vault.enc", "audit.db", "auth.db", "server.py", ".clipboard.json"}
+PROTECTED_FILES = {".vault.enc", "audit.db", "auth.db", "server.py", ".clipboard.json", "SOUL.md", "hooks.json", "mcp_servers.json"}
 
 # LLM
-CACHE_TTL = _limits.CACHE_TTL
-COMPACTION_THRESHOLD = _limits.COMPACTION_THRESHOLD
-DEFAULT_MAX_TOKENS = _limits.DEFAULT_MAX_TOKENS
-INTENT_COMPLEX_MSG = _limits.INTENT_COMPLEX_MSG
-INTENT_CONTEXT_DEPTH = _limits.INTENT_CONTEXT_DEPTH
-INTENT_SHORT_MSG = _limits.INTENT_SHORT_MSG
-REFLECT_SNIPPET_LEN = _limits.REFLECT_SNIPPET_LEN
+DEFAULT_MAX_TOKENS = 4096
+COMPACTION_THRESHOLD = 30000
+CACHE_TTL = int(_os.environ.get("SALMALM_CACHE_TTL", "3600"))
+
+# Intent classification thresholds
+INTENT_SHORT_MSG = 500  # messages shorter than this → simpler model
+INTENT_COMPLEX_MSG = 1500  # messages longer than this → complex model
+INTENT_CONTEXT_DEPTH = 40  # conversation turns threshold for complexity bump
+REFLECT_SNIPPET_LEN = 500  # max chars of user message in reflection prompt
 
 # Token cost estimates (per 1M tokens, USD)
 MODEL_COSTS = {
@@ -308,9 +289,8 @@ MODEL_COSTS = {
     "grok-3": {"input": 3.0, "output": 15.0},
     "grok-3-mini": {"input": 0.30, "output": 0.50},
     # Google
-    "gemini-3.1-pro": {"input": 1.25, "output": 10.0},
-    "gemini-3-pro-preview": {"input": 1.25, "output": 10.0},
-    "gemini-3-flash-preview": {"input": 0.15, "output": 0.60},
+    "gemini-2.5-pro-preview-06-05": {"input": 1.25, "output": 10.0},
+    "gemini-2.0-flash": {"input": 0.15, "output": 0.60},
     "gemini-2.5-pro": {"input": 1.25, "output": 10.0},
     "gemini-2.5-flash": {"input": 0.15, "output": 0.60},
     # DeepSeek (via OpenRouter)
@@ -324,10 +304,35 @@ MODEL_COSTS = {
 # ============================================================
 # Model Registry — single source of truth for all model references
 # ============================================================
-FALLBACK_MODELS = _models.FALLBACK_MODELS
-MODEL_ALIASES = _models.MODEL_ALIASES
-MODELS = _models.MODELS
-THINKING_BUDGET_MAP = _models.THINKING_BUDGET_MAP
+MODELS = {
+    # Anthropic
+    "opus": "anthropic/claude-opus-4-6",
+    "sonnet": "anthropic/claude-sonnet-4-6",
+    "haiku": "anthropic/claude-haiku-4-5-20251001",
+    # OpenAI
+    "gpt5.2": "openai/gpt-5.2-codex",
+    "gpt5.1": "openai/gpt-5.1-codex",
+    "gpt4.1": "openai/gpt-4.1",
+    "gpt4.1mini": "openai/gpt-4.1-mini",
+    "gpt4.1nano": "openai/gpt-4.1-nano",
+    "o3": "openai/o3",
+    "o4mini": "openai/o4-mini",
+    # xAI
+    "grok4": "xai/grok-4",
+    "grok3": "xai/grok-3",
+    "grok3mini": "xai/grok-3-mini",
+    # Google
+    "gemini3pro": "google/gemini-2.5-pro-preview-06-05",
+    "gemini3flash": "google/gemini-2.0-flash",
+    "gemini2.5pro": "google/gemini-2.5-pro",
+    "gemini2.5flash": "google/gemini-2.5-flash",
+    # DeepSeek (via OpenRouter)
+    "deepseek-r1": "openrouter/deepseek/deepseek-r1",
+    "deepseek-chat": "openrouter/deepseek/deepseek-chat",
+    # Meta (via OpenRouter)
+    "maverick": "openrouter/meta-llama/llama-4-maverick",
+    "scout": "openrouter/meta-llama/llama-4-scout",
+}
 
 # Tier-based model routing pools (cheapest → most capable)
 # Ollama models included for users running local LLMs
@@ -353,12 +358,49 @@ MODEL_TIERS = {
     3: [MODELS["opus"], MODELS["o3"], MODELS["sonnet"], MODELS["gpt5.1"], MODELS["grok4"], "ollama/llama3.3"],
 }
 
+# Fallback models per provider (cheapest reliable model)
+FALLBACK_MODELS = {
+    "anthropic": "claude-sonnet-4-20250514",
+    "xai": "grok-4",
+    "google": "gemini-2.0-flash",
+}
+
 # API validation test models (lightweight, for key testing)
 TEST_MODELS = {
     "anthropic": "claude-haiku-4-5-20251001",
     "openai": "gpt-4.1-nano",
     "xai": "grok-3-mini",
     "google": "gemini-2.5-flash",
+}
+
+# User-facing model aliases (for /model command)
+MODEL_ALIASES = {
+    "claude": MODELS["sonnet"],
+    "sonnet": MODELS["sonnet"],
+    "opus": MODELS["opus"],
+    "haiku": MODELS["haiku"],
+    "gpt": MODELS["gpt5.2"],
+    "gpt5": MODELS["gpt5.2"],
+    "gpt5.1": MODELS["gpt5.1"],
+    "gpt4.1": MODELS["gpt4.1"],
+    "4.1mini": MODELS["gpt4.1mini"],
+    "4.1nano": MODELS["gpt4.1nano"],
+    "o3": MODELS["o3"],
+    "o4mini": MODELS["o4mini"],
+    "grok": MODELS["grok4"],
+    "grok4": MODELS["grok4"],
+    "grok3": MODELS["grok3"],
+    "grok3mini": MODELS["grok3mini"],
+    "gemini": MODELS["gemini3pro"],
+    "flash": MODELS["gemini3flash"],
+    "deepseek": MODELS["deepseek-r1"],
+    "maverick": MODELS["maverick"],
+    "scout": MODELS["scout"],
+    "llama": "ollama/llama3.3",
+    "llama3.2": "ollama/llama3.2",
+    "llama3.3": "ollama/llama3.3",
+    "qwen": "ollama/qwen3",
+    "qwen3": "ollama/qwen3",
 }
 
 # Model for /commands processing (fast + capable; sonnet is the right balance)
@@ -399,7 +441,7 @@ MODEL_CLAUDE_SONNET = "claude-sonnet-4-6"
 MODEL_CLAUDE_HAIKU = "claude-haiku-4-5-20251001"
 MODEL_GPT_4_1_NANO_OPENAI = "gpt-4.1-nano"  # bare name, no provider prefix
 MODEL_GEMINI_FLASH = "google/gemini-2.5-flash"
-MODEL_GEMINI_2_FLASH = "gemini-2.5-flash"
+MODEL_GEMINI_2_FLASH = "gemini-2.0-flash"
 
 # ── Model fallback chains for retry logic ──
 MODEL_FALLBACKS = {
@@ -417,26 +459,26 @@ MODEL_FALLBACKS = {
     ],
     "anthropic/claude-haiku-4-5-20251001": [
         "anthropic/claude-sonnet-4-6",
-        "google/gemini-2.5-flash",
+        "google/gemini-2.0-flash",
         "openai/gpt-4.1-mini",
     ],
     "openai/gpt-5.2": ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-pro"],
     "openai/gpt-4.1": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4-6", "google/gemini-2.5-flash"],
-    "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
-    "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.5-flash", "anthropic/claude-sonnet-4-6"],
+    "openai/gpt-4.1-mini": ["openai/gpt-4.1", "google/gemini-2.0-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.5-pro": ["google/gemini-2.5-flash", "google/gemini-2.0-flash", "anthropic/claude-sonnet-4-6"],
     "google/gemini-2.5-flash": [
-        "google/gemini-2.5-flash",
+        "google/gemini-2.0-flash",
         "google/gemini-2.5-pro",
         "anthropic/claude-haiku-4-5-20251001",
     ],
-    "google/gemini-2.5-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
-    "google/gemini-3-pro-preview": [
+    "google/gemini-2.0-flash": ["google/gemini-2.5-flash", "anthropic/claude-haiku-4-5-20251001"],
+    "google/gemini-2.5-pro-preview-06-05": [
         "google/gemini-2.5-pro",
-        "google/gemini-3-flash-preview",
+        "google/gemini-2.0-flash",
         "anthropic/claude-sonnet-4-6",
     ],
-    "google/gemini-3-flash-preview": [
-        "google/gemini-2.5-flash",
+    "google/gemini-2.0-flash": [
+        "google/gemini-2.0-flash",
         "google/gemini-2.5-flash",
         "anthropic/claude-haiku-4-5-20251001",
     ],

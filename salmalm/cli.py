@@ -50,9 +50,7 @@ def _install_shortcut():
         try:
             import subprocess as _sp
 
-            win_user = _sp.check_output(["cmd.exe", "/C", "echo", "%USERNAME%"], stderr=_sp.DEVNULL, text=True, timeout=5).strip()
-            # Sanitize: Windows usernames can contain spaces/special chars
-            win_user = "".join(c for c in win_user if c.isalnum() or c in "-_.")
+            win_user = _sp.check_output(["cmd.exe", "/C", "echo", "%USERNAME%"], stderr=_sp.DEVNULL, text=True).strip()
             win_desktop = f"/mnt/c/Users/{win_user}/Desktop"
             if not os.path.isdir(win_desktop):
                 # Fallback: try OneDrive Desktop
@@ -123,7 +121,24 @@ def _run_update():
         capture_output=False,
     )
     if result.returncode == 0:
-        logger.info("Updated! Run 'salmalm' or 'python -m salmalm' to start.")
+        logger.info("Updated! Checking if server needs restart...")
+        # Auto-restart daemon if running with old version
+        try:
+            import urllib.request as _ur, json as _j
+            from salmalm.constants import VERSION as _new_ver
+            _resp = _ur.urlopen("http://localhost:18800/api/status", timeout=3)
+            _running_ver = _j.loads(_resp.read()).get("version", "")
+            if _running_ver and _running_ver != _new_ver:
+                logger.info(f"[UP] 버전 불일치 (실행: v{_running_ver} → 설치: v{_new_ver}) — 서버 자동 재시작 중...")
+                _stop_server()
+                import time as _t; _t.sleep(1)
+                import subprocess as _sp2
+                _sp2.Popen([sys.executable, "-m", "salmalm"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                logger.info("[UP] 재시작 완료.")
+            else:
+                logger.info("Updated! Run 'salmalm' or 'python -m salmalm' to start.")
+        except Exception:
+            logger.info("Updated! Run 'salmalm' or 'python -m salmalm' to start.")
     else:
         logger.error("Update failed. Try manually: pip install --upgrade salmalm")
     sys.exit(result.returncode)
@@ -513,8 +528,24 @@ def dispatch_cli() -> bool:
         import subprocess
         pid = _read_pid()
         if pid:
-            print(f"⚠️  SalmAlm already running (PID {pid}). Use 'salmalm restart' to restart.")
-            return True
+            # Version mismatch check: auto-restart if installed version differs from running version
+            try:
+                from salmalm.constants import VERSION as _installed_ver
+                import urllib.request as _ur
+                _resp = _ur.urlopen("http://localhost:18800/api/status", timeout=3)
+                import json as _j
+                _status = _j.loads(_resp.read())
+                _running_ver = _status.get("version", "")
+                if _running_ver and _running_ver != _installed_ver:
+                    print(f"🔄 버전 불일치 감지 (실행중: v{_running_ver} → 설치됨: v{_installed_ver}) — 자동 재시작 중...")
+                    _stop_server()
+                    import time as _t; _t.sleep(1)
+                else:
+                    print(f"⚠️  SalmAlm already running (PID {pid}). Use 'salmalm restart' to restart.")
+                    return True
+            except Exception:
+                print(f"⚠️  SalmAlm already running (PID {pid}). Use 'salmalm restart' to restart.")
+                return True
         subprocess.Popen(
             [sys.executable, "-m", "salmalm"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

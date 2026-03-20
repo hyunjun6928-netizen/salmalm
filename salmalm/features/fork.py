@@ -136,9 +136,9 @@ class ConversationFork:
 
         session.messages = msgs[:real_idx]
 
-        from salmalm.core.engine import process_message
+        from salmalm.core.engine_pipeline import process_message
 
-        response = await process_message(session_id, user_msg)
+        response = await asyncio.wait_for(process_message(session_id, user_msg), timeout=300)
 
         self.save_alternative(session_id, message_index, response, active=True)
 

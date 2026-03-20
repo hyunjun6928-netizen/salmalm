@@ -17,36 +17,25 @@ def _audit_get_db():
     return _get_db()
 
 
-from salmalm.constants import KST, AUDIT_DB  # noqa: E402
+from salmalm.constants import KST  # noqa: E402
 from datetime import datetime  # noqa: E402
 
 
-_audit_v2_initialized = False  # Guard: CREATE TABLE called once per process lifetime
-
-
 def _ensure_audit_v2_table():
-    """Create the v2 audit_log_v2 table. No-op after first call (flag guard, lock-protected)."""
-    global _audit_v2_initialized
-    if _audit_v2_initialized:  # fast path — no lock needed after init
-        return
-    with _audit_lock:  # serialize concurrent first-callers
-        if _audit_v2_initialized:  # double-checked locking
-            return
-        conn = _audit_get_db()
-        conn.execute("""CREATE TABLE IF NOT EXISTS audit_log_v2 (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            event_type TEXT NOT NULL,
-            session_id TEXT DEFAULT '',
-            detail TEXT DEFAULT '{}'
-        )""")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_ts ON audit_log_v2(timestamp)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)")
-        conn.commit()
-        _audit_v2_initialized = True
+    """Create the v2 audit_log_v2 table with session_id and JSON detail."""
+    conn = _audit_get_db()
+    conn.execute("""CREATE TABLE IF NOT EXISTS audit_log_v2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        session_id TEXT DEFAULT '',
+        detail TEXT DEFAULT '{}'
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_ts ON audit_log_v2(timestamp)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_v2_type ON audit_log_v2(event_type)")
+    conn.commit()
 
 
-_AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush (moved above _schedule_audit_flush)
 _audit_buffer: list = []
 _audit_flush_timer = None
 _AUDIT_BATCH_SIZE = 20  # flush after this many entries
@@ -61,7 +50,7 @@ def _schedule_audit_flush() -> None:
         _audit_flush_timer.start()
 
 
-_audit_lock = threading.RLock()  # RLock: same thread can re-acquire (prevents deadlock in flush→schedule→flush paths)
+_audit_lock = threading.Lock()  # Audit log writes
 
 
 def _init_audit_db():
@@ -106,11 +95,11 @@ def _init_audit_db():
     atexit.register(_flush_audit_buffer)
 
 
-def _flush_audit_buffer() -> None:
-    """Write buffered audit entries to SQLite in a single transaction.
+_AUDIT_FLUSH_INTERVAL = 5.0  # seconds — max delay before flush
 
-    Safe to call from atexit — checks DB availability before writing.
-    """
+
+def _flush_audit_buffer() -> None:
+    """Write buffered audit entries to SQLite in a single transaction."""
     global _audit_flush_timer
     with _audit_lock:
         if not _audit_buffer:
@@ -120,14 +109,21 @@ def _flush_audit_buffer() -> None:
         _audit_buffer.clear()
         _audit_flush_timer = None
 
-    try:
-        conn = _audit_get_db()
-    except Exception as _db_err:
-        log.warning(f"[AUDIT] DB unavailable during flush (atexit?): {_db_err}")
-        return
-    # v2 only — v1 hash-chain table retained for schema compat but no longer written.
-    # Removing dual-write halves audit storage overhead.
+    conn = _audit_get_db()
+    # Get current chain head
+    row = conn.execute("SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1").fetchone()
+    prev = row[0] if row else "0" * 64
+
     for ts, event, detail, session_id, json_detail in entries:
+        # v1: hash-chain
+        payload = f"{ts}|{event}|{detail}|{prev}"
+        h = hashlib.sha256(payload.encode()).hexdigest()
+        conn.execute(
+            "INSERT INTO audit_log (ts, event, detail, prev_hash, hash) VALUES (?,?,?,?,?)",
+            (ts, event, detail[:500], prev, h),
+        )
+        prev = h
+        # v2: structured
         conn.execute(
             "INSERT INTO audit_log_v2 (timestamp, event_type, session_id, detail) VALUES (?,?,?,?)",
             (ts, event, session_id, json_detail),
@@ -141,14 +137,14 @@ def audit_log(
     session_id: str = "",
     detail_dict: Optional[dict] = None,
 ) -> None:
-    """Write an audit event to the security log (v2 structured only).
+    """Write an audit event to the security log (v1 chain + v2 structured).
 
     Events are buffered and flushed in batches for performance.
     Flush triggers: batch size (20) or time interval (5s), whichever comes first.
 
     Args:
         event: event type string (tool_call, api_call, auth_success, etc.)
-        detail: plain text detail (kept for call-site compatibility; stored in JSON detail)
+        detail: plain text detail (for v1 compatibility)
         session_id: associated session ID
         detail_dict: structured detail as dict (serialized to JSON for v2)
     """
@@ -156,18 +152,16 @@ def audit_log(
     ts = datetime.now(KST).isoformat()  # noqa: F405
     json_detail = json.dumps(detail_dict, ensure_ascii=False) if detail_dict else json.dumps({"text": detail[:500]})
 
-    _do_flush = False
     with _audit_lock:
         _audit_buffer.append((ts, event, detail, session_id, json_detail))
         if len(_audit_buffer) >= _AUDIT_BATCH_SIZE:
-            _do_flush = True
+            pass  # will flush below
         else:
             _schedule_audit_flush()
+            return
 
-    if _do_flush:
-        # Flush outside the append lock to avoid lock inversion with _audit_lock
-        # inside _flush_audit_buffer (which re-acquires _audit_lock itself).
-        _flush_audit_buffer()
+    # Flush immediately when batch is full
+    _flush_audit_buffer()
 
 
 def audit_checkpoint() -> Optional[str]:
@@ -183,7 +177,7 @@ def audit_checkpoint() -> Optional[str]:
         if not row:
             return None
         head_hash, head_id = row[0], row[1]
-        checkpoint_file = AUDIT_DB.parent / "audit_checkpoint.log"
+        checkpoint_file = AUDIT_DB.parent / "audit_checkpoint.log"  # noqa: F405
         ts = datetime.now(KST).isoformat()  # noqa: F405
         with open(checkpoint_file, "a") as f:
             f.write(f"{ts} id={head_id} hash={head_hash}\n")

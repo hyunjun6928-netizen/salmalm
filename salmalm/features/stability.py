@@ -277,9 +277,10 @@ class HealthMonitor:
 
     def _check_database(self) -> dict:
         """Check database."""
-        from salmalm.db import get_connection
+        import sqlite3
+
         try:
-            conn = get_connection(AUDIT_DB)
+            conn = sqlite3.connect(str(AUDIT_DB))
             count = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
             usage_count = conn.execute("SELECT COUNT(*) FROM usage_stats").fetchone()[0]
             conn.close()

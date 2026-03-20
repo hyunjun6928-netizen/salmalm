@@ -3,7 +3,8 @@
 import json
 import base64
 import urllib.request
-from datetime import datetime, timedelta, timezone
+import urllib.error
+from datetime import datetime, timedelta
 from salmalm.tools.tool_registry import register
 from salmalm.security.crypto import vault
 
@@ -55,12 +56,16 @@ def handle_google_calendar(args: dict) -> str:
     import urllib.error as _ue
     action = args.get("action", "list")
     cal_id = args.get("calendar_id", "primary")
+    # Validate IDs to prevent API path traversal
+    import re as _re
+    if not _re.match(r'^[a-zA-Z0-9_.@\-]+$', cal_id):
+        return "❌ Invalid calendar_id format"
     base_url = f"https://www.googleapis.com/calendar/v3/calendars/{cal_id}"
     headers = _google_oauth_headers()
 
     if action == "list":
         days = args.get("days", 7)
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         time_min = now.isoformat() + "Z"
         time_max = (now + timedelta(days=days)).isoformat() + "Z"
         url = (
@@ -120,6 +125,8 @@ def handle_google_calendar(args: dict) -> str:
         event_id = args.get("event_id", "")
         if not event_id:
             return "❌ event_id is required for delete"
+        if not _re.match(r'^[a-zA-Z0-9_\-]+$', event_id):
+            return "❌ Invalid event_id format"
         req = urllib.request.Request(f"{base_url}/events/{event_id}", headers=headers, method="DELETE")
         urllib.request.urlopen(req, timeout=10)
         return f"📅 Event deleted: {event_id}"
@@ -172,10 +179,15 @@ def handle_gmail(args: dict) -> str:
         msg_id = args.get("message_id", "")
         if not msg_id:
             return "❌ message_id is required for read"
+        if not _re.match(r"^[a-zA-Z0-9_\-]+$", msg_id):
+            return "❌ Invalid message_id format"
         url = f"{base_url}/messages/{msg_id}?format=full"
         req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            msg = json.loads(resp.read())
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                msg = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            return f"❌ Gmail API error {e.code}: {e.read().decode('utf-8','replace')[:300]}"
         hdrs = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
         subj = hdrs.get("Subject", "(no subject)")
         frm = hdrs.get("From", "?")
@@ -219,8 +231,11 @@ def handle_gmail(args: dict) -> str:
             headers={**headers, "Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            result = json.loads(resp.read())
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            return f"❌ Gmail send error {e.code}: {e.read().decode('utf-8','replace')[:300]}"
         return f"📧 Email sent to {to} (ID: {result.get('id', '?')})"
 
     return f"❌ Unknown gmail action: {action}"

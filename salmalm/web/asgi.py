@@ -29,7 +29,6 @@ from salmalm.web.auth import (
     rate_limiter, llm_rate_limiter, ip_ban_list, daily_quota,
     RateLimitExceeded, DailyQuotaExceeded, extract_auth,
 )
-from salmalm.web.middleware import get_route_policy, _SENSITIVE_ROUTES
 import uuid
 
 # LLM-triggering paths that get the tighter LLMRateLimiter bucket
@@ -81,7 +80,7 @@ class _SSEQueue:
     _SENTINEL = None
 
     def __init__(self) -> None:
-        self._q: queue.SimpleQueue = queue.SimpleQueue()
+        self._q: queue.Queue = queue.Queue()  # Queue supports timeout; SimpleQueue does not
 
     def write(self, data: bytes) -> int:
         self._q.put(data)
@@ -175,13 +174,9 @@ class FastHandler:
     @property
     def _body(self) -> dict:
         if self._body_parsed is None:
-            if self._body_bytes:
-                try:
-                    self._body_parsed = json.loads(self._body_bytes)
-                except Exception as _e:
-                    log.debug("[ASGI] Request body is not valid JSON: %s", _e)
-                    self._body_parsed = {}
-            else:
+            try:
+                self._body_parsed = json.loads(self._body_bytes) if self._body_bytes else {}
+            except Exception:
                 self._body_parsed = {}
         return self._body_parsed
 
@@ -270,7 +265,9 @@ def create_asgi_app() -> FastAPI:
     FastHandler._POST_ROUTES = WebHandler._POST_ROUTES
     FastHandler._GET_PREFIX_ROUTES = WebHandler._GET_PREFIX_ROUTES
     FastHandler._PUBLIC_PATHS = WebHandler._PUBLIC_PATHS
-    FastHandler._TRUSTED_PROXY_NETS = WebHandler._TRUSTED_PROXY_NETS
+    # WebHandler uses _TRUSTED_PROXY_NETWORKS (with 'WORKS' suffix); FastHandler uses _TRUSTED_PROXY_NETS
+    FastHandler._TRUSTED_PROXY_NETS = getattr(WebHandler, "_TRUSTED_PROXY_NETS",
+                                               getattr(WebHandler, "_TRUSTED_PROXY_NETWORKS", ()))
     FastHandler._MAX_POST_SIZE = WebHandler._MAX_POST_SIZE
 
     # Inject all mixin bases into FastHandler dynamically
@@ -280,34 +277,24 @@ def create_asgi_app() -> FastAPI:
 
     app = FastAPI(title="SalmAlm", docs_url=None, redoc_url=None)
 
-    @app.middleware("http")
-    async def _security_headers_middleware(request: Request, call_next):
-        """Inject security headers on every HTTP response (OWASP baseline)."""
-        response = await call_next(request)
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "DENY")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
-        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
-        if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
-            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-        return response
-
-
-
-
     # ── Static files (React bundles, dist assets) ───────────────────────────
     _static_dist = Path(__file__).parent.parent / "static" / "dist"
     _static_dist.mkdir(parents=True, exist_ok=True)
     app.mount("/static/dist", StaticFiles(directory=str(_static_dist)), name="static_dist")
 
-    # ── WebSocket note ──────────────────────────────────────────────────────
-    # WebSocket runs as a separate asyncio TCP server on port 18801 (ws.py).
-    # Clients connect directly to ws://host:18801 — no ASGI WS route needed.
+    # ── Explicit route registration from WebHandler route tables ────────────
+    # Replaces the single catch-all with per-path route registrations.
+    # Benefits: Starlette router can short-circuit 404s, OpenAPI spec shows
+    # actual endpoints, method validation is enforced at routing layer.
+    _register_explicit_routes(app, WebHandler)
 
-    # ── HTTP catch-all ──────────────────────────────────────────────────────
+    # ── Fallback catch-all (prefix routes + SPA index + unknown paths) ──────
+    # Handles: prefix routes (/api/sessions/{id}/messages), SPA index.html,
+    # and any route not in the explicit GET/POST tables.
     @app.api_route(
         "/{full_path:path}",
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        include_in_schema=False,
     )
     async def catch_all(request: Request, full_path: str = ""):
         set_correlation_id(str(uuid.uuid4())[:8])
@@ -319,41 +306,29 @@ def create_asgi_app() -> FastAPI:
             return Response(
                 status_code=204,
                 headers={
-                    **_cors_headers(request),  # Only allow trusted origins
+                    "Access-Control-Allow-Origin": _cors_origin(request),
                     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH",
                     "Access-Control-Allow-Headers": (
                         "Content-Type,Authorization,X-API-Key,"
                         "X-Session-Token,X-Requested-With"
                     ),
                     "Access-Control-Max-Age": "86400",
+                    **_asgi_security_headers(),
                 },
             )
 
-        # ── RoutePolicy enforcement ──────────────────────────────────────────
-        _req_path_policy = request.url.path.split("?")[0]
-        _policy = get_route_policy(_req_path_policy, method)
-
-        # CSRF-sensitive routes: verify Origin header matches Host on write requests
-        if _policy.csrf and method in ("POST", "PUT", "DELETE", "PATCH"):
-            _origin = request.headers.get("origin", "")
-            _host = request.headers.get("host", "")
-            if _origin and not any(
-                _origin.endswith(h) for h in (
-                    f"://{_host}", "://localhost", "://127.0.0.1", "://::1"
-                )
-            ):
-                return JSONResponse(
-                    {"error": "CSRF: Origin mismatch"},
-                    status_code=403,
-                )
-
         # ── Abuse Guard ──────────────────────────────────────────────────────
         # Resolve client IP (trust X-Forwarded-For only when proxy env is set)
+        _remote_addr = (request.client.host if request.client else None) or "unknown"
         _xff = request.headers.get("x-forwarded-for", "")
-        if _xff and os.environ.get("SALMALM_TRUST_PROXY"):
+        _TRUSTED_NETS = ("127.", "10.", "172.16.", "172.17.", "172.18.", "172.19.",
+                         "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+                         "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+                         "192.168.", "::1", "fd")
+        if _xff and os.environ.get("SALMALM_TRUST_PROXY") and any(_remote_addr.startswith(n) for n in _TRUSTED_NETS):
             _client_ip = _xff.split(",")[0].strip()
         else:
-            _client_ip = (request.client.host if request.client else None) or "unknown"
+            _client_ip = _remote_addr
 
         # 1. IP ban check — hard block before any further processing
         _is_banned, _ban_remaining = ip_ban_list.is_banned(_client_ip)
@@ -362,7 +337,7 @@ def create_asgi_app() -> FastAPI:
                 {"error": "Too many requests. IP temporarily blocked.",
                  "retry_after": _ban_remaining},
                 status_code=429,
-                headers={"Retry-After": str(_ban_remaining)},
+                headers={"Retry-After": str(_ban_remaining), **_cors_headers(request)},
             )
 
         # 2. Extract auth token for role-based limiting
@@ -380,7 +355,7 @@ def create_asgi_app() -> FastAPI:
             return JSONResponse(
                 {"error": "Rate limit exceeded", "retry_after": _ra},
                 status_code=429,
-                headers={"Retry-After": str(_ra)},
+                headers={"Retry-After": str(_ra), **_cors_headers(request)},
             )
 
         # 4. Per-user role-based rate limit
@@ -395,6 +370,7 @@ def create_asgi_app() -> FastAPI:
                     headers={
                         "Retry-After": str(_ra),
                         "X-RateLimit-Role": _role,
+                        **_cors_headers(request),
                     },
                 )
 
@@ -413,7 +389,7 @@ def create_asgi_app() -> FastAPI:
                 return JSONResponse(
                     {"error": "LLM rate limit exceeded", "retry_after": _ra},
                     status_code=429,
-                    headers={"Retry-After": str(_ra)},
+                    headers={"Retry-After": str(_ra), **_cors_headers(request)},
                 )
             # 5b. Daily token quota check
             try:
@@ -427,7 +403,7 @@ def create_asgi_app() -> FastAPI:
                         "retry_after": "tomorrow",
                     },
                     status_code=429,
-                    headers={"X-Quota-Used": str(_e.used), "X-Quota-Limit": str(_e.limit)},
+                    headers={"X-Quota-Used": str(_e.used), "X-Quota-Limit": str(_e.limit), **_cors_headers(request)},
                 )
         # ── End Abuse Guard ──────────────────────────────────────────────────
 
@@ -439,11 +415,11 @@ def create_asgi_app() -> FastAPI:
             _is_upload = request.url.path == "/api/upload"
             _max_body = 50 * 1024 * 1024 if _is_upload else 10 * 1024 * 1024
             if content_length > _max_body:
-                return JSONResponse({"error": "Request too large"}, status_code=413)
+                return JSONResponse({"error": "Request too large"}, status_code=413, headers=_cors_headers(request))
             body_bytes = await request.body()
-            # Defence-in-depth: also check actual body size (Content-Length may be spoofed)
+            # Double-check actual size (Content-Length can be spoofed/omitted)
             if len(body_bytes) > _max_body:
-                return JSONResponse({"error": "Request too large"}, status_code=413)
+                return JSONResponse({"error": "Request too large"}, status_code=413, headers=_cors_headers(request))
 
         handler = FastHandler(request, body_bytes)
         req_path = handler.path.split("?")[0]
@@ -451,7 +427,7 @@ def create_asgi_app() -> FastAPI:
         try:
             # ── SSE streaming path (must be caught before generic dispatch) ──
             if method == "POST" and req_path == "/api/chat/stream":
-                return await _handle_sse_stream(handler)
+                return await _handle_sse_stream(handler, request)
 
             # ── Generic dispatch ─────────────────────────────────────────────
             if method == "GET":
@@ -467,7 +443,7 @@ def create_asgi_app() -> FastAPI:
             if handler._streaming and 300 <= handler._resp_status < 400:
                 location = handler._resp_headers.get("location", "/")
                 from starlette.responses import RedirectResponse
-                return RedirectResponse(url=location, status_code=handler._resp_status)
+                return RedirectResponse(url=location, status_code=handler._resp_status, headers=_cors_headers(request))
 
             # If handler returned normally (raw wfile writes for non-SSE streams like SW.js)
             if handler._streaming and not handler._sse_queue._q.empty():
@@ -488,16 +464,16 @@ def create_asgi_app() -> FastAPI:
             return JSONResponse(e.data, status_code=e.status,
                                 headers=_cors_headers(request))
         except _HTMLResp as e:
-            return HTMLResponse(e.content, status_code=e.status)
+            return HTMLResponse(e.content, status_code=e.status, headers=_asgi_security_headers())
         except _RawResp as e:
             return Response(e.body, media_type=e.content_type,
-                            status_code=e.status)
+                            status_code=e.status, headers=_cors_headers(request))
         except (BrokenPipeError, ConnectionResetError):
-            return Response(status_code=499)  # client disconnected
+            return Response(status_code=499, headers=_cors_headers(request))  # client disconnected
         except Exception as e:
             import traceback
             log.error(f"[ASGI] {method} {req_path}: {e}\n{traceback.format_exc()}")
-            return JSONResponse({"error": f"Internal error: {str(e)[:200]}"},
+            return JSONResponse({"error": "Internal server error"},
                                 status_code=500,
                                 headers=_cors_headers(request))
         finally:
@@ -508,9 +484,200 @@ def create_asgi_app() -> FastAPI:
     return app
 
 
+# ── Explicit route builder ───────────────────────────────────────────────────
+
+def _register_explicit_routes(app: FastAPI, WebHandler) -> None:
+    """Register all GET/POST routes from WebHandler route tables explicitly.
+
+    Replaces: single catch-all that matched every path.
+    Result: Starlette router resolves 69 GET + 76 POST routes directly;
+    the catch-all only handles prefix routes, SPA index, and 404s.
+
+    Route handler factory: each registered route calls the shared dispatch
+    logic (_dispatch_route) with the correct method + path so all existing
+    mixin methods are invoked unchanged.
+    """
+    from fastapi import APIRouter
+    router = APIRouter()
+
+    async def _make_handler(path: str, method: str):
+        """Return an async route function for the given path+method pair."""
+        async def _route(request: Request):
+            return await _dispatch_route(request, method, path)
+        # Give each closure a unique name so FastAPI doesn't deduplicate them
+        _route.__name__ = f"route_{method.lower()}_{path.replace('/', '_').strip('_')}"
+        return _route
+
+    # Register GET routes
+    for path in WebHandler._GET_ROUTES:
+        import asyncio as _asy
+
+        async def _get_route(request: Request, _p=path):
+            return await _dispatch_route(request, "GET", _p)
+        _get_route.__name__ = f"get_{path.replace('/', '_').strip('_')}"
+        router.add_api_route(path, _get_route, methods=["GET"], include_in_schema=False)
+
+    # Register POST routes (SSE /api/chat/stream is handled specially)
+    for path in WebHandler._POST_ROUTES:
+        async def _post_route(request: Request, _p=path):
+            return await _dispatch_route(request, "POST", _p)
+        _post_route.__name__ = f"post_{path.replace('/', '_').strip('_')}"
+        router.add_api_route(path, _post_route, methods=["POST"], include_in_schema=False)
+
+    # OPTIONS for all known paths (CORS preflight)
+    for path in set(list(WebHandler._GET_ROUTES) + list(WebHandler._POST_ROUTES)):
+        async def _opts(request: Request):
+            return Response(
+                status_code=204,
+                headers={
+                    "Access-Control-Allow-Origin": _cors_origin(request),
+                    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS,PATCH",
+                    "Access-Control-Allow-Headers": (
+                        "Content-Type,Authorization,X-API-Key,"
+                        "X-Session-Token,X-Requested-With"
+                    ),
+                    "Access-Control-Max-Age": "86400",
+                    **_asgi_security_headers(),
+                },
+            )
+        _opts.__name__ = f"opts_{path.replace('/', '_').strip('_')}"
+        try:
+            router.add_api_route(path, _opts, methods=["OPTIONS"], include_in_schema=False)
+        except Exception:
+            pass  # duplicate path OK
+
+    app.include_router(router)
+
+
+async def _dispatch_route(request: Request, method: str, path_override: str = "") -> Response:
+    """Shared dispatch for explicit routes — mirrors catch_all logic without prefix matching."""
+    from salmalm.web.asgi import _cors_headers  # local import to avoid forward ref
+    set_correlation_id(str(uuid.uuid4())[:8])
+    _start = time.time()
+
+    # Abuse guard (same as catch_all)
+    _remote_addr2 = (request.client.host if request.client else None) or "unknown"
+    _xff = request.headers.get("x-forwarded-for", "")
+    if _xff and os.environ.get("SALMALM_TRUST_PROXY") and any(_remote_addr2.startswith(n) for n in _TRUSTED_NETS):
+        _client_ip = _xff.split(",")[0].strip()
+    else:
+        _client_ip = _remote_addr2
+
+    _is_banned, _ban_remaining = ip_ban_list.is_banned(_client_ip)
+    if _is_banned:
+        return JSONResponse(
+            {"error": "IP temporarily blocked.", "retry_after": _ban_remaining},
+            status_code=429,
+            headers=_cors_headers(request),
+        )
+    _auth_headers = {k.lower(): v for k, v in request.headers.items()}
+    _auth_user = extract_auth(_auth_headers)
+    _role = _auth_user.get("role", "anonymous") if _auth_user else "anonymous"
+    _uid_key = str(_auth_user["id"]) if _auth_user else f"ip:{_client_ip}"
+    try:
+        rate_limiter.check(f"ip:{_client_ip}", "ip")
+    except RateLimitExceeded as _e:
+        ip_ban_list.record_violation(_client_ip)
+        return JSONResponse({"error": "Rate limit exceeded"}, status_code=429, headers=_cors_headers(request))
+
+    body_bytes = b""
+    if method in ("POST", "PUT", "PATCH"):
+        content_length = int(request.headers.get("content-length", 0))
+        _is_upload = request.url.path == "/api/upload"
+        _max_body = 50 * 1024 * 1024 if _is_upload else 10 * 1024 * 1024
+        if content_length > _max_body:
+            return JSONResponse({"error": "Request too large"}, status_code=413, headers=_cors_headers(request))
+        body_bytes = await request.body()
+        if len(body_bytes) > _max_body:
+            return JSONResponse({"error": "Request too large"}, status_code=413, headers=_cors_headers(request))
+
+    handler = FastHandler(request, body_bytes)
+
+    try:
+        if method == "POST" and request.url.path == "/api/chat/stream":
+            return await _handle_sse_stream(handler, request)
+        if method == "GET":
+            handler._do_get_inner()
+        elif method == "POST":
+            handler._do_post_inner()
+        elif method == "PUT":
+            handler._do_put_inner()
+        else:
+            raise _JSONResp({"error": "Method not allowed"}, 405)
+
+        if handler._streaming and 300 <= handler._resp_status < 400:
+            location = handler._resp_headers.get("location", "/")
+            from starlette.responses import RedirectResponse
+            return RedirectResponse(url=location, status_code=handler._resp_status, headers=_cors_headers(request))
+
+        if handler._streaming and not handler._sse_queue._q.empty():
+            chunks = []
+            q = handler._sse_queue._q
+            while not q.empty():
+                chunk = q.get_nowait()
+                if chunk is not None:
+                    chunks.append(chunk)
+            ct = handler._resp_headers.get("content-type", "application/octet-stream")
+            return Response(b"".join(chunks), media_type=ct,
+                            status_code=handler._resp_status,
+                            headers=_cors_headers(request))
+        return JSONResponse({"error": "No response"}, status_code=500)
+
+    except _JSONResp as e:
+        return JSONResponse(e.data, status_code=e.status, headers=_cors_headers(request))
+    except _HTMLResp as e:
+        return HTMLResponse(e.content, status_code=e.status, headers=_asgi_security_headers())
+    except _RawResp as e:
+        return Response(e.body, media_type=e.content_type, status_code=e.status, headers=_cors_headers(request))
+    except (BrokenPipeError, ConnectionResetError):
+        return Response(status_code=499, headers=_cors_headers(request))
+    except Exception as e:
+        import traceback
+        log.error(f"[ASGI] {method} {request.url.path}: {e}\n{traceback.format_exc()}")
+        return JSONResponse({"error": "Internal server error"}, status_code=500, headers=_cors_headers(request))
+    finally:
+        duration = (time.time() - _start) * 1000
+        ip = handler.client_address[0]
+        request_logger.log_request(method, request.url.path, ip=ip, duration_ms=duration)
+
+
 # ── SSE async bridge ─────────────────────────────────────────────────────────
 
-async def _handle_sse_stream(handler: FastHandler) -> StreamingResponse:
+
+def _cors_origin(request) -> str:
+    """Return CORS origin from request, validated against allowlist."""
+    import os as _os
+    # Extract origin header
+    origin = ""
+    if isinstance(request, dict):
+        headers = request.get("headers", {})
+        if isinstance(headers, dict):
+            origin = headers.get("origin", headers.get(b"origin", b"")).decode() if isinstance(headers.get("origin", headers.get(b"origin", b"")), bytes) else headers.get("origin", "")
+        elif isinstance(headers, list):
+            for k, v in headers:
+                if (k if isinstance(k, str) else k.decode("latin-1")).lower() == "origin":
+                    origin = v if isinstance(v, str) else v.decode("latin-1")
+                    break
+    elif hasattr(request, "headers"):
+        origin = request.headers.get("origin", "")
+
+    if not origin:
+        return "*"
+
+    port = _os.environ.get("SALMALM_PORT", "18800")
+    allowed = {
+        f"http://localhost:{port}", f"https://localhost:{port}",
+        f"http://127.0.0.1:{port}", f"https://127.0.0.1:{port}",
+        "http://localhost", "https://localhost",
+        "http://127.0.0.1", "https://127.0.0.1",
+    }
+    # Exact match only — no prefix matching to prevent subdomain confusion
+    if origin in allowed:
+        return origin
+    # Reject: return empty string so browser blocks the cross-origin read
+    return ""
+
+async def _handle_sse_stream(handler: FastHandler, request: Request = None) -> StreamingResponse:
     """Run SSE handler in thread-pool, yield chunks via async generator.
 
     The handler writes to handler.wfile (an _SSEQueue). The async generator
@@ -541,18 +708,22 @@ async def _handle_sse_stream(handler: FastHandler) -> StreamingResponse:
         finally:
             sse_q.close()  # always signal end
 
-    loop = asyncio.get_running_loop()
+    loop = asyncio.get_event_loop()
     thread_future = loop.run_in_executor(None, _run_handler)
 
     async def generate() -> AsyncIterator[bytes]:
         while True:
             try:
                 # Poll queue in executor (non-blocking for event loop)
-                chunk = await loop.run_in_executor(None, sse_q._q.get)
+                # Timeout: if no data for 90s (keepalive excluded), abort stream
+                chunk = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: sse_q._q.get(timeout=90)),
+                    timeout=95,
+                )
                 if chunk is _SSEQueue._SENTINEL:
                     break
                 yield chunk
-            except Exception:
+            except (asyncio.TimeoutError, Exception):
                 break
         # Ensure thread finishes cleanly
         try:
@@ -567,7 +738,8 @@ async def _handle_sse_stream(handler: FastHandler) -> StreamingResponse:
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # disable nginx proxy buffering
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": _cors_origin(request) if request else "*",
+            **_asgi_security_headers(),
         },
     )
 
@@ -618,11 +790,37 @@ def _inject_mixin_methods(target_cls, source_cls) -> None:
 # ── CORS helper ───────────────────────────────────────────────────────────────
 
 def _cors_headers(request: Request) -> dict:
+    headers = _asgi_security_headers()
     origin = request.headers.get("origin", "")
     if not origin:
-        return {}
+        return headers
     port = int(os.environ.get("SALMALM_PORT", 18800))
     allowed = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
     if origin in allowed:
-        return {"Access-Control-Allow-Origin": origin}
-    return {}
+        headers["Access-Control-Allow-Origin"] = origin
+    return headers
+
+
+def _asgi_security_headers() -> dict:
+    """Security headers for ASGI responses (parity with WebHandler._security_headers)."""
+    if os.environ.get("SALMALM_CSP_STRICT"):
+        script_src = "'self'"
+    else:
+        script_src = "'self' 'unsafe-inline'"
+    return {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "no-referrer",
+        "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
+        "Content-Security-Policy": (
+            "default-src 'self'; "
+            f"script-src {script_src}; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self' ws://127.0.0.1:* ws://localhost:* wss://127.0.0.1:* wss://localhost:*; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        ),
+    }

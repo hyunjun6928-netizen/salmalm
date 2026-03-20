@@ -1,8 +1,8 @@
 """Sub-agent system: spawn isolated AI workers for parallel tasks.
 
 OpenClaw-style sub-agents with isolated sessions, async execution,
-push-based completion notifications, full message history, and
-steer-message injection for live guidance.
+and result callbacks. Each sub-agent runs in its own session context
+with independent conversation history.
 """
 
 import json
@@ -22,11 +22,12 @@ class SubAgentTask:
     description: str = ""
     model: Optional[str] = None
     thinking_level: Optional[str] = None  # low/medium/high/xhigh
-    label: Optional[str] = None
+    label: Optional[str] = None  # human-readable name
     max_turns: int = 10
     timeout_s: int = 300
     parent_session: str = "web"
-    notify: bool = True
+    notify: bool = True  # auto-notify on completion
+    collected: bool = False  # whether result has been collected by parent
     status: str = "pending"  # pending, running, completed, failed, killed
     result: str = ""
     error: str = ""
@@ -35,80 +36,53 @@ class SubAgentTask:
     completed_at: float = 0
     turns_used: int = 0
     tokens_used: int = 0
-    # Full conversation history (system prompt excluded for brevity)
-    messages: List[dict] = field(default_factory=list)
-    # Queue for steer messages injected from parent
-    _steer_queue: List[str] = field(default_factory=list, repr=False)
-    _steer_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _thread: Optional[threading.Thread] = field(default=None, repr=False)
+    owner_uid: Optional[str] = None  # user id of the spawning user (for IDOR protection)
     _cancel: threading.Event = field(default_factory=threading.Event, repr=False)
 
     @property
     def elapsed_s(self) -> float:
+        """Elapsed s."""
         if self.started_at == 0:
             return 0
         end = self.completed_at if self.completed_at else time.time()
         return round(end - self.started_at, 1)
 
-    def push_steer(self, message: str) -> None:
-        """Inject a steering message for the next LLM turn."""
-        with self._steer_lock:
-            self._steer_queue.append(message)
-
-    def pop_steer(self) -> Optional[str]:
-        """Pop a pending steer message (consumed once per turn)."""
-        with self._steer_lock:
-            return self._steer_queue.pop(0) if self._steer_queue else None
-
-    def to_dict(self, include_messages: bool = False) -> dict:
-        d = {
+    def to_dict(self) -> dict:
+        """To dict."""
+        return {
             "task_id": self.task_id,
             "label": self.label or self.description[:40],
-            "description": self.description[:200],
+            "description": self.description[:100],
             "model": self.model,
             "thinking_level": self.thinking_level,
             "status": self.status,
-            "result": self.result[:1000] if self.result else "",
+            "result": self.result[:500] if self.result else "",
             "error": self.error,
             "elapsed_s": self.elapsed_s,
             "turns_used": self.turns_used,
             "tokens_used": self.tokens_used,
             "created_at": self.created_at,
-            "completed_at": self.completed_at,
             "notify": self.notify,
+            "owner_uid": self.owner_uid,
         }
-        if include_messages:
-            # Exclude system prompt, include user/assistant/tool
-            d["messages"] = [
-                m for m in self.messages
-                if m.get("role") != "system"
-            ]
-        return d
-
-
-
-
-def _get_ws_loop():
-    """Return the running asyncio event loop for WS broadcasts from threads."""
-    try:
-        from salmalm.core.llm_cron import LLMCronManager
-        lp = getattr(LLMCronManager, "_main_loop", None)
-        if lp and not lp.is_closed():
-            return lp
-    except Exception:
-        pass
-    return None
 
 
 class SubAgentManager:
-    """Manages sub-agent lifecycle: spawn, monitor, kill, steer, collect."""
+    """Manages sub-agent lifecycle: spawn, monitor, kill, collect results."""
 
     _MAX_CONCURRENT = 5
     _MAX_HISTORY = 50
 
     def __init__(self) -> None:
+        """Init  ."""
         self._tasks: Dict[str, SubAgentTask] = {}
         self._lock = threading.Lock()
+
+    _MAX_TURNS_MIN = 1
+    _MAX_TURNS_MAX = 50
+    _TIMEOUT_MIN = 10
+    _TIMEOUT_MAX = 1800
 
     def spawn(
         self,
@@ -121,9 +95,14 @@ class SubAgentManager:
         parent_session: str = "web",
         on_complete: Optional[Callable] = None,
         notify: bool = True,
+        owner_uid: Optional[str] = None,
     ) -> SubAgentTask:
         """Spawn a new sub-agent task."""
+        # Clamp max_turns and timeout_s to safe ranges
+        max_turns = max(self._MAX_TURNS_MIN, min(self._MAX_TURNS_MAX, int(max_turns)))
+        timeout_s = max(self._TIMEOUT_MIN, min(self._TIMEOUT_MAX, int(timeout_s)))
         with self._lock:
+            # Check concurrent limit
             running = sum(1 for t in self._tasks.values() if t.status == "running")
             if running >= self._MAX_CONCURRENT:
                 task = SubAgentTask(
@@ -132,7 +111,10 @@ class SubAgentManager:
                     error=f"Max concurrent sub-agents ({self._MAX_CONCURRENT}) reached",
                 )
                 return task
+
+            # Cleanup old tasks
             self._cleanup_old()
+
             task = SubAgentTask(
                 description=description,
                 model=model,
@@ -142,9 +124,11 @@ class SubAgentManager:
                 timeout_s=timeout_s,
                 parent_session=parent_session,
                 notify=notify,
+                owner_uid=owner_uid,
             )
             self._tasks[task.task_id] = task
 
+        # Start in background thread
         thread = threading.Thread(
             target=self._run_agent,
             args=(task, on_complete),
@@ -155,36 +139,37 @@ class SubAgentManager:
         task.status = "running"
         task.started_at = time.time()
         thread.start()
+
         log.info(f"[SUBAGENT] Spawned {task.task_id}: {description[:80]}")
         return task
 
     def _run_agent(self, task: SubAgentTask, on_complete: Optional[Callable] = None):
-        """Execute sub-agent in isolated session with message history + steer support."""
+        """Execute sub-agent in isolated session."""
         try:
             from salmalm.core.core import get_session, Session  # noqa: F401
             from salmalm.core.llm import call_llm
             from salmalm.core.prompt import build_system_prompt
             from salmalm.tools.tool_handlers import execute_tool
 
+            # Create isolated session — pass owner_uid so session_store enforces ownership
             session_id = f"subagent_{task.task_id}"
-            session = get_session(session_id)
-            system_prompt = build_system_prompt(mode='minimal')
+            owner_int = int(task.owner_uid) if task.owner_uid and str(task.owner_uid).isdigit() else None
+            session = get_session(session_id, user_id=owner_int)
 
-            # Bootstrap messages (system excluded from task.messages)
-            all_messages = [
+            # Build system prompt
+            system_prompt = build_system_prompt(session)
+            messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": task.description},
             ]
-            # Record initial user message
-            task.messages.append({"role": "user", "content": task.description})
 
             model = task.model
             if not model:
                 from salmalm.core.core import router
-                model = router.force_model or router._pick_available(3)
+
+                model = router._pick_available(3)  # Pick a capable model
 
             total_tokens = 0
-            content = ""
 
             for turn in range(task.max_turns):
                 if task._cancel.is_set():
@@ -192,20 +177,15 @@ class SubAgentManager:
                     task.result = "(killed by user)"
                     break
 
+                # Check timeout
                 if time.time() - task.started_at > task.timeout_s:
                     task.status = "failed"
                     task.error = f"Timeout after {task.timeout_s}s"
                     break
 
-                # Inject any pending steer message before LLM call
-                steer_msg = task.pop_steer()
-                if steer_msg:
-                    inject = {"role": "user", "content": f"[Parent guidance] {steer_msg}"}
-                    all_messages.append(inject)
-                    task.messages.append(inject)
-
+                # Call LLM with optional thinking level
                 _think = task.thinking_level if task.thinking_level and turn == 0 else False
-                result = call_llm(all_messages, model=model, tools=_get_tool_defs(), thinking=_think)
+                result = call_llm(messages, model=model, tools=_get_tool_defs(), thinking=_think)
                 task.turns_used = turn + 1
 
                 usage = result.get("usage", {})
@@ -216,35 +196,8 @@ class SubAgentManager:
                 tool_calls = result.get("tool_calls", [])
 
                 if tool_calls:
-                    # Loop detection — same tool 3x in a row
-                    _tc_names = [tc.get("name","") for tc in tool_calls]
-                    _recent_names = getattr(task, "_recent_tool_names", [])
-                    _recent_names.extend(_tc_names)
-                    task._recent_tool_names = _recent_names
-                    if len(_recent_names) >= 3:
-                        _streak = _recent_names[-3:]
-                        if len(set(_streak)) == 1 and _streak[0]:
-                            # Extract last tool result as final answer
-                            _last_result = ""
-                            for _ltc in tool_calls:
-                                try:
-                                    _lr = execute_tool(_ltc.get("name",""), _ltc.get("arguments",{}))
-                                    _last_result = str(_lr)[:500]
-                                except Exception:
-                                    pass
-                            final_content = _last_result or f"(tool {_streak[0]} loop stopped)"
-                            task.messages.append({"role": "assistant", "content": final_content})
-                            task.status = "completed"
-                            task.result = final_content
-                            break
-
-                    asst_msg = {"role": "assistant", "content": content, "tool_calls": tool_calls}
-                    all_messages.append(asst_msg)
-                    task.messages.append({
-                        "role": "assistant",
-                        "content": content,
-                        "tool_calls": [{"name": tc.get("name"), "arguments": tc.get("arguments")} for tc in tool_calls],
-                    })
+                    # Execute tools
+                    messages.append({"role": "assistant", "content": content, "tool_calls": tool_calls})
                     for tc in tool_calls:
                         tool_name = tc.get("name", "")
                         tool_args = tc.get("arguments", {})
@@ -254,26 +207,23 @@ class SubAgentManager:
                             except json.JSONDecodeError:
                                 tool_args = {}
                         tool_result = execute_tool(tool_name, tool_args)
-                        tool_str = str(tool_result)[:5000]
-                        tool_msg = {
-                            "role": "tool",
-                            "tool_call_id": tc.get("id", ""),
-                            "content": tool_str,
-                        }
-                        all_messages.append(tool_msg)
-                        task.messages.append({"role": "tool", "name": tool_name, "content": tool_str[:500]})
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tc.get("id", ""),
+                                "content": str(tool_result)[:5000],
+                            }
+                        )
                 else:
-                    # Final answer
-                    task.messages.append({"role": "assistant", "content": content})
+                    # No tool calls = final answer
                     task.status = "completed"
                     task.result = content
                     break
             else:
+                # Max turns reached
                 if task.status == "running":
-                    if content:
-                        task.messages.append({"role": "assistant", "content": content})
                     task.status = "completed"
-                    task.result = content or "(max turns reached)"
+                    task.result = content if content else "(max turns reached)"
 
         except Exception as e:
             task.status = "failed"
@@ -290,110 +240,58 @@ class SubAgentManager:
                 except Exception as e:
                     log.error(f"[SUBAGENT] Callback error: {e}")
 
+            # Auto-notify on completion (Telegram/WS push)
             if task.notify and task.status in ("completed", "failed"):
                 self._auto_notify(task)
 
-    # ── Push-based completion notification ───────────────────────────────────
-
-    def _auto_notify(self, task: SubAgentTask) -> None:
-        """Push completion event via WS and Telegram."""
-        label = task.label or task.description[:40]
-        if task.status == "completed":
-            msg = f"✅ **[서브에이전트 완료]** `{task.task_id}`\n\n{task.result[:500]}"
-        else:
-            msg = f"❌ **Sub-agent `{task.task_id}`** '{label}' failed: {task.error}"
-
-        # WS broadcast → triggers UI auto-refresh + toast
-        try:
-            from salmalm.web.ws import ws_server
-            import asyncio
-            _ws_loop = _get_ws_loop()
-            if _ws_loop:
-                asyncio.run_coroutine_threadsafe(
-                    ws_server.broadcast({
-                        "type": "subagent_done",
-                        "task": task.to_dict(),
-                        "message": msg,
-                    }),
-                    _ws_loop,
-                )
-        except Exception as e:
-            log.debug(f"[SUBAGENT] WS broadcast skipped: {e}")
-
-        # Push message into parent session chat (OpenClaw-style)
-        try:
-            from salmalm.core.core import get_session
-            parent_sid = task.parent_session or "web"
-            parent_sess = get_session(parent_sid)
-            parent_sess.add_assistant(msg)
-            log.info(f"[SUBAGENT] WS push sent to session {parent_sid}")
-        except Exception as e:
-            log.debug(f"[SUBAGENT] Parent push skipped: {e}")
-
-        # Telegram
-        try:
-            from salmalm.channels.telegram import TelegramBot
-            TelegramBot.notify_owner(msg)
-        except Exception as e:
-            log.debug(f"[SUBAGENT] Telegram notification skipped: {e}")
-
-        log.info(f"[SUBAGENT] Notified: {task.task_id} → {task.status}")
-
-    # ── Steer ────────────────────────────────────────────────────────────────
-
-    def steer(self, task_id: str, message: str) -> str:
-        """Inject a steering message into a running sub-agent's next turn."""
-        task = self._tasks.get(task_id)
-        if not task:
-            return f"Task {task_id} not found"
-        if task.status not in ("running", "completed"):
-            return f"Task {task_id} is {task.status} — cannot steer"
-
-        if task.status == "running":
-            task.push_steer(message)
-            return f"📡 Steering message queued for `{task_id}` (picked up on next turn)"
-
-        # Completed — re-run one more LLM turn
-        try:
-            from salmalm.core.llm import call_llm
-            inject = {"role": "user", "content": f"[Parent guidance] {message}"}
-            all_msgs = [{"role": "system", "content": ""}] + task.messages + [inject]
-            model = task.model
-            if not model:
-                from salmalm.core.core import router
-                model = router.force_model or router._pick_available(2)
-            result = call_llm(all_msgs, model=model, tools=_get_tool_defs(), max_tokens=4096)
-            content = result.get("content", "")
-            task.messages.append(inject)
-            task.messages.append({"role": "assistant", "content": content})
-            task.result = content
-            task.completed_at = time.time()
-            return f"🤖 `{task_id}` steered:\n\n{content[:2000]}"
-        except Exception as e:
-            return f"❌ Steer failed: {e}"
-
-    # ── CRUD helpers ─────────────────────────────────────────────────────────
-
-    def list_tasks(self, include_completed: bool = True) -> List[dict]:
+    def list_tasks(
+        self,
+        include_completed: bool = True,
+        owner_uid: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> List[dict]:
+        """List tasks.  Non-admin callers only see their own tasks."""
         with self._lock:
             tasks = list(self._tasks.values())
         if not include_completed:
             tasks = [t for t in tasks if t.status == "running"]
+        if not is_admin and owner_uid is not None:
+            tasks = [t for t in tasks if t.owner_uid == owner_uid]
         return [t.to_dict() for t in sorted(tasks, key=lambda t: t.created_at, reverse=True)]
 
-    def get_task(self, task_id: str) -> Optional[SubAgentTask]:
-        return self._tasks.get(task_id)
+    def get_task(
+        self,
+        task_id: str,
+        owner_uid: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> Optional[SubAgentTask]:
+        """Get task by ID.  Returns None if the caller does not own the task."""
+        task = self._tasks.get(task_id)
+        if task is None:
+            return None
+        if not is_admin and owner_uid is not None and task.owner_uid != owner_uid:
+            return None  # IDOR: treat as not found
+        return task
 
-    def kill(self, task_id: str) -> str:
+    def kill(
+        self,
+        task_id: str,
+        owner_uid: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> str:
+        """Kill a running sub-agent (owner or admin only)."""
         task = self._tasks.get(task_id)
         if not task:
             return f"Task {task_id} not found"
+        if not is_admin and owner_uid is not None and task.owner_uid != owner_uid:
+            return f"Task {task_id} not found"  # hide existence from non-owner
         if task.status != "running":
             return f"Task {task_id} is not running (status: {task.status})"
         task._cancel.set()
         return f"Kill signal sent to {task_id}"
 
     def kill_all(self) -> str:
+        """Kill all running sub-agents."""
         killed = 0
         for task in self._tasks.values():
             if task.status == "running":
@@ -401,43 +299,136 @@ class SubAgentManager:
                 killed += 1
         return f"Kill signal sent to {killed} sub-agents"
 
-    def clear_completed(self) -> int:
-        """Remove all completed/failed/killed tasks. Returns count removed."""
-        with self._lock:
-            to_del = [tid for tid, t in self._tasks.items()
-                      if t.status in ("completed", "failed", "killed")]
-            for tid in to_del:
-                del self._tasks[tid]
-        return len(to_del)
+    def _auto_notify(self, task: SubAgentTask) -> None:
+        """Push completion notification to parent session + Telegram/WS."""
+        label = task.label or task.description[:40]
+        if task.status == "completed":
+            msg = f"✅ Sub-agent [{task.task_id}] '{label}' completed ({task.elapsed_s}s, {task.turns_used} turns)\n\n{task.result[:500]}"
+        else:
+            msg = f"❌ Sub-agent [{task.task_id}] '{label}' failed: {task.error}"
 
-    def collect_results(self, parent_session: str = "web") -> list:
-        """Collect uncollected completed results for a parent session."""
-        results = []
-        with self._lock:
-            for task in self._tasks.values():
-                if (task.parent_session == parent_session
-                        and task.status == "completed"
-                        and not getattr(task, "_collected", False)):
-                    results.append(task.to_dict())
-                    task._collected = True  # type: ignore[attr-defined]
-        return results
+        # 1. Inject result into parent session as assistant message (shows in chat)
+        parent_sid = task.parent_session
+        if parent_sid:
+            try:
+                from salmalm.core.session_store import get_session
+                parent = get_session(parent_sid)
+                parent.add_assistant(msg)
+            except Exception as e:
+                log.debug(f"[SUBAGENT] Parent session inject skipped: {e}")
+
+        # 2. WS push — subagent_complete event only (no chunk to avoid double display)
+        try:
+            from salmalm.web.ws import ws_server
+            from salmalm.web.chat import _BG_LOOP
+            import asyncio
+
+            ws_data = {
+                "type": "subagent_complete",
+                "session_id": parent_sid or "web",
+                "task": task.to_dict(),
+                "message": msg,
+            }
+            if _BG_LOOP and _BG_LOOP.is_running():
+                asyncio.run_coroutine_threadsafe(
+                    ws_server.broadcast(ws_data, session_id=parent_sid),
+                    _BG_LOOP,
+                )
+        except Exception as e:
+            log.debug(f"[SUBAGENT] WS broadcast skipped: {e}")
+
+        # 3. Telegram notification
+        try:
+            from salmalm.channels.telegram import TelegramBot
+            TelegramBot.notify_owner(msg)
+        except Exception as e:
+            log.debug(f"[SUBAGENT] Telegram notification skipped: {e}")
+
+        log.info(f"[SUBAGENT] Notify: {task.task_id} → {task.status} (parent={parent_sid})")
 
     def _cleanup_old(self):
+        """Remove old completed tasks beyond history limit."""
         if len(self._tasks) <= self._MAX_HISTORY:
             return
-        completed = [(tid, t) for tid, t in self._tasks.items()
-                     if t.status in ("completed", "failed", "killed")]
+        completed = [(tid, t) for tid, t in self._tasks.items() if t.status in ("completed", "failed", "killed")]
         completed.sort(key=lambda x: x[1].completed_at)
         to_remove = len(self._tasks) - self._MAX_HISTORY
         for tid, _ in completed[:to_remove]:
             del self._tasks[tid]
 
+    def steer(
+        self,
+        task_id: str,
+        message: str,
+        owner_uid: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> str:
+        """Send a steering message to a running or completed sub-agent (owner or admin only).
+
+        OpenClaw-style: inject guidance into the agent's session without
+        killing it. For running agents, the message is queued and picked up
+        on the next LLM turn. For completed agents, re-runs with the message.
+        """
+        task = self._tasks.get(task_id)
+        if not task:
+            return f"Task {task_id} not found"
+        if not is_admin and owner_uid is not None and task.owner_uid != owner_uid:
+            return f"Task {task_id} not found"  # hide from non-owner
+
+        session_id = f"subagent_{task_id}"
+        try:
+            from salmalm.core.core import get_session
+
+            session = get_session(session_id)
+            session.messages.append({"role": "user", "content": f"[Steering from parent] {message}"})
+
+            if task.status == "running":
+                return f"📡 Steering message queued for {task_id} (will be picked up on next turn)"
+
+            # Completed/failed — re-run with the steering message
+            from salmalm.core.llm import call_llm
+
+            model = task.model
+            if not model:
+                from salmalm.core.core import router
+
+                model = router._pick_available(2)
+
+            result = call_llm(session.messages, model=model, tools=_get_tool_defs(), max_tokens=4096)
+            content = result.get("content", "")
+            task.result = content
+            task.status = "completed"
+            task.completed_at = time.time()
+            return f"🤖 [{task_id}] steered response:\n\n{content[:2000]}"
+        except Exception as e:
+            return f"❌ Steer failed: {e}"
+
+    def collect_results(self, parent_session: str = "web") -> list:
+        """Collect all completed results for a parent session (OpenClaw push-style).
+
+        Returns list of completed tasks and marks them as collected.
+        """
+        results = []
+        with self._lock:
+            for task in self._tasks.values():
+                if (
+                    task.parent_session == parent_session
+                    and task.status == "completed"
+                    and not task.collected
+                ):
+                    results.append(task.to_dict())
+                    task.collected = True
+        return results
+
 
 def _get_tool_defs() -> list:
-    """Get tool definitions for sub-agents (all except dangerous ones)."""
+    """Get tool definitions for sub-agents (subset of safe tools)."""
     from salmalm.tools.tool_registry import get_all_tools
-    _BLOCKED = {"exec", "exec_session", "browser_action"}
-    return [t for t in get_all_tools() if t.get("name") not in _BLOCKED]
+
+    # Sub-agents get all tools except dangerous ones
+    _BLOCKED_FOR_SUBAGENTS = {"exec", "exec_session", "browser_action", "sub_agent"}
+    all_tools = get_all_tools()
+    return [t for t in all_tools if t.get("name") not in _BLOCKED_FOR_SUBAGENTS]
 
 
 # Singleton

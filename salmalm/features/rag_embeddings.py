@@ -62,11 +62,11 @@ def _embed_google(texts: List[str], api_key: str) -> List[List[float]]:
         body = json.dumps({
             "content": {"parts": [{"text": text}]},
         }).encode()
-        url = "https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent"
+        url = f"https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key={api_key}"
         req = urllib.request.Request(
             url,
             data=body,
-            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+            headers={"Content-Type": "application/json"},
         )
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read())

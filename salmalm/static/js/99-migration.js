@@ -87,12 +87,14 @@
       var jobs=d.jobs||[];var kr=_lang==='ko';
       if(!jobs.length){c.innerHTML='<div style="padding:24px;text-align:center;color:var(--text2);border:1px dashed var(--border);border-radius:10px">'+(kr?'크론 작업 없음 — 위의 ➕ 버튼으로 추가하세요':'No cron jobs — click ➕ above to add one')+'</div>';return}
       var h='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-      h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;background:var(--bg3);font-weight:600;font-size:12px">';
-      h+='<div style="padding:10px 14px">'+(kr?'이름':'Name')+'</div><div style="padding:10px 14px">'+(kr?'간격':'Interval')+'</div><div style="padding:10px 14px">'+(kr?'실행 횟수':'Runs')+'</div><div style="padding:10px 14px">'+(kr?'상태':'Status')+'</div><div style="padding:10px 14px"></div></div>';
+      h+='<div style="display:grid;grid-template-columns:1fr 1fr auto auto auto auto;background:var(--bg3);font-weight:600;font-size:12px">';
+      h+='<div style="padding:10px 14px">'+(kr?'이름':'Name')+'</div><div style="padding:10px 14px">'+(kr?'프롬프트':'Prompt')+'</div><div style="padding:10px 14px">'+(kr?'간격':'Interval')+'</div><div style="padding:10px 14px">'+(kr?'실행 횟수':'Runs')+'</div><div style="padding:10px 14px">'+(kr?'상태':'Status')+'</div><div style="padding:10px 14px"></div></div>';
       jobs.forEach(function(j){
-        var sched=j.schedule||{};var interval=sched.seconds?_fmtInterval(sched.seconds):(sched.expr||'—');
-        h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;font-size:13px;border-top:1px solid var(--border)">';
+        var sched=j.schedule||{};var interval=j.interval||(sched.seconds?_fmtInterval(sched.seconds):(sched.expr||'—'));
+        var promptPreview=(j.prompt||'').slice(0,60)+((j.prompt||'').length>60?'…':'');
+        h+='<div style="display:grid;grid-template-columns:1fr 1fr auto auto auto auto;font-size:13px;border-top:1px solid var(--border)">';
         h+='<div style="padding:10px 14px;font-weight:500">'+j.name+'</div>';
+        h+='<div style="padding:10px 14px;color:var(--text2);font-size:12px" title="'+(j.prompt||'')+'">'+promptPreview+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+interval+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+j.run_count+'</div>';
         h+='<div style="padding:10px 14px"><button data-action="toggleCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:13px">'+(j.enabled?'🟢 '+(kr?'활성':'On'):'🔴 '+(kr?'비활성':'Off'))+'</button></div>';
@@ -117,7 +119,8 @@
     var name=document.getElementById('cron-name').value.trim()||'untitled';
     var interval=parseInt(document.getElementById('cron-interval').value)||3600;
     var prompt=document.getElementById('cron-prompt').value.trim();
-    var runAt=document.getElementById('cron-at').value||'';
+    var cronModeOnce=document.getElementById('cron-mode-once');
+    var runAt=(cronModeOnce&&cronModeOnce.checked)?document.getElementById('cron-at').value||'':'';
     if(!prompt){alert(_lang==='ko'?'프롬프트를 입력하세요':'Enter a prompt');return}
     var payload={name:name,interval:interval,prompt:prompt};
     if(runAt)payload.run_at=runAt;

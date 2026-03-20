@@ -351,10 +351,9 @@ class NodeManager:
             if len(mac) != 12:
                 return {"error": "Invalid MAC address"}
             magic = b"\xff" * 6 + bytes.fromhex(mac) * 16
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            sock.sendto(magic, (broadcast, port))
-            sock.close()
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                sock.sendto(magic, (broadcast, port))
             return {"success": True, "mac": mac_address}
         except Exception as e:
             return {"error": str(e)}
@@ -572,11 +571,9 @@ class NodeAgent:
         import socket
 
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip  # type: ignore[no-any-return]
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                return s.getsockname()[0]  # type: ignore[no-any-return]
         except Exception as e:  # noqa: broad-except
             return "127.0.0.1"
 

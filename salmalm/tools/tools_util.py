@@ -27,10 +27,16 @@ def handle_hash_text(args: dict) -> str:
         if not text:
             return "❌ text is required"
         algo = args.get("algorithm", "sha256")
-        _HASH_ALGOS = ("sha256", "md5", "sha1", "sha512", "sha384")
-        if algo not in _HASH_ALGOS:
-            return f"❌ Supported algorithms: {', '.join(_HASH_ALGOS)}"
-        h = hashlib.new(algo, text.encode("utf-8"), usedforsecurity=False).hexdigest()
+        algos = {
+            "sha256": hashlib.sha256,
+            "md5": hashlib.md5,
+            "sha1": hashlib.sha1,
+            "sha512": hashlib.sha512,
+            "sha384": hashlib.sha384,
+        }
+        if algo not in algos:
+            return f"❌ Supported algorithms: {', '.join(algos.keys())}"
+        h = algos[algo](text.encode("utf-8")).hexdigest()
         return f"🔐 {algo.upper()}: {h}"
     elif action == "password":
         length = max(8, min(args.get("length", 16), 128))
@@ -123,6 +129,10 @@ def handle_json_query(args: dict) -> str:
 
     data_str = args.get("data", "")
     query = args.get("query", ".")
+    # Block jq builtins that leak process environment or enable I/O
+    _BLOCKED_JQ = re.compile(r'\benv\b|\$ENV\b|\binput\b|\binputs\b|\bdebug\b|\bpath\(|\bgetpath\b|\bbuiltins\b|\bimport\b|\binclude\b|\bmodulemeta\b|\$__loc__\b')
+    if _BLOCKED_JQ.search(query):
+        return "❌ Blocked: jq expression contains restricted builtins (env, input, debug, builtins)"
     from_file = args.get("from_file", False)
     if from_file:
         fpath = _resolve_path(data_str)
@@ -133,23 +143,29 @@ def handle_json_query(args: dict) -> str:
             return result.stdout[:8000] or "(empty)"
         return f"❌ jq error: {result.stderr[:500]}"
     except FileNotFoundError:
-        data = json.loads(data_str)
-        parts = query.strip(".").split(".")
-        current = data
-        for p in parts:
-            if not p:
-                continue
-            if p.endswith("[]"):
-                p = p[:-2]
-                if p:
+        try:
+            data = json.loads(data_str)
+        except json.JSONDecodeError as e:
+            return f"❌ Invalid JSON: {e}"
+        try:
+            parts = query.strip(".").split(".")
+            current = data
+            for p in parts:
+                if not p:
+                    continue
+                if p.endswith("[]"):
+                    p = p[:-2]
+                    if p:
+                        current = current[p]
+                    if isinstance(current, list):
+                        current = current
+                elif p.isdigit():
+                    current = current[int(p)]
+                else:
                     current = current[p]
-                if isinstance(current, list):
-                    current = current
-            elif p.isdigit():
-                current = current[int(p)]
-            else:
-                current = current[p]
-        return json.dumps(current, ensure_ascii=False, indent=2)[:8000]
+            return json.dumps(current, ensure_ascii=False, indent=2)[:8000]
+        except (KeyError, IndexError, TypeError) as e:
+            return f"❌ Query path error at '{p}': {e}"
 
 
 @register("clipboard")

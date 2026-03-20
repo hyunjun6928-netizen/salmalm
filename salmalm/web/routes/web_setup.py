@@ -5,6 +5,7 @@ import json
 import os
 from salmalm.constants import DATA_DIR, VAULT_FILE, TEST_MODELS
 from salmalm.core import audit_log
+from salmalm.web.auth import extract_auth
 
 
 def _ensure_vault_unlocked(vault) -> bool:
@@ -22,16 +23,6 @@ def _ensure_vault_unlocked(vault) -> bool:
 
 
 class WebSetupMixin:
-    GET_ROUTES = {
-        "/api/onboarding": "_get_api_onboarding",
-        "/setup": "_get_setup",
-    }
-    POST_ROUTES = {
-        "/api/setup": "_post_api_setup",
-        "/api/onboarding": "_post_api_onboarding",
-        "/api/onboarding/preferences": "_post_api_onboarding_preferences",
-    }
-
     """Mixin providing setup route handlers."""
 
     def _needs_onboarding(self) -> bool:
@@ -91,12 +82,20 @@ class WebSetupMixin:
         self._html(_tmpl.ONBOARDING_HTML)
 
     def _post_api_setup(self):
-        """Post api setup."""
+        """Post api setup (first-run only — blocked once users exist)."""
         body = self._body
-        # First-run setup — create vault with or without password
+        # Guard 1: vault file must not exist
         if VAULT_FILE.exists():  # noqa: F405
             self._json({"error": "Already set up"}, 400)
             return
+        # Guard 2: user database must be empty — prevents re-setup after vault deletion
+        try:
+            from salmalm.web.auth import auth_manager as _am
+            if _am._has_users():
+                self._json({"error": "Already set up"}, 400)
+                return
+        except Exception:
+            pass
         use_pw = body.get("use_password", False)
         pw = body.get("password", "")
         if use_pw:
@@ -108,17 +107,25 @@ class WebSetupMixin:
             vault.create(_vault_pw)
             # Auto-unlock vault after creation so API keys can be saved immediately
             vault.unlock(_vault_pw, save_to_keychain=True)
-            # Save password hint file for auto-unlock on restart (WSL lacks keychain)
+            # Auto-unlock on restart: prefer OS keychain (already attempted above).
+            # For keychain-less environments (WSL/containers), write a marker-only
+            # .vault_auto file — passwords are NEVER stored in this file.
+            # Users who need passwordless auto-unlock should use env SALMALM_VAULT_PASSWORD.
             try:
                 _pw_hint_file = VAULT_FILE.parent / ".vault_auto"  # noqa: F405
+                # Empty file = "no-password vault; unlock with empty string"
+                # If a real password was set, write nothing — keychain or env var required.
                 if not use_pw:
                     _pw_hint_file.write_text("", encoding="utf-8")
+                    _pw_hint_file.chmod(0o600)
                 else:
-                    # Store obfuscated pw for auto-unlock (local machine only)
-                    import base64
-
-                    _pw_hint_file.write_text(base64.b64encode(_vault_pw.encode()).decode(), encoding="utf-8")
-                _pw_hint_file.chmod(0o600)
+                    # Remove any existing .vault_auto that might contain old obfuscated pw
+                    if _pw_hint_file.exists():
+                        _pw_hint_file.unlink()
+                    log.info(
+                        "[SETUP] Vault password set. Auto-unlock requires OS keychain "
+                        "or SALMALM_VAULT_PASSWORD env variable."
+                    )
             except Exception as e:
                 log.debug(f"Suppressed: {e}")
             audit_log("setup", f"vault created {'with' if use_pw else 'without'} password")
@@ -145,11 +152,29 @@ class WebSetupMixin:
             return self._post_api_onboarding_inner()
         except Exception as e:
             log.exception(f"[ONBOARDING] Unhandled error: {e}")
-            self._json({"error": f"Internal error: {str(e)[:200]}"}, 500)
+            self._json({"error": "Internal server error"}, 500)
 
     def _post_api_onboarding_inner(self):
-        """Post api onboarding inner."""
+        """Post api onboarding inner.
+
+        Security: this endpoint is in _PUBLIC_PATHS only for first-run UX.
+        Once a user account exists OR onboarding has been completed, it must
+        require authentication — otherwise any network/SSRF attacker can
+        overwrite vault API keys without credentials.
+        """
         body = self._body
+        # ── Guard: block re-entry after initial setup ─────────────────────
+        # If users exist, treat this as a protected endpoint — require auth.
+        try:
+            from salmalm.web.auth import auth_manager as _am_ob
+            if _am_ob._has_users():
+                user = extract_auth(dict(self.headers))
+                if not user:
+                    self._json({"error": "Authentication required after initial setup"}, 401)
+                    return
+        except Exception:
+            pass
+        # ── Guard: vault must be unlocked ─────────────────────────────────
         if not vault.is_unlocked:
             if not _ensure_vault_unlocked(vault):
                 self._json({"error": "Vault locked"}, 403)
@@ -245,9 +270,9 @@ class WebSetupMixin:
 
                 gk = body["google_api_key"]
                 req = urllib.request.Request(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent",  # noqa: F405
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{TEST_MODELS['google']}:generateContent?key={gk}",  # noqa: F405
                     data=json.dumps({"contents": [{"parts": [{"text": "ping"}]}]}).encode(),
-                    headers={"Content-Type": "application/json", "x-goog-api-key": gk},
+                    headers={"Content-Type": "application/json"},
                 )
                 urllib.request.urlopen(req, timeout=15)
                 test_results.append("✅ Google OK")
@@ -293,7 +318,21 @@ class WebSetupMixin:
         return
 
     def _post_api_onboarding_preferences(self):
-        """Post api onboarding preferences."""
+        """Post api onboarding preferences.
+
+        Gated: if users exist, authentication is required (same re-entry guard
+        as _post_api_onboarding_inner) to prevent unauthenticated vault writes.
+        """
+        # Re-entry guard — same policy as _post_api_onboarding_inner
+        try:
+            from salmalm.web.auth import auth_manager as _am_pref
+            if _am_pref._has_users():
+                user = extract_auth(dict(self.headers))
+                if not user:
+                    self._json({"error": "Authentication required"}, 401)
+                    return
+        except Exception:
+            pass
         body = self._body
         # Save model + persona preferences from setup wizard
         model = body.get("model", "auto")
@@ -327,139 +366,3 @@ class WebSetupMixin:
         audit_log("onboarding", f"preferences: model={model}, persona={persona}")
         self._json({"ok": True})
         return
-
-
-# ── FastAPI router ────────────────────────────────────────────────────────────
-import asyncio as _asyncio
-from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
-from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
-from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
-
-router = _APIRouter()
-
-@router.get("/api/onboarding")
-async def get_onboarding():
-    from salmalm.security.crypto import vault
-    from salmalm.web.routes.web_setup import WebSetupMixin
-    _result = {}
-    class _H(WebSetupMixin):
-        def _json(self, data, status=200): _result["d"] = data
-    h = _H.__new__(_H)
-    import types
-    h._json = types.MethodType(_H._json, h)
-    h._get_api_onboarding()
-    return _JSON(content=_result.get("d", {}))
-
-@router.get("/setup")
-async def get_setup():
-    from salmalm.web import templates as _tmpl
-    return _HTML(content=_tmpl.ONBOARDING_HTML)
-
-@router.post("/api/setup")
-async def post_setup(request: _Request):
-    import os, base64
-    from salmalm.security.crypto import vault, log
-    from salmalm.constants import VAULT_FILE
-    from salmalm.core import audit_log
-    body = await request.json()
-    if VAULT_FILE.exists():
-        return _JSON(content={"error": "Already set up"}, status_code=400)
-    use_pw = body.get("use_password", False)
-    pw = body.get("password", "")
-    if use_pw and len(pw) < 4:
-        return _JSON(content={"error": "Password must be at least 4 characters"}, status_code=400)
-    try:
-        _vault_pw = pw if use_pw else ""
-        vault.create(_vault_pw)
-        vault.unlock(_vault_pw, save_to_keychain=True)
-        try:
-            _pw_hint_file = VAULT_FILE.parent / ".vault_auto"
-            if not use_pw:
-                _pw_hint_file.write_text("", encoding="utf-8")
-            else:
-                _pw_hint_file.write_text(base64.b64encode(_vault_pw.encode()).decode(), encoding="utf-8")
-            _pw_hint_file.chmod(0o600)
-        except Exception as e:
-            log.debug(f"Suppressed: {e}")
-        audit_log("setup", f"vault created {'with' if use_pw else 'without'} password")
-    except RuntimeError:
-        log.warning("[SETUP] Vault unavailable (no cryptography). Proceeding without encryption.")
-        audit_log("setup", "vault skipped — no cryptography package")
-        vault._data = {}
-        vault._password = ""
-        vault._salt = b"\x00" * 16
-        try:
-            VAULT_FILE.parent.mkdir(parents=True, exist_ok=True)
-            VAULT_FILE.write_bytes(b'{"no_crypto": true}')
-        except Exception:
-            pass
-    return _JSON(content={"ok": True})
-
-@router.post("/api/onboarding")
-async def post_onboarding(request: _Request, _u=_Depends(_optauth)):
-    import os as _os_onb
-    import asyncio as _aio_onb
-    import types as _types_onb
-    # On external bind: reject unauthenticated onboarding API key writes
-    _bind_onb = _os_onb.environ.get("SALMALM_BIND", "127.0.0.1")
-    if _bind_onb not in ("127.0.0.1", "localhost", "::1") and not _u:
-        return _JSON(content={"error": "Authentication required"}, status_code=401)
-    from salmalm.web.routes.web_setup import WebSetupMixin, _ensure_vault_unlocked
-    from salmalm.security.crypto import vault, log
-    body = await request.json()
-    _result = {}
-    class _H(WebSetupMixin):
-        @property
-        def _body(self): return body
-        def _json(self, data, status=200): _result["d"] = (data, status)
-    h = _H.__new__(_H)
-    # _body is a read-only property — do NOT assign h._body = body (AttributeError)
-    h._json = _types_onb.MethodType(_H._json, h)
-    # Run in thread: _post_api_onboarding_inner() makes blocking HTTP calls (key tests)
-    try:
-        await _aio_onb.to_thread(h._post_api_onboarding_inner)
-    except Exception as _exc_onb:
-        log.exception(f"[ONBOARDING] Unhandled error in thread: {_exc_onb}")
-        return _JSON(content={"error": "Internal server error"}, status_code=500)
-    data, status = _result.get("d", ({}, 200))
-    return _JSON(content=data, status_code=status)
-
-@router.post("/api/onboarding/preferences")
-async def post_onboarding_preferences(request: _Request, _u=_Depends(_optauth)):
-    import os
-    from salmalm.security.crypto import vault, log
-    from salmalm.constants import DATA_DIR
-    from salmalm.core import audit_log
-    # Require vault to be unlocked (= local session or authenticated user)
-    if not vault.is_unlocked:
-        return _JSON(content={"error": "Vault locked — unlock vault first"}, status_code=403)
-    # On external bind: require authentication (no anonymous preference writes)
-    _bind = os.environ.get("SALMALM_BIND", "127.0.0.1")
-    _is_local_bind = _bind in ("127.0.0.1", "localhost", "::1")
-    if not _is_local_bind and not _u:
-        return _JSON(content={"error": "Authentication required"}, status_code=401)
-    body = await request.json()
-    model = body.get("model", "auto")
-    persona = body.get("persona", "expert")
-    if model and model != "auto":
-        vault.set("default_model", model)
-        try:
-            from salmalm.core.core import router as _router
-            _router.set_force_model(model)
-        except Exception as e:
-            log.warning(f"[SETUP] Failed to set router model: {e}")
-    persona_templates = {
-        "expert": "# SOUL.md\n\nYou are a professional AI expert. Be precise, detail-oriented, and thorough.",
-        "friend": "# SOUL.md\n\nYou are a friendly and warm conversational partner. Be casual and engaging.",
-        "assistant": "# SOUL.md\n\nYou are an efficient personal assistant. Be concise and task-focused.",
-    }
-    template = persona_templates.get(persona, persona_templates["expert"])
-    try:
-        soul_path = os.path.join(str(DATA_DIR), "SOUL.md")
-        os.makedirs(os.path.dirname(soul_path), exist_ok=True)
-        with open(soul_path, "w", encoding="utf-8") as f:
-            f.write(template)
-    except Exception as e:
-        log.debug(f"Suppressed: {e}")
-    audit_log("onboarding", f"preferences: model={model}, persona={persona}")
-    return _JSON(content={"ok": True})

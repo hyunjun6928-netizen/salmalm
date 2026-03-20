@@ -8,9 +8,11 @@
     var host=location.hostname||'localhost';
     var port=location.port;
     /* Behind nginx (port 80/443/empty): WS through same nginx host */
-    if(!port||port==='80'||port==='443'){return proto+'//'+location.host;}
+    if(!port||port==='80'||port==='443'){var u2=proto+'//'+location.host;var t2=_tok||localStorage.getItem('salm_token')||'';return t2?u2+'?token='+encodeURIComponent(t2):u2;}
     /* Direct access: WS on port 18801 */
-    return proto+'//'+host+':18801';
+    var wsBase=proto+'//'+host+':18801';
+    var t=_tok||localStorage.getItem('salm_token')||'';
+    return t?wsBase+'?token='+encodeURIComponent(t):wsBase;
   }
 
   function _wsConnect(){
@@ -101,11 +103,11 @@
       var _secs=((Date.now()-_wsSendStart)/1000).toFixed(1);
       var _wcIcons={simple:'⚡',moderate:'🔧',complex:'💎'};
       var _wcLabel=data.complexity&&data.complexity!=='auto'&&data.complexity!=='manual'?(_wcIcons[data.complexity]||'')+data.complexity+' → ':'';
-      if(data.complexity==='manual')_isAutoRouting=false;
+      
       var _wmShort=(data.model||'').split('/').pop();
       addMsg('assistant',data.text||'',_wcLabel+_wmShort+' · ⏱️'+_secs+'s');
       if(_wmShort)modelBadge.textContent=_isAutoRouting?'Auto → '+_wmShort:_wmShort;
-      fetch('/api/status').then(function(r){return r.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+      fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(s){if(s&&s.usage)costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
       /* Queue drain: send next queued message */
       if(window._msgQueue&&window._msgQueue.length>0){var _nextMsg=window._msgQueue.shift();setTimeout(function(){var _inp=document.getElementById('input');if(_inp){_inp.value=_nextMsg;window.doSend()}},500)}
       var _sb=document.getElementById('stop-btn');var _sbSend=document.getElementById('send-btn');if(_sb)_sb.style.display='none';if(_sbSend)_sbSend.style.display='flex';
@@ -113,25 +115,7 @@
     }else if(data.type==='error'){
       _wsRequestPending=false;
       if(typingEl)typingEl.remove();
-      /* Convert technical errors to friendly messages */
-      var _rawErr=data.error||'Unknown error';
-      var _friendlyErr=_rawErr;
-      var _eLow=_rawErr.toLowerCase();
-      if(_eLow.indexOf('rate limit')>=0||_eLow.indexOf('429')>=0)
-        _friendlyErr='⏳ 잠깐 너무 많은 요청이 왔어요. 잠시 후 자동으로 다시 시도합니다...';
-      else if(_eLow.indexOf('timeout')>=0||_eLow.indexOf('timed out')>=0)
-        _friendlyErr='⏰ 응답이 조금 오래 걸렸어요. 다시 시도해주세요.';
-      else if(_eLow.indexOf('overloaded')>=0||_eLow.indexOf('529')>=0)
-        _friendlyErr='🏋️ AI 서버가 잠시 바쁩니다. 곧 복구됩니다...';
-      else if(_eLow.indexOf('api key')>=0||_eLow.indexOf('auth')>=0||_eLow.indexOf('401')>=0)
-        _friendlyErr='🔑 API 키 설정을 확인해주세요. (Settings → API Keys)';
-      else if(_eLow.indexOf('unavailable')>=0||_eLow.indexOf('all ai')>=0)
-        _friendlyErr='😓 AI 모델이 일시적으로 점검 중입니다. 잠시 후 다시 시도해주세요.';
-      else if(_eLow.indexOf('context')>=0||_eLow.indexOf('too long')>=0)
-        _friendlyErr='📏 대화가 너무 길어졌어요. /compact 명령으로 정리해보세요.';
-      else
-        _friendlyErr='😅 잠깐 문제가 생겼어요. 다시 시도해주세요.';
-      addMsg('assistant',_friendlyErr);
+      addMsg('assistant','❌ '+data.error);
       var _sb2=document.getElementById('stop-btn');var _sb2Send=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb2Send)_sb2Send.style.display='flex';
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
     }else if(data.type==='shutdown'){
@@ -146,6 +130,9 @@
         addMsg('assistant','✅ Updated to v'+(data.version||'?')+'. Restarting...');
         _waitForServerThenReload();
       }
+    }else if(data.type==='cron_result'){
+      /* Cron job completed — show in current chat window regardless of session */
+      addMsg('assistant',data.text||('⏰ Cron: '+(data.job_name||'')),'⏰ cron');
     }
   }
 
@@ -154,12 +141,17 @@
     var typingEl=document.getElementById('typing-row');
     var sid=window._currentSession||'web';
     var _pollCount=0;
+    /* Record timestamp at the moment of reconnect — only accept responses newer than this */
+    var _recoverStart=_wsSendStart||Date.now();
     function _poll(){
       _pollCount++;
       fetch('/api/sessions/'+encodeURIComponent(sid)+'/last',{headers:{'X-Session-Token':_tok}})
       .then(function(r){return r.json()}).then(function(d){
-        if(d.ok&&d.message&&d.msg_count>_wsRequestMsgCount){
-          /* New response arrived — show it */
+        /* Fix: compare last_active timestamp (ms) against send-start time, not DOM msg count.
+           DOM count vs server count are mismatched (server includes system msgs) causing false positives. */
+        var _lastActive=(d.last_active||0)*1000; /* server returns seconds, convert to ms */
+        if(d.ok&&d.message&&_lastActive>_recoverStart){
+          /* New response arrived after our send — show it */
           if(typingEl)typingEl.remove();
           addMsg('assistant',d.message,'🔄 recovered');
           var _sb=document.getElementById('stop-btn');var _sbS=document.getElementById('send-btn');

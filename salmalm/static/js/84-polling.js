@@ -6,7 +6,9 @@
       if(!r.ok)return;
       var d=await r.json();
       if(d.notifications&&d.notifications.length){
-        d.notifications.forEach(n=>addMsg('assistant',n.text,'notification'));
+        d.notifications.forEach(n=>addMsg('assistant',n.text,'⏰ cron'));
+        /* Clear after showing to prevent duplicates on next poll */
+        fetch('/api/notifications/clear',{method:'POST',headers:{'X-Session-Token':_tok}}).catch(()=>{});
       }
     }catch(e){}
   },30000);

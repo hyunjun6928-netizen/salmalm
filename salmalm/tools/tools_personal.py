@@ -118,7 +118,7 @@ def handle_note(args: dict) -> str:
         return "\n".join(lines)
 
     elif action == "list":
-        count = max(1, min(int(args.get("count", 10)), 100))
+        count = int(args.get("count", 10))
         with _db_lock:
             conn = _get_db()
             rows = conn.execute(
@@ -284,6 +284,10 @@ def _save_link_impl(args: dict) -> str:
     summary, tags, content = args.get("summary", ""), args.get("tags", ""), ""
     if not title:
         try:
+            from salmalm.tools.tools_common import _is_private_url_follow_redirects
+            blocked, reason, _ = _is_private_url_follow_redirects(url)
+            if blocked:
+                return f"❌ Blocked URL (SSRF protection): {reason}"
             req = urllib.request.Request(url, headers={"User-Agent": "SalmAlm/1.0"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 html = resp.read().decode("utf-8", errors="replace")[:50000]
@@ -314,7 +318,7 @@ def handle_save_link(args: dict) -> str:
         return _save_link_impl(args)
 
     elif action == "list":
-        count = max(1, min(int(args.get("count", 10)), 100))
+        count = int(args.get("count", 10))
         with _db_lock:
             conn = _get_db()
             rows = conn.execute(

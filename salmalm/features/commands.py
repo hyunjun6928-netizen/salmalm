@@ -479,6 +479,9 @@ class CommandRouter:
         """Cmd config."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "show"
+        # Admin-only for write operations
+        if sub in ("set", "delete", "reset") and not getattr(session, 'is_admin', False):
+            return "🚫 Admin privilege required to modify config."
         _ensure_config_dir()
         try:
             cfg = json.loads(_CONFIG_PATH.read_text()) if _CONFIG_PATH.exists() else {}
@@ -592,6 +595,8 @@ class CommandRouter:
         """Cmd allowlist."""
         parts = cmd.split()
         sub = parts[1] if len(parts) > 1 else "list"
+        if sub in ("add", "remove") and not getattr(session, 'is_admin', False):
+            return "🚫 Admin privilege required to modify allowlist."
         _ensure_config_dir()
         al_path = _CONFIG_DIR / "allowlist.json"
         try:
@@ -770,6 +775,7 @@ class CommandRouter:
             return f"❌ MCP error: {e}"
         return "❓ Usage: /mcp install|list|catalog|remove|status|search"
 
+    @staticmethod
     def _cmd_brave(cmd: str, session, **_) -> str:
         """Quick Brave web search."""
         query = cmd[len("/brave") :].strip()

@@ -8,7 +8,7 @@ import re
 import os
 import time
 from salmalm.tools.tool_registry import register
-from salmalm.tools.tools_common import _is_safe_command, apply_git_safe_overrides
+from salmalm.tools.tools_common import _is_safe_command
 from salmalm.constants import WORKSPACE_DIR
 from salmalm.security.exec_approvals import (  # noqa: F401
     check_approval,
@@ -46,18 +46,26 @@ def _sanitized_env(extra_env: dict | None = None) -> dict:
         else:
             clean[k] = v
     if extra_env:
-        # extra_env originates from LLM-generated tool arguments, NOT from the human.
-        # The LLM could emit {"env": {"PYTHONPATH": "/tmp/evil"}} to hijack imports.
-        # check_env_override() in handle_exec() is the primary gate; this is a
-        # secondary defence to ensure the blocked set is enforced even on direct
-        # _sanitized_env() calls (e.g., future callers that skip handle_exec).
-        from salmalm.security.exec_approvals import BLOCKED_ENV_OVERRIDES
+        # Block dynamic loader / Python interpreter hijack vectors.
+        # Even though extra_env is user-supplied, an LLM could generate these.
+        _DANGEROUS_ENV_KEYS = frozenset({
+            "PYTHONPATH",       # import path injection → load attacker .py
+            "PYTHONSTARTUP",    # auto-exec arbitrary file on interpreter start
+            "PYTHONHOME",       # redirect stdlib → hijack all imports
+            "PYTHONINSPECT",    # force interactive mode
+            "LD_PRELOAD",       # shared library injection (Linux)
+            "LD_LIBRARY_PATH",  # library search path hijack (Linux)
+            "DYLD_INSERT_LIBRARIES",  # shared library injection (macOS)
+            "DYLD_LIBRARY_PATH",      # library search path hijack (macOS)
+            "PATH",             # command resolution hijack
+            "SALMALM_ALLOW_SHELL",      # re-enable blocked shell operators
+            "SALMALM_ALLOW_ELEVATED",   # escalate exec privileges
+            "SALMALM_EXEC_DATABASE",    # redirect exec DB
+            "SALMALM_EXEC_NETWORK",     # re-enable network in sandbox
+        })
         for k, v in extra_env.items():
-            if k in BLOCKED_ENV_OVERRIDES:
-                log.warning("[EXEC] Stripped blocked env var from extra_env: %s", k)
-                continue
-            if k.startswith(("LD_", "DYLD_", "PYTHON")):
-                log.warning("[EXEC] Stripped suspicious env prefix from extra_env: %s", k)
+            if k.upper() in _DANGEROUS_ENV_KEYS:
+                log.warning(f"[EXEC] Blocked dangerous env override: {k!r}")
                 continue
             clean[k] = v
     return clean
@@ -104,20 +112,28 @@ def _set_exec_limits(timeout: int) -> None:
         resource.setrlimit(resource.RLIMIT_NOFILE, (100, 100))
         resource.setrlimit(resource.RLIMIT_FSIZE, (50 * 1024 * 1024, 50 * 1024 * 1024))
     except Exception as e:  # noqa: broad-except
-        log.debug(f"Suppressed: {e}")
+        log.warning(f"[EXEC] Failed to set resource limits — sandbox degraded: {e}")
 
 
 _MAX_STDOUT = 50 * 1024    # 50 KB shown to LLM
 _MAX_READ   = 5 * 1024 * 1024  # 5 MB hard read cap — avoids OOM on runaway output
 
 
+_READ_CHUNK = 64 * 1024  # 64 KB per incremental read
+
+
 def _run_capped(run_args: dict, timeout: int, extra_kwargs: dict) -> "tuple[str, str, int]":
     """Run subprocess with a hard stdout/stderr read cap to prevent OOM.
 
+    Uses threaded incremental reading instead of communicate() so that the
+    process is KILLED as soon as either stream exceeds _MAX_READ bytes — the
+    excess is never buffered.  This is a true read-cap, not post-hoc truncation.
+
     Returns (stdout_text, stderr_text, returncode).
-    subprocess.run(capture_output=True) reads ALL output before returning;
-    this wrapper uses Popen so we can stop after _MAX_READ bytes.
     """
+    import threading
+    import io
+
     proc = subprocess.Popen(
         **run_args,
         stdout=subprocess.PIPE,
@@ -125,20 +141,57 @@ def _run_capped(run_args: dict, timeout: int, extra_kwargs: dict) -> "tuple[str,
         cwd=str(WORKSPACE_DIR),
         **extra_kwargs,
     )
+
+    stdout_buf = io.BytesIO()
+    stderr_buf = io.BytesIO()
+    stdout_capped = [False]
+    stderr_capped = [False]
+
+    def _reader(pipe, buf: io.BytesIO, capped: list) -> None:
+        """Read from pipe into buf up to _MAX_READ; kill proc and flag if exceeded."""
+        total = 0
+        try:
+            while True:
+                chunk = pipe.read(_READ_CHUNK)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > _MAX_READ:
+                    capped[0] = True
+                    proc.kill()
+                    break
+                buf.write(chunk)
+        except OSError:
+            pass
+
+    t_out = threading.Thread(target=_reader, args=(proc.stdout, stdout_buf, stdout_capped), daemon=True)
+    t_err = threading.Thread(target=_reader, args=(proc.stderr, stderr_buf, stderr_capped), daemon=True)
+    t_out.start()
+    t_err.start()
+
     try:
-        # communicate() buffers all output — cap after the fact to limit memory retention.
-        stdout_bytes, stderr_bytes = proc.communicate(timeout=timeout)
-        if len(stdout_bytes) > _MAX_READ:
-            stdout_bytes = stdout_bytes[-_MAX_READ:]  # keep tail (most recent output)
-        if len(stderr_bytes) > _MAX_READ:
-            stderr_bytes = stderr_bytes[-_MAX_READ:]
-        return stdout_bytes.decode("utf-8", errors="replace"), \
-               stderr_bytes.decode("utf-8", errors="replace"), \
-               proc.returncode
+        t_out.join(timeout=timeout)
+        t_err.join(timeout=max(1, timeout // 2))
+        proc.wait(timeout=2)
     except subprocess.TimeoutExpired:
         proc.kill()
-        proc.communicate()
+        try:
+            proc.wait(timeout=3)  # reap zombie
+        except subprocess.TimeoutExpired:
+            pass
+        t_out.join(timeout=2)
+        t_err.join(timeout=2)
         raise
+
+    stdout_bytes = stdout_buf.getvalue()
+    stderr_bytes = stderr_buf.getvalue()
+
+    cap_notice = b"\n...[output capped at 5 MB - process killed]" if stdout_capped[0] else b""
+    return (
+        (stdout_bytes + cap_notice).decode("utf-8", errors="replace"),
+        stderr_bytes.decode("utf-8", errors="replace") + ("\n[stderr capped]" if stderr_capped[0] else ""),
+        proc.returncode if proc.returncode is not None else -1,
+    )
 
 
 def _format_exec_output(result) -> str:
@@ -174,9 +227,6 @@ def handle_exec(args: dict) -> str:
     yield_ms = args.get("yieldMs", 0)
     notify_on_exit = args.get("notifyOnExit", False)
     env = args.get("env", None)
-
-    # Git safe override: inject --no-verify / core.hooksPath=/dev/null before safety check
-    cmd = apply_git_safe_overrides(cmd)
 
     # Basic safety check
     safe, reason = _is_safe_command(cmd)
@@ -301,6 +351,28 @@ def _ast_validate(code: str) -> str | None:
             "code",
             "codeop",
             "compileall",
+            # AST bypass vectors — absent from original list (reported in code review)
+            "pickle",       # arbitrary code exec via __reduce__
+            "marshal",      # bytecode deserialization
+            "builtins",     # __import__, exec, eval re-access
+            "gc",           # gc.get_objects() → traverse all live objects
+            "types",        # types.CodeType → construct arbitrary code objects
+            "dis",          # bytecode inspection / manipulation
+            "inspect",      # inspect.currentframe() → escape sandbox via frames
+            "ast",          # metaprogramming / AST manipulation
+            "tokenize",     # source-level analysis bypass
+            "linecache",    # arbitrary file read via frame trickery
+            "traceback",    # frame inspection
+            "copyreg",      # pickle extension bypass
+            "_io",          # raw I/O bypass
+            "io",           # file I/O
+            "tempfile",     # write to temp files
+            "glob",         # filesystem enumeration
+            "fnmatch",      # filesystem enumeration
+            "zipfile",      # archive read/write
+            "tarfile",      # archive read/write
+            "zipimport",    # import from zip → code exec
+            "pkg_resources",# arbitrary package import
         }
     )
     try:
@@ -356,22 +428,11 @@ def _ast_validate(code: str) -> str | None:
 
 @register("python_eval")
 def handle_python_eval(args: dict) -> str:
-    """Execute Python code with multi-layer sandboxing.
+    """Handle python eval. Disabled by default — enable with SALMALM_PYTHON_EVAL=1."""
+    import os as _os
 
-    Sandbox architecture:
-      1. AST validation — blocks dangerous builtins, imports, dunder access
-      2. String blocklist — defense-in-depth for patterns AST misses
-      3. Subprocess isolation — runs in a child process, not the main process
-      4. Resource limits — CPU/AS/NOFILE/FSIZE capped via RLIMIT
-
-    ⚠️  SECURITY NOTICE: This sandbox does NOT provide hard isolation.
-    A sufficiently motivated attacker can bypass AST + blocklist checks in
-    CPython (e.g., via codec manipulation, C extension loading, etc.).
-    The real protection is SALMALM_PYTHON_EVAL=0 (default).
-    For genuine isolation, run in nsjail/bubblewrap or a separate VM.
-    """
-    if os.environ.get("SALMALM_PYTHON_EVAL", "0") != "1":
-        return "⚠️ python_eval is disabled. Set SALMALM_PYTHON_EVAL=1 to enable."
+    if _os.environ.get("SALMALM_PYTHON_EVAL", "0") != "1":
+        return "⚠️ python_eval is disabled by default for security. Enable with SALMALM_PYTHON_EVAL=1"
     code = args.get("code", "")
     timeout_sec = min(args.get("timeout", 15), 30)
 
@@ -381,8 +442,6 @@ def handle_python_eval(args: dict) -> str:
         return f"Security blocked: {ast_err}"
 
     # Secondary: string blocklist
-    # NOTE: AST validation is the primary gate; this list is defense-in-depth.
-    # It does NOT fully sandbox CPython — SALMALM_PYTHON_EVAL=0 is the real defense.
     _EVAL_BLOCKLIST = [
         "import os",
         "import sys",
@@ -422,22 +481,36 @@ def handle_python_eval(args: dict) -> str:
         "__subclasses__",
         "__bases__",
         "__mro__",
+        "__reduce__",
+        "__reduce_ex__",
+        "__code__",
+        "__globals__",
+        "__builtins__",
         "importlib",
         "ctypes",
         "signal",
-        # Modules with known arbitrary-code-execution gadgets
+        # AST bypass vectors (added in code review)
         "import pickle",
-        "import builtins",     # direct access to all builtins bypasses AST blocks
-        "import gc",           # gc.get_objects() exposes live Python objects
-        "import types",        # FunctionType(code_obj, globals) → exec arbitrary bytecode
-        "import dis",          # bytecode inspection / manipulation
-        "import marshal",      # load serialised code objects
-        "import inspect",      # inspect.currentframe().f_globals exposes globals
-        "import zipimport",    # load code from zip archives
-        "import importlib",    # duplicate of importlib entry, kept for coverage
-        "import ast",          # can compile+eval arbitrary code objects
-        "import tokenize",     # read source files
-        "import linecache",    # reads source files by line
+        "import marshal",
+        "import gc",
+        "import types",
+        "import dis",
+        "import inspect",
+        "import ast",
+        "import io",
+        "import tempfile",
+        "gc.get_objects",
+        "gc.get_referrers",
+        "types.CodeType",
+        "types.FunctionType",
+        "marshal.loads",
+        "marshal.dumps",
+        "pickle.loads",
+        "pickle.dumps",
+        "inspect.currentframe",
+        "inspect.stack",
+        "dis.dis",
+        "dis.get_instructions",
         # Secret exfiltration prevention
         "salmalm.security",
         "from salmalm",
@@ -459,13 +532,7 @@ def handle_python_eval(args: dict) -> str:
         "auth.json",
         "credentials.json",
     ]
-    # Normalise whitespace for pattern matching — strip ALL Unicode whitespace
-    # (NBSP, ZWSP, etc.) to prevent bypass via e.g. "import\u00a0pickle"
-    import unicodedata as _ucd
-    code_lower = "".join(
-        c for c in code.lower()
-        if not (_ucd.category(c).startswith("Z") or c in " \t\n\r\x0b\x0c\u200b\u200c\u200d\u2060\ufeff")
-    )
+    code_lower = code.lower().replace(" ", "").replace("\t", "")
     for blocked in _EVAL_BLOCKLIST:
         if blocked.lower().replace(" ", "") in code_lower:
             return f"Security blocked: `{blocked}` not allowed."
@@ -487,7 +554,8 @@ def handle_python_eval(args: dict) -> str:
             if dd in code.lower():
                 return f"Security blocked: `{dd}` not allowed."
     wrapper = f"""
-import json, math, re, statistics, collections, itertools, functools, datetime, hashlib, base64, random, string, textwrap, csv, io
+import json, math, re, statistics, collections, itertools, functools, datetime, hashlib, base64, random, string, textwrap, csv
+# io intentionally excluded — io.FileIO/BufferedReader enables sandbox escape
 _result = None
 try:
     exec({repr(code)})

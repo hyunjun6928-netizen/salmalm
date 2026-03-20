@@ -1,16 +1,14 @@
 """Misc tools: reminder, workflow, file_index, notification, weather, rss_reader."""
 
 import json
-import os
 import re
-import tempfile
 import time
 import secrets
 import threading
 import subprocess
 import sys
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from salmalm.tools.tool_registry import register
 from salmalm.constants import WORKSPACE_DIR
@@ -21,7 +19,7 @@ from salmalm.security.crypto import vault, log
 # ── Reminder System ──────────────────────────────────────────
 
 _reminders: list = []
-_reminder_lock = threading.RLock()  # RLock: reentrant — _ensure_reminder_thread holds it while calling _load_reminders
+_reminder_lock = threading.RLock()  # RLock: _load_reminders may be called while lock held
 _reminder_thread_started = False
 
 
@@ -79,7 +77,7 @@ def _parse_en_time(m_en) -> tuple:
 
 def _parse_relative_time(s: str) -> datetime:
     """Parse time string into datetime."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now()
     s_stripped = s.strip().lower()
 
     m = re.match(r"^(\d+)\s*(m|min|h|hr|hour|d|day|w|week)s?$", s_stripped)
@@ -148,44 +146,36 @@ def _reminders_file() -> Path:
 
 
 def _load_reminders():
-    """Load reminders from disk into _reminders in-place.
-
-    Mutates the list (clear + extend) instead of rebinding the global.
-    This preserves all external references to _reminders obtained via
-    ``from salmalm.tools.tools_misc import _reminders`` (e.g. from
-    tool_handlers re-export or tests).  Rebinding with ``global _reminders
-    = ...`` would silently leave all importers pointing at the old empty list.
-    """
+    """Load reminders from disk — in-place mutation to preserve module-level references."""
     fp = _reminders_file()
-    with _reminder_lock:
-        _reminders.clear()
-        if fp.exists():
-            try:
-                loaded = json.loads(fp.read_text(encoding="utf-8"))
-                if isinstance(loaded, list):
-                    _reminders.extend(loaded)
-            except Exception as e:  # noqa: broad-except
-                pass  # Leave _reminders empty on corrupt file
+    loaded: list = []
+    if fp.exists():
+        try:
+            loaded = json.loads(fp.read_text(encoding="utf-8"))
+            if not isinstance(loaded, list):
+                loaded = []
+        except Exception:
+            loaded = []
+    _reminders.clear()
+    _reminders.extend(loaded)
 
 
 def _save_reminders():
-    """Save reminders atomically (tempfile + fsync + rename)."""
+    """Atomic save — write to temp file then replace (prevents corrupt state on crash)."""
+    import tempfile, os as _os
     fp = _reminders_file()
-    fp.parent.mkdir(parents=True, exist_ok=True)
     data = json.dumps(_reminders, ensure_ascii=False, indent=2, default=str).encode("utf-8")
-    tmp_fd, tmp_path = tempfile.mkstemp(dir=fp.parent, suffix=".tmp")
     try:
-        with os.fdopen(tmp_fd, "wb") as f:
-            f.write(data)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_path, fp)
-    except Exception as _e:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        log.warning("[REMINDER] Failed to save reminders: %s", _e)
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=fp.parent, prefix=".reminders_", suffix=".tmp", delete=False
+        ) as tmp:
+            tmp.write(data)
+            tmp.flush()
+            _os.fsync(tmp.fileno())
+            tmp_path = tmp.name
+        _os.replace(tmp_path, fp)
+    except Exception as e:
+        log.warning(f"[REMINDERS] Save failed: {e}")
 
 
 def _send_notification_impl(
@@ -203,17 +193,13 @@ def _send_notification_impl(
                 owner = vault.get("telegram_owner_id") or ""
                 if owner:
                     text = f"🔔 {title}\n{message}" if title else f"🔔 {message}"
-                    _tg_bot_token = vault.get("telegram_bot_token")
-                    if not _tg_bot_token:
-                        results.append("telegram: ❌ bot token not configured")
-                    else:
-                        tg_url = f"https://api.telegram.org/bot{_tg_bot_token}/sendMessage"
-                        body = json.dumps({"chat_id": owner, "text": text}).encode()
-                        req = urllib.request.Request(
-                            tg_url, data=body, headers={"Content-Type": "application/json"}, method="POST"
-                        )
-                        urllib.request.urlopen(req, timeout=10)
-                        results.append("telegram: ✅")
+                    tg_url = f"https://api.telegram.org/bot{vault.get('telegram_bot_token')}/sendMessage"
+                    body = json.dumps({"chat_id": owner, "text": text}).encode()
+                    req = urllib.request.Request(
+                        tg_url, data=body, headers={"Content-Type": "application/json"}, method="POST"
+                    )
+                    urllib.request.urlopen(req, timeout=10)
+                    results.append("telegram: ✅")
                 else:
                     results.append("telegram: ⚠️ no owner_id")
             else:
@@ -224,8 +210,11 @@ def _send_notification_impl(
     if channel in ("desktop", "all"):
         try:
             if sys.platform == "darwin":
+                # Escape quotes to prevent AppleScript injection
+                safe_msg = message.replace("\\", "\\\\").replace('"', '\\"')
+                safe_title = (title or "SalmAlm").replace("\\", "\\\\").replace('"', '\\"')
                 subprocess.run(
-                    ["osascript", "-e", f'display notification "{message}" with title "{title or "SalmAlm"}"'],
+                    ["osascript", "-e", f'display notification "{safe_msg}" with title "{safe_title}"'],
                     timeout=5,
                     capture_output=True,
                 )
@@ -234,11 +223,14 @@ def _send_notification_impl(
                 subprocess.run(["notify-send", title or "SalmAlm", message], timeout=5, capture_output=True)
                 results.append("desktop: ✅")
             elif sys.platform == "win32":
+                # Escape PowerShell string injection
+                ps_title = (title or "SalmAlm").replace('"', '`"').replace("'", "`'")
+                ps_msg = message.replace('"', '`"').replace("'", "`'")
                 ps_cmd = f'''
                 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
                 $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
-                $template.GetElementsByTagName("text")[0].AppendChild($template.CreateTextNode("{title or "SalmAlm"}")) | Out-Null
-                $template.GetElementsByTagName("text")[1].AppendChild($template.CreateTextNode("{message}")) | Out-Null
+                $template.GetElementsByTagName("text")[0].AppendChild($template.CreateTextNode("{ps_title}")) | Out-Null
+                $template.GetElementsByTagName("text")[1].AppendChild($template.CreateTextNode("{ps_msg}")) | Out-Null
                 $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
                 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("SalmAlm").Show($toast)
                 '''
@@ -253,12 +245,17 @@ def _send_notification_impl(
 
     if channel == "webhook" and url:
         try:
+            from salmalm.tools.tools_common import _is_private_url_follow_redirects
+            blocked, reason, _ = _is_private_url_follow_redirects(url)
+            if blocked:
+                results.append(f"webhook: ❌ Blocked (SSRF): {reason}")
+                return "\n".join(results) if results else "⚠️ Blocked"
             body = json.dumps(
                 {
                     "title": title or "SalmAlm",
                     "message": message,
                     "priority": priority,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now().isoformat(),
                 }
             ).encode()
             req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
@@ -274,7 +271,7 @@ def _reminder_check_loop():
     """Reminder check loop."""
     while True:
         time.sleep(30)
-        now = datetime.now(timezone.utc)
+        now = datetime.now()
         with _reminder_lock:
             due = []
             remaining = []
@@ -310,13 +307,9 @@ def _reminder_check_loop():
 
 
 def _ensure_reminder_thread():
-    """Ensure reminder thread starts exactly once (thread-safe double-check)."""
+    """Ensure reminder thread."""
     global _reminder_thread_started
-    if _reminder_thread_started:
-        return
-    with _reminder_lock:
-        if _reminder_thread_started:
-            return
+    if not _reminder_thread_started:
         _reminder_thread_started = True
         _load_reminders()
         t = threading.Thread(target=_reminder_check_loop, daemon=True)
@@ -340,7 +333,7 @@ def handle_reminder(args: dict) -> str:
             "message": message,
             "time": trigger_time.isoformat(),
             "repeat": args.get("repeat"),
-            "created": datetime.now(timezone.utc).isoformat(),
+            "created": datetime.now().isoformat(),
         }
         with _reminder_lock:
             _reminders.append(reminder)
@@ -417,7 +410,7 @@ def handle_workflow(args: dict) -> str:
         if not name or not steps:
             return "❌ name and steps are required for save"
         wf = _load_workflows()
-        wf[name] = {"steps": steps, "created": datetime.now(timezone.utc).isoformat()}
+        wf[name] = {"steps": steps, "created": datetime.now().isoformat()}
         _save_workflows(wf)
         return f"🔄 Workflow saved: **{name}** ({len(steps)} steps)"
 
@@ -472,7 +465,15 @@ def handle_file_index(args: dict) -> str:
     action = args.get("action", "search")
 
     if action == "index" or action == "status":
-        target_dir = Path(args.get("path", str(WORKSPACE_DIR)))
+        target_dir = Path(args.get("path", str(WORKSPACE_DIR))).resolve()
+        workspace = Path(WORKSPACE_DIR).resolve()
+        try:
+            target_dir.relative_to(workspace)
+        except ValueError:
+            try:
+                target_dir.relative_to(Path.home())
+            except ValueError:
+                return "❌ Access denied: path outside allowed directories"
         if not target_dir.exists():
             return f"❌ Directory not found: {target_dir}"
         exts = args.get("extensions", "py,md,txt,json,yaml,yml,toml,cfg,ini,sh,bat,js,ts,html,css")
@@ -565,11 +566,77 @@ def handle_weather(args: dict) -> str:
         url = f"https://wttr.in/{loc_encoded}?format=j1&lang={lang}"
 
     req = urllib.request.Request(url, headers={"User-Agent": "curl/7.0", "Accept-Language": lang})
+    data = None
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=5) as resp:
             data = resp.read().decode("utf-8", errors="replace")
-    except Exception as e:
-        return f"❌ Weather fetch failed: {e}"
+    except Exception as _wttr_err:
+        # wttr.in unavailable — fallback to Open-Meteo (no API key required)
+        try:
+            # Korean city → lat/lon table (common cities, avoids geocoding failures with Korean text)
+            _KR_CITIES = {
+                "서울": (37.5665, 126.9780, "서울"), "seoul": (37.5665, 126.9780, "Seoul"),
+                "부산": (35.1796, 129.0756, "부산"), "busan": (35.1796, 129.0756, "Busan"),
+                "인천": (37.4563, 126.7052, "인천"), "incheon": (37.4563, 126.7052, "Incheon"),
+                "대구": (35.8714, 128.6014, "대구"), "대전": (36.3504, 127.3845, "대전"),
+                "광주": (35.1595, 126.8526, "광주"), "울산": (35.5384, 129.3114, "울산"),
+                "수원": (37.2636, 127.0286, "수원"), "용인": (37.2411, 127.1776, "용인"),
+                "성남": (37.4201, 127.1267, "성남"), "안양": (37.3942, 126.9568, "안양"),
+                "안산": (37.3219, 126.8309, "안산"), "고양": (37.6564, 126.8350, "고양"),
+                "의정부": (37.7381, 127.0338, "의정부"), "남양주": (37.6360, 127.2165, "남양주"),
+                "화성": (37.1995, 126.8312, "화성"), "평택": (36.9921, 127.1126, "평택"),
+                "제주": (33.4996, 126.5312, "제주"), "수지": (37.3220, 127.0972, "수지(용인)"),
+                "분당": (37.3825, 127.1194, "분당(성남)"), "판교": (37.3952, 127.1101, "판교(성남)"),
+                "세종": (36.4800, 127.2890, "세종"),
+            }
+            _res = []
+            _loc_lower = location.lower().replace("시", "").replace("구", "").replace("동", "").replace("군", "").replace("읍", "").strip()
+            # Try known cities first
+            for _ckey, (_clat, _clon, _cname) in _KR_CITIES.items():
+                if _ckey in location or _ckey in _loc_lower:
+                    _res = [{"latitude": _clat, "longitude": _clon, "name": _cname, "country_code": "KR"}]
+                    break
+            # Fallback: Open-Meteo geocoding with ASCII tokens
+            if not _res:
+                _ascii_tokens = [t for t in location.replace(",", " ").split() if t.isascii() and len(t) > 2]
+                for _tok in _ascii_tokens:
+                    _tok_enc = urllib.parse.quote(_tok)
+                    _geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={_tok_enc}&count=5&language=ko&format=json"
+                    try:
+                        with urllib.request.urlopen(_geo_url, timeout=5) as _gr:
+                            _gd = json.loads(_gr.read())
+                        _kr = [r for r in _gd.get("results", []) if r.get("country_code") == "KR"]
+                        if _kr:
+                            _res = _kr
+                            break
+                        elif _gd.get("results") and not _res:
+                            _res = _gd["results"]
+                    except Exception:
+                        continue
+            if not _res:
+                return f"❌ 위치를 찾을 수 없소: {location}"
+            _lat, _lon, _city = _res[0]["latitude"], _res[0]["longitude"], _res[0].get("name", location)
+            _murl = (f"https://api.open-meteo.com/v1/forecast?latitude={_lat}&longitude={_lon}"
+                     "&current_weather=true&hourly=relativehumidity_2m,precipitation_probability"
+                     "&forecast_days=1&timezone=Asia/Seoul")
+            with urllib.request.urlopen(_murl, timeout=5) as _mr:
+                _md = json.loads(_mr.read())
+            _cw = _md.get("current_weather", {})
+            _temp = _cw.get("temperature", "?")
+            _wind = _cw.get("windspeed", "?")
+            _wcode = {0:"맑음",1:"대체로 맑음",2:"부분적으로 흐림",3:"흐림",45:"안개",48:"안개",51:"이슬비",53:"이슬비",55:"이슬비",
+                      61:"비",63:"비",65:"비",71:"눈",73:"눈",75:"눈",80:"소나기",81:"소나기",82:"폭우",
+                      95:"뇌우",96:"뇌우",99:"뇌우"}
+            _desc = _wcode.get(int(_cw.get("weathercode", 0)), "알 수 없음")
+            _hourly = _md.get("hourly", {})
+            _humid = _hourly.get("relativehumidity_2m", [None])[0]
+            _precip = _hourly.get("precipitation_probability", [None])[0]
+            lines = [f"🌤️ **{_city}** (Open-Meteo)"]
+            lines.append(f"  🌡️ {_temp}°C | {_desc}")
+            lines.append(f"  💨 풍속 {_wind}km/h" + (f" | 💧 습도 {_humid}%" if _humid else "") + (f" | 🌧️ 강수확률 {_precip}%" if _precip is not None else ""))
+            return "\n".join(lines)
+        except Exception as _om_err:
+            return f"❌ 날씨 조회 실패: wttr.in={_wttr_err}, open-meteo={_om_err}"
 
     if fmt in ("short", "forecast"):
         return f"🌤️ {data.strip()}"
@@ -697,10 +764,15 @@ def _rss_subscribe(args: dict) -> str:
     name = args.get("name", "")
     if not url:
         return "❌ url is required for subscribe"
+    from salmalm.tools.tools_common import _is_private_url_follow_redirects
+
+    blocked, reason, _ = _is_private_url_follow_redirects(url)
+    if blocked:
+        return f"❌ Blocked URL (SSRF protection): {reason}"
     if not name:
         name = url.split("/")[2] if "/" in url else url[:30]
     feeds = _load_feeds()
-    feeds[name] = {"url": url, "added": datetime.now(timezone.utc).isoformat()}
+    feeds[name] = {"url": url, "added": datetime.now().isoformat()}
     _save_feeds(feeds)
     return f"📰 Subscribed: **{name}** ({url})"
 
@@ -729,14 +801,10 @@ def _rss_fetch(args: dict) -> str:
     count = args.get("count", 5)
     if not url:
         return _rss_fetch_all_feeds(count)
-    # SSRF guard: reject private/loopback/metadata URLs
-    try:
-        from salmalm.tools.tools_common import _is_private_url_follow_redirects
-        _blocked, _reason, url = _is_private_url_follow_redirects(url)
-        if _blocked:
-            return f"❌ RSS fetch blocked: {_reason}"
-    except Exception:
-        pass
+    from salmalm.tools.tools_common import _is_private_url_follow_redirects
+    blocked, reason, _ = _is_private_url_follow_redirects(url)
+    if blocked:
+        return f"❌ Blocked URL (SSRF protection): {reason}"
     req = urllib.request.Request(url, headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -751,13 +819,20 @@ def _rss_fetch(args: dict) -> str:
 
 def _rss_fetch_all_feeds(count: int) -> str:
     """Fetch articles from all subscribed feeds."""
+    from salmalm.tools.tools_common import _is_private_url_follow_redirects
+
     feeds = _load_feeds()
     if not feeds:
         return "❌ No URL provided and no subscribed feeds."
     all_articles = []
     for name, info in feeds.items():
         try:
-            req = urllib.request.Request(info["url"], headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
+            feed_url = info.get("url", "")
+            blocked, reason, _ = _is_private_url_follow_redirects(feed_url)
+            if blocked:
+                log.warning(f"[RSS] Blocked subscribed feed '{name}': {reason}")
+                continue
+            req = urllib.request.Request(feed_url, headers={"User-Agent": "SalmAlm/1.0 RSS Reader"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 xml = resp.read().decode("utf-8", errors="replace")
             articles = _parse_rss(xml)

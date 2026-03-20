@@ -5,7 +5,7 @@
   input.focus();
 
   /* --- Restore model preference from server --- */
-  fetch('/api/status?session='+encodeURIComponent(_currentSession)).then(r=>r.json()).then(d=>{
+  fetch('/api/status?session='+encodeURIComponent(_currentSession),{headers:{'X-Session-Token':_tok}}).then(r=>r.json()).then(d=>{
     if(d.model&&d.model!=='auto'){
       _isAutoRouting=false;
       var sel=document.getElementById('s-model');

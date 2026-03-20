@@ -345,9 +345,11 @@ class MessageQueue:
         self._lock = threading.Lock()
         self._cleanup_ts = 0.0
 
-        mc = self._config.get("maxConcurrent", DEFAULT_CONFIG["maxConcurrent"])
-        self._main_sem = asyncio.Semaphore(mc.get("main", 4))
-        self._subagent_sem = asyncio.Semaphore(mc.get("subagent", 8))
+        # Defer semaphore creation until first use inside the running event loop.
+        # Creating asyncio.Semaphore at import time binds to whatever loop
+        # happens to exist then, causing "attached to a different loop" errors.
+        self._main_sem: Optional[asyncio.Semaphore] = None
+        self._subagent_sem: Optional[asyncio.Semaphore] = None
 
     @property
     def config(self) -> dict:
@@ -358,8 +360,16 @@ class MessageQueue:
         """Reload config."""
         self._config = load_config()
 
+    def _ensure_semaphores(self) -> None:
+        """Lazily create semaphores inside the running event loop."""
+        if self._main_sem is None:
+            mc = self._config.get("maxConcurrent", DEFAULT_CONFIG["maxConcurrent"])
+            self._main_sem = asyncio.Semaphore(mc.get("main", 4))
+            self._subagent_sem = asyncio.Semaphore(mc.get("subagent", 8))
+
     def _get_semaphore(self, session_id: str) -> asyncio.Semaphore:
         """Get semaphore."""
+        self._ensure_semaphores()
         if "subagent" in session_id:
             return self._subagent_sem
         return self._main_sem
@@ -493,11 +503,13 @@ class MessageQueue:
     @property
     def main_semaphore(self) -> asyncio.Semaphore:
         """Main semaphore."""
+        self._ensure_semaphores()
         return self._main_sem
 
     @property
     def subagent_semaphore(self) -> asyncio.Semaphore:
         """Subagent semaphore."""
+        self._ensure_semaphores()
         return self._subagent_sem
 
 

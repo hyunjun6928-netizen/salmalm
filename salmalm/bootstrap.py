@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import http.server
-import logging
 import os
 import signal
 import sys
 import threading
 import time
-
-log = logging.getLogger(__name__)
 
 from salmalm.constants import (  # noqa: F401
     VERSION,
@@ -26,6 +23,7 @@ from salmalm.core import (  # noqa: F401
     _init_audit_db,
     _restore_usage,
     audit_log,
+    _sessions,
     cron,
     LLMCronManager,
     PluginLoader,
@@ -39,23 +37,11 @@ from salmalm.nodes import node_manager
 from salmalm.stability import health_monitor
 import salmalm.core as _core
 
-
-_UPDATE_CHECK_INTERVAL = 86400  # 24h — avoid blocking startup on every run
-_update_cache: dict = {}  # {"ts": float, "msg": str}
+_main_loop: asyncio.AbstractEventLoop | None = None
 
 
 def _check_for_updates() -> str:
-    """Check PyPI for newer version. Returns update message or empty string.
-
-    Result is cached for 24h so offline environments don't pay the 5s timeout
-    on every restart.
-    """
-    import time as _t
-    now = _t.time()
-    if _update_cache and now - _update_cache.get("ts", 0) < _UPDATE_CHECK_INTERVAL:
-        return _update_cache.get("msg", "")
-
-    msg = ""
+    """Check PyPI for newer version. Returns update message or empty string."""
     try:
         from salmalm.utils.http import request_json as _rj
 
@@ -67,24 +53,19 @@ def _check_for_updates() -> str:
         latest = data.get("info", {}).get("version", "")
 
         def _ver_tuple(v) -> tuple:
-            """Ver tuple — handles 1.2.3, 1.2.3.post1, 1.2.3a1 etc."""
-            import re as _re_ver
-            return tuple(int(x) for x in _re_ver.findall(r"\d+", v.split("+")[0]))
+            """Ver tuple."""
+            return tuple(int(x) for x in v.split("."))
 
         if latest and _ver_tuple(latest) > _ver_tuple(VERSION):
             if getattr(sys, "frozen", False):
-                msg = (
+                return (
                     f"⬆️  New version {latest} available!\n"
                     f"   Download: https://github.com/hyunjun6928-netizen/salmalm/releases/latest"
                 )
-            else:
-                msg = f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
+            return f"⬆️  New version {latest} found! Upgrade: pip install --upgrade salmalm"
     except (OSError, ValueError, KeyError, ImportError):
         pass  # network/parse errors — silently skip
-
-    _update_cache["ts"] = now
-    _update_cache["msg"] = msg
-    return msg
+    return ""
 
 
 async def _start_telegram_bot() -> None:
@@ -130,9 +111,9 @@ async def _start_discord_bot() -> None:
                 _channel_id = raw_data.get("channel_id", "")
                 _session_id = f"discord_{_channel_id}"
                 _start = time.time()
-                from salmalm.core.engine import process_message
+                from salmalm.core.engine_pipeline import process_message
 
-                response = await process_message(_session_id, content, on_token=on_token)
+                response = await asyncio.wait_for(process_message(_session_id, content, on_token=on_token), timeout=300)
                 _elapsed = time.time() - _start
                 return f"{response}\n\n⏱️ {_elapsed:.1f}s" if response else None
 
@@ -143,7 +124,7 @@ async def _start_discord_bot() -> None:
             log.warning(f"[DISCORD] Failed to start: {e}")
 
 
-def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=None):
+def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=18801):
     """Print startup banner (deferred to run_server call)."""
     # RAG stats available but not displayed in banner (intentional)
     st = f"{selftest['passed']}/{selftest['total']}" if selftest else "skipped"
@@ -152,7 +133,7 @@ def _print_banner(selftest=None, bind_addr="127.0.0.1", port=18800, ws_port=None
     _lines = [
         f"😈 {APP_NAME} v{VERSION}",
         f"Web UI:    http://{bind_addr}:{port}",
-        f"WebSocket: ws://{bind_addr}:{port}/ws",
+        f"WebSocket: ws://{bind_addr}:{ws_port}",
         f"Vault:     {'🔓 Unlocked' if vault.is_unlocked else '🔒 Locked — open Web UI'}",
         f"Crypto:    {'AES-256-GCM' if HAS_CRYPTO else ('HMAC-CTR (fallback)' if os.environ.get('SALMALM_VAULT_FALLBACK') else 'Vault disabled')}",
         f"Self-test: {st}",
@@ -194,7 +175,7 @@ def _auto_unlock_vault() -> None:
         _refresh_vault_backup()
         return
     # 3. Try env var (deprecated)
-    vault_pw = os.environ.get("SALMALM_VAULT_PW")
+    vault_pw = os.environ.pop("SALMALM_VAULT_PW", None)  # read once + scrub from env
     if vault_pw and vault.unlock(vault_pw, save_to_keychain=True):
         log.info("[UNLOCK] Vault auto-unlocked from env")
         _refresh_vault_backup()
@@ -261,23 +242,31 @@ def _refresh_vault_backup() -> None:
 
 
 def _try_vault_auto_file() -> None:
-    """Try unlocking vault from .vault_auto file."""
+    """Try unlocking vault from .vault_auto file.
+
+    Supports two formats:
+    - Empty file: no-password vault, unlock with empty string
+    - Non-empty file: plain-text password on first line (legacy/convenience mode)
+
+    Security note: storing passwords in plain text is a local convenience for
+    single-user workstations.  Use SALMALM_VAULT_PASSWORD env var for stricter
+    environments (env var is checked first in _auto_unlock_vault).
+    """
     try:
         _pw_hint_file = VAULT_FILE.parent / ".vault_auto"
         if not _pw_hint_file.exists():
             return
         _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
         if _hint:
-            import base64 as _b64
-
-            try:
-                _auto_pw = _b64.b64decode(_hint).decode()
-            except Exception:
-                _auto_pw = _hint  # Plain text fallback
-        else:
-            _auto_pw = ""
-        if vault.unlock(_auto_pw, save_to_keychain=True):
-            log.info("[UNLOCK] Vault auto-unlocked from .vault_auto")
+            # Plain-text password stored in file — use it directly
+            if vault.unlock(_hint, save_to_keychain=True):
+                log.info("[UNLOCK] Vault auto-unlocked via .vault_auto")
+            else:
+                log.warning("[UNLOCK] .vault_auto password incorrect — vault remains locked")
+            return
+        # Empty file = no-password vault
+        if vault.unlock("", save_to_keychain=True):
+            log.info("[UNLOCK] Vault auto-unlocked (no-password vault)")
     except (OSError, ValueError, ImportError) as _e:
         log.warning(f"[UNLOCK] .vault_auto read failed: {_e}")
 
@@ -415,7 +404,7 @@ async def _handle_ws_msg(client, data: dict) -> None:
         await client.send_json({"type": "typing", "status": status_type, "detail": detail})
 
     try:
-        from salmalm.core.engine import process_message
+        from salmalm.core.engine_pipeline import process_message
         from salmalm.core import get_session as _gs_ws
 
         image_data = (image_b64, image_mime) if image_b64 else None
@@ -423,29 +412,111 @@ async def _handle_ws_msg(client, data: dict) -> None:
         _model_ov_ws = getattr(_sess_ws, "model_override", None)
         if _model_ov_ws == "auto":
             _model_ov_ws = None
-        response = await process_message(
-            session_id,
-            text or "",
-            image_data=image_data,
-            model_override=_model_ov_ws,
-            on_tool=on_tool,
-            on_status=on_status,
+        response = await asyncio.wait_for(
+            process_message(
+                session_id,
+                text or "",
+                image_data=image_data,
+                model_override=_model_ov_ws,
+                on_tool=on_tool,
+                on_status=on_status,
+            ),
+            timeout=300,
         )
         await stream.send_done(response)
+    except asyncio.TimeoutError:
+        await stream.send_error("⚠️ 응답 시간 초과 (300s)")
     except Exception as e:
         await stream.send_error(str(e)[:200])
 
 
-async def _setup_services(host: str, port: int, _httpd, server_thread, url: str) -> None:
-    """Setup vault, channels, background services (phases 5-12)."""
-    _auto_unlock_vault()
+def _register_usage_hooks() -> None:
+    """Register all cross-layer hooks to keep core/ free of reverse imports.
+
+    Called once at startup from _setup_services().
+    Hooks wired here:
+    - usage_hook: per-user cost + daily quota tracking
+    - usage_detail_hook: usage_tracker.record() for dashboard charts
+    - abort_hook: abort_controller.is_aborted()/get_partial()/clear()
+    - ws_notify_hook: ws_server.broadcast() for cron/event notifications
+    """
+    from salmalm.core.core import (
+        register_usage_hook,
+        register_usage_detail_hook,
+        register_abort_hook,
+        register_ws_notify_hook,
+    )
+
+    # ── Usage cost / quota hooks ──────────────────────────────────────────────
+    def _quota_hook(user_id, cost, tokens):
+        if user_id:
+            try:
+                from salmalm.features.users import user_manager
+                user_manager.record_cost(user_id, cost)
+            except Exception:
+                pass
+
+    def _daily_quota_hook(user_id, cost, tokens):
+        try:
+            from salmalm.web.auth import daily_quota as _dq
+            _uid_str = str(user_id) if user_id else "anonymous"
+            _dq.add_usage(_uid_str, tokens)
+        except Exception:
+            pass
+
+    register_usage_hook(_quota_hook)
+    register_usage_hook(_daily_quota_hook)
+
+    # ── Usage detail hook (features.edge_cases.usage_tracker) ────────────────
+    def _usage_detail_hook(session_id, model, inp, out, cost, intent):
+        try:
+            from salmalm.features.edge_cases import usage_tracker
+            usage_tracker.record(session_id, model, inp, out, cost, intent)
+        except Exception:
+            pass
+
+    register_usage_detail_hook(_usage_detail_hook)
+
+    # ── Abort hook (features.edge_cases.abort_controller) ────────────────────
+    def _abort_hook(session_id):
+        try:
+            from salmalm.features.edge_cases import abort_controller
+            if abort_controller.is_aborted(session_id):
+                partial = abort_controller.get_partial(session_id) or ""
+                abort_controller.clear(session_id)
+                return (partial + "\n\n⏹ [생성 중단됨 / Generation aborted]").strip()
+        except Exception:
+            pass
+        return None
+
+    register_abort_hook(_abort_hook)
+
+    # ── WS notify hook (web.ws.ws_server.broadcast) ───────────────────────────
+    def _ws_notify_hook(session_id, event_type, data):
+        try:
+            from salmalm.web.ws import ws_server as _ws
+            payload = {"type": event_type, **data}
+            if session_id:
+                payload["session_id"] = session_id
+            if _main_loop and _main_loop.is_running():
+                asyncio.run_coroutine_threadsafe(_ws.broadcast(payload), _main_loop)
+        except Exception:
+            pass
+
+    register_ws_notify_hook(_ws_notify_hook)
+
+
+async def _setup_services() -> None:
+    """Setup channels and background services (phases 5-12).
+
+    Vault unlock is performed by run_server() before this is called — do not repeat.
+    Parameters removed: host, port, httpd, server_thread, url were all unused.
+    """
+    _register_usage_hooks()
     # ── Phase 6: WebSocket Server ──
-    # SALMALM_WS_PORT is deprecated — WS is now served on the same port as HTTP.
-    _ws_port_legacy = os.environ.get("SALMALM_WS_PORT")
-    if _ws_port_legacy:
-        log.warning("[WS] SALMALM_WS_PORT is deprecated; WebSocket now shares the HTTP port via /ws")
+    ws_port = int(os.environ.get("SALMALM_WS_PORT", 18801))
     try:
-        ws_server.port = port
+        ws_server.port = ws_port
         await ws_server.start()
     except Exception as e:
         log.error(f"WebSocket server failed: {e}")
@@ -469,8 +540,7 @@ async def _setup_services(host: str, port: int, _httpd, server_thread, url: str)
     # ── Phase 8: MCP (Model Context Protocol) ──
     try:
         mcp_manager.load_config()
-        from salmalm.tools.tool_handlers import execute_tool
-        from salmalm.tools.tool_registry import get_all_tools as TOOL_DEFINITIONS
+        from salmalm.tools import TOOL_DEFINITIONS, execute_tool
 
         async def mcp_tool_executor(name: str, args):
             """Mcp tool executor."""
@@ -490,20 +560,15 @@ async def _setup_services(host: str, port: int, _httpd, server_thread, url: str)
 
     cron.add_job("audit_cleanup", 86400, audit_log_cleanup, days=30)
 
-    # Schedule LLM cron tick (every 60s — runs user-defined AI cron jobs)
-    async def _llm_cron_tick_wrapper():
-        try:
-            await llm_cron.tick()
-        except Exception as _e:
-            log.warning(f"[CRON] LLM cron tick error: {_e}")
-
-    cron.add_job("llm_cron_tick", 60, _llm_cron_tick_wrapper)
+    # Schedule LLM cron tick (every 60s — fires user-created cron jobs)
+    cron.add_job("llm_cron_tick", 60, llm_cron.tick)
 
     # ── Phase 10: Self-test, Nodes, Plugins, Cron start ──
     selftest = health_monitor.startup_selftest()
     log.info(f"[SELFTEST] {selftest.get('passed', 0)}/{selftest.get('total', 0)} passed")
     node_manager.load_config()
-    PluginLoader.scan()
+    if os.environ.get("SALMALM_PLUGINS", "0") == "1":
+        PluginLoader.scan()
     asyncio.create_task(cron.run())
 
     # ── Phase 10.5: Auto-detect Ollama ──
@@ -602,7 +667,7 @@ def _start_tunnel(port: int) -> None:
             if m:
                 tunnel_url = m.group(1)
                 print(f"\n  🌐 Tunnel URL: {tunnel_url}")
-                print("  📱 폰에서 이 URL을 열거나, QR 코드를 스캔하세요:\n")
+                print(f"  📱 폰에서 이 URL을 열거나, QR 코드를 스캔하세요:\n")
                 try:
                     _print_qr(tunnel_url)
                 except Exception as e:
@@ -623,6 +688,8 @@ def _start_tunnel(port: int) -> None:
 
 async def run_server():
     """Main async entry point — boot all services."""
+    global _main_loop
+    _main_loop = asyncio.get_running_loop()
     # ── PID file — enables `salmalm stop` without systemd ──
     _pid_path = DATA_DIR / "salmalm.pid"
     try:
@@ -633,6 +700,8 @@ async def run_server():
     # ── Phase 1: Database & Core State ──
     _init_audit_db()
     _restore_usage()
+    # Unlock vault ASAP — before HTTP server starts accepting requests
+    _auto_unlock_vault()
     # Restore sessions from disk so dashboard/status reflect history
     from salmalm.core.session_store import restore_all_sessions_from_disk
     restore_all_sessions_from_disk()
@@ -666,19 +735,10 @@ async def run_server():
             "[WARN] Binding to 0.0.0.0 — server is accessible from LAN. "
             "Set SALMALM_BIND=127.0.0.1 to restrict to localhost."
         )
-        # External exposure safety checks — fail-closed if admin not configured
+        # External exposure safety checks
         from salmalm.web.middleware import check_external_exposure_safety
 
         exposure_warnings = check_external_exposure_safety(bind_addr, WebHandler)
-        _has_critical = any("CRITICAL" in w or "no admin" in w.lower() for w in exposure_warnings)
-        if _has_critical and os.environ.get("SALMALM_EXTERNAL_TOOLS_OK") != "1":
-            for w in exposure_warnings:
-                log.error(w)
-            log.error(
-                "❌ Refusing to start on 0.0.0.0 without admin password. "
-                "Set admin password first, or SALMALM_EXTERNAL_TOOLS_OK=1 to override."
-            )
-            sys.exit(1)
         for w in exposure_warnings:
             log.warning(w)
     url = f"http://{bind_addr}:{port}"
@@ -704,13 +764,6 @@ async def run_server():
         )
         raise SystemExit(1)
 
-    # ── Load persisted engine settings (compaction threshold, tokens, etc.) ──
-    try:
-        from salmalm.web.routes.web_engine import load_engine_settings
-        load_engine_settings()
-    except Exception as _se:
-        log.warning(f"[ENGINE-SETTINGS] Could not load persisted settings: {_se}")
-
     # ── Try uvicorn (ASGI) first; fall back to ThreadingHTTPServer ──────────
     _uvicorn_ok = False
     server = None
@@ -718,7 +771,8 @@ async def run_server():
 
     try:
         import uvicorn
-        from salmalm.web.app import app as asgi_app
+        from salmalm.web.asgi import create_asgi_app
+        asgi_app = create_asgi_app()
         uvicorn_config = uvicorn.Config(
             asgi_app,
             host=bind_addr,
@@ -772,9 +826,10 @@ async def run_server():
     if os.environ.get("SALMALM_TUNNEL", "") == "1":
         _start_tunnel(port)
 
-    await _setup_services(bind_addr, port, server, web_thread, url)
+    await _setup_services()
 
-    _print_banner(bind_addr=bind_addr, port=port)
+    _ws_port = int(os.environ.get("SALMALM_WS_PORT", 18801))
+    _print_banner(bind_addr=bind_addr, port=port, ws_port=_ws_port)
 
     # ── Graceful Shutdown Setup ──
     _trigger_shutdown = asyncio.Event()
@@ -801,7 +856,7 @@ async def run_server():
 
     # === Shutdown Sequence ===
     log.info("[SHUTDOWN] Phase 1: Stop accepting new requests")
-    from salmalm.core.engine import begin_shutdown, wait_for_active_requests
+    from salmalm.core.engine_pipeline import begin_shutdown, wait_for_active_requests
 
     begin_shutdown()
 

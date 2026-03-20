@@ -68,25 +68,12 @@ body{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:260px 1
 .msg-row.assistant .bubble{background:var(--bot-bg);border:1px solid var(--border);border-bottom-left-radius:4px}
 .bubble code{background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;font-size:13px;font-family:'SF Mono',monospace}
 .bubble pre{background:#1e1e2e;padding:12px;border-radius:8px;overflow-x:auto;margin:8px 0;font-size:13px;border:1px solid var(--border);color:#cdd6f4}
-/* ── Legacy tool-block (kept for backward compat) ── */
 .tool-block{margin:4px 0;border-radius:6px;overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 20%,var(--border));font-size:12px}
 .tool-header{padding:6px 10px;background:color-mix(in srgb,var(--accent) 8%,var(--bg2));cursor:pointer;font-size:12px;font-weight:500;list-style:none;display:flex;align-items:center;gap:6px;color:var(--text2)}
 .tool-header::-webkit-details-marker{display:none}
 .tool-header::before{content:'▶';font-size:9px;transition:transform 0.15s;color:var(--accent)}
 details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
 .tool-body{padding:8px 10px;margin:0;font-size:11px;overflow-x:auto;background:var(--bg);border-top:1px solid color-mix(in srgb,var(--accent) 15%,var(--border));max-height:200px;overflow-y:auto;color:var(--text2);line-height:1.4}
-/* ── OpenClaw-style tool cards ── */
-.tool-card{margin:5px 0;border-radius:8px;border:1px solid var(--border);background:var(--bg2);overflow:hidden;font-size:13px}
-.tc-header{display:flex;align-items:center;gap:7px;padding:7px 12px;background:color-mix(in srgb,var(--accent) 6%,var(--bg2))}
-.tc-icon{font-size:14px;line-height:1}
-.tc-label{font-weight:600;color:var(--text);font-size:13px}
-.tc-status{margin-left:auto;font-size:13px;font-weight:700}
-.tc-done{color:#4caf50}
-.tc-pending{color:var(--text2);opacity:.6}
-.tc-preview{padding:4px 12px 4px 33px;font-size:12px;color:var(--text2);font-family:'SF Mono',monospace;white-space:pre-wrap;word-break:break-all;border-top:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
-.tc-result{padding:4px 12px 4px 33px;font-size:11px;color:var(--text2);opacity:.75;white-space:pre-wrap;word-break:break-all}
-.tc-completed{padding:3px 12px 6px 33px;font-size:11px;color:var(--text2);opacity:.55}
-.tc-result-only{opacity:.7}
 .bubble pre code{background:none;padding:0;font-size:13px}
 /* Syntax highlight keywords */
 .bubble pre .kw{color:#c792ea}.bubble pre .str{color:#c3e88d}.bubble pre .num{color:#f78c6c}.bubble pre .cmt{color:#546e7a;font-style:italic}
@@ -803,8 +790,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           <div style="margin-bottom:8px">
             <select id="eng-compaction" style="width:auto;padding:8px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
               <option value="15000">Aggressive (15K)</option>
-              <option value="20000" selected>Balanced (20K) ★</option>
-              <option value="30000">Standard (30K)</option>
+              <option value="30000" selected>Balanced (30K)</option>
               <option value="60000">Relaxed (60K)</option>
               <option value="120000">Maximum (120K)</option>
             </select>
@@ -812,14 +798,12 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           <div style="font-size:12px;color:var(--text2);line-height:1.8">
             <span class="eng-en">Controls when old messages are summarized to free up context space. Lower = more frequent compaction = lower cost per turn but may lose details.<br>
             <b>15K (Aggressive):</b> Compacts often. Best for cost savings. <span style="color:#4ade80">~$0.01/turn avg on Opus</span><br>
-            <b>20K (Balanced ★):</b> Recommended default. Earlier compaction, lower cost. <span style="color:#4ade80">~$0.015/turn avg</span><br>
-            <b>30K (Standard):</b> Previous default. Good middle ground. <span style="color:#facc15">~$0.02/turn avg</span><br>
+            <b>30K (Balanced):</b> Good middle ground. <span style="color:#facc15">~$0.02/turn avg</span><br>
             <b>60K (Relaxed):</b> Keeps more history. <span style="color:#f97316">~$0.04/turn avg</span><br>
             <b>120K (Maximum):</b> Full context retention. Best for long coding sessions. <span style="color:#f87171">~$0.08/turn avg</span></span>
             <span class="eng-kr">이전 메시지를 요약하여 컨텍스트 공간을 확보하는 시점을 제어합니다. 낮을수록 더 자주 압축 = 턴당 비용 절감, 세부사항 손실 가능.<br>
             <b>15K (적극적):</b> 자주 압축. 비용 절감 최적. <span style="color:#4ade80">Opus 기준 턴당 평균 ~$0.01</span><br>
-            <b>20K (균형 ★):</b> 권장 기본값. 더 일찍 압축, 비용 절감. <span style="color:#4ade80">턴당 평균 ~$0.015</span><br>
-            <b>30K (표준):</b> 이전 기본값. <span style="color:#facc15">턴당 평균 ~$0.02</span><br>
+            <b>30K (균형):</b> 적절한 중간값. <span style="color:#facc15">턴당 평균 ~$0.02</span><br>
             <b>60K (여유):</b> 더 많은 히스토리 유지. <span style="color:#f97316">턴당 평균 ~$0.04</span><br>
             <b>120K (최대):</b> 전체 컨텍스트 유지. 긴 코딩 세션에 적합. <span style="color:#f87171">턴당 평균 ~$0.08</span></span><br>
             <span style="background:var(--bg);padding:4px 8px;border-radius:6px;border:1px solid var(--border)"><span class="eng-en">🆚 <b>OpenClaw:</b> Auto-compaction <b>ON</b>, threshold fixed internally (~<b>60-120K</b>). Not user-configurable.</span><span class="eng-kr">🆚 <b>오픈클로:</b> 자동 압축 <b>ON</b>, 임계값은 내부 고정 (사용자 조절 불가). 대략 <b>60-120K</b> 수준.</span></span>
@@ -1002,15 +986,15 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
             <b>512 tokens</b> ≈ short paragraph (~380 words) — good for quick answers<br>
             <b>4,096 tokens</b> ≈ ~2 pages of text — good for code and detailed explanations<br>
             <b>16,384 tokens</b> ≈ ~8 pages — for very long outputs<br><br>
-            <b>💬 Chat</b> — Everyday conversations. Recommended: <b>1,024</b>. 512 can cut replies short.<br>
-            <b>💻 Code/Analysis</b> — Programming, analysis, long-form writing. Recommended: <b>4,096+</b>.<br>
+            <b>💬 Chat</b> — Everyday conversations. Lower values save money; raise if replies feel cut off.<br>
+            <b>💻 Code/Analysis</b> — Programming, analysis, long-form writing. Needs more room.<br>
             <b>⚠️ Cost impact:</b> Higher limits don't always cost more (you only pay for tokens actually used), but the AI may write longer than needed.</span>
             <span class="eng-kr">AI 응답의 최대 길이를 제한하오. 1토큰 ≈ 한국어 1~2글자 (영어 0.75단어).<br>
             <b>512 토큰</b> ≈ 짧은 문단 (~250자) — 간단한 답변에 적합<br>
             <b>4,096 토큰</b> ≈ A4 2페이지 분량 — 코드, 상세 설명에 적합<br>
             <b>16,384 토큰</b> ≈ A4 8페이지 — 매우 긴 출력용<br><br>
-            <b>💬 대화</b> — 일상 대화. 권장값 <b>1,024</b>. 512는 답변이 잘리는 경우가 있소.<br>
-            <b>💻 코드/분석</b> — 프로그래밍, 분석, 장문 작성. 권장값 <b>4,096</b> 이상.<br>
+            <b>💬 대화</b> — 일상 대화. 낮은 값이 비용 절감되나, 답변이 잘리면 올릴 것.<br>
+            <b>💻 코드/분석</b> — 프로그래밍, 분석, 장문 작성. 넉넉한 공간 필요.<br>
             <b>⚠️ 비용 영향:</b> 한도를 높인다고 무조건 비싸지진 않소 (실제 사용한 토큰만 과금). 다만 AI가 필요 이상으로 길게 쓸 수 있소.</span>
           </div>
           <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -1280,7 +1264,7 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
   </div>
   <!-- Agents Tab -->
   <div id="settings-agents" style="display:none;padding:16px">
-    <div id="agent-panel-root" style="height:calc(100vh - 200px);min-height:400px;display:flex;flex-direction:column">
+    <div id="agent-panel-root">
       <!-- React AgentPanel mounts here -->
       <div style="color:var(--text2);font-size:13px;padding:20px;text-align:center">Loading agent panel...</div>
     </div>
@@ -1358,15 +1342,25 @@ details.tool-block[open]>.tool-header::before{transform:rotate(90deg)}
           <button type="button" class="btn cron-preset" data-seconds="43200" style="font-size:11px;padding:4px 10px">12h</button>
           <button type="button" class="btn cron-preset" data-seconds="86400" style="font-size:11px;padding:4px 10px">24h</button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-          <div>
-            <label style="font-size:11px;color:var(--text2)" data-i18n="cron-interval">Interval (seconds)</label>
-            <input id="cron-interval" type="number" value="3600" min="60" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:2px">
-          </div>
-          <div>
-            <label style="font-size:11px;color:var(--text2)" data-i18n="cron-at">Run at (optional)</label>
-            <input id="cron-at" type="time" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:2px">
-          </div>
+        <div style="display:flex;gap:16px;margin-top:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600">
+            <input type="radio" name="cron-mode" id="cron-mode-repeat" value="repeat" checked
+              onchange="document.getElementById('cron-repeat-row').style.display='';document.getElementById('cron-at-row').style.display='none'">
+            🔁 반복 실행
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600">
+            <input type="radio" name="cron-mode" id="cron-mode-once" value="once"
+              onchange="document.getElementById('cron-repeat-row').style.display='none';document.getElementById('cron-at-row').style.display=''">
+            🕐 매일 특정 시각 1회
+          </label>
+        </div>
+        <div id="cron-repeat-row" style="margin-top:8px">
+          <label style="font-size:11px;color:var(--text2)">간격 (초 단위, 계속 반복)</label>
+          <input id="cron-interval" type="number" value="3600" min="60" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:2px">
+        </div>
+        <div id="cron-at-row" style="display:none;margin-top:8px">
+          <label style="font-size:11px;color:var(--text2)">실행 시각 (매일 이 시각에 1회)</label>
+          <input id="cron-at" type="time" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-top:2px">
         </div>
       </div>
     </div>

@@ -8,6 +8,7 @@ hard security boundary, this module for the softer approval workflow.
 """
 
 import re
+import sys
 import threading
 import time
 import os
@@ -35,22 +36,20 @@ DANGEROUS_PATTERNS = [
     r"\bkillall\b",
     r"\bnc\s.*-[lLeEp]",  # netcat listen/exec
     r"\bncat\s.*-[lLeEp]",  # ncat variant
-    r"\bcurl\s.*\|\s*(ba)?sh",  # curl | sh
-    r"\bwget\s.*\|\s*(ba)?sh",
+    r"\bcurl\b.+\|.+\b(ba|z|fi|da|c|k)?sh\b",  # curl | sh/bash/zsh/fish/etc
+    r"\bcurl\b.+\|\s*/\S*sh\b",  # curl | /bin/sh, /usr/bin/zsh
+    r"\bwget\b.+\|.+\b(ba|z|fi|da|c|k)?sh\b",
+    r"\bwget\b.+\|\s*/\S*sh\b",
+    r"\bcurl\b.+\|\s*python",  # curl | python
+    r"\bwget\b.+\|\s*python",
     r"\bcurl\s.*\|\s*python",  # curl | python
     r"\bwget\s.*\|\s*python",
-    # Pipe-chain data exfiltration: cat sensitive_file | curl/nc/wget attacker
-    r"(cat|tail|head|grep)\s+.*(passwd|shadow|id_rsa|\.env|secret|token|key)\s*\|",
-    r"\|\s*(curl|wget|nc|ncat|socat)\s+[a-zA-Z0-9]",  # any pipe into network tool
-    r">\s*/proc/",   # write to /proc (kernel interface manipulation)
-    r"\|\s*base64\s*\|\s*(curl|wget)",  # encode + exfiltrate pattern
     r">\s*/dev/[sh]d[a-z]",  # write to raw block device
     r"\bmv\s+.*\s+/dev/null\b",  # mv to /dev/null (data destruction)
 ]
 
 # Env vars that cannot be overridden (binary hijacking prevention)
 BLOCKED_ENV_OVERRIDES = {
-    # Binary hijacking (shared library / dynamic linker)
     "PATH",
     "LD_PRELOAD",
     "LD_LIBRARY_PATH",
@@ -58,14 +57,6 @@ BLOCKED_ENV_OVERRIDES = {
     "DYLD_INSERT_LIBRARIES",
     "DYLD_LIBRARY_PATH",
     "DYLD_FRAMEWORK_PATH",
-    # Python interpreter — import hijacking / startup code injection
-    "PYTHONPATH",          # prepends dirs to sys.path → import attacker-controlled modules
-    "PYTHONSTARTUP",       # executes a file before the interpreter starts
-    "PYTHONHOME",          # overrides Python's standard library location
-    "PYTHONEXECUTABLE",    # changes which Python binary is invoked
-    "PYTHON_PATH",         # non-standard alias used in some environments
-    "PYTHONDONTWRITEBYTECODE",  # minor, but keeps the pattern consistent
-    "PYTHONFAULTHANDLER",  # can dump memory addresses; minimal risk but blocked for safety
 }
 
 
@@ -168,6 +159,13 @@ class BackgroundSession:
         import subprocess
         import shlex
 
+        # Dangerous command pattern check
+        approved, reason, needs_confirm = check_approval(self.command)
+        if not approved and not needs_confirm:
+            self.status = "error"
+            self.stderr_data = f"Blocked: {reason}"
+            return self.session_id
+
         # Env var security check
         if self._env:
             safe, blocked = check_env_override(self._env)
@@ -202,8 +200,18 @@ class BackgroundSession:
                         return
 
                 self.status = "running"
+                def _bg_limits():
+                    """Resource limits for background sessions (same as foreground)."""
+                    try:
+                        import resource
+                        resource.setrlimit(resource.RLIMIT_AS, (1024**3, 1024**3))  # 1 GB RAM cap
+                        resource.setrlimit(resource.RLIMIT_FSIZE, (50 * 1024 * 1024, 50 * 1024 * 1024))
+                    except Exception:
+                        pass
+
+                _extra = {"preexec_fn": _bg_limits} if sys.platform != "win32" else {}
                 proc = subprocess.Popen(
-                    **popen_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=run_env, cwd=str(_ws)
+                    **popen_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=run_env, cwd=str(_ws), **_extra
                 )
                 self.process = proc  # Now kill() can reach it
                 try:

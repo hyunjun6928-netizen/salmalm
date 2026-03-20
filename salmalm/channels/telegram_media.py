@@ -9,8 +9,6 @@ import urllib.request
 from pathlib import Path
 
 from salmalm.security.crypto import vault
-from salmalm.core import audit_log, get_session
-from salmalm.utils.chunker import load_config_from_file, CHANNEL_TELEGRAM
 
 log = logging.getLogger(__name__)
 
@@ -237,7 +235,7 @@ class TelegramMediaMixin:
             pass
 
         _start = time.time()
-        from salmalm.core.engine import process_message
+        from salmalm.core.engine_pipeline import process_message
 
         # Pass session-level model override (same as web_chat.py)
         _model_ov = getattr(_sess_obj, "model_override", None)
@@ -245,14 +243,20 @@ class TelegramMediaMixin:
             _model_ov = None
 
         try:
-            response = await process_message(
-                session_id,
-                text,
-                model_override=_model_ov,
-                image_data=_image_data,
-                on_token=_on_stream_token,
-                on_status=_on_status,
+            response = await asyncio.wait_for(
+                process_message(
+                    session_id,
+                    text,
+                    model_override=_model_ov,
+                    image_data=_image_data,
+                    on_token=_on_stream_token,
+                    on_status=_on_status,
+                ),
+                timeout=300,
             )
+        except asyncio.TimeoutError:
+            log.error("Telegram process_message timeout (300s)")
+            response = "⚠️ 응답 시간 초과"
         except Exception as e:
             log.error(f"Telegram process_message error: {e}")
             response = f"⚠️ 일시적 오류가 발생했습니다. 다시 시도해주세요.\n(Error: {type(e).__name__})"

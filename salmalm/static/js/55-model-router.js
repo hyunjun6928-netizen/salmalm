@@ -21,8 +21,8 @@
       var sel=document.getElementById('s-model');
       if(sel){
         sel.innerHTML='<option value="auto">🔄 Auto Routing</option>';
-        d.providers.forEach(function(p){
-          p.models.forEach(function(m){
+        (d.providers||[]).forEach(function(p){
+          (p.models||[]).forEach(function(m){
             var opt=document.createElement('option');opt.value=m.full;opt.textContent=m.name;
             if(cur===m.full)opt.selected=true;
             sel.appendChild(opt);
@@ -35,7 +35,7 @@
       var kr=_lang==='ko';
       var provIcons={anthropic:'🟣',openai:'🟢',xai:'🔵',google:'🟡',openrouter:'🔷',ollama:'🦙'};
       var h='';
-      d.providers.forEach(function(p){
+      (d.providers||[]).forEach(function(p){
         var icon=provIcons[p.name]||'📦';
         var status=p.available?'<span style="color:var(--green,#4ade80)">●</span>':'<span style="color:var(--red,#f87171)">●</span>';
         h+='<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg)">';
@@ -47,7 +47,7 @@
         var statusText=p.available?(kr?'연결됨':'Connected'):((p.name==='ollama')?(kr?'오프라인':'Offline'):(kr?'키 없음':'No key'));
         h+='<span style="font-size:11px;color:var(--text2);margin-left:auto">'+statusText+'</span>';
         h+='</div>';
-        p.models.forEach(function(m){
+        (p.models||[]).forEach(function(m){
           var isActive=cur&&(cur===m.full||cur===m.name);
           var price=_getPrice(m.full);
           var priceStr=price?'$'+price.i+' / $'+price.o:'';

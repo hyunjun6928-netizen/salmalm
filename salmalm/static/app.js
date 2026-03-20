@@ -7,7 +7,8 @@
     filePrev=document.getElementById('file-preview'),fileIconEl=document.getElementById('file-icon'),
     fileNameEl=document.getElementById('file-name'),fileSizeEl=document.getElementById('file-size'),
     imgPrev=document.getElementById('img-preview'),inputArea=document.getElementById('input-area');
-  let _tok=sessionStorage.getItem('tok')||'',pendingFile=null,pendingFiles=[];
+  let _tok=sessionStorage.getItem('tok')||localStorage.getItem('salm_token')||'',pendingFile=null,pendingFiles=[];
+  if(_tok&&!sessionStorage.getItem('tok'))sessionStorage.setItem('tok',_tok);
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
   var _isAutoRouting=true;
@@ -276,79 +277,28 @@
   /* --- Helpers --- */
   var _copyId=0;
   function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-  /* Tool icon + label mapping (OpenClaw-style) */
-  var _TOOL_META={
-    exec:{icon:'⚡',label:'Exec'},bash:{icon:'⚡',label:'Exec'},shell:{icon:'⚡',label:'Exec'},run:{icon:'⚡',label:'Exec'},
-    edit:{icon:'✏️',label:'Edit'},write:{icon:'✏️',label:'Edit'},file_write:{icon:'✏️',label:'Edit'},
-    read:{icon:'📖',label:'Read'},file_read:{icon:'📖',label:'Read'},
-    web_search:{icon:'🔍',label:'Search'},search:{icon:'🔍',label:'Search'},
-    web_fetch:{icon:'🌐',label:'Fetch'},fetch:{icon:'🌐',label:'Fetch'},
-    browser:{icon:'🖥️',label:'Browser'},
-    image:{icon:'🖼️',label:'Image'},
-    memory_search:{icon:'🧠',label:'Memory'},memory_get:{icon:'🧠',label:'Memory'},
-  };
-  function _toolMeta(name){
-    var m=_TOOL_META[name]||_TOOL_META[name.toLowerCase()];
-    if(m)return m;
-    return {icon:'🔧',label:name.charAt(0).toUpperCase()+name.slice(1).replace(/_/g,' ')};
-  }
-  /* Build a one-liner preview from tool call args */
-  function _toolPreview(callBody){
-    try{
-      var parsed=JSON.parse(callBody.trim());
-      var args=parsed.arguments||parsed;
-      delete args.name;
-      var keys=Object.keys(args);
-      if(!keys.length)return '';
-      // First meaningful string arg, truncated
-      var first=String(args[keys[0]]||'').replace(/\n/g,' ').trim();
-      if(keys.length>1)first+=' (+'+( keys.length-1)+' more)';
-      return first.length>120?first.substring(0,120)+'…':first;
-    }catch(e){
-      var s=callBody.replace(/"?name"?\s*[:=]\s*"[^"]*",?\s*/,'').trim();
-      return s.length>120?s.substring(0,120)+'…':s;
-    }
-  }
-  function _toolCard(name,preview,resultSnippet,done){
-    var m=_toolMeta(name);
-    var status=done
-      ?'<span class="tc-status tc-done">✓</span>'
-      :'<span class="tc-status tc-pending">…</span>';
-    var previewHtml=preview?'<div class="tc-preview">with '+escHtml(preview)+'</div>':'';
-    var resultHtml='';
-    if(done&&resultSnippet){
-      var rs=resultSnippet.trim();
-      if(rs.length>200)rs=rs.substring(0,200)+'…';
-      resultHtml='<div class="tc-result">'+escHtml(rs)+'</div>';
-    }
-    return '<div class="tool-card">'
-      +'<div class="tc-header"><span class="tc-icon">'+m.icon+'</span><span class="tc-label">'+escHtml(m.label)+'</span>'+status+'</div>'
-      +previewHtml
-      +(done?'<div class="tc-completed">Completed</div>':'')
-      +'</div>';
-  }
   function _renderToolBlocks(t){
-    /* Merge consecutive tool_call+tool_result into single card */
+    /* Merge consecutive tool_call+tool_result into single compact block */
     t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>\s*<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,callBody,resultBody){
-      var name=(callBody.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
-      var preview=_toolPreview(callBody);
-      return _toolCard(name,preview,resultBody,true);
+      var name2=(callBody.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
+      var preview2=resultBody.length>300?resultBody.substring(0,300)+'…':resultBody;
+      return '<details class="tool-block"><summary class="tool-header">🔧 <b>'+name2+'</b> <span style="margin-left:auto;font-size:10px;opacity:0.6">✓ done</span></summary><pre class="tool-body">'+preview2.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
     });
-    /* Pending tool_call (no result yet) */
+    /* Remaining unmatched tool_call (no result yet) */
     t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g,function(_,body){
-      var name=(body.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
-      var preview=_toolPreview(body);
-      return _toolCard(name,preview,'',false);
+      var name='tool';var args='';
+      try{var parsed=JSON.parse(body.trim());name=parsed.name||'tool';args=JSON.stringify(parsed.arguments||parsed,null,2)}catch(e){args=body.trim()}
+      if(args.length>200)args=args.substring(0,200)+'…';
+      return '<details class="tool-block"><summary class="tool-header">🔧 <strong>'+name+'</strong> <span style="margin-left:auto;font-size:10px;opacity:0.6">⏳</span></summary><pre class="tool-body">'+args.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
     });
-    /* Orphan tool_result */
     t=t.replace(/<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,body){
-      var preview=body.trim();if(preview.length>200)preview=preview.substring(0,200)+'…';
-      return '<div class="tool-card tc-result-only"><div class="tc-header"><span class="tc-icon">📤</span><span class="tc-label">Result</span></div><div class="tc-preview">'+escHtml(preview)+'</div></div>';
+      var preview=body.trim();if(preview.length>300)preview=preview.substring(0,300)+'...';
+      return '<details class="tool-block"><summary class="tool-header">📤 Result</summary><pre class="tool-body">'+preview.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
     });
     return t;
   }
   function renderMd(t){
-    if(t.startsWith('<img ')||t.startsWith('<audio '))return t;
+    if((t.startsWith('<img ')||t.startsWith('<audio '))&&t.indexOf('/uploads/')!==-1)return t;
     t=_renderToolBlocks(t);
     /* Extract code blocks first, escape everything else, then restore */
     var codeBlocks=[];
@@ -397,8 +347,8 @@
       if(/^(javascript|data|vbscript):/i.test(safeUrl))safeUrl='#blocked';
       return '<a href="'+safeUrl+'" target="_blank" rel="noopener noreferrer" style="color:var(--accent2);text-decoration:underline">'+label+'</a>';
     });
-    t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" data-action="openImage">');
-    t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
+    t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,function(_m,f){var _t=window._tok||sessionStorage.getItem("tok")||localStorage.getItem("salm_token")||"";return '<img src="/uploads/'+f+(_t?'?token='+_t:'')+'" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="'+f+'" data-action="openImage">'});
+    t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,function(_m,f){var _t=window._tok||sessionStorage.getItem("tok")||localStorage.getItem("salm_token")||"";return '<audio controls src="/uploads/'+f+(_t?'?token='+_t:'')+'" style="display:block;margin:8px 0"></audio> 🔊 '+f});
     /* Restore code blocks AFTER all markdown transforms */
     for(var ci=0;ci<codeBlocks.length;ci++){t=t.replace('%%CODEBLOCK'+ci+'%%',codeBlocks[ci])}
     /* Collapse 2+ consecutive blank lines into 1 */
@@ -704,9 +654,11 @@
     var host=location.hostname||'localhost';
     var port=location.port;
     /* Behind nginx (port 80/443/empty): WS through same nginx host */
-    if(!port||port==='80'||port==='443'){return proto+'//'+location.host;}
+    if(!port||port==='80'||port==='443'){var u2=proto+'//'+location.host;var t2=_tok||localStorage.getItem('salm_token')||'';return t2?u2+'?token='+encodeURIComponent(t2):u2;}
     /* Direct access: WS on port 18801 */
-    return proto+'//'+host+':18801';
+    var wsBase=proto+'//'+host+':18801';
+    var t=_tok||localStorage.getItem('salm_token')||'';
+    return t?wsBase+'?token='+encodeURIComponent(t):wsBase;
   }
 
   function _wsConnect(){
@@ -797,11 +749,11 @@
       var _secs=((Date.now()-_wsSendStart)/1000).toFixed(1);
       var _wcIcons={simple:'⚡',moderate:'🔧',complex:'💎'};
       var _wcLabel=data.complexity&&data.complexity!=='auto'&&data.complexity!=='manual'?(_wcIcons[data.complexity]||'')+data.complexity+' → ':'';
-      if(data.complexity==='manual')_isAutoRouting=false;
+      
       var _wmShort=(data.model||'').split('/').pop();
       addMsg('assistant',data.text||'',_wcLabel+_wmShort+' · ⏱️'+_secs+'s');
       if(_wmShort)modelBadge.textContent=_isAutoRouting?'Auto → '+_wmShort:_wmShort;
-      fetch('/api/status').then(function(r){return r.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+      fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r){return r.json()}).then(function(s){if(s&&s.usage)costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
       /* Queue drain: send next queued message */
       if(window._msgQueue&&window._msgQueue.length>0){var _nextMsg=window._msgQueue.shift();setTimeout(function(){var _inp=document.getElementById('input');if(_inp){_inp.value=_nextMsg;window.doSend()}},500)}
       var _sb=document.getElementById('stop-btn');var _sbSend=document.getElementById('send-btn');if(_sb)_sb.style.display='none';if(_sbSend)_sbSend.style.display='flex';
@@ -809,25 +761,7 @@
     }else if(data.type==='error'){
       _wsRequestPending=false;
       if(typingEl)typingEl.remove();
-      /* Convert technical errors to friendly messages */
-      var _rawErr=data.error||'Unknown error';
-      var _friendlyErr=_rawErr;
-      var _eLow=_rawErr.toLowerCase();
-      if(_eLow.indexOf('rate limit')>=0||_eLow.indexOf('429')>=0)
-        _friendlyErr='⏳ 잠깐 너무 많은 요청이 왔어요. 잠시 후 자동으로 다시 시도합니다...';
-      else if(_eLow.indexOf('timeout')>=0||_eLow.indexOf('timed out')>=0)
-        _friendlyErr='⏰ 응답이 조금 오래 걸렸어요. 다시 시도해주세요.';
-      else if(_eLow.indexOf('overloaded')>=0||_eLow.indexOf('529')>=0)
-        _friendlyErr='🏋️ AI 서버가 잠시 바쁩니다. 곧 복구됩니다...';
-      else if(_eLow.indexOf('api key')>=0||_eLow.indexOf('auth')>=0||_eLow.indexOf('401')>=0)
-        _friendlyErr='🔑 API 키 설정을 확인해주세요. (Settings → API Keys)';
-      else if(_eLow.indexOf('unavailable')>=0||_eLow.indexOf('all ai')>=0)
-        _friendlyErr='😓 AI 모델이 일시적으로 점검 중입니다. 잠시 후 다시 시도해주세요.';
-      else if(_eLow.indexOf('context')>=0||_eLow.indexOf('too long')>=0)
-        _friendlyErr='📏 대화가 너무 길어졌어요. /compact 명령으로 정리해보세요.';
-      else
-        _friendlyErr='😅 잠깐 문제가 생겼어요. 다시 시도해주세요.';
-      addMsg('assistant',_friendlyErr);
+      addMsg('assistant','❌ '+data.error);
       var _sb2=document.getElementById('stop-btn');var _sb2Send=document.getElementById('send-btn');if(_sb2)_sb2.style.display='none';if(_sb2Send)_sb2Send.style.display='flex';
       if(_wsPendingResolve){_wsPendingResolve({done:true});_wsPendingResolve=null}
     }else if(data.type==='shutdown'){
@@ -842,6 +776,9 @@
         addMsg('assistant','✅ Updated to v'+(data.version||'?')+'. Restarting...');
         _waitForServerThenReload();
       }
+    }else if(data.type==='cron_result'){
+      /* Cron job completed — show in current chat window regardless of session */
+      addMsg('assistant',data.text||('⏰ Cron: '+(data.job_name||'')),'⏰ cron');
     }
   }
 
@@ -850,12 +787,17 @@
     var typingEl=document.getElementById('typing-row');
     var sid=window._currentSession||'web';
     var _pollCount=0;
+    /* Record timestamp at the moment of reconnect — only accept responses newer than this */
+    var _recoverStart=_wsSendStart||Date.now();
     function _poll(){
       _pollCount++;
       fetch('/api/sessions/'+encodeURIComponent(sid)+'/last',{headers:{'X-Session-Token':_tok}})
       .then(function(r){return r.json()}).then(function(d){
-        if(d.ok&&d.message&&d.msg_count>_wsRequestMsgCount){
-          /* New response arrived — show it */
+        /* Fix: compare last_active timestamp (ms) against send-start time, not DOM msg count.
+           DOM count vs server count are mismatched (server includes system msgs) causing false positives. */
+        var _lastActive=(d.last_active||0)*1000; /* server returns seconds, convert to ms */
+        if(d.ok&&d.message&&_lastActive>_recoverStart){
+          /* New response arrived after our send — show it */
           if(typingEl)typingEl.remove();
           addMsg('assistant',d.message,'🔄 recovered');
           var _sb=document.getElementById('stop-btn');var _sbS=document.getElementById('send-btn');
@@ -963,16 +905,34 @@
       /* Mark pending so page refresh can recover */
       localStorage.setItem('salm_sse_pending',chatBody.session||'web');
       _currentAbort=new AbortController();
+      /* Show "Waiting..." immediately so user knows request is in-flight (prevents premature stop on long TTFT) */
+      var _earlyTyping=document.getElementById('typing-row');
+      if(_earlyTyping){var _et=_earlyTyping.querySelector('.bubble');if(_et&&!_et._streaming)_et.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> ⏳ '+((_lang==='ko')?'응답 대기 중...':'Waiting for response...')}
       var r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json','X-Session-Token':_tok},
         body:JSON.stringify(chatBody),signal:_currentAbort.signal});
       if(!r.ok||!r.body){throw new Error('stream unavailable')}
       var reader=r.body.getReader();var decoder=new TextDecoder();var buf='';var gotDone=false;
       var typingEl=document.getElementById('typing-row');
-      /* No stall timeout — wait indefinitely like OpenClaw.
-         Heavy models (opus) can take 3+ minutes for complex tasks. */
+      /* Per-chunk stall timeout: if server holds connection open but sends nothing for 60s,
+         abort and fall back to HTTP POST (prevents indefinite hang) */
+      var _STALL_MS=60000;
       var _stallTimer=null;
+      /* Fix #8: track last REAL SSE event time (not keepalive comments).
+         Keepalive pings (": keep-alive") are raw bytes but not real events — they
+         previously reset the stall timer and masked LLM API hangs indefinitely. */
+      var _lastRealEvent=Date.now();
+      var _REAL_EVENT_TIMEOUT=90000; /* 90s without a real event → abort */
+      var _realEventTimer=setInterval(function(){
+        if(Date.now()-_lastRealEvent>_REAL_EVENT_TIMEOUT){
+          clearInterval(_realEventTimer);
+          if(_currentAbort){try{_currentAbort.abort();}catch(e){}}
+        }
+      },5000);
       function _readWithTimeout(){
-        return reader.read();
+        return Promise.race([
+          reader.read(),
+          new Promise(function(_,reject){_stallTimer=setTimeout(function(){reject(new Error('SSE stall: no data for '+_STALL_MS+'ms'))},_STALL_MS)})
+        ]);
       }
       while(true){
         var chunk=await _readWithTimeout();
@@ -985,6 +945,7 @@
           var em=evt.match(/^event: (\w+)\ndata: (.+)$/m);
           if(!em)continue;
           var etype=em[1],edata=JSON.parse(em[2]);
+          _lastRealEvent=Date.now(); /* real SSE event received — reset real-event timer */
           if(etype==='status'){
             if(typingEl){var tb=typingEl.querySelector('.bubble');if(tb)tb.innerHTML='<div class="typing-indicator"><span></span><span></span><span></span></div> '+edata.text}
           }else if(etype==='tool'){
@@ -1021,6 +982,7 @@
           }else if(etype==='done'){
             gotDone=true;
             _currentAbort=null; /* Prevent stale abort after completion */
+            clearInterval(_realEventTimer);
             localStorage.removeItem('salm_sse_pending');
             if(typingEl)typingEl.remove();
             /* Restore send button immediately */
@@ -1032,11 +994,11 @@
             var _secs=((Date.now()-_sendStart)/1000).toFixed(1);
             var _cIcons={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
             var _cLabel=edata.complexity&&edata.complexity!=='auto'&&edata.complexity!=='manual'?(_cIcons[edata.complexity]||'')+edata.complexity+' → ':'';
-            if(edata.complexity==='manual')_isAutoRouting=false;
+            
             var _mShort=(edata.model||'').split('/').pop();
             var _sMeta=(_cLabel||'')+(_mShort||'');if(_sMeta)_sMeta+=' · ';_sMeta+='⏱️'+_secs+'s';addMsg('assistant',edata.response||'',_sMeta);
             modelBadge.textContent=_mShort?(_isAutoRouting?'Auto → '+_mShort:_mShort):'auto routing';
-            fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+            fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r2){return r2.json()}).then(function(s){if(s&&s.usage)costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
             break; /* Exit reader loop immediately after done event */
           }
         }
@@ -1055,17 +1017,18 @@
             var _secs3=((Date.now()-_sendStart)/1000).toFixed(1);
             var _cI2={simple:'⚡',moderate:'🔧',complex:'💎',auto:''};
             var _cL2=edata2.complexity&&edata2.complexity!=='auto'&&edata2.complexity!=='manual'?(_cI2[edata2.complexity]||'')+edata2.complexity+' → ':'';
-            if(edata2.complexity==='manual')_isAutoRouting=false;
+            
             var _mS2=(edata2.model||'').split('/').pop();
             var _sM2=(_cL2||'')+(_mS2||'');if(_sM2)_sM2+=' · ';_sM2+='⏱️'+_secs3+'s';addMsg('assistant',edata2.response||'',_sM2);
             modelBadge.textContent=_mS2?(_isAutoRouting?'Auto → '+_mS2:_mS2):'auto routing';
-            fetch('/api/status').then(function(r2){return r2.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+            fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r2){return r2.json()}).then(function(s){if(s&&s.usage)costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
           }
         }
       }
       if(!gotDone)throw new Error('stream incomplete');
       if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
     }catch(streamErr){
+      clearInterval(_realEventTimer);
       /* User-initiated abort: clean up and stop — don't fallback */
       if(streamErr.name==='AbortError'){
         console.log('SSE aborted by user');
@@ -1093,7 +1056,7 @@
         var _secs2=((Date.now()-_sendStart)/1000).toFixed(1);
         if(d.response){localStorage.removeItem('salm_sse_pending');var _fcI={simple:'⚡',moderate:'🔧',complex:'💎'};var _fcL=d.complexity&&d.complexity!=='auto'?(_fcI[d.complexity]||'')+d.complexity+' → ':'';var _fmS=(d.model||'').split('/').pop();var _meta=(_fcL||'')+(_fmS||'');if(_meta)_meta+=' · ';_meta+='⏱️'+_secs2+'s';addMsg('assistant',d.response,_meta);if(_fmS)modelBadge.textContent=_isAutoRouting?'Auto → '+_fmS:_fmS;}
         else if(d.error){localStorage.removeItem('salm_sse_pending');addMsg('assistant','❌ '+d.error);}
-        fetch('/api/status').then(function(r3){return r3.json()}).then(function(s){costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
+        fetch('/api/status',{headers:{'X-Session-Token':_tok}}).then(function(r3){return r3.json()}).then(function(s){if(s&&s.usage)costEl.textContent='$'+s.usage.total_cost.toFixed(4)});
       }catch(fbErr){
         console.error('Fallback POST also failed:',fbErr);
         if(document.getElementById('typing-row'))document.getElementById('typing-row').remove();
@@ -1848,8 +1811,8 @@ window._i18n={
       var sel=document.getElementById('s-model');
       if(sel){
         sel.innerHTML='<option value="auto">🔄 Auto Routing</option>';
-        d.providers.forEach(function(p){
-          p.models.forEach(function(m){
+        (d.providers||[]).forEach(function(p){
+          (p.models||[]).forEach(function(m){
             var opt=document.createElement('option');opt.value=m.full;opt.textContent=m.name;
             if(cur===m.full)opt.selected=true;
             sel.appendChild(opt);
@@ -1862,7 +1825,7 @@ window._i18n={
       var kr=_lang==='ko';
       var provIcons={anthropic:'🟣',openai:'🟢',xai:'🔵',google:'🟡',openrouter:'🔷',ollama:'🦙'};
       var h='';
-      d.providers.forEach(function(p){
+      (d.providers||[]).forEach(function(p){
         var icon=provIcons[p.name]||'📦';
         var status=p.available?'<span style="color:var(--green,#4ade80)">●</span>':'<span style="color:var(--red,#f87171)">●</span>';
         h+='<div style="border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg)">';
@@ -1874,7 +1837,7 @@ window._i18n={
         var statusText=p.available?(kr?'연결됨':'Connected'):((p.name==='ollama')?(kr?'오프라인':'Offline'):(kr?'키 없음':'No key'));
         h+='<span style="font-size:11px;color:var(--text2);margin-left:auto">'+statusText+'</span>';
         h+='</div>';
-        p.models.forEach(function(m){
+        (p.models||[]).forEach(function(m){
           var isActive=cur&&(cur===m.full||cur===m.name);
           var price=_getPrice(m.full);
           var priceStr=price?'$'+price.i+' / $'+price.o:'';
@@ -2632,7 +2595,7 @@ window._i18n={
   input.focus();
 
   /* --- Restore model preference from server --- */
-  fetch('/api/status?session='+encodeURIComponent(_currentSession)).then(r=>r.json()).then(d=>{
+  fetch('/api/status?session='+encodeURIComponent(_currentSession),{headers:{'X-Session-Token':_tok}}).then(r=>r.json()).then(d=>{
     if(d.model&&d.model!=='auto'){
       _isAutoRouting=false;
       var sel=document.getElementById('s-model');
@@ -2656,7 +2619,9 @@ window._i18n={
       if(!r.ok)return;
       var d=await r.json();
       if(d.notifications&&d.notifications.length){
-        d.notifications.forEach(n=>addMsg('assistant',n.text,'notification'));
+        d.notifications.forEach(n=>addMsg('assistant',n.text,'⏰ cron'));
+        /* Clear after showing to prevent duplicates on next poll */
+        fetch('/api/notifications/clear',{method:'POST',headers:{'X-Session-Token':_tok}}).catch(()=>{});
       }
     }catch(e){}
   },30000);
@@ -3584,12 +3549,14 @@ window._i18n={
       var jobs=d.jobs||[];var kr=_lang==='ko';
       if(!jobs.length){c.innerHTML='<div style="padding:24px;text-align:center;color:var(--text2);border:1px dashed var(--border);border-radius:10px">'+(kr?'크론 작업 없음 — 위의 ➕ 버튼으로 추가하세요':'No cron jobs — click ➕ above to add one')+'</div>';return}
       var h='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-      h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;background:var(--bg3);font-weight:600;font-size:12px">';
-      h+='<div style="padding:10px 14px">'+(kr?'이름':'Name')+'</div><div style="padding:10px 14px">'+(kr?'간격':'Interval')+'</div><div style="padding:10px 14px">'+(kr?'실행 횟수':'Runs')+'</div><div style="padding:10px 14px">'+(kr?'상태':'Status')+'</div><div style="padding:10px 14px"></div></div>';
+      h+='<div style="display:grid;grid-template-columns:1fr 1fr auto auto auto auto;background:var(--bg3);font-weight:600;font-size:12px">';
+      h+='<div style="padding:10px 14px">'+(kr?'이름':'Name')+'</div><div style="padding:10px 14px">'+(kr?'프롬프트':'Prompt')+'</div><div style="padding:10px 14px">'+(kr?'간격':'Interval')+'</div><div style="padding:10px 14px">'+(kr?'실행 횟수':'Runs')+'</div><div style="padding:10px 14px">'+(kr?'상태':'Status')+'</div><div style="padding:10px 14px"></div></div>';
       jobs.forEach(function(j){
-        var sched=j.schedule||{};var interval=sched.seconds?_fmtInterval(sched.seconds):(sched.expr||'—');
-        h+='<div style="display:grid;grid-template-columns:1fr auto auto auto auto;font-size:13px;border-top:1px solid var(--border)">';
+        var sched=j.schedule||{};var interval=j.interval||(sched.seconds?_fmtInterval(sched.seconds):(sched.expr||'—'));
+        var promptPreview=(j.prompt||'').slice(0,60)+((j.prompt||'').length>60?'…':'');
+        h+='<div style="display:grid;grid-template-columns:1fr 1fr auto auto auto auto;font-size:13px;border-top:1px solid var(--border)">';
         h+='<div style="padding:10px 14px;font-weight:500">'+j.name+'</div>';
+        h+='<div style="padding:10px 14px;color:var(--text2);font-size:12px" title="'+(j.prompt||'')+'">'+promptPreview+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+interval+'</div>';
         h+='<div style="padding:10px 14px;color:var(--text2)">'+j.run_count+'</div>';
         h+='<div style="padding:10px 14px"><button data-action="toggleCronJob" data-cron-id="'+j.id+'" style="background:none;border:none;cursor:pointer;font-size:13px">'+(j.enabled?'🟢 '+(kr?'활성':'On'):'🔴 '+(kr?'비활성':'Off'))+'</button></div>';
@@ -3614,7 +3581,8 @@ window._i18n={
     var name=document.getElementById('cron-name').value.trim()||'untitled';
     var interval=parseInt(document.getElementById('cron-interval').value)||3600;
     var prompt=document.getElementById('cron-prompt').value.trim();
-    var runAt=document.getElementById('cron-at').value||'';
+    var cronModeOnce=document.getElementById('cron-mode-once');
+    var runAt=(cronModeOnce&&cronModeOnce.checked)?document.getElementById('cron-at').value||'':'';
     if(!prompt){alert(_lang==='ko'?'프롬프트를 입력하세요':'Enter a prompt');return}
     var payload={name:name,interval:interval,prompt:prompt};
     if(runAt)payload.run_at=runAt;

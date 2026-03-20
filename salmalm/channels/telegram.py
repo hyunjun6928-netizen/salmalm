@@ -560,14 +560,14 @@ class TelegramBot(TelegramCommandsMixin, TelegramMediaMixin):
             self.send_typing(cb_chat_id)
             session_id = f"telegram_{cb_chat_id}"
             _start = time.time()
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
             from salmalm.core import get_session as _gs_cb
 
             _cb_sess = _gs_cb(session_id)
             _cb_model_ov = getattr(_cb_sess, "model_override", None)
             if _cb_model_ov == "auto":
                 _cb_model_ov = None
-            response = await process_message(session_id, btn_text, model_override=_cb_model_ov)
+            response = await asyncio.wait_for(process_message(session_id, btn_text, model_override=_cb_model_ov), timeout=300)
             _elapsed = time.time() - _start
             self.send_message(cb_chat_id, f"{response}\n\n⏱️ {_elapsed:.1f}s")
 

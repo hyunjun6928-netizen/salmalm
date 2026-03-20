@@ -15,7 +15,6 @@ from salmalm.core.core import (  # noqa: F401
     _restore_usage,
     _llm_cron,
     _metrics,
-    _metrics_lock,
     _session_lock,
     _sessions,
     _tfidf,

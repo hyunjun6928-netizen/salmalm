@@ -5,13 +5,11 @@
 """
 
 import json
-import logging
 import os
-import tempfile
+import logging
 from salmalm.constants import DATA_DIR
 
 log = logging.getLogger(__name__)
-
 
 # Runtime CLI overrides (populated by __main__ / entry points)
 _cli_overrides: dict = {}
@@ -35,8 +33,17 @@ class ConfigManager:
     BASE_DIR = DATA_DIR
 
     @classmethod
+    def _validate_name(cls, name: str) -> str:
+        """Validate config name to prevent path traversal."""
+        import re
+        if not re.fullmatch(r'[a-zA-Z0-9_\-]+', name):
+            raise ValueError(f"Invalid config name: {name}")
+        return name
+
+    @classmethod
     def load(cls, name: str, defaults: dict = None) -> dict:
         """설정 파일 로드. name='mood' → ~/.salmalm/mood.json"""
+        cls._validate_name(name)
         path = cls.BASE_DIR / f"{name}.json"
         if path.exists():
             try:
@@ -46,33 +53,18 @@ class ConfigManager:
                     merged = {**defaults, **config}
                     return merged
                 return config
-            except json.JSONDecodeError as e:
-                log.warning("[CONFIG] Corrupt JSON in %s.json: %s — falling back to defaults", name, e)
-            except OSError as e:
-                log.warning("[CONFIG] Cannot read %s.json: %s — falling back to defaults", name, e)
+            except (json.JSONDecodeError, OSError) as e:
+                log.warning("Config load failed for %s (%s): %s", path, type(e).__name__, e)
         return dict(defaults) if defaults else {}
 
     @classmethod
     def save(cls, name: str, config: dict) -> None:
-        """설정 파일 저장 (원자적 write — tempfile + fsync + rename).
-
-        Prevents config file corruption if the process is killed during write.
-        """
+        """설정 파일 저장."""
+        cls._validate_name(name)
         cls.BASE_DIR.mkdir(parents=True, exist_ok=True)
         path = cls.BASE_DIR / f"{name}.json"
-        tmp_fd, tmp_path = tempfile.mkstemp(dir=cls.BASE_DIR, suffix=".tmp")
-        try:
-            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=2, ensure_ascii=False)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp_path, path)
-        except Exception:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            raise
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
 
     @classmethod
     def resolve(cls, name: str, key: str, default=None):
@@ -89,15 +81,11 @@ class ConfigManager:
         env_key = f"SALMALM_{name.upper()}_{key.upper()}"
         env_val = os.environ.get(env_key)
         if env_val is not None:
-            # Only attempt JSON parse if value looks structured — avoids exception
-            # overhead on plain strings like SALMALM_FOO=hello (fired on every lookup).
-            _first = env_val[0] if env_val else ""
-            if _first in ('{', '[', '"') or _first.lstrip('-').isdigit() or env_val in ('true', 'false', 'null'):
-                try:
-                    return json.loads(env_val)
-                except (json.JSONDecodeError, ValueError):
-                    pass
-            return env_val
+            # Attempt JSON parse for non-string types
+            try:
+                return json.loads(env_val)
+            except (json.JSONDecodeError, ValueError):
+                return env_val
 
         # 3. Config file
         config = cls.load(name)
@@ -148,9 +136,7 @@ class ConfigManager:
         migrated = False
         for migration in CONFIG_MIGRATIONS:
             if migration["version"] > current_version:
-                _fn = migration.get("migrate")
-                if callable(_fn):
-                    config = _fn(config)
+                config = migration["migrate"](config)
                 config["_version"] = migration["version"]
                 migrated = True
         if migrated:

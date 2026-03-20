@@ -54,13 +54,24 @@ def handle_write_file(args: dict) -> str:
 @register("edit_file")
 def handle_edit_file(args: dict) -> str:
     """Handle edit file."""
-    p = _resolve_path(args["path"], writing=True)
-    text = p.read_text(encoding="utf-8")
-    if args["old_text"] not in text:
-        return "Text not found"
+    try:
+        p = _resolve_path(args["path"], writing=True)
+    except (KeyError, ValueError) as e:
+        return f"❌ Invalid path: {e}"
+    if not p.exists():
+        return f"❌ File not found: {p}"
+    try:
+        text = p.read_text(encoding="utf-8")
+    except OSError as e:
+        return f"❌ Cannot read file: {e}"
+    if args.get("old_text", "") not in text:
+        return "❌ old_text not found in file"
     text = text.replace(args["old_text"], args["new_text"], 1)
-    p.write_text(text, encoding="utf-8")
-    return f"File edited: {p}"
+    try:
+        p.write_text(text, encoding="utf-8")
+    except OSError as e:
+        return f"❌ Cannot write file: {e}"
+    return f"✅ File edited: {p}"
 
 
 @register("diff_files")

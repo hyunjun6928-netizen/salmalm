@@ -22,6 +22,7 @@ Usage:
 
 
 import asyncio
+import atexit
 import json
 import os
 import subprocess
@@ -40,7 +41,7 @@ _rpc_id_lock = threading.Lock()
 
 
 def _next_id() -> int:
-    """Thread-safe monotonic RPC ID generator."""
+    """Thread-safe RPC request ID generator."""
     global _rpc_id
     with _rpc_id_lock:
         _rpc_id += 1
@@ -320,8 +321,21 @@ class MCPServer:
 # ══════════════════════════════════════════════════════════════
 
 
+def _sanitize_mcp_desc(desc: str, max_len: int = 500) -> str:
+    """Strip injection-prone content from MCP tool descriptions."""
+    import re
+    # Remove common prompt injection patterns
+    desc = re.sub(r'(?i)(system\s*override|ignore\s*previous|you\s*must|you\s*are\s*now)', '[FILTERED]', desc)
+    # Strip control characters and excessive whitespace
+    desc = re.sub(r'[\x00-\x1f\x7f]', ' ', desc)
+    desc = re.sub(r'\s{3,}', '  ', desc)
+    return desc[:max_len]
+
+
 class MCPClientConnection:
     """A connection to a single external MCP server (stdio transport)."""
+    _spawned_processes: set = set()
+    _processes_lock = threading.Lock()
 
     def __init__(
         self, name: str, command: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None
@@ -342,7 +356,14 @@ class MCPClientConnection:
     def connect(self) -> bool:
         """Start the MCP server subprocess and initialize."""
         try:
-            full_env = {**os.environ, **self.env}
+            # Sanitize env: only forward safe vars, strip secrets
+            import re as _re
+            _SECRET_PAT = _re.compile(r"(?i)(API[_-]?KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AUTH|VAULT)")
+            _SAFE_BASE = {"PATH", "HOME", "USER", "LANG", "TMPDIR", "TERM", "SHELL",
+                          "XDG_RUNTIME_DIR", "XDG_DATA_HOME", "XDG_CONFIG_HOME"}
+            full_env = {k: v for k, v in os.environ.items()
+                        if k in _SAFE_BASE or not _SECRET_PAT.search(k)}
+            full_env.update(self.env)  # explicit user overrides allowed
             self._process = subprocess.Popen(
                 self.command,
                 stdin=subprocess.PIPE,
@@ -352,6 +373,8 @@ class MCPClientConnection:
                 cwd=self.cwd,
                 bufsize=0,
             )
+            with self._processes_lock:
+                self._spawned_processes.add(self._process)
 
             # Start reader thread
             self._reader_thread = threading.Thread(target=self._read_loop, daemon=True)
@@ -399,15 +422,35 @@ class MCPClientConnection:
         """Disconnect from an MCP server."""
         self._connected = False
         if self._process:
+            _proc = self._process
             try:
-                self._process.terminate()
-                self._process.wait(timeout=5)
+                _proc.terminate()
+                _proc.wait(timeout=5)
             except Exception as e:  # noqa: broad-except
                 try:
-                    self._process.kill()
+                    _proc.kill()
                 except Exception as e:  # noqa: broad-except
                     log.debug(f"Suppressed: {e}")
+            with self._processes_lock:
+                self._spawned_processes.discard(_proc)
             self._process = None
+
+    @classmethod
+    def cleanup_spawned_processes(cls) -> None:
+        """Best-effort cleanup for any leaked MCP subprocesses."""
+        with cls._processes_lock:
+            procs = list(cls._spawned_processes)
+            cls._spawned_processes.clear()
+        for proc in procs:
+            try:
+                if proc.poll() is None:
+                    proc.terminate()
+                    proc.wait(timeout=3)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
 
     def _read_loop(self):
         """Background thread: read JSON-RPC responses from stdout."""
@@ -564,7 +607,7 @@ class MCPManager:
                 tools.append(
                     {
                         "name": f"mcp_{name}_{tool['name']}",
-                        "description": f"[MCP:{name}] {tool.get('description', '')}",
+                        "description": f"[MCP:{name}] {_sanitize_mcp_desc(tool.get('description', ''))}",
                         "input_schema": tool.get("inputSchema", {"type": "object", "properties": {}}),
                         "_mcp_server": name,
                         "_mcp_tool": tool["name"],
@@ -615,11 +658,23 @@ class MCPManager:
         for client in self._clients.values():
             client.disconnect()
         self._clients.clear()
+        MCPClientConnection.cleanup_spawned_processes()
 
 
 # ── Module-level instance ──────────────────────────────────────
 
 mcp_manager = MCPManager()
+
+
+def _cleanup_mcp_on_exit() -> None:
+    """Ensure MCP subprocesses are terminated at interpreter exit."""
+    try:
+        mcp_manager.shutdown()
+    except Exception:
+        MCPClientConnection.cleanup_spawned_processes()
+
+
+atexit.register(_cleanup_mcp_on_exit)
 
 
 # ── CLI entry point for stdio server mode ──────────────────────
@@ -634,8 +689,7 @@ async def _run_server_stdio():
         logging.root.removeHandler(handler)
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-    from salmalm.tools.tool_handlers import execute_tool
-    from salmalm.tools.tool_registry import get_all_tools as TOOL_DEFINITIONS
+    from salmalm.tools import TOOL_DEFINITIONS, execute_tool
 
     server = MCPServer()
 

@@ -16,9 +16,9 @@ from salmalm.core.llm import _http_get
 @register("web_search")
 def handle_web_search(args: dict) -> str:
     """Handle web search."""
-    api_key = vault.get("brave_api_key")
+    api_key = vault.get("brave_api_key") or os.environ.get("BRAVE_API_KEY", "")
     if not api_key:
-        return "Brave Search API key not found. Add it in Settings → API Keys."
+        return "Brave Search API key not found. Add it in Settings → API Keys or set BRAVE_API_KEY env var."
     query = urllib.parse.quote(args["query"])
     count = min(args.get("count", 5), 10)
     try:

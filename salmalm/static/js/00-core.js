@@ -4,7 +4,8 @@
     filePrev=document.getElementById('file-preview'),fileIconEl=document.getElementById('file-icon'),
     fileNameEl=document.getElementById('file-name'),fileSizeEl=document.getElementById('file-size'),
     imgPrev=document.getElementById('img-preview'),inputArea=document.getElementById('input-area');
-  let _tok=sessionStorage.getItem('tok')||'',pendingFile=null,pendingFiles=[];
+  let _tok=sessionStorage.getItem('tok')||localStorage.getItem('salm_token')||'',pendingFile=null,pendingFiles=[];
+  if(_tok&&!sessionStorage.getItem('tok'))sessionStorage.setItem('tok',_tok);
   var _currentSession=localStorage.getItem('salm_active_session')||'web';
   var _sessionCache={};
   var _isAutoRouting=true;

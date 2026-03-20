@@ -4,8 +4,8 @@ Extracted from core.py to reduce god object. All core.py dependencies
 use lazy imports to avoid circular import issues.
 """
 
+import asyncio
 import json
-import re
 import threading
 import time
 import uuid as _uuid
@@ -55,9 +55,11 @@ class Session:
 
     def __init__(self, session_id: str, user_id: Optional[int] = None) -> None:
         """Create a new session with isolated context, message history, and model preferences."""
+        import threading as _threading
         self.id = session_id
         self.user_id = user_id  # Multi-tenant: owning user (None = legacy/local)
         self.messages: list = []
+        self._messages_lock = _threading.RLock()  # Protects messages list from concurrent tool threads
         self.created = time.time()
         self.last_active = time.time()
         self.metadata: dict = {}  # Arbitrary session metadata
@@ -72,14 +74,19 @@ class Session:
         self.last_complexity = "auto"  # Last complexity level
 
     def add_system(self, content: str) -> None:
-        # Replace existing system message
-        """Add a system message to the session."""
-        self.messages = [m for m in self.messages if m["role"] != "system"]
-        self.messages.insert(0, {"role": "system", "content": content})
+        """Add (or replace) the system message. Thread-safe."""
+        with self._messages_lock:
+            self.messages = [m for m in self.messages if m["role"] != "system"]
+            self.messages.insert(0, {"role": "system", "content": content})
+
+    async def _persist_async(self):
+        """Async wrapper: run _persist() in a thread pool to avoid blocking the event loop."""
+        await asyncio.to_thread(self._persist)
 
     def _persist(self):
         """Save session to SQLite (only text messages, skip image data).
 
+        Call _persist_async() from async contexts to avoid blocking the event loop.
         Handles: disk full (OSError), DB lock (sqlite3.OperationalError).
         """
         try:
@@ -111,18 +118,8 @@ class Session:
                 },
                 ensure_ascii=False,
             )
-            # Use UPSERT (INSERT ... ON CONFLICT DO UPDATE) instead of INSERT OR REPLACE.
-            # INSERT OR REPLACE = DELETE + INSERT → wipes columns not in the INSERT list
-            # (title, parent_session_id, branch_index → all reset to DEFAULT on every save).
-            # UPSERT only overwrites the columns we explicitly set, preserving the rest.
             conn.execute(
-                """INSERT INTO session_store (session_id, messages, updated_at, user_id, session_meta)
-                   VALUES (?,?,?,?,?)
-                   ON CONFLICT(session_id) DO UPDATE SET
-                       messages=excluded.messages,
-                       updated_at=excluded.updated_at,
-                       user_id=excluded.user_id,
-                       session_meta=excluded.session_meta""",
+                "INSERT OR REPLACE INTO session_store (session_id, messages, updated_at, user_id, session_meta) VALUES (?,?,?,?,?)",
                 (
                     self.id,
                     json.dumps(saveable, ensure_ascii=False),
@@ -136,38 +133,39 @@ class Session:
             log.warning(f"Session persist error: {e}")
 
     def add_user(self, content: str) -> None:
-        """Add a user message to the session.
-
-        Auto-compaction: if session exceeds 1000 messages, trim old ones.
-        """
-        self.messages.append({"role": "user", "content": content})
-        self.last_active = time.time()
-        # Session size explosion prevention
-        if len(self.messages) > 1000:
-            system_msgs = [m for m in self.messages if m["role"] == "system"][:1]
-            recent = [m for m in self.messages if m["role"] != "system"][-50:]
-            self.messages = system_msgs + recent
-            log.warning(f"[SESSION] Auto-trimmed session {self.id}: >1000 msgs → {len(self.messages)}")
-        # Persist user message immediately — prevents message loss on crash
-        # before add_assistant() is called (e.g. long LLM round-trip with kill -9)
-        try:
-            self._persist()
-        except Exception as _e:
-            log.warning("[SESSION] add_user _persist failed for %s: %s", self.id, _e)
+        """Add a user message. Thread-safe. Auto-compacts on explosion (>1000 msgs)."""
+        with self._messages_lock:
+            self.messages.append({"role": "user", "content": content})
+            self.last_active = time.time()
+            if len(self.messages) > 1000:
+                system_msgs = [m for m in self.messages if m["role"] == "system"][:1]
+                recent = [m for m in self.messages if m["role"] != "system"][-50:]
+                self.messages = system_msgs + recent
+                log.warning(f"[SESSION] Auto-trimmed session {self.id}: >1000 msgs → {len(self.messages)}")
 
     def add_assistant(self, content: str) -> None:
-        """Add an assistant response to the session."""
-        self.messages.append({"role": "assistant", "content": content})
-        self.last_active = time.time()
-        self._persist()
-        # Auto-save to disk after final response (debounced — not on tool calls)
+        """Add an assistant response. Thread-safe.
+
+        Schedules _persist() via the event loop if one is running (async context),
+        otherwise falls back to a direct synchronous call.
+        """
+        with self._messages_lock:
+            self.messages.append({"role": "assistant", "content": content})
+            self.last_active = time.time()
+        # Avoid blocking the event loop: schedule persist in thread pool when async
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._persist_async())
+        except RuntimeError:
+            # No running event loop — sync context (tests, CLI, shutdown)
+            self._persist()
         try:
             save_session_to_disk(self.id)
         except Exception as e:
             log.debug(f"Suppressed: {e}")
 
     def add_tool_results(self, results: list) -> None:
-        """Add tool results as a single user message with all results.
+        """Add tool results as a single user message. Thread-safe.
         results: list of {'tool_use_id': str, 'content': str}
         """
         content = [
@@ -178,7 +176,8 @@ class Session:
             }
             for r in results
         ]
-        self.messages.append({"role": "user", "content": content})
+        with self._messages_lock:
+            self.messages.append({"role": "user", "content": content})
 
 
 _tg_bot = None  # Set during startup by telegram module
@@ -204,37 +203,45 @@ _SESSION_MAX = 200
 
 
 def _cleanup_sessions():
-    """Remove inactive sessions older than TTL."""
+    """Remove inactive sessions older than TTL.
+
+    Persist stale sessions OUTSIDE the lock to prevent lock-while-SQLite-write
+    (could block for up to busy_timeout=5s per session, causing multi-second freezes).
+    """
     global _session_cleanup_ts
     now = time.time()
     if now - _session_cleanup_ts < 600:  # Check every 10 min
         return
     _session_cleanup_ts = now
+
+    # Step 1: collect stale sessions under lock, then release
     with _session_lock:
-        stale = [sid for sid, s in _sessions.items() if now - s.last_active > _SESSION_TTL]
-        for sid in stale:
-            try:
-                _sessions[sid]._persist()
-            except Exception as e:
-                log.debug(f"Suppressed: {e}")
-            del _sessions[sid]
-            try:
-                from salmalm.core.session_manager import evict_session_timing
-                evict_session_timing(sid)
-            except Exception:
-                pass
-        if stale:
-            log.info(f"[CLEAN] Session cleanup: removed {len(stale)} inactive sessions")
-        # Hard cap
+        stale = [(sid, _sessions.pop(sid)) for sid, s in list(_sessions.items())
+                 if now - s.last_active > _SESSION_TTL]
+        # Hard cap — evict oldest beyond _SESSION_MAX
         if len(_sessions) > _SESSION_MAX:
             by_age = sorted(_sessions.items(), key=lambda x: x[1].last_active)
             for sid, _ in by_age[: len(_sessions) - _SESSION_MAX]:
-                del _sessions[sid]
-                try:
-                    from salmalm.core.session_manager import evict_session_timing
-                    evict_session_timing(sid)
-                except Exception:
-                    pass
+                stale.append((sid, _sessions.pop(sid)))
+
+    # Step 2: persist outside lock (SQLite I/O, can be slow)
+    for sid, sess in stale:
+        try:
+            sess._persist()
+        except Exception as e:
+            log.debug(f"[CLEAN] persist failed for {sid}: {e}")
+
+    # Step 3: clean up orphaned session locks in engine_pipeline (H-4 fix)
+    if stale:
+        stale_ids = {sid for sid, _ in stale}
+        try:
+            from salmalm.core.engine_pipeline import _session_locks, _session_locks_lock
+            with _session_locks_lock:
+                for sid in stale_ids:
+                    _session_locks.pop(sid, None)
+        except Exception:
+            pass
+        log.info(f"[CLEAN] Session cleanup: removed {len(stale)} inactive sessions")
 
 
 def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
@@ -243,56 +250,42 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
     If user_id is provided and the session already exists with a different user_id,
     access is denied (returns a new isolated session instead of the existing one).
     """
-    # Sanitize session_id: prevent path traversal and memory key injection
-    if not session_id or len(session_id) > 128:
-        session_id = "default"
-    elif re.search(r'[/\\\x00\r\n]|\.\.', session_id):
-        session_id = re.sub(r"[^a-zA-Z0-9_\-\.@:]", "_", session_id)[:128]
     _cleanup_sessions()
     with _session_lock:
         if session_id in _sessions:
             existing = _sessions[session_id]
-            # Access control: deny if owned by a *different* authenticated user.
-            if user_id is not None:
-                _owner_conflict = (
-                    existing.user_id is not None and existing.user_id != user_id
-                ) or (
-                    existing.user_id is None
-                    and session_id not in ("web", "local", "default")
-                    and _is_multi_user_mode()
+            if user_id is not None and existing.user_id is not None and existing.user_id != user_id:
+                # Session belongs to another user — create isolated session
+                log.warning(
+                    f"[SESSION] User {user_id} denied access to session {session_id} (owned by {existing.user_id})"
                 )
-                if _owner_conflict:
-                    log.warning(
-                        "[SESSION] User %s denied access to session %s (owned by %s)",
-                        user_id, session_id, existing.user_id
-                    )
-                    isolated_id = f"{session_id}_u{user_id}"
-                    if isolated_id not in _sessions:
-                        _sessions[isolated_id] = Session(isolated_id, user_id=user_id)
-                    return _sessions[isolated_id]
-            return existing
+                isolated_id = f"{session_id}_u{user_id}"
+                if isolated_id not in _sessions:
+                    _sessions[isolated_id] = Session(isolated_id, user_id=user_id)
+                return _sessions[isolated_id]
         if session_id not in _sessions:
             _sessions[session_id] = Session(session_id, user_id=user_id)
             # Try to restore from SQLite
             try:
                 conn = _get_db()
-                row = conn.execute(
-                    "SELECT messages, session_meta FROM session_store WHERE session_id=?",
-                    (session_id,),
-                ).fetchone()
+                # Ownership-aware restore: if user_id provided, verify it matches
+                if user_id is not None:
+                    row = conn.execute(
+                        "SELECT messages, session_meta FROM session_store WHERE session_id=? AND (user_id IS NULL OR user_id=?)",
+                        (session_id, user_id),
+                    ).fetchone()
+                else:
+                    row = conn.execute(
+                        "SELECT messages, session_meta FROM session_store WHERE session_id=?",
+                        (session_id,),
+                    ).fetchone()
                 if row:
                     try:
                         restored = json.loads(row[0])
                         if not isinstance(restored, list):
                             raise ValueError("Session data is not a list")
-                        # Sanitize: only allow known roles from DB
-                        _ALLOWED_ROLES = {"user", "assistant", "system", "tool"}
-                        sanitized = [m for m in restored if isinstance(m, dict) and m.get("role") in _ALLOWED_ROLES]
-                        if len(sanitized) != len(restored):
-                            log.warning("[SESSION] Dropped %d invalid-role messages from DB for %s",
-                                        len(restored) - len(sanitized), session_id)
-                        _sessions[session_id].messages = sanitized
-                        log.info(f"[NOTE] Session restored: {session_id} ({len(sanitized)} msgs)")
+                        _sessions[session_id].messages = restored
+                        log.info(f"[NOTE] Session restored: {session_id} ({len(restored)} msgs)")
                     except (json.JSONDecodeError, ValueError, TypeError) as je:
                         # Corrupted session JSON — start fresh
                         log.warning(f"[SESSION] Corrupt session JSON for {session_id}: {je}")
@@ -359,11 +352,6 @@ def get_session(session_id: str, user_id: Optional[int] = None) -> Session:
                 session_id=session_id,
                 detail_dict={"session_id": session_id},
             )
-        try:
-            from salmalm.monitoring.metrics import active_sessions
-            active_sessions.set(len(_sessions))
-        except Exception:
-            pass
         return _sessions[session_id]
 
 
@@ -398,21 +386,22 @@ def rollback_session(session_id: str, count: int) -> dict:
     if not indices_to_remove:
         return {"ok": False, "error": "No messages to rollback"}
 
-    removed_msgs = [session.messages[i] for i in sorted(indices_to_remove)]
-    conn = _get_db()
-    conn.execute(
-        "INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)",
-        (
-            session_id,
-            json.dumps(removed_msgs, ensure_ascii=False),
-            datetime.now(KST).isoformat(),
-            "rollback",
-        ),
-    )  # noqa: F405
-    conn.commit()
+    with session._messages_lock:
+        removed_msgs = [session.messages[i] for i in sorted(indices_to_remove)]
+        conn = _get_db()
+        conn.execute(
+            "INSERT INTO session_message_backup (session_id, messages_json, removed_at, reason) VALUES (?,?,?,?)",
+            (
+                session_id,
+                json.dumps(removed_msgs, ensure_ascii=False),
+                datetime.now(KST).isoformat(),
+                "rollback",
+            ),
+        )  # noqa: F405
+        conn.commit()
 
-    for i in sorted(indices_to_remove, reverse=True):
-        session.messages.pop(i)
+        for i in sorted(indices_to_remove, reverse=True):
+            session.messages.pop(i)
 
     session._persist()
     try:
@@ -423,7 +412,7 @@ def rollback_session(session_id: str, count: int) -> dict:
     return {"ok": True, "removed": pairs_removed}
 
 
-def branch_session(session_id: str, message_index: int, user_id: int | None = None) -> dict:
+def branch_session(session_id: str, message_index: int) -> dict:
     """Create a new session branching from session_id at message_index.
 
     Copies messages[0:message_index+1] into a new session.
@@ -431,10 +420,6 @@ def branch_session(session_id: str, message_index: int, user_id: int | None = No
     """
 
     session = get_session(session_id)
-    # Ownership check: non-admin users can only branch their own sessions
-    if user_id is not None and session.user_id is not None and session.user_id != user_id:
-        log.warning("[BRANCH] User %s denied branch of session %s (owned by %s)", user_id, session_id, session.user_id)
-        return {"ok": False, "error": "Access denied — session belongs to another user"}
     if message_index < 0 or message_index >= len(session.messages):
         return {"ok": False, "error": f"Invalid message_index: {message_index}"}
 
@@ -469,6 +454,10 @@ _SESSIONS_DIR = DATA_DIR / "sessions"
 
 def save_session_to_disk(session_id: str) -> None:
     """Serialize session state to ~/.salmalm/sessions/{id}.json."""
+    # Path traversal guard
+    import re as _re
+    if not _re.fullmatch(r'[a-zA-Z0-9_:\-\.]+', session_id):
+        return  # reject suspicious session IDs silently
     with _session_lock:
         session = _sessions.get(session_id)
         if not session:
@@ -490,9 +479,7 @@ def save_session_to_disk(session_id: str) -> None:
             "last_active": session.last_active,
             "metadata": session.metadata,
         }
-        # Path traversal guard: sanitize session_id before using as filename
-        _safe_sid = re.sub(r"[^a-zA-Z0-9_\-\.]", "_", session_id)[:128]
-        path = _SESSIONS_DIR / f"{_safe_sid}.json"
+        path = _SESSIONS_DIR / f"{session_id}.json"
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception as e:
         log.warning(f"[DISK] Failed to save session {session_id}: {e}")

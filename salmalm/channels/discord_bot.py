@@ -401,8 +401,11 @@ class DiscordBot:
         if not content:
             return
 
-        # Built-in slash commands
+        # Built-in slash commands — owner only
         if content.startswith("/"):
+            if self.owner_id and author.get("id") != self.owner_id:
+                self.send_message(channel_id, "❌ Unauthorized — owner only.", reply_to=message_id)
+                return
             cmd_response = self._handle_command(content, channel_id)
             if cmd_response:
                 self.send_message(channel_id, cmd_response, reply_to=message_id)
@@ -437,7 +440,7 @@ class DiscordBot:
                 return execute_tool("usage_report", {})
             elif cmd == "/model":
                 parts = text.split(maxsplit=1)
-                from salmalm.core.engine import router
+                from salmalm.core import router
 
                 if len(parts) > 1:
                     choice = parts[1].strip()

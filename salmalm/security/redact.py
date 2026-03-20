@@ -17,6 +17,12 @@ _SECRET_PATTERNS: List[re.Pattern] = [
     re.compile(r"\b(password|비밀번호|credential|API.?key)\s*[:=]\s*\S+", re.I),  # key=value
     re.compile(r"\b(sk-ant-[a-zA-Z0-9_-]{20,})\b"),  # Anthropic keys
     re.compile(r"\b(xai-[a-zA-Z0-9]{20,})\b"),  # xAI keys
+    re.compile(r"\b(hf_[A-Za-z0-9]{37,})\b"),  # Hugging Face tokens
+    re.compile(r"\b(sk-or-[a-zA-Z0-9]{40,})\b"),  # OpenRouter keys
+    re.compile(r"\b(gh[osr]_[a-zA-Z0-9]{36,})\b"),  # GitHub OAuth/server tokens
+    re.compile(r"\b(github_pat_[A-Za-z0-9_]{82})\b"),  # GitHub fine-grained PATs
+    re.compile(r"\b([0-9]{8,10}:[A-Za-z0-9_-]{35})\b"),  # Telegram bot tokens
+    re.compile(r"[a-zA-Z+]+://[^:@\s]+:[^:@\s]+@[^/\s]+"),  # DSN with creds
 ]
 
 

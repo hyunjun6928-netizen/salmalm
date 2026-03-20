@@ -73,7 +73,7 @@ def backoff_delay(attempt: int, base: float = 1.0, max_delay: float = 60.0, jitt
     """
     delay = min(base * (2**attempt), max_delay)
     if jitter:
-        delay = delay * (0.5 + random.random() * 0.5)  # not security-sensitive: backoff jitter
+        delay = delay * (0.5 + random.random() * 0.5)  # 50-100% of calculated delay
     return delay
 
 
@@ -198,11 +198,6 @@ async def retry_with_recovery(
             # Check for soft failures (200 but error content)
             content = result.get("content", "") if isinstance(result, dict) else ""
             if isinstance(content, str) and content.startswith("❌"):
-                # Billing/auth errors embedded in content → treat as permanent, do not retry
-                _err_lower = content.lower()
-                if any(p in _err_lower for p in ("billing", "quota", "api key", "unauthorized", "credit")):
-                    circuit_breakers.record_failure(provider)
-                    return {**result, "_failed": True}, None
                 raise RuntimeError(content)
 
             circuit_breakers.record_success(provider)
@@ -239,8 +234,8 @@ async def retry_with_recovery(
                 if on_retry:
                     try:
                         on_retry(attempt, delay, e)
-                    except Exception as _cb_err:
-                        log.debug(f"Suppressed on_retry callback error: {_cb_err}")
+                    except Exception as e:
+                        log.debug(f"Suppressed: {e}")
                 await _async_sleep(delay)
             else:
                 log.error(f"[RETRY] {provider} all {max_retries} retries exhausted: {e}")
@@ -324,55 +319,25 @@ class StreamBuffer:
 
 
 def friendly_error(error: str, provider: str = "") -> str:
-    """Convert technical errors to user-friendly messages.
+    """Convert technical errors to user-friendly messages."""
+    error_lower = error.lower()
 
-    Delegates to error_messages.friendly_error (canonical implementation).
-    Provider prefix prepended when available.
-    """
-    from salmalm.core.error_messages import friendly_error as _canonical
-    exc_like = Exception(error)
-    msg = _canonical(exc_like)
-    # Inject provider name if provided and not already present
-    if provider and provider not in msg:
-        msg = msg.replace(
-            "(Invalid API key", f"({provider} — Invalid API key", 1
-        ) if "Invalid API key" in msg else f"[{provider}] {msg}"
-    return msg
+    if "api key" in error_lower or "authentication" in error_lower or "401" in error_lower:
+        return f"🔑 {provider} API key is missing or invalid. Check Settings → API Keys."
 
+    if "rate limit" in error_lower or "429" in error_lower:
+        return f"⏳ {provider} rate limit hit. Waiting a moment before retrying..."
 
-# ── Global Service-Level Circuit Breaker ──
+    if "overloaded" in error_lower or "529" in error_lower:
+        return f"🏋️ {provider} is overloaded right now. Trying again shortly..."
 
-class GlobalCircuitBreaker:
-    """Last-resort guard: if ALL providers are in OPEN state (failed),
-    immediately return a friendly message instead of hammering dead endpoints.
+    if "timeout" in error_lower:
+        return f"⏰ {provider} request timed out. This usually means the response was too complex."
 
-    Threshold: if 3+ providers are unavailable, declare global outage.
-    """
+    if "connection" in error_lower or "network" in error_lower:
+        return f"🌐 Can't reach {provider}. Check your internet connection."
 
-    def __init__(self, threshold: int = 3) -> None:
-        self._threshold = threshold
+    if "context" in error_lower and ("long" in error_lower or "length" in error_lower):
+        return "📏 Conversation too long. Try /compact to compress context."
 
-    def all_models_down(self) -> bool:
-        """True when enough providers are tripped to declare a global outage."""
-        status = circuit_breakers.status()
-        down = sum(1 for v in status.values() if v.get("state") == "open")
-        return down >= self._threshold
-
-    def __call__(self, func: Callable) -> Callable:
-        """Decorator: short-circuit if all providers are down."""
-        import functools
-
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
-            if self.all_models_down():
-                log.warning("[GLOBAL_CB] All providers down — short-circuiting")
-                return (
-                    "😓 모든 AI 모델 서버가 일시적으로 응답하지 않습니다.\n"
-                    "잠시 후 다시 시도해주세요. / All AI providers are temporarily unavailable. Please try again later."
-                )
-            return await func(*args, **kwargs)
-
-        return wrapper
-
-
-global_circuit_breaker = GlobalCircuitBreaker(threshold=3)
+    return f"❌ {provider}: {error[:200]}"

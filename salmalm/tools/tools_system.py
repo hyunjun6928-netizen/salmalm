@@ -11,7 +11,6 @@ except ImportError:
     _resource_mod = None
 
 
-@register("system_monitor")
 def _collect_cpu() -> list:
     """Collect CPU info."""
     cpu_count = os.cpu_count() or 1
@@ -52,6 +51,7 @@ _MONITOR_COLLECTORS = {
 }
 
 
+@register("system_monitor")
 def handle_system_monitor(args: dict) -> str:
     """Handle system monitor."""
     detail = args.get("detail", "overview")

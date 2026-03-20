@@ -178,13 +178,16 @@ class HeartbeatManager:
             state_ctx = "\n\nLast checks:\n" + "\n".join(checks)
 
         try:
-            from salmalm.core.engine import process_message
+            from salmalm.core.engine_pipeline import process_message
 
             # Run in isolated session (OpenClaw pattern: no cross-contamination)
-            result = await process_message(
-                f"heartbeat-{int(time.time())}",
-                f"[Heartbeat check]\n{prompt}{state_ctx}\n\nIf nothing needs attention, reply HEARTBEAT_OK.",
-                model_override=None,  # Use auto-routing
+            result = await asyncio.wait_for(
+                process_message(
+                    f"heartbeat-{int(time.time())}",
+                    f"[Heartbeat check]\n{prompt}{state_ctx}\n\nIf nothing needs attention, reply HEARTBEAT_OK.",
+                    model_override=None,  # Use auto-routing
+                ),
+                timeout=120,  # heartbeat should be fast
             )
 
             # Update state
@@ -206,7 +209,11 @@ class HeartbeatManager:
             # Announce if result is meaningful
             if result and "HEARTBEAT_OK" not in result:
                 cls._announce(result)
-                write_daily_log(f"[HEARTBEAT] {result[:200]}")
+                try:
+                    from salmalm.core.core import write_daily_log as _write_daily_log
+                    _write_daily_log(f"[HEARTBEAT] {result[:200]}")
+                except Exception as _wdl_err:
+                    log.debug(f"[HEARTBEAT] write_daily_log skipped: {_wdl_err}")
 
             return result
         except Exception as e:
@@ -216,6 +223,13 @@ class HeartbeatManager:
     @classmethod
     def _announce(cls, result: str) -> None:
         """Announce heartbeat results to configured channels."""
+        # Lazy imports to avoid circular dependency
+        try:
+            from salmalm.core.session_store import _tg_bot, _sessions
+        except Exception:
+            _tg_bot = None
+            _sessions = {}
+
         # Telegram notification
         if _tg_bot and _tg_bot.token and _tg_bot.owner_id:
             try:
@@ -230,8 +244,6 @@ class HeartbeatManager:
             if not hasattr(web_session, "_notifications"):
                 web_session._notifications = []
             web_session._notifications.append({"time": time.time(), "text": f"💓 Heartbeat: {result[:200]}"})
-            if len(web_session._notifications) > 200:
-                web_session._notifications = web_session._notifications[-200:]
 
 
 heartbeat = HeartbeatManager()

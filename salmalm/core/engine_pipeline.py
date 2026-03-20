@@ -1,5 +1,6 @@
 """Engine message processing pipeline."""
 
+import asyncio
 import logging
 import time
 from typing import Optional, Tuple, Any, Callable
@@ -16,25 +17,20 @@ _active_requests_event = _threading.Event()
 # Per-session concurrency guard — prevents overlapping requests on same session
 _session_locks: dict = {}  # session_id → threading.Lock
 _session_locks_lock = _threading.Lock()
+_SESSION_LOCKS_MAX = 500  # cap to prevent unbounded memory growth
 
 import re as _re
 
 
 def _get_thinking_budget_map():
-    """Get thinking budget map from constants (single source of truth)."""
-    from salmalm.constants import THINKING_BUDGET_MAP
-    return THINKING_BUDGET_MAP
+    """Lazy import to avoid circular dependency."""
+    from salmalm.core.intelligence_engine import _THINKING_BUDGET_MAP
+
+    return _THINKING_BUDGET_MAP
 
 
 _MAX_MESSAGE_LENGTH = 100_000
-_SESSION_ID_RE = _re.compile(r"^[a-zA-Z0-9_\-\.]+$")
-
-
-# Lazy imports to break circular deps — resolved at call time
-def _get_engine_deps():
-    """Import engine dependencies lazily."""
-
-    return locals()
+_SESSION_ID_RE = _re.compile(r"^[a-zA-Z0-9_\-\.:]+$")
 
 
 def _sanitize_input(text: str) -> str:
@@ -43,110 +39,52 @@ def _sanitize_input(text: str) -> str:
     return "".join(c for c in text if c == "\n" or c == "\t" or c == "\r" or ord(c) >= 32)
 
 
-
-
-# --- Natural language model switch ---
-import re as _re_model
-_MODEL_SWITCH_PATTERNS = [
-    # Korean
-    _re_model.compile(r'모델.*(?:바꿔|변경|전환|스위치|바꾸|바꿈|변경해)'),
-    _re_model.compile(r'(?:바꿔|변경|전환).*모델'),
-    # English
-    _re_model.compile(r'(?:switch|change|set|use)\s+(?:the\s+)?model', _re_model.IGNORECASE),
-    _re_model.compile(r'model\s+(?:to|=)', _re_model.IGNORECASE),
-]
-_MODEL_NAME_MAP = {
-    'opus': 'anthropic/claude-opus-4-6',
-    '오푸스': 'anthropic/claude-opus-4-6',
-    'claude opus': 'anthropic/claude-opus-4-6',
-    '클로드 오푸스': 'anthropic/claude-opus-4-6',
-    'sonnet': 'anthropic/claude-sonnet-4-6',
-    '소네트': 'anthropic/claude-sonnet-4-6',
-    'claude sonnet': 'anthropic/claude-sonnet-4-6',
-    '클로드 소네트': 'anthropic/claude-sonnet-4-6',
-    'claude': 'anthropic/claude-sonnet-4-6',
-    '클로드': 'anthropic/claude-sonnet-4-6',
-    'haiku': 'anthropic/claude-haiku-4-5-20251001',
-    '하이쿠': 'anthropic/claude-haiku-4-5-20251001',
-    'gpt': 'openai/gpt-4.1',
-    'gpt-4': 'openai/gpt-4.1',
-    'gpt-4.1': 'openai/gpt-4.1',
-    'gemini': 'google/gemini-2.5-flash',
-    '제미니': 'google/gemini-2.5-flash',
-    'gemini flash': 'google/gemini-2.5-flash',
-    'gemini pro': 'google/gemini-2.5-pro',
-    'grok': 'xai/grok-4',
-    '그록': 'xai/grok-4',
-    'auto': None,
-    '자동': None,
-}
-
-def _detect_model_switch(text: str):
-    """Detect natural language model switch request. Returns model name or None."""
-    text = text.strip()
-    if len(text) > 100:
-        return None
-    matched = any(p.search(text) for p in _MODEL_SWITCH_PATTERNS)
-    if not matched:
-        return None
-    text_lower = text.lower()
-    for name, model in sorted(_MODEL_NAME_MAP.items(), key=lambda x: -len(x[0])):
-        if name in text_lower:
-            return model
-    return None
-
-async def _process_message_guarded(
+async def process_message(
     session_id: str,
     user_message: str,
+    user_id: Optional[int] = None,
     model_override: Optional[str] = None,
     image_data: Optional[Tuple[str, str]] = None,
     on_tool: Optional[Callable[[str, Any], None]] = None,
     on_token: Optional[Callable] = None,
     on_status: Optional[Callable] = None,
     lang: Optional[str] = None,
+    system_suffix: Optional[str] = None,
 ) -> str:
     """Process a user message through the Intelligence Engine pipeline.
 
-    Wrapped by global_circuit_breaker (see bottom of module) before export
-    as the public ``process_message`` symbol.
-
-    Edge cases handled:
+    Edge cases:
     - Shutdown rejection
-    - Per-session concurrent-request guard (threading.Lock via run_in_executor)
     - Unhandled exceptions → graceful error message
     """
+    # Event loop reference is now obtained dynamically via _get_event_loop()
     # Reject new requests during shutdown
     if _shutting_down:
         return "⚠️ Server is shutting down. Please try again later. / 서버가 종료 중입니다."
 
-    # Per-session lock: prevents overlapping requests on the same session.
+    # Per-session lock: if previous request still running, abort it and wait
     with _session_locks_lock:
         if session_id not in _session_locks:
+            # Evict oldest entries if at cap
+            if len(_session_locks) >= _SESSION_LOCKS_MAX:
+                # Remove locks that are not currently held
+                to_remove = [k for k, v in _session_locks.items()
+                             if not v.locked() and k != session_id]
+                for k in to_remove[:len(_session_locks) // 2]:
+                    del _session_locks[k]
             _session_locks[session_id] = _threading.Lock()
         sess_lock = _session_locks[session_id]
 
-    # Track whether *this coroutine* holds the lock so finally can release safely.
-    _lock_acquired = False
     if not sess_lock.acquire(blocking=False):
-        # Previous request still running — send abort signal and wait.
-        # IMPORTANT: sess_lock is a threading.Lock. We must NOT call
-        # blocking .acquire() directly in an async context — it would
-        # stall the entire event loop. Offload to a thread pool instead.
+        # Previous request still running — send abort signal and wait
         from salmalm.features.abort import abort_controller
         abort_controller.set_abort(session_id)
         log.info(f"[ENGINE] Session {session_id} busy — aborting previous and waiting")
-        import asyncio as _asyncio
-        loop = _asyncio.get_event_loop()
-        _lock_acquired = await loop.run_in_executor(
-            None, lambda: sess_lock.acquire(blocking=True, timeout=15.0)
-        )
-        if not _lock_acquired:
-            # Timeout: refuse to proceed — two concurrent requests on the same
-            # session would corrupt session.messages (race condition).
+        import asyncio as _aio
+        acquired = await _aio.to_thread(sess_lock.acquire, True, 15.0)
+        if not acquired:
             log.warning(f"[ENGINE] Session {session_id} lock timeout — rejecting request")
-            return "⏳ 이전 요청이 아직 처리 중입니다. 잠시 후 다시 시도해주세요.\n(Previous request still in progress — please wait.)"
-    else:
-        _lock_acquired = True
+            return "⚠️ Session busy, please try again"
 
     with _active_requests_lock:
         global _active_requests
@@ -154,25 +92,17 @@ async def _process_message_guarded(
         _active_requests_event.clear()
 
     try:
-        # --- Natural language model switch interceptor ---
-        _model_switch = _detect_model_switch(user_message)
-        if _model_switch:
-            from salmalm.core.session_store import get_session as _gs
-            _sess = _gs(session_id)
-            _sess.model_override = _model_switch
-            _model_short = _model_switch.split('/')[-1]
-            log.info(f'[MODEL-SWITCH] {session_id} -> {_model_switch}')
-            return f'✅ 모델을 **{_model_short}**로 변경했습니다.'
-
         return await _process_message_inner(
             session_id,
             user_message,
+            user_id=user_id,
             model_override=model_override,
             image_data=image_data,
             on_tool=on_tool,
             on_token=on_token,
             on_status=on_status,
             lang=lang,
+            system_suffix=system_suffix,
         )
     except Exception as e:
         log.error(f"[ENGINE] Unhandled error: {type(e).__name__}: {e}")
@@ -185,22 +115,10 @@ async def _process_message_guarded(
             _active_requests -= 1
             if _active_requests == 0:
                 _active_requests_event.set()
-        if _lock_acquired:
-            try:
-                sess_lock.release()
-            except RuntimeError:
-                pass  # Should never happen — guard is belt-and-suspenders
-        # Evict lock entry if session no longer exists — prevents unbounded growth.
-        # Check lazily here: most sessions are long-lived so eviction is rare.
         try:
-            from salmalm.core.session_store import _sessions as _ss
-            if session_id not in _ss:
-                with _session_locks_lock:
-                    # Double-check inside the lock (another coroutine may have just added it)
-                    if session_id not in _ss:
-                        _session_locks.pop(session_id, None)
-        except Exception:
-            pass  # Non-critical cleanup — never block on this
+            sess_lock.release()
+        except RuntimeError:
+            pass  # Already released
 
 
 def _classify_task(session, user_message: str) -> dict:
@@ -226,6 +144,47 @@ def _classify_task(session, user_message: str) -> dict:
     return classification
 
 
+# Allowed model name prefixes.  Overrides that don't start with one of these
+# are rejected and fall back to auto-routing instead of being forwarded as-is
+# to the LLM provider (prevents provider enumeration / SSRF via model names).
+_ALLOWED_MODEL_PREFIXES = (
+    "anthropic/",
+    "openai/",
+    "google/",
+    "mistral/",
+    "xai/",
+    "meta/",
+    "deepseek/",
+    "cohere/",
+    "groq/",
+    "ollama/",
+)
+
+
+def _validate_model_override(model_override: str) -> Optional[str]:
+    """Validate a model override string.
+
+    Returns the validated (possibly alias-resolved) model name, or None if
+    the override is invalid and should fall back to auto-routing.
+    """
+    from salmalm.constants import MODEL_ALIASES as _ALIASES
+    from salmalm.core.model_selection import fix_model_name as _fix_model_name
+
+    # Resolve known aliases first (e.g. "sonnet" → "anthropic/claude-sonnet-4-6")
+    resolved = _ALIASES.get(model_override, model_override)
+    fixed = _fix_model_name(resolved)
+
+    # Must match one of the allowed prefixes after resolution
+    if any(fixed.startswith(p) for p in _ALLOWED_MODEL_PREFIXES):
+        return fixed
+
+    log.warning(
+        f"[ROUTE] model_override '{model_override}' resolved to '{fixed}' which does not "
+        f"match any allowed prefix — falling back to auto-routing"
+    )
+    return None
+
+
 def _route_model(model_override, user_message: str, session) -> tuple:
     """Select model via routing or override. Returns (model, complexity).
 
@@ -233,29 +192,31 @@ def _route_model(model_override, user_message: str, session) -> tuple:
        :mod:`salmalm.core.model_selection`.  Prefer calling
        ``model_selection.select_model`` directly for new code.
     """
-    from salmalm.core.model_selection import select_model as _select_model, fix_model_name as _fix_model_name
-    from salmalm.constants import MODEL_ALIASES as _ALIASES
+    from salmalm.core.model_selection import select_model as _select_model
 
     if model_override:
-        # Resolve short aliases (sonnet → anthropic/claude-sonnet-4-6, etc.)
-        resolved = _ALIASES.get(model_override, model_override)
-        return _fix_model_name(resolved), "auto"
+        validated = _validate_model_override(model_override)
+        if validated:
+            return validated, "auto"
+        # Fallthrough to auto-routing on invalid override
+
     selected, complexity = _select_model(user_message, session)
     log.info(f"[ROUTE] Multi-model: {complexity} → {selected}")
+    from salmalm.core.model_selection import fix_model_name as _fix_model_name
     return _fix_model_name(selected), complexity
 
 
-def _prepare_context(session, user_message: str, lang, on_status) -> None:
+def _prepare_context(session, user_message: str, lang, on_status, system_suffix: Optional[str] = None) -> None:
     """Prepare session context: language, compaction, RAG, mood, self-evolve."""
     from salmalm.core.compaction import compact_messages
     from salmalm.core.prompt import build_system_prompt
 
     if lang and lang in ("en", "ko"):
         lang_directive = "Respond in English." if lang == "en" else "한국어로 응답하세요."
-        lang_content = f"[Language: {lang_directive}]"
-        # Dedup: strip previous lang directives before appending (same pattern as _recall)
-        session.messages = [m for m in session.messages if not m.get("_lang")]
-        session.messages.append({"role": "system", "content": lang_content, "_lang": True})
+        session.messages.append({"role": "system", "content": f"[Language: {lang_directive}]"})
+
+    if system_suffix:
+        session.messages.append({"role": "system", "content": system_suffix})
 
     session.messages = compact_messages(session.messages, session=session, on_status=on_status)
     if len(session.messages) % 20 == 0:
@@ -267,24 +228,18 @@ def _prepare_context(session, user_message: str, lang, on_status) -> None:
         for i, m in enumerate(session.messages):
             if m.get("role") == "system":
                 session.messages[i] = dict(m)
-                session.messages[i]["content"] = inject_rag_context(session.messages, m["content"], max_chars=1500)
+                session.messages[i]["content"] = inject_rag_context(session.messages, m["content"], max_chars=2500)
                 break
     except Exception as e:
         log.warning(f"RAG injection skipped: {e}")
 
     # Auto-recall: inject relevant memory context (OpenClaw-style)
-    # Dedup: remove previous recall injections before appending new one.
-    # Prevents identical [Memory Recall] blocks accumulating on every turn.
     try:
         from salmalm.core.memory import memory_manager
 
         recall = memory_manager.auto_recall(user_message)
         if recall:
-            # Strip stale recall messages from previous turns
-            session.messages = [m for m in session.messages if not m.get("_recall")]
-            # Skip injection if recall content is identical to the one we just removed
-            # (i.e., same context window — no new information to add)
-            session.messages.append({"role": "system", "content": recall, "_recall": True})
+            session.messages.append({"role": "system", "content": recall})
     except Exception as _recall_err:
         log.debug(f"[PIPELINE] auto_recall skipped: {_recall_err}")
 
@@ -363,42 +318,43 @@ def _post_process(session, session_id: str, user_message: str, response: str, cl
     if _hint:
         response = response + _hint
         del session._thinking_hint
+
+    # Auto-inject generated image paths that the LLM forgot to include in response
+    import re as _re
+    _img_exts = r"(png|jpg|jpeg|gif|webp)"
+    _img_pattern = _re.compile(rf"uploads/[\w.-]+\.{_img_exts}", _re.IGNORECASE)
+    if not _img_pattern.search(response):
+        # Scan recent tool results for generated images
+        for msg in reversed(session.messages[-10:]):
+            if msg.get("role") == "tool":
+                content = str(msg.get("content", ""))
+                m = _img_pattern.search(content)
+                if m and "✅ Image generated" in content:
+                    path = m.group(0)
+                    # Extract alt from prompt line if available
+                    alt_m = _re.search(r"Prompt:\s*(.+)", content)
+                    alt = alt_m.group(1).strip() if alt_m else "image"
+                    response = response.rstrip() + f"\n![{alt}]({path})"
+                    break
+
     return response
-
-
-async def _safe(coro_or_fn, *args, fallback=None, label="stage", **kwargs):
-    """Safely call an async coroutine or sync function.
-
-    Returns fallback value on any exception — prevents one stage failure
-    from killing the entire request pipeline.
-    """
-    import asyncio as _asyncio
-    import inspect
-    try:
-        if inspect.iscoroutinefunction(coro_or_fn):
-            return await coro_or_fn(*args, **kwargs)
-        elif inspect.iscoroutine(coro_or_fn):
-            return await coro_or_fn
-        else:
-            return coro_or_fn(*args, **kwargs)
-    except Exception as _e:
-        import traceback as _tb
-        log.warning(f"[PIPELINE] {label} failed (fallback): {type(_e).__name__}: {_e}\n{_tb.format_exc()}")
-        return fallback
 
 
 async def _process_message_inner(
     session_id: str,
     user_message: str,
+    user_id: Optional[int] = None,
     model_override: Optional[str] = None,
     image_data: Optional[Tuple[str, str]] = None,
     on_tool: Optional[Callable[[str, Any], None]] = None,
     on_token: Optional[Callable] = None,
     on_status: Optional[Callable] = None,
     lang: Optional[str] = None,
+    system_suffix: Optional[str] = None,
 ) -> str:
     """Inner implementation of process_message."""
-    from salmalm.core.engine import _engine  # singleton
+    from salmalm.core.intelligence_engine import _get_engine as _ie_get_engine
+    _engine = _ie_get_engine()  # lazy singleton — no circular import
 
     # Input sanitization
     if not _SESSION_ID_RE.match(session_id):
@@ -409,7 +365,7 @@ async def _process_message_inner(
 
     from salmalm.core.session_store import get_session
 
-    session = get_session(session_id)
+    session = get_session(session_id, user_id=user_id)
 
     # Set user context for cost tracking (multi-tenant)
     from salmalm.core import set_current_user_id
@@ -440,54 +396,6 @@ async def _process_message_inner(
     slash_result = await _dispatch_slash_command(cmd, session, session_id, model_override, on_tool)
     if slash_result is not None:
         return slash_result
-
-    # --- Natural-language sub-agent spawn detection ---
-    _spawn_patterns_ko = [
-        ("서브 에이전트로", "서브에이전트로"),
-        ("서브에이전트로",),
-        ("백그라운드로 실행", "백그라운드로 돌려"),
-        ("서브에이전트 돌려", "서브 에이전트 돌려"),
-    ]
-    _msg_lower = user_message.strip()
-    _is_spawn_request = any(
-        kw in _msg_lower
-        for kw in ("서브에이전트로", "서브 에이전트로", "서브에이전트로 돌려", "서브에이전트를 써서",
-                   "subagent로", "sub-agent로", "백그라운드로 실행해", "서브에이전트 실행")
-    )
-    if _is_spawn_request and not _msg_lower.startswith("/"):
-        try:
-            from salmalm.features.subagents import subagent_manager
-            # Strip Korean spawn-request suffix to extract the actual task
-            _task = user_message.strip()
-            for _suf in sorted([
-                "서브에이전트로 돌리시오", "서브 에이전트로 돌리시오",
-                "서브에이전트로 돌려주시오", "서브 에이전트로 돌려주시오",
-                "서브에이전트로 돌려", "서브 에이전트로 돌려",
-                "서브에이전트로 실행하시오", "서브 에이전트로 실행하시오",
-                "서브에이전트를 써서", "서브에이전트로", "서브 에이전트로",
-                "백그라운드로 실행해", "서브에이전트 실행",
-            ], key=len, reverse=True):
-                _task = _task.replace(_suf, "").strip()
-            # Remove trailing Korean particles (을/를/이/가/은/는)
-            import re as _re
-            _task = _re.sub(r"[을를이가은는]$", "", _task.strip()).strip()
-            _task = _task.strip("., ") or user_message.strip()
-            _task_obj = subagent_manager.spawn(
-                description=_task,
-                parent_session=session_id,
-            )
-            _reply = (
-                f"✅ 서브에이전트 실행 시작!\n\n"
-                f"• **Agent ID:** `{_task_obj.task_id}`\n"
-                f"• **Task:** {_task[:80]}\n"
-                f"• **Status:** 🔄 진행 중...\n\n"
-                f"완료되면 자동으로 알려드리겠소."
-            )
-            session.add_assistant(_reply)
-            return _reply
-        except Exception as _se:
-            log.warning(f"[ENGINE] Auto-spawn failed: {_se}")
-            # fall through to LLM
 
     # --- Normal message processing ---
     if not user_message.strip() and not image_data:
@@ -520,33 +428,23 @@ async def _process_message_inner(
         else:
             log.info("[ENGINE] Dedup: user message already in session — skipping add_user (SSE fallback)")
 
-    await _safe(_prepare_context, session, user_message, lang, on_status,
-                label="prepare_context")
+    # _prepare_context contains compact_messages() which calls the LLM synchronously.
+    # Running it in a thread pool prevents blocking the event loop for other users.
+    await asyncio.to_thread(_prepare_context, session, user_message, lang, on_status, system_suffix=system_suffix)
 
-    classification = await _safe(
-        _classify_task, session, user_message,
-        fallback={"tier": 1, "score": 1, "intent": "chat", "thinking": False,
-                  "thinking_level": None, "thinking_budget": 0},
-        label="classify_task",
-    )
-    _route_result = await _safe(
-        _route_model, model_override, user_message, session,
-        fallback=None, label="route_model",
-    )
-    if _route_result is None:
-        from salmalm.constants import DEFAULT_MODEL as _DEF_MODEL
-        selected_model, complexity = _DEF_MODEL, "auto"
-    else:
-        selected_model, complexity = _route_result
+    classification = _classify_task(session, user_message)
+    selected_model, complexity = _route_model(model_override, user_message, session)
 
     # ── SLA: Measure latency (레이턴시 측정) + abort token accumulation ──
     _sla_start = time.time()
     _sla_first_token_time = [0.0]  # mutable for closure
     _orig_on_token = on_token
 
-    # Start streaming accumulator for abort recovery
+    # Clear any stale abort flag from a previous aborted request on this session,
+    # then start fresh streaming accumulator for abort recovery.
     from salmalm.features.abort import abort_controller as _abort_ctl
 
+    _abort_ctl.clear(session_id)   # ← must happen BEFORE start_streaming
     _abort_ctl.start_streaming(session_id)
 
     def _sla_on_token(event) -> None:
@@ -609,7 +507,7 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
     # Web notification (if task came from telegram)
     if session_id == "telegram":
         # Store notification for web polling
-        from salmalm.core.session_store import _sessions  # canonical source
+        from salmalm.core import _sessions  # noqa: F811
 
         web_session = _sessions.get("web")
         if web_session:
@@ -625,17 +523,18 @@ def _notify_completion(session_id: str, user_message: str, response: str, classi
             web_session._notifications = web_session._notifications[-20:]  # type: ignore[attr-defined]
 
 
-from salmalm.core.error_recovery import global_circuit_breaker as _gcb
-
-process_message = _gcb(_process_message_guarded)
-"""Public entry point — global circuit breaker wraps the guarded pipeline."""
-
-
 def begin_shutdown() -> None:
-    """Signal the engine to stop accepting new requests."""
+    """Signal the engine to stop accepting new requests and shutdown tool executor."""
     global _shutting_down
     _shutting_down = True
     log.info("[SHUTDOWN] Engine: rejecting new requests")
+    # Gracefully shutdown tool executor
+    try:
+        from salmalm.core.intelligence_engine import _get_engine
+        engine = _get_engine()
+        engine.shutdown(wait=False)
+    except Exception:
+        pass
 
 
 def wait_for_active_requests(timeout: float = 30.0) -> bool:

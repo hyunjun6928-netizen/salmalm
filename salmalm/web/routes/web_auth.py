@@ -13,18 +13,6 @@ from salmalm.web.auth import auth_manager, extract_auth
 
 
 class WebAuthMixin:
-    GET_ROUTES = {
-        "/api/auth/users": "_get_api_auth_users",
-        "/api/google/auth": "_get_api_google_auth",
-    }
-    POST_ROUTES = {
-        "/api/users/register": "_post_api_users_register",
-        "/api/auth/login": "_post_api_auth_login",
-        "/api/auth/register": "_post_api_auth_register",
-        "/api/unlock": "_post_api_unlock",
-        "/api/auto-unlock": "_post_api_auto_unlock",
-    }
-
     """Mixin providing auth route handlers."""
 
     def _auto_unlock_localhost(self) -> bool:
@@ -40,25 +28,28 @@ class WebAuthMixin:
         # 1. Try OS keychain first (most secure)
         if vault.try_keychain_unlock():
             return True
-        # 1b. Try .vault_auto file (WSL/no-keychain fallback)
+        # 1b. .vault_auto marker file (WSL/no-keychain fallback).
+        # H-9 fix: base64 decode path removed — v0.30.2+ writes empty marker only.
+        # Non-empty .vault_auto files are refused here (bootstrap.py also rejects them).
+        # Password must come from OS keychain or SALMALM_VAULT_PASSWORD env var.
         try:
             _pw_hint_file = VAULT_FILE.parent / ".vault_auto"  # noqa: F405
             if _pw_hint_file.exists():
                 _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
                 if _hint:
-                    # Try base64 first, fall back to plain text
-                    import base64
-                    try:
-                        _auto_pw = base64.b64decode(_hint).decode()
-                    except Exception:
-                        _auto_pw = _hint  # Plain text fallback
+                    # Non-empty .vault_auto: old format (password was stored here).
+                    # Refuse to use it — direct user to set SALMALM_VAULT_PASSWORD instead.
+                    log.warning(
+                        "[VAULT] .vault_auto contains data (legacy format) — ignoring. "
+                        "Set SALMALM_VAULT_PASSWORD env var for passworded vaults."
+                    )
                 else:
-                    _auto_pw = ""
-                if vault.unlock(_auto_pw, save_to_keychain=True):
-                    return True
+                    # Empty marker — try empty-password unlock (no-crypto mode)
+                    if vault.unlock("", save_to_keychain=False):
+                        return True
         except Exception as e:
             log.debug(f"Suppressed: {e}")
-        pw = os.environ.get("SALMALM_VAULT_PW", "")
+        pw = os.environ.pop("SALMALM_VAULT_PW", "")  # read once + scrub from env
         if pw:
             import warnings
 
@@ -92,20 +83,15 @@ class WebAuthMixin:
                 return False  # Has password but no env var — show unlock screen
             return False
         else:
-            # No vault file — auto-create from .vault_auto or env pw
-            _auto_pw = ""
+            # No vault file — auto-create from env pw (H-9: .vault_auto base64 path removed)
+            _auto_pw = pw  # SALMALM_VAULT_PASSWORD or SALMALM_VAULT_PW (deprecated)
             try:
                 _pw_hint_file = VAULT_FILE.parent / ".vault_auto"  # noqa: F405
                 if _pw_hint_file.exists():
                     _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
                     if _hint:
-                        import base64 as _b64
-                        try:
-                            _auto_pw = _b64.b64decode(_hint).decode()
-                        except Exception:
-                            _auto_pw = _hint
-                elif pw:
-                    _auto_pw = pw
+                        log.warning("[VAULT] .vault_auto has data — ignored (legacy). Use SALMALM_VAULT_PASSWORD.")
+                    # Empty marker is fine — means no-crypto; _auto_pw stays as env var value or ""
             except Exception as e:
                 log.debug(f"Suppressed: {e}")
             try:
@@ -129,7 +115,8 @@ class WebAuthMixin:
 
     def _get_api_google_auth(self):
         """Get api google auth."""
-        if not self._require_auth("user"):
+        _auth_user = self._require_auth("user")
+        if not _auth_user:
             return
         client_id = vault.get("google_client_id") or ""
         if not client_id:
@@ -202,7 +189,7 @@ class WebAuthMixin:
         password = body.get("password", "")
         user = auth_manager.authenticate(username, password)
         if user:
-            token = auth_manager.create_token(user, expires_in=86400 * 30)  # 30 days — matches cookie lifetime
+            token = auth_manager.create_token(user)
             audit_log(
                 "auth_success",
                 f"user={username}",
@@ -286,8 +273,8 @@ class WebAuthMixin:
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Permissions-Policy", "camera=(), microphone=(self), geolocation=()")
-        # CSP: unsafe-inline by default (setup/unlock templates use inline scripts).
-        # Set SALMALM_CSP_STRICT=1 to use nonce-based script-src instead.
+        # CSP: unsafe-inline by default (templates use inline scripts without nonces).
+        # Set SALMALM_CSP_STRICT=1 to use nonce-based script-src (requires nonce on all inline scripts).
         if os.environ.get("SALMALM_CSP_STRICT"):
             script_src = f"'self' 'nonce-{self._csp_nonce}'"
         else:
@@ -331,200 +318,33 @@ class WebAuthMixin:
             self.wfile.write(json.dumps({"error": "Rate limit exceeded", "retry_after": e.retry_after}).encode())
             return False
 
+    def _post_api_auth_logout(self):
+        """Logout — revoke the current bearer token server-side.
 
-# ── FastAPI router ────────────────────────────────────────────────────────────
-import asyncio as _asyncio
-from fastapi import APIRouter as _APIRouter, Request as _Request, Depends as _Depends, Query as _Query
-from fastapi.responses import JSONResponse as _JSON, Response as _Response, HTMLResponse as _HTML, StreamingResponse as _SR, RedirectResponse as _RR
-from salmalm.web.fastapi_deps import require_auth as _auth, optional_auth as _optauth
-
-from salmalm.web.schemas import LoginRequest, UnlockRequest, UserCreate
-
-router = _APIRouter()
-
-@router.get("/api/auth/users")
-async def get_auth_users(request: _Request):
-    from salmalm.web.auth import extract_auth, auth_manager
-    user = extract_auth(dict(request.headers))
-    if not user or user.get("role") != "admin":
-        return _JSON(content={"error": "Admin access required"}, status_code=403)
-    return _JSON(content={"users": auth_manager.list_users()})
-
-@router.get("/api/google/auth")
-async def get_google_auth(request: _Request, _u=_Depends(_auth)):
-    import secrets, time, urllib.parse
-    from salmalm.security.crypto import vault
-    from salmalm.web.web import _google_oauth_pending_states
-    import os as _os
-    client_id = vault.get("google_client_id") or ""
-    if not client_id:
-        return _JSON(content={"error": "Set google_client_id in vault first (Settings > Vault)"}, status_code=400)
-    port = int(_os.environ.get("SALMALM_PORT", 18800))
-    redirect_uri = f"http://localhost:{port}/api/google/callback"
-    state = secrets.token_urlsafe(32)
-    _google_oauth_pending_states[state] = time.time()
-    _cutoff = time.time() - 900
-    for _k in [k for k, v in _google_oauth_pending_states.items() if v < _cutoff]:
-        _google_oauth_pending_states.pop(_k, None)
-    params = urllib.parse.urlencode({"client_id": client_id, "redirect_uri": redirect_uri,
-        "response_type": "code", "scope": "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/calendar",
-        "access_type": "offline", "prompt": "consent", "state": state})
-    url = f"https://accounts.google.com/o/oauth2/v2/auth?{params}"
-    return _RR(url=url, status_code=302)
-
-@router.post("/api/users/register")
-async def post_users_register(req: UserCreate, request: _Request):
-    from salmalm.web.auth import extract_auth, auth_manager
-    from salmalm.features.users import user_manager
-    requester = extract_auth(dict(request.headers))
-    reg_mode = user_manager.get_registration_mode()
-    if reg_mode == "admin_only":
-        if not requester or requester.get("role") != "admin":
-            return _JSON(content={"error": "Admin access required for registration / 관리자만 등록 가능"}, status_code=403)
-    try:
-        user = auth_manager.create_user(req.username, req.password, req.role)
-        user_manager.ensure_quota(user["id"])
-        return _JSON(content={"ok": True, "user": user})
-    except ValueError as e:
-        return _JSON(content={"error": str(e)}, status_code=400)
-
-@router.post("/api/auth/login")
-async def post_auth_login(req: LoginRequest, request: _Request):
-    from salmalm.web.auth import auth_manager
-    from salmalm.core import audit_log
-    import os as _os_login
-    username = req.username
-    password = req.password
-    user = auth_manager.authenticate(username, password)
-    ip = request.client.host if request.client else "unknown"
-    if user:
-        token = auth_manager.create_token(user)
-        audit_log("auth_success", f"user={username}", detail_dict={"username": username, "ip": ip})
-        # Browser clients use HttpOnly cookie (no token in body).
-        # API clients that send Accept: application/json get the token.
-        _accept = request.headers.get("accept", "")
-        _is_api_client = "application/json" in _accept and "text/html" not in _accept
-        _body = {"ok": True, "user": user}
-        if _is_api_client:
-            _body["token"] = token  # API/CLI clients need the raw token
-        resp = _JSON(content=_body, headers={"Cache-Control": "no-store, no-cache", "Pragma": "no-cache"})
-        # HttpOnly + SameSite cookie for XSS-resistant auth
-        _is_local = ip in ("127.0.0.1", "::1", "localhost")
-        _secure = not _is_local
-        resp.set_cookie(
-            key="salmalm_token",
-            value=token,
-            httponly=True,
-            samesite="lax",
-            secure=_secure,
-            max_age=86400 * 30,  # 30 days (matches JWT expires_in above)
-            path="/",
+        Extracts the raw token from the Authorization header or salmalm_token
+        cookie and passes it to token_manager.revoke() so the jti is added to
+        the revocation table.  Clients should also clear their local cookie/storage.
+        """
+        raw_token = None
+        auth_header = (
+            self.headers.get("Authorization", "")
+            or self.headers.get("authorization", "")
         )
-        return resp
-    else:
-        audit_log("auth_failure", f"user={username}", detail_dict={"username": username, "ip": ip})
-        return _JSON(content={"error": "Invalid credentials"}, status_code=401)
-
-@router.post("/api/auth/register")
-async def post_auth_register(req: UserCreate, request: _Request):
-    from salmalm.web.auth import extract_auth, auth_manager
-    requester = extract_auth(dict(request.headers))
-    if not requester or requester.get("role") != "admin":
-        return _JSON(content={"error": "Admin access required"}, status_code=403)
-    try:
-        user = auth_manager.create_user(req.username, req.password, req.role)
-        return _JSON(content={"ok": True, "user": user})
-    except ValueError as e:
-        return _JSON(content={"error": str(e)}, status_code=400)
-
-@router.post("/api/unlock")
-async def post_unlock(req: UnlockRequest, request: _Request):
-    from salmalm.security.crypto import vault
-    from salmalm.constants import VAULT_FILE
-    from salmalm.core import audit_log
-    from salmalm.web.auth import rate_limiter, ip_ban_list, RateLimitExceeded
-    import secrets
-    _ip = request.client.host if request.client else "unknown"
-    # Rate-limit vault unlock: 5 attempts/5min per IP (brute-force protection)
-    try:
-        rate_limiter.check(f"vault:{_ip}", "anonymous")
-    except RateLimitExceeded as _rle:
-        ip_ban_list.record_violation(_ip)
-        return _JSON(content={"error": "Too many unlock attempts"}, status_code=429,
-                     headers={"Retry-After": str(int(_rle.retry_after))})
-    password = req.password
-    if VAULT_FILE.exists():
-        ok = vault.unlock(password, save_to_keychain=True)
-    else:
-        vault.create(password, save_to_keychain=True)
-        ok = True
-    if ok:
-        audit_log("unlock", "vault unlocked")
-        return _JSON(content={"ok": True, "token": secrets.token_hex(32)})
-    else:
-        audit_log("unlock_fail", "wrong password")
-        return _JSON(content={"ok": False, "error": "Wrong password"}, status_code=401)
-
-@router.post("/api/auto-unlock")
-async def post_auto_unlock(request: _Request):
-    from salmalm.security.crypto import vault
-    from salmalm.core import audit_log
-    import secrets
-    if vault.is_unlocked:
-        return _JSON(content={"ok": True, "token": secrets.token_hex(32)})
-    ip = request.client.host if request.client else "unknown"
-    _is_local = ip in ("127.0.0.1", "::1", "localhost")
-    import os as _os_unlock
-    _trust_loopback = _os_unlock.environ.get("SALMALM_TRUST_LOOPBACK", "1") == "1"
-    if not _is_local or not _trust_loopback:
-        return _JSON(content={"ok": False}, status_code=401)
-    # Try auto-unlock via vault keychain/file
-    if vault.try_keychain_unlock():
-        audit_log("unlock", "vault auto-unlocked")
-        return _JSON(content={"ok": True, "token": secrets.token_hex(32)})
-    from salmalm.constants import VAULT_FILE
-    import os
-    try:
-        _pw_hint_file = VAULT_FILE.parent / ".vault_auto"
-        if _pw_hint_file.exists():
-            _hint = _pw_hint_file.read_text(encoding="utf-8").strip()
-            import base64
+        if auth_header.startswith("Bearer "):
+            raw_token = auth_header[7:].strip()
+        if not raw_token:
+            cookie_header = (
+                self.headers.get("Cookie", "")
+                or self.headers.get("cookie", "")
+            )
+            for part in cookie_header.split(";"):
+                part = part.strip()
+                if part.startswith("salmalm_token="):
+                    raw_token = part[len("salmalm_token="):]
+                    break
+        if raw_token:
             try:
-                _auto_pw = base64.b64decode(_hint).decode()
+                auth_manager.revoke_token(raw_token)
             except Exception:
-                _auto_pw = _hint
-            if vault.unlock(_auto_pw, save_to_keychain=True):
-                audit_log("unlock", "vault auto-unlocked from page load")
-                return _JSON(content={"ok": True, "token": secrets.token_hex(32)})
-    except Exception:
-        pass
-    pw = os.environ.get("SALMALM_VAULT_PW", "")
-    if pw and vault.unlock(pw, save_to_keychain=True):
-        audit_log("unlock", "vault auto-unlocked from page load")
-        return _JSON(content={"ok": True, "token": secrets.token_hex(32)})
-    if VAULT_FILE.exists() and vault.unlock(""):
-        audit_log("unlock", "vault auto-unlocked (no password)")
-        return _JSON(content={"ok": True, "token": secrets.token_hex(32)})
-    return _JSON(content={"ok": False}, status_code=401)
-
-
-@router.post("/api/auth/logout")
-async def post_auth_logout(request: _Request):
-    """Revoke the current JWT (server-side logout). Clears HttpOnly cookie."""
-    from salmalm.web.auth import extract_auth
-    from salmalm.web.token_manager import token_manager
-    user = extract_auth(dict(request.headers))
-    resp = _JSON(content={"ok": True, "message": "Logged out"})
-    # Revoke token so it cannot be reused even if intercepted
-    # extract raw token string from Authorization header or cookie
-    _raw_token = None
-    _auth_header = request.headers.get("authorization", "")
-    if _auth_header.startswith("Bearer "):
-        _raw_token = _auth_header[7:].strip()
-    if not _raw_token:
-        _raw_token = request.cookies.get("salmalm_token")
-    if _raw_token and user and user.get("jti"):
-        token_manager.revoke(_raw_token)
-    # Clear cookie
-    resp.delete_cookie(key="salmalm_token", path="/")
-    return resp
+                pass  # already expired or invalid — revocation is best-effort
+        self._json({"ok": True, "message": "Logged out"})

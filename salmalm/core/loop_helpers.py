@@ -13,17 +13,28 @@ log = logging.getLogger("salmalm")
 
 
 def check_abort(session_id: str) -> str | None:
-    """Check if generation was aborted. Returns partial response or None."""
-    from salmalm.features.abort import abort_controller
+    """Check if generation was aborted. Returns partial response or None.
 
-    if abort_controller.is_aborted(session_id):
-        partial = abort_controller.get_partial(session_id) or ""
-        abort_controller.clear(session_id)
-        return (partial + "\n\n⏹ [생성 중단됨 / Generation aborted]").strip()
+    Uses hook registry (core.check_abort_via_hook) to avoid core→features import.
+    Falls back to direct import if hooks are not yet registered (e.g. during tests).
+    """
+    from salmalm.core.core import check_abort_via_hook
+    result = check_abort_via_hook(session_id)
+    if result is not None:
+        return result
+    # Fallback: direct import (e.g. test environments without bootstrap)
+    try:
+        from salmalm.features.edge_cases import abort_controller
+        if abort_controller.is_aborted(session_id):
+            partial = abort_controller.get_partial(session_id) or ""
+            abort_controller.clear(session_id)
+            return (partial + "\n\n⏹ [생성 중단됨 / Generation aborted]").strip()
+    except Exception:
+        pass
     return None
 
 
-def select_model(model_override: str | None, user_message: str, tier: int, iteration: int, router) -> str:
+def select_model(model_override, user_message, tier, iteration, router):
     """Select model based on override, tier, or router."""
     if model_override:
         return model_override
@@ -40,53 +51,36 @@ def trim_history(session, classification) -> None:
     _INTENT_HISTORY_LIMIT = {"chat": 10, "memory": 10, "creative": 20}
     _hist_limit = _INTENT_HISTORY_LIMIT.get(classification["intent"])
     if _hist_limit and len(session.messages) > _hist_limit:
-        _sys = [m for m in session.messages if m.get("role") == "system"]
-        _recent = [m for m in session.messages if m.get("role") != "system"][-_hist_limit:]
-        session.messages = _sys + _recent
+        lock = getattr(session, "_messages_lock", None)
+        if lock:
+            with lock:
+                _sys = [m for m in session.messages if m.get("role") == "system"]
+                _recent = [m for m in session.messages if m.get("role") != "system"][-_hist_limit:]
+                session.messages = _sys + _recent
+        else:
+            _sys = [m for m in session.messages if m.get("role") == "system"]
+            _recent = [m for m in session.messages if m.get("role") != "system"][-_hist_limit:]
+            session.messages = _sys + _recent
 
 
-def prune_session_context(session, model: str) -> list:
-    """Prune context. Runs three stages when needed:
+def prune_session_context(session, model: str):
+    """Prune context if cache TTL expired."""
+    from salmalm.core.session_manager import _should_prune_for_cache, estimate_context_window, prune_context
 
-    A (tool-result pruning) — always run when cache TTL has expired.
-    B (role-aware pair dropping) — run when Stage A is insufficient.
-    C (critical truncation) — last resort, keeps minimum pairs.
-    """
-    from salmalm.core.engine import _should_prune_for_cache, estimate_context_window, prune_context
-    from salmalm.core.session_manager import recover_overflow, _estimate_total_tokens
-
-    _ctx_win = estimate_context_window(model)
-    _sid = getattr(session, "id", "__global__")
-
-    # ── Stage A: tool-result pruning (cache-TTL aware) ──
-    if _should_prune_for_cache(session_id=_sid):
-        pruned, a_stats = prune_context(session.messages, context_window_tokens=_ctx_win, session_id=_sid)
-        if a_stats["soft_trimmed"] or a_stats["hard_cleared"]:
-            log.info("[PRUNE-A] soft=%d hard=%d", a_stats["soft_trimmed"], a_stats["hard_cleared"])
-    else:
-        pruned = list(session.messages)
-
-    # ── Stage B/C: role-aware overflow recovery ──
-    # Run whenever estimated tokens exceed 90% of the context window,
-    # regardless of cache TTL (overflow must be handled proactively).
-    _overflow_threshold = int(_ctx_win * 0.90)
-    if _estimate_total_tokens(pruned) > _overflow_threshold:
-        pruned, bc_stats = recover_overflow(pruned, _ctx_win)
-        if bc_stats["stage"] != "A":
-            log.warning(
-                "[PRUNE-%s] dropped %d pair(s), ~%d → ~%d tokens",
-                bc_stats["stage"],
-                bc_stats["pairs_dropped"],
-                bc_stats["estimated_tokens_before"],
-                bc_stats["estimated_tokens_after"],
-            )
-
-    return pruned
+    if _should_prune_for_cache():
+        _ctx_win = estimate_context_window(model)
+        pruned, stats = prune_context(session.messages, context_window_tokens=_ctx_win)
+        if stats["soft_trimmed"] or stats["hard_cleared"]:
+            log.info(f"[PRUNE] soft={stats['soft_trimmed']} hard={stats['hard_cleared']}")
+        return pruned
+    return session.messages
 
 
 def record_usage(session_id: str, model: str, result, classification, iteration) -> None:
     """Record API usage and audit log."""
-    from salmalm.core.engine import record_response_usage, estimate_cost, audit_log
+    from salmalm.core.slash_commands import record_response_usage
+    from salmalm.core.cost import estimate_cost
+    from salmalm.core import audit_log
 
     usage = result.get("usage", {})
     record_response_usage(session_id, result.get("model", model), usage)
@@ -104,26 +98,19 @@ def record_usage(session_id: str, model: str, result, classification, iteration)
             detail_dict=api_detail,
         )
         try:
-            from salmalm.features.edge_cases import usage_tracker
-
+            from salmalm.core.core import _usage_detail_hooks
             _inp, _out = usage.get("input", 0), usage.get("output", 0)
             _cost = estimate_cost(model, usage)
-            usage_tracker.record(session_id, model, _inp, _out, _cost, classification.get("intent", ""))
+            for _hook in _usage_detail_hooks:
+                _hook(session_id, model, _inp, _out, _cost, classification.get("intent", ""))
         except Exception as _exc:
             log.debug(f"Suppressed: {_exc}")
 
-
-_MAX_TOOL_CALLS_PER_TURN = 20  # Guard against LLM returning runaway tool lists
 
 def validate_tool_calls(tool_calls: list) -> tuple[list, dict]:
     """Validate and parse tool call arguments. Returns (valid_tools, error_outputs)."""
     valid_tools = []
     error_outputs = {}
-    # Hard cap: ignore excess tool calls to prevent DoS / runaway loops
-    if len(tool_calls) > _MAX_TOOL_CALLS_PER_TURN:
-        log.warning("[TOOLS] %d tool calls in one turn — capped to %d",
-                    len(tool_calls), _MAX_TOOL_CALLS_PER_TURN)
-        tool_calls = tool_calls[:_MAX_TOOL_CALLS_PER_TURN]
     for tc in tool_calls:
         if not isinstance(tc.get("arguments"), dict):
             try:
@@ -137,7 +124,7 @@ def validate_tool_calls(tool_calls: list) -> tuple[list, dict]:
 
 def check_circuit_breaker(tool_outputs: dict, consecutive_errors: int, max_errors: int) -> tuple[int, str | None]:
     """Check for consecutive tool errors. Returns (new_error_count, error_message_or_None)."""
-    errors = sum(1 for v in tool_outputs.values() if str(v).startswith(("❌", "⚠️")))
+    errors = sum(1 for v in tool_outputs.values() if str(v).startswith("❌"))
     if errors > 0:
         consecutive_errors += errors
         if consecutive_errors >= max_errors:
@@ -149,35 +136,28 @@ def check_circuit_breaker(tool_outputs: dict, consecutive_errors: int, max_error
 
 
 def check_loop_detection(tool_calls: list, recent_calls: list) -> str | None:
-    """Detect infinite loops from repeated tool calls."""
+    """Detect infinite loops from repeated tool calls. Returns error message or None."""
     for tc in tool_calls:
-        name = tc.get("name", "")
-        sig = (name, hashlib.sha256(json.dumps(tc.get("arguments", {}), sort_keys=True).encode()).hexdigest()[:12])
+        sig = (
+            tc.get("name", ""),
+            hashlib.sha256(json.dumps(tc.get("arguments", {}), sort_keys=True).encode()).hexdigest()[:16],
+        )
         recent_calls.append(sig)
 
-    # Same call repeated 2+ times in last 4
-    if len(recent_calls) >= 4:
-        freq = Counter(recent_calls[-4:])
+    if len(recent_calls) >= 6:
+        freq = Counter(recent_calls[-6:])
         top = freq.most_common(1)[0]
-        if top[1] >= 2:
-            log.warning(f"[BREAK] same-call loop: {top[0][0]} x{top[1]}")
-            return f"⚠️ Tool `{top[0][0]}` already returned a result. Use it to write the final answer NOW."
-
-    # Same tool NAME 3x in a row (any args)
-    if len(recent_calls) >= 3:
-        name_streak = [s[0] for s in recent_calls[-3:]]
-        if len(set(name_streak)) == 1 and name_streak[0]:
-            log.warning(f"[BREAK] name-streak: {name_streak[0]} x3")
-            return f"⚠️ Tool `{name_streak[0]}` called 3 times in a row. STOP calling tools. Write the final answer using the result you already have."
-
+        if top[1] >= 3:
+            log.warning(f"[BREAK] Loop detected: {top[0][0]} called {top[1]}x with same args in last 6 iterations")
+            return f"⚠️ Infinite loop detected — tool `{top[0][0]}` repeating with same arguments. Stopping."
     return None
+
 
 async def handle_empty_response(call_fn, pruned_messages, model: str, tools: list) -> str:
     """Retry empty responses up to 2 times with backoff."""
-    import asyncio as _aio_er
     for _retry in range(2):
         log.warning(f"[LLM] Empty response, retry #{_retry + 1}")
-        await _aio_er.sleep(0.5 * (_retry + 1))
+        await asyncio.sleep(0.5 * (_retry + 1))
         retry_result, _ = await call_fn(pruned_messages, model=model, tools=tools, max_tokens=4096, thinking=False)
         response = retry_result.get("content", "")
         if response and response.strip():
@@ -221,4 +201,4 @@ def auto_log_conversation(user_message: str, response: str, classification: dict
         entry = f"{tag} Q: {q_snippet}\n  A: {a_snippet}"
         write_daily_log(entry)
     except Exception as e:  # noqa: broad-except
-        pass  # Memory logging should never break the main flow
+        log.debug(f"[AUTO_LOG] Suppressed: {e}")  # Memory logging should never break the main flow

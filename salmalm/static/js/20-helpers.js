@@ -1,79 +1,28 @@
   /* --- Helpers --- */
   var _copyId=0;
   function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-  /* Tool icon + label mapping (OpenClaw-style) */
-  var _TOOL_META={
-    exec:{icon:'⚡',label:'Exec'},bash:{icon:'⚡',label:'Exec'},shell:{icon:'⚡',label:'Exec'},run:{icon:'⚡',label:'Exec'},
-    edit:{icon:'✏️',label:'Edit'},write:{icon:'✏️',label:'Edit'},file_write:{icon:'✏️',label:'Edit'},
-    read:{icon:'📖',label:'Read'},file_read:{icon:'📖',label:'Read'},
-    web_search:{icon:'🔍',label:'Search'},search:{icon:'🔍',label:'Search'},
-    web_fetch:{icon:'🌐',label:'Fetch'},fetch:{icon:'🌐',label:'Fetch'},
-    browser:{icon:'🖥️',label:'Browser'},
-    image:{icon:'🖼️',label:'Image'},
-    memory_search:{icon:'🧠',label:'Memory'},memory_get:{icon:'🧠',label:'Memory'},
-  };
-  function _toolMeta(name){
-    var m=_TOOL_META[name]||_TOOL_META[name.toLowerCase()];
-    if(m)return m;
-    return {icon:'🔧',label:name.charAt(0).toUpperCase()+name.slice(1).replace(/_/g,' ')};
-  }
-  /* Build a one-liner preview from tool call args */
-  function _toolPreview(callBody){
-    try{
-      var parsed=JSON.parse(callBody.trim());
-      var args=parsed.arguments||parsed;
-      delete args.name;
-      var keys=Object.keys(args);
-      if(!keys.length)return '';
-      // First meaningful string arg, truncated
-      var first=String(args[keys[0]]||'').replace(/\n/g,' ').trim();
-      if(keys.length>1)first+=' (+'+( keys.length-1)+' more)';
-      return first.length>120?first.substring(0,120)+'…':first;
-    }catch(e){
-      var s=callBody.replace(/"?name"?\s*[:=]\s*"[^"]*",?\s*/,'').trim();
-      return s.length>120?s.substring(0,120)+'…':s;
-    }
-  }
-  function _toolCard(name,preview,resultSnippet,done){
-    var m=_toolMeta(name);
-    var status=done
-      ?'<span class="tc-status tc-done">✓</span>'
-      :'<span class="tc-status tc-pending">…</span>';
-    var previewHtml=preview?'<div class="tc-preview">with '+escHtml(preview)+'</div>':'';
-    var resultHtml='';
-    if(done&&resultSnippet){
-      var rs=resultSnippet.trim();
-      if(rs.length>200)rs=rs.substring(0,200)+'…';
-      resultHtml='<div class="tc-result">'+escHtml(rs)+'</div>';
-    }
-    return '<div class="tool-card">'
-      +'<div class="tc-header"><span class="tc-icon">'+m.icon+'</span><span class="tc-label">'+escHtml(m.label)+'</span>'+status+'</div>'
-      +previewHtml
-      +(done?'<div class="tc-completed">Completed</div>':'')
-      +'</div>';
-  }
   function _renderToolBlocks(t){
-    /* Merge consecutive tool_call+tool_result into single card */
+    /* Merge consecutive tool_call+tool_result into single compact block */
     t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>\s*<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,callBody,resultBody){
-      var name=(callBody.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
-      var preview=_toolPreview(callBody);
-      return _toolCard(name,preview,resultBody,true);
+      var name2=(callBody.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
+      var preview2=resultBody.length>300?resultBody.substring(0,300)+'…':resultBody;
+      return '<details class="tool-block"><summary class="tool-header">🔧 <b>'+name2+'</b> <span style="margin-left:auto;font-size:10px;opacity:0.6">✓ done</span></summary><pre class="tool-body">'+preview2.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
     });
-    /* Pending tool_call (no result yet) */
+    /* Remaining unmatched tool_call (no result yet) */
     t=t.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g,function(_,body){
-      var name=(body.match(/\"?name\"?\s*[:=]\s*"?(\w+)/)||['','tool'])[1];
-      var preview=_toolPreview(body);
-      return _toolCard(name,preview,'',false);
+      var name='tool';var args='';
+      try{var parsed=JSON.parse(body.trim());name=parsed.name||'tool';args=JSON.stringify(parsed.arguments||parsed,null,2)}catch(e){args=body.trim()}
+      if(args.length>200)args=args.substring(0,200)+'…';
+      return '<details class="tool-block"><summary class="tool-header">🔧 <strong>'+name+'</strong> <span style="margin-left:auto;font-size:10px;opacity:0.6">⏳</span></summary><pre class="tool-body">'+args.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
     });
-    /* Orphan tool_result */
     t=t.replace(/<tool_result>\s*([\s\S]*?)\s*<\/tool_result>/g,function(_,body){
-      var preview=body.trim();if(preview.length>200)preview=preview.substring(0,200)+'…';
-      return '<div class="tool-card tc-result-only"><div class="tc-header"><span class="tc-icon">📤</span><span class="tc-label">Result</span></div><div class="tc-preview">'+escHtml(preview)+'</div></div>';
+      var preview=body.trim();if(preview.length>300)preview=preview.substring(0,300)+'...';
+      return '<details class="tool-block"><summary class="tool-header">📤 Result</summary><pre class="tool-body">'+preview.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre></details>';
     });
     return t;
   }
   function renderMd(t){
-    if(t.startsWith('<img ')||t.startsWith('<audio '))return t;
+    if((t.startsWith('<img ')||t.startsWith('<audio '))&&t.indexOf('/uploads/')!==-1)return t;
     t=_renderToolBlocks(t);
     /* Extract code blocks first, escape everything else, then restore */
     var codeBlocks=[];
@@ -122,8 +71,8 @@
       if(/^(javascript|data|vbscript):/i.test(safeUrl))safeUrl='#blocked';
       return '<a href="'+safeUrl+'" target="_blank" rel="noopener noreferrer" style="color:var(--accent2);text-decoration:underline">'+label+'</a>';
     });
-    t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,'<img src="/uploads/$1" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="$1" data-action="openImage">');
-    t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,'<audio controls src="/uploads/$1" style="display:block;margin:8px 0"></audio> 🔊 $1');
+    t=t.replace(/uploads[/]([\w.-]+[.](png|jpg|jpeg|gif|webp))/gi,function(_m,f){var _t=window._tok||sessionStorage.getItem("tok")||localStorage.getItem("salm_token")||"";return '<img src="/uploads/'+f+(_t?'?token='+_t:'')+'" style="max-width:400px;max-height:400px;border-radius:8px;display:block;margin:8px 0;cursor:pointer" alt="'+f+'" data-action="openImage">'});
+    t=t.replace(/uploads[/]([\w.-]+[.](mp3|wav|ogg))/gi,function(_m,f){var _t=window._tok||sessionStorage.getItem("tok")||localStorage.getItem("salm_token")||"";return '<audio controls src="/uploads/'+f+(_t?'?token='+_t:'')+'" style="display:block;margin:8px 0"></audio> 🔊 '+f});
     /* Restore code blocks AFTER all markdown transforms */
     for(var ci=0;ci<codeBlocks.length;ci++){t=t.replace('%%CODEBLOCK'+ci+'%%',codeBlocks[ci])}
     /* Collapse 2+ consecutive blank lines into 1 */

@@ -151,7 +151,8 @@ class RequestLogger:
             sc = str(status_code)
             self._metrics["by_status"][sc] = self._metrics["by_status"].get(sc, 0) + 1
             # Track top paths
-            self._metrics["by_path"][path] = self._metrics["by_path"].get(path, 0) + 1
+            if len(self._metrics["by_path"]) < 500 or path in self._metrics["by_path"]:
+                self._metrics["by_path"][path] = self._metrics["by_path"].get(path, 0) + 1
             # Rolling average duration
             self._metrics["_durations"].append(duration_ms)
             if len(self._metrics["_durations"]) > 1000:

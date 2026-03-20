@@ -10,14 +10,13 @@ import json
 import threading as _threading
 import time as _time
 from salmalm.constants import DATA_DIR as _DATA_DIR, MODEL_FALLBACKS as _DEFAULT_FALLBACKS
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from salmalm.security.crypto import log
 from salmalm.core.llm import (
     call_llm as _call_llm_sync,
     stream_anthropic as _stream_anthropic,
     stream_google as _stream_google,
-    stream_openai as _stream_openai,
 )
 
 # ============================================================
@@ -76,25 +75,12 @@ def _load_cooldowns() -> dict:
 
 
 def _save_cooldowns(cd: dict) -> None:
-    """Save cooldowns atomically (tempfile + rename — safe on process kill)."""
-    import os as _os, tempfile as _tf
+    """Save cooldowns."""
     try:
         _COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = _tf.mkstemp(dir=_COOLDOWN_FILE.parent, suffix=".tmp")
-        try:
-            with _os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(json.dumps(cd))
-                f.flush()
-                _os.fsync(f.fileno())
-            _os.replace(tmp, _COOLDOWN_FILE)
-        except Exception:
-            try:
-                _os.unlink(tmp)
-            except OSError:
-                pass
-            raise
+        _COOLDOWN_FILE.write_text(json.dumps(cd), encoding="utf-8")
     except Exception as e:
-        log.debug(f"[COOLDOWN] Save failed: {e}")
+        log.debug(f"Suppressed: {e}")
 
 
 def _is_model_cooled_down(model: str) -> bool:
@@ -112,19 +98,11 @@ def _cooldown_provider(model: str, cooldown_seconds: int = 3600) -> None:
     provider = model.split("/")[0] if "/" in model else model
     with _cooldown_lock:
         cd = _load_cooldowns()
-        # Find all models from this provider — both built-in fallbacks AND
-        # any user-added models from the live failover config.
+        # Find all models from this provider in fallback config
         all_models = set()
         for m in _DEFAULT_FALLBACKS:
             if m.startswith(provider + "/"):
                 all_models.add(m)
-        try:
-            live_cfg = get_failover_config()
-            for m in live_cfg:
-                if isinstance(m, str) and m.startswith(provider + "/"):
-                    all_models.add(m)
-        except Exception:
-            pass  # Non-critical: built-in fallbacks already covered
         all_models.add(model)
         for m in all_models:
             cd[m] = {"until": _time.time() + cooldown_seconds, "failures": 99}
@@ -169,31 +147,37 @@ def _record_model_failure(model: str, cooldown_seconds: int = 0) -> None:
         }
         _save_cooldowns(cd)
         log.warning(f"[FAILOVER] {model} cooled down for {cooldown_secs}s (failure #{failures + 1})")
-    # Sync to CircuitBreakerRegistry so global_circuit_breaker sees provider state
-    try:
-        from salmalm.core.error_recovery import circuit_breakers
-        provider = model.split("/")[0] if "/" in model else model
-        circuit_breakers.record_failure(provider)
-    except Exception:
-        pass  # Non-critical — cooldown file is the primary state
+
+
+def _record_billing_failure(model: str, error_msg: str = "") -> None:
+    """Record billing/quota failure with escalating cooldown (5h→12h→24h).
+
+    Reads failure count under lock to prevent stale-read race conditions.
+    """
+    with _cooldown_lock:
+        cd = _load_cooldowns()
+        entry = cd.get(model, {"until": 0, "failures": 0})
+        failures = entry.get("failures", 0)
+        step = min(failures, len(_BILLING_COOLDOWN_STEPS) - 1)
+        cooldown_secs = _BILLING_COOLDOWN_STEPS[step]
+        cd[model] = {
+            "until": _time.time() + cooldown_secs,
+            "failures": failures + 1,
+        }
+        _save_cooldowns(cd)
+        log.warning(
+            f"[BILLING] {model} billing/quota error — cooldown {cooldown_secs // 3600}h "
+            f"(failure #{failures + 1}): {error_msg}"
+        )
 
 
 def _clear_model_cooldown(model: str) -> None:
-    """Clear cooldown on successful call. Also resets failure counter so next
-    failure starts from 0 rather than inheriting stale escalated backoff.
-    Also notifies CircuitBreakerRegistry so the provider circuit resets."""
+    """Clear cooldown on successful call."""
     with _cooldown_lock:
         cd = _load_cooldowns()
         if model in cd:
-            del cd[model]  # Full removal resets failures implicitly
+            del cd[model]
             _save_cooldowns(cd)
-    # Sync success to CircuitBreakerRegistry — provider circuit closes if it was open
-    try:
-        from salmalm.core.error_recovery import circuit_breakers
-        provider = model.split("/")[0] if "/" in model else model
-        circuit_breakers.record_success(provider)
-    except Exception:
-        pass  # Non-critical — cooldown file is the primary state
 
 
 def get_failover_config() -> dict:
@@ -347,64 +331,6 @@ async def _call_llm_streaming(
     return await asyncio.to_thread(_run)
 
 
-async def _call_openai_streaming(messages: list, model=None, tools=None, max_tokens=4096, on_token=None) -> dict:
-    """Streaming OpenAI-compatible call — yields tokens via on_token, returns final result.
-
-    Supports: openai, xai, deepseek, openrouter, meta-llama, mistralai, qwen, ollama.
-    """
-    def _run() -> dict:
-        accumulated_text = []
-        tool_calls_out = []
-        final_result = None
-        try:
-            for event in _stream_openai(messages, model=model, tools=tools, max_tokens=max_tokens):
-                if on_token:
-                    on_token(event)
-                if event.get("type") == "text_delta":
-                    accumulated_text.append(event.get("text", ""))
-                elif event.get("type") == "tool_use_end":
-                    tool_calls_out.append({
-                        "id": event["id"],
-                        "name": event["name"],
-                        "arguments": event["arguments"],
-                    })
-                elif event.get("type") == "message_end":
-                    final_result = event
-                elif event.get("type") == "error":
-                    return {
-                        "content": event.get("error", "❌ OpenAI streaming error"),
-                        "tool_calls": [],
-                        "usage": {"input": 0, "output": 0},
-                        "model": model or "?",
-                    }
-        except Exception as e:
-            partial = "".join(accumulated_text)
-            if partial:
-                log.warning(f"[STREAM] OpenAI interrupted with {len(partial)} chars partial: {e}")
-                return {
-                    "content": partial + "\n\n⚠️ [Streaming interrupted]",
-                    "tool_calls": [],
-                    "usage": {"input": 0, "output": 0},
-                    "model": model or "?",
-                }
-            raise
-        return final_result or {
-            "content": "".join(accumulated_text),
-            "tool_calls": tool_calls_out,
-            "usage": {"input": 0, "output": 0},
-            "model": model or "?",
-        }
-
-    return await asyncio.to_thread(_run)
-
-
-# OpenAI-compatible providers that support our streaming implementation
-_OPENAI_COMPATIBLE_PROVIDERS = frozenset({
-    "openai", "xai", "deepseek", "openrouter",
-    "meta-llama", "mistralai", "qwen", "ollama",
-})
-
-
 # ============================================================
 # Failover-aware LLM calls (used by IntelligenceEngine)
 # ============================================================
@@ -416,8 +342,8 @@ async def call_with_failover(
     tools: Optional[list] = None,
     max_tokens: int = 4096,
     thinking: bool = False,
-    on_token: Optional[Callable] = None,
-    on_status: Optional[Callable] = None,
+    on_token: Optional[object] = None,
+    on_status: Optional[object] = None,
 ) -> Tuple[Dict[str, Any], Optional[str]]:
     """LLM call with automatic failover on failure.
 
@@ -430,20 +356,14 @@ async def call_with_failover(
         chain = _load_failover_config().get(model, [])
         for fb in chain:
             if not _is_model_cooled_down(fb):
-                warn = ""  # suppress cooldown warning from chat UI (log already records it)
+                warn = f"⚠️ {model.split('/')[-1]} in cooldown, using {fb.split('/')[-1]}"
                 result = await try_llm_call(messages, fb, tools, max_tokens, thinking, on_token)
                 if not result.get("_failed"):
                     _clear_model_cooldown(fb)
                     return result, warn
                 _record_model_failure(fb)
-        # All fallbacks in cooldown — reject immediately without hammering dead endpoints
-        log.warning(f"[FAILOVER] {model} + all fallbacks in cooldown — rejecting request")
-        return {
-            "content": "⚠️ 모든 AI 모델이 일시적으로 사용 불가합니다. 잠시 후 다시 시도해주세요.",
-            "tool_calls": [],
-            "_failed": True,
-            "usage": {"input": 0, "output": 0},
-        }, f"⚠️ {model.split('/')[-1]} and all fallbacks in cooldown"
+        # All in cooldown — try primary anyway
+        pass
 
     # Try primary model
     result = await try_llm_call(messages, model, tools, max_tokens, thinking, on_token)
@@ -508,7 +428,7 @@ async def call_with_failover(
 
 
 async def try_llm_call(
-    messages: list, model: str, tools: Optional[list], max_tokens: int, thinking: bool, on_token: Optional[Callable]
+    messages: list, model: str, tools: Optional[list], max_tokens: int, thinking: bool, on_token: Optional[object]
 ) -> Dict[str, Any]:
     """Single LLM call attempt with transient error retry.
 
@@ -528,7 +448,7 @@ async def try_llm_call(
         "rate limit",
         "429",
     )
-    _AUTH_PATTERNS = ("401", "403", "invalid api key", "unauthorized", "authentication", "invalid x-api-key", "forbidden")
+    _AUTH_PATTERNS = ("401", "invalid api key", "unauthorized", "authentication", "invalid x-api-key")
 
     last_error = None
     for attempt in range(2):  # 1 initial + 1 retry
@@ -541,10 +461,6 @@ async def try_llm_call(
                 result = await _call_google_streaming(
                     messages, model=model, tools=tools, max_tokens=max_tokens, on_token=on_token
                 )
-            elif on_token and provider in _OPENAI_COMPATIBLE_PROVIDERS:
-                result = await _call_openai_streaming(
-                    messages, model=model, tools=tools, max_tokens=max_tokens, on_token=on_token
-                )
             else:
                 result = await _call_llm_async(messages, model=model, tools=tools, thinking=thinking)
             # Check for error responses — prefer explicit 'error' field over content sniffing
@@ -552,15 +468,8 @@ async def try_llm_call(
                 error_str = str(result["error"]).lower()
                 # Billing / quota errors: long cooldown (5h→12h→24h), not retried
                 if any(p in error_str for p in _BILLING_PATTERNS):
-                    _cd = _load_cooldowns()
-                    _billing_failures = _cd.get(model, {}).get("failures", 0)
-                    _billing_step = min(_billing_failures, len(_BILLING_COOLDOWN_STEPS) - 1)
-                    _billing_secs = _BILLING_COOLDOWN_STEPS[_billing_step]
-                    log.warning(
-                        f"[BILLING] {model} billing/quota error — cooldown {_billing_secs//3600}h "
-                        f"(failure #{_billing_failures + 1}): {result['error']}"
-                    )
-                    _record_model_failure(model, cooldown_seconds=_billing_secs)
+                    # Read failure count under lock to avoid stale reads
+                    _record_billing_failure(model, result.get("error", ""))
                     result["_failed"] = True
                     result["_billing_error"] = True
                     return result
